@@ -1,0 +1,67 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
+
+export const PROJECT_ROOT = path.resolve(CURRENT_DIR, "../..");
+
+function loadLocalEnv() {
+  for (const fileName of [".env.local", ".env"]) {
+    const envPath = path.join(PROJECT_ROOT, fileName);
+    if (!fs.existsSync(envPath)) continue;
+
+    for (const sourceLine of fs.readFileSync(envPath, "utf8").split(/\r?\n/)) {
+      const line = sourceLine.trim();
+      if (!line || line.startsWith("#")) continue;
+
+      const separator = line.indexOf("=");
+      if (separator < 0) continue;
+
+      const name = line.slice(0, separator).trim();
+      const value = line
+        .slice(separator + 1)
+        .trim()
+        .replace(/^(['"])(.*)\1$/, "$2");
+
+      if (!process.env[name]) process.env[name] = value;
+    }
+  }
+}
+
+loadLocalEnv();
+
+export const TOUR_API_KEY = process.env.TOUR_API_KEY?.trim() ?? "";
+
+export const TOUR_API_SERVICES = Object.freeze({
+  korean: {
+    label: "국문 관광정보",
+    baseUrl: "https://apis.data.go.kr/B551011/KorService2",
+  },
+  english: {
+    label: "영문 관광정보",
+    baseUrl: "https://apis.data.go.kr/B551011/EngService2",
+  },
+  barrierFree: {
+    label: "무장애 여행정보",
+    baseUrl: "https://apis.data.go.kr/B551011/KorWithService2",
+  },
+});
+
+export const TOUR_API_COMMON_PARAMS = Object.freeze({
+  MobileOS: "ETC",
+  MobileApp: "SafeHour",
+  _type: "json",
+});
+
+export const TOUR_API_DAILY_LIMIT = 1_000;
+export const TOUR_API_WARNING_AT = 800;
+
+export const TOUR_API_PATHS = Object.freeze({
+  logs: path.join(PROJECT_ROOT, "logs", "tour-api"),
+  cache: path.join(PROJECT_ROOT, ".cache", "tour-api"),
+});
+
+for (const directory of Object.values(TOUR_API_PATHS)) {
+  fs.mkdirSync(directory, { recursive: true });
+}

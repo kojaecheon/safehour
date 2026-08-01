@@ -1,0 +1,42 @@
+name: SafeHour CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: safehour-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: 소스 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      - name: 정적 검사
+        run: npm run lint
+
+      - name: 자동 테스트
+        run: npm test
+
+      - name: 프로덕션 빌드
+        run: npm run build
+
+      - name: 운영 의존성 보안 감사
+        run: npm run audit

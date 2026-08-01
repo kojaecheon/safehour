@@ -1,0 +1,413 @@
+/* SafeHour 모바일 웹 — D08 안전 우선 원칙
+   - 본문 최소 16px, 터치 대상 최소 44px
+   - 상태는 색상만으로 구분하지 않는다 (텍스트 라벨 병행)
+   - NO_TOURISM은 오류가 아닌 정상 결과 — error 스타일 금지 */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --ink: #1a2233;
+  --ink-soft: #55617a;
+  --line: #e3e7ee;
+  /* 입력 필드 경계 전용 — 흰 배경 위 3:1 이상 (WCAG 1.4.11) */
+  --line-input: #8a94a8;
+  --brand: #1554c4;
+  --brand-ink: #ffffff;
+
+  /* 판정 상태 색 — 의료 경고처럼 보이지 않도록 차분한 톤 */
+  --state-no-tourism-bg: #fdf0f2;
+  --state-no-tourism-ink: #8f2440;
+  --state-no-tourism-line: #f0c8d1;
+  --state-standby-bg: #fdf6e8;
+  --state-standby-ink: #7a5410;
+  --state-standby-line: #efdcb2;
+  --state-split-bg: #eef5fd;
+  --state-split-ink: #1a4f8a;
+  --state-split-line: #c8ddf2;
+  --state-together-bg: #eef8f0;
+  --state-together-ink: #1f6b39;
+  --state-together-line: #c6e6cf;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
+    'Noto Sans KR', 'Segoe UI', sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+.app-shell {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+main.page {
+  flex: 1;
+  padding: 20px 16px 120px;
+}
+
+h1 { font-size: 24px; line-height: 1.3; }
+h2 { font-size: 18px; margin-bottom: 10px; }
+h3 { font-size: 16px; }
+p  { color: var(--ink-soft); }
+strong { color: var(--ink); }
+
+a { color: inherit; text-decoration: none; }
+
+/* ── 카드 ── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+/* ── 의료 경계 콜아웃 (D08-CMP002) ── */
+.medical-callout {
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 15px;
+  color: var(--ink-soft);
+  margin-bottom: 14px;
+}
+
+/* ── 상태 배너 (D08-CMP006) ── */
+.state-banner {
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 14px;
+  border: 1px solid;
+}
+.state-banner .state-label {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+.state-banner h2 { margin-bottom: 4px; }
+/* opacity 감산 금지 — 15px 본문이 STANDBY·TOGETHER 배경 위에서 4.5:1 미달됨 */
+.state-banner p { font-size: 15px; color: inherit; }
+
+.state-NO_TOURISM  { background: var(--state-no-tourism-bg);  color: var(--state-no-tourism-ink);  border-color: var(--state-no-tourism-line); }
+.state-STANDBY     { background: var(--state-standby-bg);     color: var(--state-standby-ink);     border-color: var(--state-standby-line); }
+.state-SPLIT_NEARBY{ background: var(--state-split-bg);       color: var(--state-split-ink);       border-color: var(--state-split-line); }
+.state-TOGETHER    { background: var(--state-together-bg);    color: var(--state-together-ink);    border-color: var(--state-together-line); }
+
+/* ── 폼 ── */
+.field { margin-bottom: 14px; }
+.field > label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.field .hint { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+
+input[type='text'],
+input[type='number'],
+input[type='datetime-local'],
+select {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  font-size: 16px;
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+}
+::placeholder { color: var(--ink-soft); }
+
+/* 키보드 포커스 — UA 기본에 맡기지 않고 3:1 이상 링을 명시한다 */
+:focus-visible {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+.btn:focus-visible,
+.btn-return:focus-visible {
+  outline-color: var(--ink);
+}
+/* 카드형 라디오·토글은 내부 22~28px 입력이 아니라 카드 전체로 포커스를 표시한다 */
+.radio-option:focus-within,
+.toggle-row:focus-within {
+  box-shadow: 0 0 0 2px var(--brand);
+  border-radius: var(--radius-sm);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-row .label { font-size: 16px; }
+.toggle-row .sub { display: block; font-size: 13px; color: var(--ink-soft); }
+.toggle-row input[type='checkbox'] {
+  width: 28px;
+  height: 28px;
+  accent-color: var(--brand);
+  flex-shrink: 0;
+}
+
+.radio-group { display: flex; flex-direction: column; gap: 8px; }
+.radio-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  min-height: 48px;
+  background: var(--surface);
+}
+.radio-option input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
+.radio-option .sub { display: block; font-size: 13px; color: var(--ink-soft); }
+.radio-option.selected { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+
+/* ── 버튼 ── */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 16px;
+  font-size: 17px;
+  font-weight: 700;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.btn-small {
+  min-height: 44px;
+  font-size: 15px;
+  width: auto;
+  padding: 8px 14px;
+}
+.btn-return {
+  background: #8f2440;
+  color: #fff;
+}
+
+/* ── 추천 카드 (D08-CMP008) ── */
+.course-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.course-card .title-row { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.course-card h3 { font-size: 17px; }
+.course-card .meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 8px;
+  font-size: 16px; /* 이동시간·복귀 여유 등 안전 판단 정보 — 본문 최소 16px */
+  color: var(--ink-soft);
+}
+
+.badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  background: var(--bg);
+  white-space: nowrap;
+}
+.badge-estimate { border-color: var(--state-standby-line); color: var(--state-standby-ink); background: var(--state-standby-bg); }
+.badge-lang { border-color: var(--state-split-line); color: var(--state-split-ink); background: var(--state-split-bg); }
+
+/* ── 제외 사유 ── */
+.excluded-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+.excluded-item:last-child { border-bottom: none; }
+.excluded-item .name { font-weight: 600; color: var(--ink); }
+.excluded-item .reasons { color: var(--ink-soft); }
+
+details.disclosure > summary {
+  list-style: none;
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
+details.disclosure > summary::after { content: '▾' / ''; color: var(--ink-soft); }
+details.disclosure[open] > summary::after { content: '▴' / ''; }
+
+/* ── 탭 ── */
+.tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.tabs button {
+  flex: 1;
+  min-height: 46px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  border-bottom: 3px solid transparent;
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+/* 선택 상태는 색상 외에 하단 바 + 굵기로도 구분한다 (D08 색상 단독 구분 금지) */
+.tabs button[aria-selected='true'] {
+  border-color: var(--brand);
+  border-bottom: 3px solid var(--brand);
+  color: var(--brand);
+  font-weight: 700;
+  background: #f0f5ff;
+}
+
+/* ── 변화 델타 ── */
+.delta-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 0;
+  font-size: 16px; /* 무엇이 왜 바뀌었는지 전달하는 본문 — 최소 16px */
+  border-bottom: 1px solid var(--line);
+}
+.delta-row:last-child { border-bottom: none; }
+.delta-tag { flex-shrink: 0; font-weight: 700; font-size: 13px; padding: 2px 8px; border-radius: 6px; }
+.delta-removed  { background: var(--state-no-tourism-bg); color: var(--state-no-tourism-ink); }
+.delta-added    { background: var(--state-together-bg);   color: var(--state-together-ink); }
+.delta-shortened{ background: var(--state-standby-bg);    color: var(--state-standby-ink); }
+.delta-state    { background: var(--state-split-bg);      color: var(--state-split-ink); }
+
+/* ── 하단 고정 복귀 CTA (D08-CMP012) ── */
+.sticky-return {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 70%, transparent);
+}
+
+/* ── 모달 시트 ── */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 26, 40, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+}
+.sheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--surface);
+  border-radius: 18px 18px 0 0;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  max-height: 85dvh;
+  overflow-y: auto;
+}
+
+/* ── 기타 ── */
+.top-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.top-bar .brand { font-weight: 800; font-size: 17px; color: var(--brand); }
+.top-bar .back {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 22px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ink);
+}
+
+.source-note {
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 12px 4px;
+}
+
+.loading-block {
+  text-align: center;
+  padding: 48px 16px;
+  color: var(--ink-soft);
+}
+
+/* 스피너 기본 형태는 항상 보이고, 회전만 모션 허용 시 적용한다 */
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--line);
+  border-top-color: var(--brand);
+  border-radius: 50%;
+  margin: 0 auto 12px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .spinner { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+}
+
+/* aria-disabled 버튼 — 포커스는 유지하되(키보드 위치 보존) 시각적으로 비활성 표시.
+   opacity 감산 대신 색 교체로 텍스트 대비를 유지한다 */
+.btn[aria-disabled='true'] {
+  background: var(--bg);
+  color: var(--ink-soft);
+  border-color: var(--line);
+  cursor: not-allowed;
+}

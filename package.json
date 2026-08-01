@@ -1,0 +1,37 @@
+{
+  "name": "safehour",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "test": "node --test test/*.test.js",
+    "test:coverage": "node --test --experimental-test-coverage test/*.test.js",
+    "test:engine": "node --test test/scenarios.test.js",
+    "test:tour-api": "node scripts/test-tour-api.mjs",
+    "analyze:gangnam": "node scripts/analyze-gangnam-data.mjs",
+    "demo:live": "node scripts/run-live-safehour-scenario.mjs",
+    "demo:engine": "node demo/run-scenarios.js",
+    "audit": "npm audit --omit=dev --audit-level=high",
+    "check": "npm run lint && npm test && npm run build && npm run audit"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "dependencies": {
+    "next": "^16.2.12",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.12"
+  },
+  "overrides": {
+    "postcss": "8.5.25",
+    "sharp": "0.35.3"
+  }
+}
