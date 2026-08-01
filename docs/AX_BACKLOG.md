@@ -7,7 +7,7 @@
 | ID | 작업 | 연결 | 완료 조건 | 상태 |
 | --- | --- | --- | --- | --- |
 | AX-001 | 저장소·CI·lint·audit 기준선 구성 | D04 G3, D09-RG003 | `npm run check`, CI 파일, Git main | 완료 |
-| AX-002 | 내부 API schema·오류 계약 고정 | F001–F002, API007–009, AC001–003 | 유효/무효 payload 계약 테스트, 일관된 오류코드 | 대기 |
+| AX-002 | 내부 API schema·오류 계약 고정 | F001–F002, API007–009, AC001–003 | 유효/무효 payload 계약 테스트, 일관된 오류코드 | 완료 — `docs/API_CONTRACT.md`, `test/api-contract.test.js` (84/84) |
 | AX-003 | D03 라우트·화면 계약 결정 | SCR002–SCR006, F013 | 합쳐진 `/plan` 승인 또는 단계 라우트 분리 ADR | 결정 필요 |
 | AX-004 | 핵심 흐름 E2E 구축 | AC018, QA033–040 | 입력→결과→휴무 대체→즉시 복귀, 360px, GPS 요청 0 | 대기 |
 | AX-005 | 장소 상세 SCR006 구현 | SCR006, F009, AC016 | 원문/추정/저작권 분리, 누락 상태 표시 | 대기 |
