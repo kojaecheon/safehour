@@ -21,19 +21,43 @@ function kstDate() {
   }).format(new Date());
 }
 
-function callLogPath() {
-  return path.join(TOUR_API_PATHS.logs, `calls-${kstDate()}.jsonl`);
+function callLogPath(day = kstDate()) {
+  return path.join(TOUR_API_PATHS.logs, `calls-${day}.jsonl`);
 }
 
-function counterPath() {
-  return path.join(TOUR_API_PATHS.logs, `counter-${kstDate()}.json`);
+function counterPath(day = kstDate()) {
+  return path.join(TOUR_API_PATHS.logs, `counter-${day}.json`);
 }
 
-function readCounter() {
+/** 카운터를 신뢰할 수 없을 때 던진다 — 조용히 0 으로 되돌리지 않는다 */
+export class CounterIntegrityError extends Error {}
+
+/**
+ * 파일 없음(=새 날, 정상적으로 0회)과 손상(=카운트를 잃어버림)을 구분한다.
+ * 손상을 {} 로 삼키면 한도 차단이 통째로 사라지고, 복구하려 덮어쓰는 순간
+ * 살아 있던 다른 operation 카운트까지 영구 소실된다.
+ */
+function readCounter(day) {
+  let raw;
   try {
-    return JSON.parse(fs.readFileSync(counterPath(), "utf8"));
+    raw = fs.readFileSync(counterPath(day), "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return {};
+    throw new CounterIntegrityError(
+      `호출 카운터를 읽을 수 없어 한도를 확인할 수 없습니다: ${error.code}`,
+    );
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("객체가 아님");
+    }
+    return parsed;
   } catch {
-    return {};
+    throw new CounterIntegrityError(
+      "호출 카운터 파일이 손상돼 한도를 확인할 수 없습니다.",
+    );
   }
 }
 
@@ -44,18 +68,25 @@ function readCounter() {
  * 검사와 증가를 분리하면(검사 → await fetch → 증가) 병렬 호출이 모두
  * 같은 값을 읽어 한도를 넘겨 호출한다. 그래서 fetch 전에 예약한다.
  */
-function reserveCallSlot(operationKey) {
-  const counter = readCounter();
+function reserveCallSlot(operationKey, day) {
+  const counter = readCounter(day);
   const current = counter[operationKey] ?? 0;
   if (current >= TOUR_API_DAILY_LIMIT) return null;
 
   counter[operationKey] = current + 1;
-  fs.writeFileSync(counterPath(), `${JSON.stringify(counter, null, 2)}\n`, "utf8");
+
+  // 임시 파일에 쓰고 rename 으로 교체한다. truncate 후 write 는 원자적이지 않아
+  // 프로세스 종료·다중 프로세스에서 부분 파일이 남고, 그 파일이 곧 카운트 소실이다.
+  const target = counterPath(day);
+  const temp = `${target}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, `${JSON.stringify(counter, null, 2)}\n`, "utf8");
+  fs.renameSync(temp, target);
+
   return counter[operationKey];
 }
 
 function appendCallLog(entry) {
-  fs.appendFileSync(callLogPath(), `${JSON.stringify(entry)}\n`, "utf8");
+  fs.appendFileSync(callLogPath(entry.kstDate), `${JSON.stringify(entry)}\n`, "utf8");
 }
 
 function encodeServiceKey(serviceKey) {
@@ -119,9 +150,10 @@ export function tourTotalCount(result) {
 }
 
 export function tourApiCounterSummary() {
-  const byOperation = readCounter();
+  const day = kstDate();
+  const byOperation = readCounter(day);
   return {
-    date: kstDate(),
+    date: day,
     byOperation,
     total: Object.values(byOperation).reduce((sum, count) => sum + count, 0),
   };
@@ -143,6 +175,9 @@ export async function callTourApi({
   if (!TOUR_API_KEY) throw new Error("TOUR_API_KEY가 설정되지 않았습니다.");
 
   const operationKey = `${serviceName}.${operation}`;
+  // 호출당 KST 날짜를 한 번만 정한다. 읽기·쓰기·로그가 각자 시계를 읽으면
+  // 자정 경계에서 어제 카운터를 오늘 파일에 써 새 날이 어제 누적치로 시작한다.
+  const day = kstDate();
 
   const cacheFile = path.join(
     TOUR_API_PATHS.cache,
@@ -163,7 +198,7 @@ export async function callTourApi({
   // 한도 예약(reserve): 검사와 증가를 한 번의 읽기-쓰기로 묶는다.
   // 상위에서 Promise.all 로 동시 호출해도 각 호출이 서로 다른 번호를 받아야
   // operation별 1,000회 차단(D07-POL005)이 초과 호출을 허용하지 않는다.
-  const dailyCount = reserveCallSlot(operationKey);
+  const dailyCount = reserveCallSlot(operationKey, day);
   if (dailyCount === null) {
     throw new Error(
       `TourAPI 일일 한도 초과: ${operationKey} (${TOUR_API_DAILY_LIMIT}/${TOUR_API_DAILY_LIMIT})`,
@@ -212,7 +247,7 @@ export async function callTourApi({
 
   appendCallLog({
     timestamp: new Date().toISOString(),
-    kstDate: kstDate(),
+    kstDate: day,
     serviceName,
     serviceLabel: service.label,
     operation,

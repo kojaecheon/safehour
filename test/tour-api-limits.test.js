@@ -309,6 +309,56 @@ describe('캐시 경계 (D06-E006)', () => {
   });
 });
 
+describe('카운터 파일 무결성', () => {
+  test('손상된 카운터로는 한도 차단이 무력화되지 않는다', async () => {
+    // 부분 기록으로 잘린 파일 — 한도를 소진한 상태였는지 알 수 없다
+    fs.writeFileSync(counterFile(), '{"korean.locationBasedList2": 1000,', 'utf8');
+    const { impl, state } = countingFetch();
+
+    await assert.rejects(
+      () => callTourApi({ ...OP, parameters: uniqueParams(60), useCache: false, fetchImpl: impl }),
+      /카운터/,
+      '카운터를 신뢰할 수 없는데 외부 호출을 허용했다',
+    );
+    assert.equal(state.calls, 0);
+  });
+
+  test('손상된 카운터를 0 으로 덮어써 다른 operation 카운트를 지우지 않는다', async () => {
+    fs.writeFileSync(counterFile(), '{"korean.locationBasedList2": 1000,', 'utf8');
+    const { impl } = countingFetch();
+
+    await assert.rejects(() =>
+      callTourApi({ ...OP, parameters: uniqueParams(61), useCache: false, fetchImpl: impl }),
+    );
+
+    // 복구를 빌미로 파일을 통째로 재작성하면 살아있던 다른 카운트가 사라진다
+    const raw = fs.readFileSync(counterFile(), 'utf8');
+    assert.equal(raw.startsWith('{"korean.locationBasedList2": 1000,'), true, '손상 파일을 덮어썼다');
+  });
+
+  test('카운터 파일이 없으면 새 날로 보고 정상 진행한다', async () => {
+    fs.rmSync(counterFile(), { force: true });
+    const { impl, state } = countingFetch();
+
+    await callTourApi({ ...OP, parameters: uniqueParams(62), useCache: false, fetchImpl: impl });
+
+    assert.equal(state.calls, 1);
+    assert.equal(tourApiCounterSummary().byOperation[OP_KEY], 1);
+  });
+
+  test('카운터 쓰기는 원자적이라 중간 상태가 남지 않는다', async () => {
+    const { impl } = countingFetch();
+    await callTourApi({ ...OP, parameters: uniqueParams(63), useCache: false, fetchImpl: impl });
+
+    // 임시 파일이 남아 다음 읽기를 오염시키면 안 된다
+    const strays = fs
+      .readdirSync(TOUR_API_PATHS.logs)
+      .filter((f) => f.includes('.tmp') || f.endsWith('~'));
+    assert.deepEqual(strays, [], `임시 파일이 남았다: ${strays.join(', ')}`);
+    assert.doesNotThrow(() => JSON.parse(fs.readFileSync(counterFile(), 'utf8')));
+  });
+});
+
 describe('로그 안전성 (AGENTS.md 불변조건)', () => {
   test('인증키와 전체 query URL 이 호출 로그에 남지 않는다', async () => {
     const { impl, state } = countingFetch();

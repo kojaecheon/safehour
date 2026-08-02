@@ -77,6 +77,9 @@ async function fetchLocationList({
   });
 }
 
+/** 조회 실패 표식 — "데이터 없음(null)"과 구분한다 */
+const FAILED = Symbol("barrier-detail-failed");
+
 async function fetchBarrierDetails(items, detailLimit, useCache) {
   const selected = items.slice(0, detailLimit);
   const entries = await Promise.all(
@@ -97,12 +100,21 @@ async function fetchBarrierDetails(items, detailLimit, useCache) {
       } catch {
         // 무장애 상세는 보강 신호다. 실패해도 후보 자체를 잃지 않는다.
         // 신호가 없으면 보행부담 보정을 적용하지 않을 뿐이다 (D04-BR012).
-        return [String(item.contentid), null];
+        return [String(item.contentid), FAILED];
       }
     }),
   );
 
-  return new Map(entries);
+  // 조회 실패와 "조회했으나 데이터 없음"을 구분한다. 실패를 성공처럼 세면
+  // 증빙 문서의 barrierDetailCount 가 실제보다 부풀려진다.
+  const details = new Map(
+    entries.filter(([, value]) => value !== FAILED),
+  );
+  const failedIds = entries
+    .filter(([, value]) => value === FAILED)
+    .map(([contentId]) => contentId);
+
+  return { details, failedIds };
 }
 
 /**
@@ -176,11 +188,12 @@ export async function loadSafeHourCandidates({
   const matchedBarrierItems = barrierMatches
     .map((match) => match.localized)
     .filter(Boolean);
-  const barrierDetails = await fetchBarrierDetails(
-    matchedBarrierItems,
-    Math.max(0, Number(barrierDetailLimit) || 0),
-    useCache,
-  );
+  const { details: barrierDetails, failedIds: barrierDetailFailedIds } =
+    await fetchBarrierDetails(
+      matchedBarrierItems,
+      Math.max(0, Number(barrierDetailLimit) || 0),
+      useCache,
+    );
 
   const candidates = koreanItems.map((korean) => {
     const koreanId = String(korean.contentid);
@@ -219,7 +232,9 @@ export async function loadSafeHourCandidates({
         english: summarizeMatches(englishMatches),
         barrierFree: summarizeMatches(barrierMatches),
       },
+      // 조회에 성공한 건수만 센다 (실패는 barrierDetailFailed 로 분리)
       barrierDetailCount: barrierDetails.size,
+      barrierDetailFailed: barrierDetailFailedIds.length,
     },
   };
 }

@@ -149,6 +149,34 @@ describe('부분 실패와 폴백 (D02-S001 대체 흐름)', () => {
     assert.equal(result.candidates.length, 1);
   });
 
+  test('무장애 상세 실패는 성공 건수로 집계되지 않는다', async () => {
+    stubServices({
+      korean: [listItem(1, '코엑스')],
+      english: [],
+      barrierFree: [listItem(1, '코엑스')],
+      detail: null, // 상세만 장애
+    });
+
+    const result = await loadSafeHourCandidates({ origin: ORIGIN, useCache: false });
+
+    assert.equal(result.diagnostics.barrierDetailCount, 0, '실패를 성공으로 셌다');
+    assert.equal(result.diagnostics.barrierDetailFailed, 1);
+  });
+
+  test('무장애 상세가 성공하면 성공 건수로 집계된다', async () => {
+    stubServices({
+      korean: [listItem(1, '코엑스')],
+      english: [],
+      barrierFree: [listItem(1, '코엑스')],
+      detail: [{ contentid: '1', wheelchair: '있음' }],
+    });
+
+    const result = await loadSafeHourCandidates({ origin: ORIGIN, useCache: false });
+
+    assert.equal(result.diagnostics.barrierDetailCount, 1);
+    assert.equal(result.diagnostics.barrierDetailFailed, 0);
+  });
+
   test('국문 조회가 실패하면 안전한 미추천으로 간다 (임의 후보 생성 금지)', async () => {
     stubServices({ korean: null, english: [listItem(1, 'COEX')], barrierFree: [] });
 
