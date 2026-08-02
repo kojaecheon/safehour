@@ -81,18 +81,24 @@ async function fetchBarrierDetails(items, detailLimit, useCache) {
   const selected = items.slice(0, detailLimit);
   const entries = await Promise.all(
     selected.map(async (item) => {
-      const result = await callTourApi({
-        serviceName: "barrierFree",
-        operation: "detailWithTour2",
-        parameters: {
-          contentId: String(item.contentid),
-          numOfRows: "10",
-          pageNo: "1",
-        },
-        useCache,
-      });
+      try {
+        const result = await callTourApi({
+          serviceName: "barrierFree",
+          operation: "detailWithTour2",
+          parameters: {
+            contentId: String(item.contentid),
+            numOfRows: "10",
+            pageNo: "1",
+          },
+          useCache,
+        });
 
-      return [String(item.contentid), extractTourItems(result)[0] ?? null];
+        return [String(item.contentid), extractTourItems(result)[0] ?? null];
+      } catch {
+        // 무장애 상세는 보강 신호다. 실패해도 후보 자체를 잃지 않는다.
+        // 신호가 없으면 보행부담 보정을 적용하지 않을 뿐이다 (D04-BR012).
+        return [String(item.contentid), null];
+      }
     }),
   );
 
@@ -113,7 +119,10 @@ export async function loadSafeHourCandidates({
   const query = validateCandidateQuery({ origin, radiusMeters });
   const boundedRows = Math.min(Math.max(Number(numOfRows) || 1, 1), 1_000);
 
-  const [koreanResult, englishResult, barrierResult] = await Promise.all([
+  // 국문 관광정보는 후보의 근간이므로 실패하면 안전한 미추천으로 간다 (D06-E005).
+  // 영문·무장애는 보강 데이터이므로 실패해도 국문 후보로 서비스를 계속한다
+  // (D02-S001 대체 흐름: 영문이 없으면 국문 폴백과 번역 필요 상태를 표시).
+  const [koreanSettled, englishSettled, barrierSettled] = await Promise.allSettled([
     fetchLocationList({
       serviceName: "korean",
       ...query,
@@ -133,6 +142,18 @@ export async function loadSafeHourCandidates({
       useCache,
     }),
   ]);
+
+  if (koreanSettled.status === "rejected") throw koreanSettled.reason;
+
+  const koreanResult = koreanSettled.value;
+  const englishResult =
+    englishSettled.status === "fulfilled" ? englishSettled.value : null;
+  const barrierResult =
+    barrierSettled.status === "fulfilled" ? barrierSettled.value : null;
+  const degraded = {
+    english: englishSettled.status === "rejected",
+    barrierFree: barrierSettled.status === "rejected",
+  };
 
   const koreanItems = extractTourItems(koreanResult);
   const englishItems = extractTourItems(englishResult);
@@ -182,6 +203,8 @@ export async function loadSafeHourCandidates({
     radiusMeters: query.radiusMeters,
     candidates,
     diagnostics: {
+      // 폴백이 일어났으면 화면이 불확실성을 표시할 수 있게 남긴다
+      degraded,
       totals: {
         korean: tourTotalCount(koreanResult),
         english: tourTotalCount(englishResult),

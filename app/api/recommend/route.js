@@ -102,6 +102,8 @@ export async function POST(request) {
     },
     diagnostics: {
       candidateCount: candidateResult.candidates.length,
+      // 영문·무장애 조회가 실패해 국문으로 폴백했는지 — 화면이 불확실성을 표시한다
+      degraded: candidateResult.diagnostics.degraded,
       totals: candidateResult.diagnostics.totals,
       matching: {
         english: candidateResult.diagnostics.matching.english.matched,

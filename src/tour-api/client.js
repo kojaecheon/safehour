@@ -37,9 +37,19 @@ function readCounter() {
   }
 }
 
-function bumpCounter(operationKey) {
+/**
+ * 호출 슬롯을 예약한다. 읽기·한도검사·증가·쓰기가 모두 동기이므로
+ * 중간에 다른 비동기 호출이 끼어들 수 없다. 한도에 도달했으면 null.
+ *
+ * 검사와 증가를 분리하면(검사 → await fetch → 증가) 병렬 호출이 모두
+ * 같은 값을 읽어 한도를 넘겨 호출한다. 그래서 fetch 전에 예약한다.
+ */
+function reserveCallSlot(operationKey) {
   const counter = readCounter();
-  counter[operationKey] = (counter[operationKey] ?? 0) + 1;
+  const current = counter[operationKey] ?? 0;
+  if (current >= TOUR_API_DAILY_LIMIT) return null;
+
+  counter[operationKey] = current + 1;
   fs.writeFileSync(counterPath(), `${JSON.stringify(counter, null, 2)}\n`, "utf8");
   return counter[operationKey];
 }
@@ -75,7 +85,12 @@ function createCacheKey(serviceName, operation, parameters) {
 function readFreshCache(cacheFile, ttlMs) {
   try {
     const stat = fs.statSync(cacheFile);
-    if (Date.now() - stat.mtimeMs > ttlMs) return null;
+    // 경계는 만료 쪽으로 판정한다 — ttl 0 은 "캐시를 쓰지 않는다"는 뜻이어야 하고,
+    // stale 데이터를 신선한 사실로 바꾸지 않는 보수적 방향이다.
+    // mtimeMs 는 소수점 밀리초라 방금 쓴 파일도 Date.now() 보다 미세하게 클 수 있다.
+    // 음수 age 는 "방금 씀"으로 보고 0 으로 클램프한다.
+    const ageMs = Math.max(0, Date.now() - stat.mtimeMs);
+    if (ageMs >= ttlMs) return null;
     return JSON.parse(fs.readFileSync(cacheFile, "utf8"));
   } catch {
     return null;
@@ -121,24 +136,20 @@ export async function callTourApi({
   parameters = {},
   useCache = true,
   cacheTtlMs = DEFAULT_CACHE_TTL_MS,
+  fetchImpl = fetch,
 }) {
   const service = TOUR_API_SERVICES[serviceName];
   if (!service) throw new Error(`알 수 없는 TourAPI 서비스: ${serviceName}`);
   if (!TOUR_API_KEY) throw new Error("TOUR_API_KEY가 설정되지 않았습니다.");
 
   const operationKey = `${serviceName}.${operation}`;
-  const currentCount = readCounter()[operationKey] ?? 0;
-  if (currentCount >= TOUR_API_DAILY_LIMIT) {
-    throw new Error(
-      `TourAPI 일일 한도 초과: ${operationKey} (${currentCount}/${TOUR_API_DAILY_LIMIT})`,
-    );
-  }
 
   const cacheFile = path.join(
     TOUR_API_PATHS.cache,
     `${createCacheKey(serviceName, operation, parameters)}.json`,
   );
 
+  // 캐시 적중은 외부 호출이 아니므로 한도 검사·카운터 증가 대상이 아니다.
   if (useCache) {
     const cached = readFreshCache(cacheFile, cacheTtlMs);
     if (cached) {
@@ -149,6 +160,16 @@ export async function callTourApi({
     }
   }
 
+  // 한도 예약(reserve): 검사와 증가를 한 번의 읽기-쓰기로 묶는다.
+  // 상위에서 Promise.all 로 동시 호출해도 각 호출이 서로 다른 번호를 받아야
+  // operation별 1,000회 차단(D07-POL005)이 초과 호출을 허용하지 않는다.
+  const dailyCount = reserveCallSlot(operationKey);
+  if (dailyCount === null) {
+    throw new Error(
+      `TourAPI 일일 한도 초과: ${operationKey} (${TOUR_API_DAILY_LIMIT}/${TOUR_API_DAILY_LIMIT})`,
+    );
+  }
+
   const requestUrl = buildRequestUrl(service, operation, parameters);
   const startedAt = Date.now();
   let httpStatus = 0;
@@ -156,7 +177,7 @@ export async function callTourApi({
   let errorMessage = null;
 
   try {
-    const response = await fetch(requestUrl, {
+    const response = await fetchImpl(requestUrl, {
       headers: {
         Accept: "application/json",
         "User-Agent": "SafeHour/0.1 TourAPI client",
@@ -187,7 +208,6 @@ export async function callTourApi({
     errorMessage = error.message;
   }
 
-  const dailyCount = bumpCounter(operationKey);
   const elapsedMs = Date.now() - startedAt;
 
   appendCallLog({
