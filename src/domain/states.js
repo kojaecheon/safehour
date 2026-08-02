@@ -78,6 +78,8 @@ export const REASON = {
   PATIENT_RECALLED: 'PATIENT_RECALLED',
   NON_TOURISM_ACTIVITY: 'NON_TOURISM_ACTIVITY',
   NO_CANDIDATE: 'NO_CANDIDATE',
+  /** 운영자가 추천을 전면 중단시킨 상태 (kill switch) */
+  SERVICE_PAUSED: 'SERVICE_PAUSED',
 };
 
 export const REASON_TEXT = {
@@ -102,4 +104,8 @@ export const REASON_TEXT = {
   [REASON.PATIENT_RECALLED]: { ko: '환자 또는 병원이 복귀를 요청했습니다', en: 'Patient or hospital requested return' },
   [REASON.NON_TOURISM_ACTIVITY]: { ko: '관광 활동 장소가 아니어서 제외했습니다', en: 'Excluded because it is not a tourism activity' },
   [REASON.NO_CANDIDATE]: { ko: '조건을 통과한 후보가 없습니다', en: 'No candidate passed the conditions' },
+  [REASON.SERVICE_PAUSED]: {
+    ko: '점검을 위해 추천을 일시 중단했습니다. 병원 안내를 먼저 따르세요',
+    en: 'Recommendations are paused for maintenance. Please follow your hospital guidance',
+  },
 };

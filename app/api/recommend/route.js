@@ -16,6 +16,7 @@ import {
   normalizeReturnBy,
   normalizeRoles,
 } from '../../../lib/server/engine-io.js';
+import { isRecommendationKilled, killSwitchDecision } from '../../../lib/server/runtime-flags.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,29 @@ export async function POST(request) {
       return Response.json({ ok: false, errorCode: 'SAFEHOUR_CONDITION_INVALID', message: error.message }, { status: 400 });
     }
     throw error;
+  }
+
+  // ── kill switch — 판정도 외부 호출도 하지 않고 즉시 미추천으로 응답한다 ──
+  // 위험 추천이 발견됐을 때 배포를 기다리지 않고 차단하기 위한 경로다 (D06-E014).
+  if (isRecommendationKilled()) {
+    return Response.json({
+      ok: true,
+      displayLimit: DISPLAY_LIMIT,
+      decision: killSwitchDecision(),
+      origin,
+      returnBy: returnBy.toISOString(),
+      travelTimeSource: 'none',
+      servicePaused: true,
+      // 재계산도 같은 이유로 차단되므로 후보를 실어 보내지 않는다
+      recalcPayload: {
+        origin,
+        returnBy: returnBy.toISOString(),
+        condition: { ...condition, issuedAt: condition.issuedAt.toISOString() },
+        roles,
+        candidates: [],
+        ctx: {},
+      },
+    });
   }
 
   // ── 기상 실황 (후보 조회와 병렬) — 실패해도 throw 하지 않는다 ──
