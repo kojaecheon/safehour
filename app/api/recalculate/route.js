@@ -20,6 +20,7 @@ import {
   normalizeRoles,
   toCumulativeEvent,
 } from '../../../lib/server/engine-io.js';
+import { isRecommendationKilled, killSwitchDecision } from '../../../lib/server/runtime-flags.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,32 @@ export async function POST(request) {
     body = await request.json();
   } catch {
     return Response.json({ ok: false, errorCode: 'SAFEHOUR_BAD_REQUEST', message: '요청 본문이 올바르지 않습니다.' }, { status: 400 });
+  }
+
+  // kill switch 가 켜져 있으면 재판정도 하지 않는다. 이벤트 종류와 무관하게
+  // 더 안전한 쪽(미추천)으로만 응답한다 (D06-E014).
+  if (isRecommendationKilled()) {
+    const paused = killSwitchDecision();
+    return Response.json({
+      ok: true,
+      displayLimit: DISPLAY_LIMIT,
+      servicePaused: true,
+      recalc: {
+        event: body.event ?? null,
+        before: { state: paused.state, courseIds: [] },
+        after: { state: paused.state, courseIds: [], reasons: paused.reasons },
+        delta: {
+          stateChanged: false,
+          removed: [],
+          added: [],
+          shortened: [],
+          newlyExcluded: [],
+          hasVisibleChange: true,
+        },
+        result: paused,
+      },
+      nextRecalcPayload: { ...(body.recalcPayload ?? {}), candidates: [], ctx: {} },
+    });
   }
 
   let engineInput, event, nextRecalcPayload;

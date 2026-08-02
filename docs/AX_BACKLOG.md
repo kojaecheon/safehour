@@ -26,7 +26,7 @@
 | AX-102 | 접근성·반응형 검증 | AC019, QA033–036 | axe, 키보드, 200%, 스크린리더, 실기기 | 자동 검증 완료 (axe 8화면·키보드 4·반응형 7) — **스크린리더·실기기는 사람 검증 필요** |
 | AX-103 | 지도·Directions ADR | F012, POL002 | 위치정보 검토, 공급자·폴백·비용 결정 | HUMAN |
 | AX-104 | 보존·동의 ADR | DB001–006, POL008 | 데이터별 보존·파기·동의 승인 | HUMAN |
-| AX-105 | 배포·feature flag·rollback | RG007–008 | preview/production, kill switch, canary, rollback 리허설 | 대기 |
+| AX-105 | 배포·feature flag·rollback | RG007–008 | preview/production, kill switch, canary, rollback 리허설 | 준비 완료 — `docs/DEPLOYMENT.md`, kill switch, `/api/health`. **Vercel 프로젝트 연결·환경변수·리허설은 운영자 실행 필요** |
 | AX-106 | 전문 signoff 패키지 | D07, AC020 | 의료·개인정보·위치·법무·콘텐츠 승인 증거 | HUMAN |
 
 ## P2 · 공모전 제출 완성도
