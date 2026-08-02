@@ -16,7 +16,9 @@
     "demo:live": "node scripts/run-live-safehour-scenario.mjs",
     "demo:engine": "node demo/run-scenarios.js",
     "audit": "npm audit --omit=dev --audit-level=high",
-    "check": "npm run lint && npm test && npm run build && npm run audit"
+    "check": "npm run lint && npm test && npm run build && npm run audit",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "engines": {
     "node": ">=20.9.0"
@@ -27,6 +29,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.12"
   },
