@@ -4,6 +4,7 @@
 // 360px 화면에서 끊김 없이 동작하고, 현재 GPS 를 한 번도 요구하지 않는다.
 
 import { test, expect } from '@playwright/test';
+import { submitPlan, assertNoHorizontalScroll } from './helpers.js';
 
 /** 현재 GPS 요청을 감시한다 — 한 번이라도 호출되면 D07-BAN002 위반이다 */
 async function watchGeolocation(page) {
@@ -25,36 +26,6 @@ async function watchGeolocation(page) {
 async function assertNoGpsRequest(page) {
   const calls = await page.evaluate(() => window.__gpsCalls ?? []);
   expect(calls, '현재 GPS 를 요청했다 (D07-BAN002 위반)').toEqual([]);
-}
-
-/** 360px 에서 가로 스크롤이 생기지 않아야 한다 (AC018) */
-async function assertNoHorizontalScroll(page, where) {
-  const overflow = await page.evaluate(() => ({
-    scrollWidth: document.documentElement.scrollWidth,
-    clientWidth: document.documentElement.clientWidth,
-  }));
-  expect(
-    overflow.scrollWidth,
-    `${where}: 360px 에서 가로 스크롤 발생 (${overflow.scrollWidth} > ${overflow.clientWidth})`,
-  ).toBeLessThanOrEqual(overflow.clientWidth + 1);
-}
-
-/** 병원 조건을 채우고 판정 결과까지 진행한다 */
-async function submitPlan(page) {
-  await page.goto('/plan');
-
-  // 기준점: 강남 시연 프리셋 (캐시 시드와 같은 좌표)
-  await expect(page.getByRole('heading', { name: '1. 병원·숙소 기준점' })).toBeVisible();
-
-  // 조건 발행 시각 — "방금 받음" 으로 채운다 (24시간 최신성 게이트)
-  await page.getByRole('button', { name: '방금 받음' }).click();
-  await expect(page.locator('#issued-at')).not.toHaveValue('');
-
-  // 외출 허용은 기본값이 없다. 명시적으로 선택해야 제출된다.
-  await page.getByText('외출이 허용되었습니다').click();
-
-  await page.getByRole('button', { name: '안전 판정으로 추천 받기' }).click();
-  await page.waitForURL('**/result');
 }
 
 test.describe('핵심 흐름 (AC018)', () => {

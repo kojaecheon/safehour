@@ -23,7 +23,9 @@ export default function StateBanner({ state, reasons = [], live = false }) {
     >
       <span className="state-label">{STATE_LABEL[state] ?? state}</span>
       <h2>{message.ko}</h2>
-      <p lang="en" style={{ opacity: 0.85, fontSize: 14 }}>{message.en}</p>
+      {/* opacity 로 흐리게 하면 배너 배경 위에서 4.5:1 을 넘지 못한다.
+          영문 병기는 보조 정보지만 안전 문구이므로 대비를 낮추지 않는다. */}
+      <p lang="en" style={{ fontSize: 14 }}>{message.en}</p>
       <p>{message.action.ko}</p>
       {reasons.length > 0 && (
         <ul style={{ marginTop: 8, paddingLeft: 18, fontSize: 14 }}>
