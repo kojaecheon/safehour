@@ -86,10 +86,26 @@ describe('POST /api/recalculate 계약', () => {
     assert.ok(data.message);
   });
 
-  test('후보 목록이 없으면 400 SAFEHOUR_RECALCULATION_INVALID', async () => {
+  test('후보 0건은 정상 결과이므로 재판정을 허용한다', async () => {
+    // 후보 0건은 STANDBY 라는 정상 결과다. 400 으로 막으면 그 상태에서
+    // 환자 호출·위험신호가 들어와도 재판정이 불가능해진다 (D04-BR011).
     const res = await recalculatePost(
       jsonRequest('http://test/api/recalculate', {
         recalcPayload: validRecalcPayload({ candidates: [] }),
+        event: { type: 'PATIENT_RECALL' },
+      }),
+    );
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.ok, true);
+    assert.equal(data.recalc.result.state, 'NO_TOURISM');
+    assert.equal(data.recalc.result.returnNow, true);
+  });
+
+  test('후보 목록이 배열이 아니면 400 SAFEHOUR_RECALCULATION_INVALID', async () => {
+    const res = await recalculatePost(
+      jsonRequest('http://test/api/recalculate', {
+        recalcPayload: validRecalcPayload({ candidates: null }),
         event: { type: 'WEATHER' },
       }),
     );

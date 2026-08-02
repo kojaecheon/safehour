@@ -55,7 +55,8 @@
 
 검증 규칙 (모두 `lib/server/engine-io.js` 의 normalize 계열이 정본):
 
-- `origin.lat/lng` 유한 수 필수. `label` 80자 절단.
+- `origin.lat/lng` 유한 수 필수이며 **대한민국 범위**(위도 33~39, 경도 124~132) 여야 한다.
+  범위를 벗어나면 외부 API 장애가 아니라 입력 오류(400)로 응답한다. `label` 80자 절단.
 - `condition.version` 필수(60자 절단), `issuedAt` 파싱 가능한 시각 필수.
 - `maxWalkMin`/`maxTravelMin` 0–240 클램프. boolean 필드는 truthy 강제 변환.
 - `escortRequired && splitAllowed` 동시 true 는 엔진이 `CONFLICTING_CONDITION` 으로
@@ -114,6 +115,10 @@
 누적 계약: 수치 이벤트는 payload `ctx` 의 기존 값과 합산한 **총량**으로 판정하며,
 응답의 `nextRecalcPayload.ctx` 에는 판정에 쓴 것과 **동일한 총량**이 저장된다
 (`recalc.event` 에서 실제 적용된 총량을 확인할 수 있다).
+
+**후보 0건 계약**: `candidates: []` 는 오류가 아니다. 후보 0건은 STANDBY 라는 정상
+결과이며, 그 상태에서도 환자 호출·위험신호 재판정이 가능해야 한다 (D04-BR011).
+배열이 아닌 값만 400 으로 거부한다.
 
 ### 응답 (200)
 
