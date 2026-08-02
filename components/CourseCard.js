@@ -4,6 +4,7 @@
 // 원천 관광정보와 SafeHour 추정값을 시각적으로 구분한다.
 // 이동시간이 폴백 추정이면 반드시 "추정" 배지를 붙인다 (D06-E011).
 
+import Link from 'next/link';
 import { minutesLabel } from '@/lib/format.js';
 
 export default function CourseCard({ candidate, rank, mode }) {
@@ -39,6 +40,15 @@ export default function CourseCard({ candidate, rank, mode }) {
         </span>
         {candidate.walkMin != null && <span>보행 약 {minutesLabel(candidate.walkMin)}</span>}
       </div>
+      {/* 상세 CTA (D03-SCR005 추천 카드 표시 항목 · NAV002) */}
+      <Link
+        href={`/place/${encodeURIComponent(candidate.id)}`}
+        className="btn btn-secondary btn-small"
+        style={{ marginTop: 10 }}
+      >
+        추천 근거와 원문 보기
+        <span className="visually-hidden"> — {candidate.title}</span>
+      </Link>
     </article>
   );
 }

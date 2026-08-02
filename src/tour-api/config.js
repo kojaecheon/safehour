@@ -57,9 +57,15 @@ export const TOUR_API_COMMON_PARAMS = Object.freeze({
 export const TOUR_API_DAILY_LIMIT = 1_000;
 export const TOUR_API_WARNING_AT = 800;
 
+// 호출 로그·카운터·캐시가 쓰이는 루트. 테스트는 SAFEHOUR_DATA_ROOT 로
+// 임시 디렉터리를 지정해 실제 운영 카운터를 건드리지 않고 경계를 검증한다.
+const DATA_ROOT = process.env.SAFEHOUR_DATA_ROOT
+  ? path.resolve(process.env.SAFEHOUR_DATA_ROOT)
+  : PROJECT_ROOT;
+
 export const TOUR_API_PATHS = Object.freeze({
-  logs: path.join(PROJECT_ROOT, "logs", "tour-api"),
-  cache: path.join(PROJECT_ROOT, ".cache", "tour-api"),
+  logs: path.join(DATA_ROOT, "logs", "tour-api"),
+  cache: path.join(DATA_ROOT, ".cache", "tour-api"),
 });
 
 for (const directory of Object.values(TOUR_API_PATHS)) {

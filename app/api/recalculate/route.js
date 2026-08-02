@@ -4,7 +4,8 @@
 // 그대로 되돌려 보내고, 서버는 이벤트를 적용해 1단계부터 다시 판정한다.
 // 알림만 표시하고 코스를 유지하는 동작은 금지된다 (D07-BAN008).
 
-import { applyEvent } from '@/src/engine/recommend.js';
+// 상대 경로 사용 — Next 외부(node --test)에서 라우트 핸들러를 직접 계약 테스트하기 위함
+import { applyEvent } from '../../../src/engine/recommend.js';
 import {
   BadRequestError,
   DISPLAY_LIMIT,
@@ -18,7 +19,7 @@ import {
   normalizeReturnBy,
   normalizeRoles,
   toCumulativeEvent,
-} from '@/lib/server/engine-io.js';
+} from '../../../lib/server/engine-io.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -84,6 +85,6 @@ export async function POST(request) {
       ok: false,
       errorCode: 'SAFEHOUR_RECALCULATION_FAILED',
       message: '변화를 반영한 재계산에 실패했습니다. 안전을 위해 기존 추천을 계속 신뢰하지 마시고, 조건을 다시 입력해 주세요.',
-    });
+    }, { status: 500 });
   }
 }
