@@ -216,6 +216,13 @@ export default function ResultPage() {
                   : `기상 실황 이상 없음 (기상청 ${session.weather.observedAt} 발표)`}
             </p>
           )}
+          {(session.diagnostics?.degraded?.english || session.diagnostics?.degraded?.barrierFree) && (
+            <p style={{ fontSize: 14, color: 'var(--ink-soft)', marginTop: 6 }}>
+              {session.diagnostics.degraded.english && '영문 관광정보를 불러오지 못해 국문 정보로 표시합니다. '}
+              {session.diagnostics.degraded.barrierFree && '무장애 정보를 확인하지 못했습니다. '}
+              확인되지 않은 정보는 사실로 표시하지 않습니다.
+            </p>
+          )}
         </section>
 
         {/* 추천 코스 */}

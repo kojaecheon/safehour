@@ -77,26 +77,44 @@ async function fetchLocationList({
   });
 }
 
+/** 조회 실패 표식 — "데이터 없음(null)"과 구분한다 */
+const FAILED = Symbol("barrier-detail-failed");
+
 async function fetchBarrierDetails(items, detailLimit, useCache) {
   const selected = items.slice(0, detailLimit);
   const entries = await Promise.all(
     selected.map(async (item) => {
-      const result = await callTourApi({
-        serviceName: "barrierFree",
-        operation: "detailWithTour2",
-        parameters: {
-          contentId: String(item.contentid),
-          numOfRows: "10",
-          pageNo: "1",
-        },
-        useCache,
-      });
+      try {
+        const result = await callTourApi({
+          serviceName: "barrierFree",
+          operation: "detailWithTour2",
+          parameters: {
+            contentId: String(item.contentid),
+            numOfRows: "10",
+            pageNo: "1",
+          },
+          useCache,
+        });
 
-      return [String(item.contentid), extractTourItems(result)[0] ?? null];
+        return [String(item.contentid), extractTourItems(result)[0] ?? null];
+      } catch {
+        // 무장애 상세는 보강 신호다. 실패해도 후보 자체를 잃지 않는다.
+        // 신호가 없으면 보행부담 보정을 적용하지 않을 뿐이다 (D04-BR012).
+        return [String(item.contentid), FAILED];
+      }
     }),
   );
 
-  return new Map(entries);
+  // 조회 실패와 "조회했으나 데이터 없음"을 구분한다. 실패를 성공처럼 세면
+  // 증빙 문서의 barrierDetailCount 가 실제보다 부풀려진다.
+  const details = new Map(
+    entries.filter(([, value]) => value !== FAILED),
+  );
+  const failedIds = entries
+    .filter(([, value]) => value === FAILED)
+    .map(([contentId]) => contentId);
+
+  return { details, failedIds };
 }
 
 /**
@@ -113,7 +131,10 @@ export async function loadSafeHourCandidates({
   const query = validateCandidateQuery({ origin, radiusMeters });
   const boundedRows = Math.min(Math.max(Number(numOfRows) || 1, 1), 1_000);
 
-  const [koreanResult, englishResult, barrierResult] = await Promise.all([
+  // 국문 관광정보는 후보의 근간이므로 실패하면 안전한 미추천으로 간다 (D06-E005).
+  // 영문·무장애는 보강 데이터이므로 실패해도 국문 후보로 서비스를 계속한다
+  // (D02-S001 대체 흐름: 영문이 없으면 국문 폴백과 번역 필요 상태를 표시).
+  const [koreanSettled, englishSettled, barrierSettled] = await Promise.allSettled([
     fetchLocationList({
       serviceName: "korean",
       ...query,
@@ -133,6 +154,18 @@ export async function loadSafeHourCandidates({
       useCache,
     }),
   ]);
+
+  if (koreanSettled.status === "rejected") throw koreanSettled.reason;
+
+  const koreanResult = koreanSettled.value;
+  const englishResult =
+    englishSettled.status === "fulfilled" ? englishSettled.value : null;
+  const barrierResult =
+    barrierSettled.status === "fulfilled" ? barrierSettled.value : null;
+  const degraded = {
+    english: englishSettled.status === "rejected",
+    barrierFree: barrierSettled.status === "rejected",
+  };
 
   const koreanItems = extractTourItems(koreanResult);
   const englishItems = extractTourItems(englishResult);
@@ -155,11 +188,12 @@ export async function loadSafeHourCandidates({
   const matchedBarrierItems = barrierMatches
     .map((match) => match.localized)
     .filter(Boolean);
-  const barrierDetails = await fetchBarrierDetails(
-    matchedBarrierItems,
-    Math.max(0, Number(barrierDetailLimit) || 0),
-    useCache,
-  );
+  const { details: barrierDetails, failedIds: barrierDetailFailedIds } =
+    await fetchBarrierDetails(
+      matchedBarrierItems,
+      Math.max(0, Number(barrierDetailLimit) || 0),
+      useCache,
+    );
 
   const candidates = koreanItems.map((korean) => {
     const koreanId = String(korean.contentid);
@@ -182,6 +216,8 @@ export async function loadSafeHourCandidates({
     radiusMeters: query.radiusMeters,
     candidates,
     diagnostics: {
+      // 폴백이 일어났으면 화면이 불확실성을 표시할 수 있게 남긴다
+      degraded,
       totals: {
         korean: tourTotalCount(koreanResult),
         english: tourTotalCount(englishResult),
@@ -196,7 +232,9 @@ export async function loadSafeHourCandidates({
         english: summarizeMatches(englishMatches),
         barrierFree: summarizeMatches(barrierMatches),
       },
+      // 조회에 성공한 건수만 센다 (실패는 barrierDetailFailed 로 분리)
       barrierDetailCount: barrierDetails.size,
+      barrierDetailFailed: barrierDetailFailedIds.length,
     },
   };
 }
