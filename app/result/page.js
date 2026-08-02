@@ -15,8 +15,42 @@ import CourseCard from '@/components/CourseCard.js';
 import EventPanel from '@/components/EventPanel.js';
 import DeltaSheet from '@/components/DeltaSheet.js';
 import ReturnSheet from '@/components/ReturnSheet.js';
-import { REASON_TEXT } from '@/src/domain/states.js';
+import { REASON_TEXT, STATE_MESSAGE } from '@/src/domain/states.js';
 import { fmtDateTime, fmtTime } from '@/lib/format.js';
+
+const EVENT_LABEL = {
+  CLOSURE: '장소 휴무',
+  WEATHER: '기상 악화',
+  TRAFFIC_SURGE: '교통 지연',
+  APPOINTMENT: '진료시간 변경',
+  PATIENT_RECALL: '환자 호출',
+  RISK_SIGNAL: '위험신호 입력',
+};
+
+/**
+ * 재판정 결과를 화면에 남길 요약으로 압축한다.
+ * 시트는 닫히지만 "무엇이 왜 바뀌었는지"는 결과 화면에 계속 보여야 한다 (AC010·AC012 증빙).
+ */
+function summarizeChange(recalc, titles) {
+  const { event, before, after, delta } = recalc;
+  const nameOf = (id) => titles[String(id)] ?? String(id);
+  const parts = [];
+  if (delta.stateChanged) {
+    parts.push(
+      `상태 ${STATE_MESSAGE[before.state]?.ko ?? before.state} → ${STATE_MESSAGE[after.state]?.ko ?? after.state}`,
+    );
+  }
+  if (delta.removed.length > 0) parts.push(`제거 ${delta.removed.map(nameOf).join(', ')}`);
+  if (delta.added.length > 0) parts.push(`대체 투입 ${delta.added.map(nameOf).join(', ')}`);
+  if (delta.shortened.length > 0) {
+    parts.push(`체류 축소 ${delta.shortened.map((s) => nameOf(s.id)).join(', ')}`);
+  }
+  return {
+    eventLabel: EVENT_LABEL[event.type] ?? event.type,
+    summary: parts.length > 0 ? parts.join(' · ') : '조건과 복귀 SLA를 계속 충족해 코스가 유지됐습니다.',
+    hasVisibleChange: delta.hasVisibleChange,
+  };
+}
 
 export default function ResultPage() {
   const router = useRouter();
@@ -29,6 +63,8 @@ export default function ResultPage() {
   const [recalcError, setRecalcError] = useState(null);
   const [showReturn, setShowReturn] = useState(false);
   const [returnNowDismissed, setReturnNowDismissed] = useState(false);
+  // 시트를 닫아도 결과 화면에 남는 마지막 변화 요약 (ADR-0001 보완 조건 5)
+  const [lastChange, setLastChange] = useState(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -134,6 +170,7 @@ export default function ResultPage() {
         recalcPayload: data.nextRecalcPayload ?? session.recalcPayload,
       };
       setSession(next);
+      setLastChange(summarizeChange(data.recalc, candidateTitles));
       if (data.recalc.result.state === 'SPLIT_NEARBY') setMode('companion');
       if (data.recalc.result.returnNow) setReturnNowDismissed(false);
       try {
@@ -301,6 +338,22 @@ export default function ResultPage() {
                 )}
               </div>
             </details>
+          </section>
+        )}
+
+        {/* 마지막 변화 요약 — 시트를 닫아도 남는다. 변화 증빙이 스크린샷 한 장에
+            의존하지 않게 한다 (ADR-0001 보완 조건 5, D09-AC010·AC012) */}
+        {lastChange && (
+          <section className="card" aria-labelledby="last-change-h">
+            <h3 id="last-change-h">
+              마지막 변화: {lastChange.eventLabel}{' '}
+              {lastChange.hasVisibleChange ? (
+                <span className="badge badge-estimate">코스 변경됨</span>
+              ) : (
+                <span className="badge">코스 유지</span>
+              )}
+            </h3>
+            <p style={{ marginTop: 6 }}>{lastChange.summary}</p>
           </section>
         )}
 

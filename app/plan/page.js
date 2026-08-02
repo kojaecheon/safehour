@@ -20,6 +20,12 @@ const ANCHOR_PRESETS = [
   { id: 'custom', label: '좌표 직접 입력' },
 ];
 
+/**
+ * 입력 유지용 draft 키 (D03-NAV004 "브라우저 뒤로가기 시 입력값을 유지한다").
+ * 병원 조건이 담기므로 sessionStorage 에만 두고(탭 종료 시 소멸), 세션 초기화 시 지운다.
+ */
+const DRAFT_KEY = 'safehour.planDraft';
+
 export default function PlanPage() {
   const router = useRouter();
 
@@ -50,16 +56,53 @@ export default function PlanPage() {
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState('');
   const [nowLocal, setNowLocal] = useState('');
+  // 복원이 끝나기 전에 초기값으로 draft 를 덮어쓰지 않도록 하는 플래그
+  const [draftLoaded, setDraftLoaded] = useState(false);
   const errorRef = useRef(null);
 
   // 하이드레이션 불일치를 피하기 위해 시간 기본값은 마운트 후에 채운다.
   // 조건 발행 시각(issuedAt)은 미리 채우지 않는다 — 실제 받은 시각을 입력해야
   // 24시간 최신성 게이트가 의미를 가진다.
+  // 저장된 draft 가 있으면 기본값 대신 그것을 복원한다 (D03-NAV004).
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const now = new Date();
       setNowLocal(toLocalInputValue(now));
-      setReturnBy(toLocalInputValue(new Date(now.getTime() + 4 * 3600000)));
+
+      let draft = null;
+      try {
+        const raw = sessionStorage.getItem(DRAFT_KEY);
+        if (raw) draft = JSON.parse(raw);
+      } catch {
+        draft = null;
+      }
+
+      if (!draft) {
+        setReturnBy(toLocalInputValue(new Date(now.getTime() + 4 * 3600000)));
+        setDraftLoaded(true);
+        return;
+      }
+
+      setAnchorPreset(draft.anchorPreset ?? 'gangnam');
+      setAnchorLabel(draft.anchorLabel ?? '병원');
+      setCustomLat(draft.customLat ?? '');
+      setCustomLng(draft.customLng ?? '');
+      setReturnBy(draft.returnBy || toLocalInputValue(new Date(now.getTime() + 4 * 3600000)));
+      setIssuedAt(draft.issuedAt ?? '');
+      setIssuedBy(draft.issuedBy ?? 'medical_staff');
+      setFasting(Boolean(draft.fasting));
+      // 외출 허용은 명시적 선택이 필요한 값이므로 저장된 값이 boolean 일 때만 복원한다
+      setOutingAllowed(typeof draft.outingAllowed === 'boolean' ? draft.outingAllowed : null);
+      setEscortRequired(Boolean(draft.escortRequired));
+      setAvoidUv(Boolean(draft.avoidUv));
+      setIndoorOnly(Boolean(draft.indoorOnly));
+      setMaxWalkMin(draft.maxWalkMin ?? '20');
+      setMaxTravelMin(draft.maxTravelMin ?? '30');
+      setHasCompanion(Boolean(draft.hasCompanion));
+      setPatientResting(Boolean(draft.patientResting));
+      setCompanionSeparateAllowed(Boolean(draft.companionSeparateAllowed));
+      setNotice('이전에 입력한 조건을 복원했습니다. 병원 안내와 다르면 수정해 주세요.');
+      setDraftLoaded(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
@@ -69,9 +112,67 @@ export default function PlanPage() {
     if (error) errorRef.current?.focus();
   }, [error]);
 
+  // 입력이 바뀔 때마다 저장한다. 입력 도중 이탈해도(뒤로가기·홈) 값이 남는다.
+  useEffect(() => {
+    if (!draftLoaded) return;
+    saveDraft();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 폼 값 전체가 저장 대상이다
+  }, [
+    draftLoaded,
+    anchorPreset,
+    anchorLabel,
+    customLat,
+    customLng,
+    returnBy,
+    issuedAt,
+    issuedBy,
+    fasting,
+    outingAllowed,
+    escortRequired,
+    avoidUv,
+    indoorOnly,
+    maxWalkMin,
+    maxTravelMin,
+    hasCompanion,
+    patientResting,
+    companionSeparateAllowed,
+  ]);
+
+  /** 현재 입력을 draft 로 저장한다 — 결과 화면에서 돌아와도 값이 남는다 */
+  function saveDraft() {
+    try {
+      sessionStorage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({
+          anchorPreset,
+          anchorLabel,
+          customLat,
+          customLng,
+          returnBy,
+          issuedAt,
+          issuedBy,
+          fasting,
+          outingAllowed,
+          escortRequired,
+          avoidUv,
+          indoorOnly,
+          maxWalkMin,
+          maxTravelMin,
+          hasCompanion,
+          patientResting,
+          companionSeparateAllowed,
+        }),
+      );
+    } catch {
+      // 저장 실패는 조용히 넘긴다 — 입력 자체를 막을 이유는 없다
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    // 검증 실패로 되돌아오더라도 입력이 남도록 제출 시도 시점에 저장한다
+    saveDraft();
 
     const preset = ANCHOR_PRESETS.find((p) => p.id === anchorPreset);
     // Number('') === 0 이므로 빈 문자열을 먼저 걸러야 (0,0) 좌표 통과를 막는다
@@ -155,7 +256,7 @@ export default function PlanPage() {
         {/* noValidate — 네이티브 말풍선 대신 필드명을 명시한 커스텀 오류로 일원화 */}
         <form onSubmit={handleSubmit} noValidate>
           {/* ── 기준점 ── */}
-          <section className="card" aria-labelledby="anchor-h">
+          <section className="card" id="location" aria-labelledby="anchor-h">
             <h2 id="anchor-h">1. 병원·숙소 기준점</h2>
             <p className="hint" style={{ fontSize: 13, marginBottom: 10 }}>
               현재 위치(GPS)는 사용하지 않습니다. 복귀할 기준점을 직접 선택합니다.
@@ -199,7 +300,7 @@ export default function PlanPage() {
           </section>
 
           {/* ── 복귀 시각 ── */}
-          <section className="card" aria-labelledby="return-h">
+          <section className="card" id="return" aria-labelledby="return-h">
             <h2 id="return-h">2. 병원 복귀 시각</h2>
             <div className="field" style={{ marginBottom: 0 }}>
               <label htmlFor="return-by">이 시각까지 기준점으로 복귀해야 합니다 (필수)</label>
@@ -217,7 +318,7 @@ export default function PlanPage() {
           </section>
 
           {/* ── 병원 조건 ── */}
-          <section className="card" aria-labelledby="cond-h">
+          <section className="card" id="condition" aria-labelledby="cond-h">
             <h2 id="cond-h">3. 병원 주의조건</h2>
             <div className="field">
               <label htmlFor="issued-by">조건 제공 주체</label>
@@ -326,7 +427,7 @@ export default function PlanPage() {
           </section>
 
           {/* ── 역할 ── */}
-          <section className="card" aria-labelledby="roles-h">
+          <section className="card" id="role" aria-labelledby="roles-h">
             <h2 id="roles-h">4. 동행 상황</h2>
             <label className="toggle-row">
               <span className="label">보호자가 함께 있습니다</span>
