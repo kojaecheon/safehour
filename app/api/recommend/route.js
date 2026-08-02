@@ -3,9 +3,10 @@
 // 실패 시 동작 (D06): 임의 후보를 만들지 않는다.
 // 외부 API 실패는 "안전한 미추천 + 오류 안내"로 응답한다.
 
-import { recommend } from '@/src/engine/recommend.js';
-import { loadSafeHourCandidates } from '@/src/tour-api/candidate-service.js';
-import { fetchKmaNowcast } from '@/src/adapters/weather.js';
+// 상대 경로 사용 — Next 외부(node --test)에서 라우트 핸들러를 직접 계약 테스트하기 위함
+import { recommend } from '../../../src/engine/recommend.js';
+import { loadSafeHourCandidates } from '../../../src/tour-api/candidate-service.js';
+import { fetchKmaNowcast } from '../../../src/adapters/weather.js';
 import {
   BadRequestError,
   DISPLAY_LIMIT,
@@ -14,7 +15,7 @@ import {
   normalizeOrigin,
   normalizeReturnBy,
   normalizeRoles,
-} from '@/lib/server/engine-io.js';
+} from '../../../lib/server/engine-io.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,7 +66,7 @@ export async function POST(request) {
       errorCode: 'SAFEHOUR_EXTERNAL_API',
       message: '관광정보를 불러오지 못했습니다. 안전을 위해 지금은 추천을 제공하지 않습니다. 잠시 후 다시 시도해 주세요.',
       failSafeState: 'STANDBY',
-    });
+    }, { status: 502 });
   }
 
   // ── 기상 반영 — outdoorUnsafe 확인된 경우에만 판정 입력에 넣는다.
