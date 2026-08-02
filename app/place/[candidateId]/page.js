@@ -21,6 +21,12 @@ const COPYRIGHT_LABEL = {
  * TourAPI 운영정보 필드명 → 사용자용 라벨.
  * 값(원문)은 그대로 두고 라벨만 붙인다 — 원문 자체는 가공하지 않는다.
  */
+/** 관광을 권하지 않는 판정 — 이 상태에서는 장소 상세를 열지 않는다 */
+function isBlocked(decision) {
+  if (!decision) return false;
+  return decision.state === 'NO_TOURISM' || Boolean(decision.returnNow);
+}
+
 const SCHEDULE_LABEL = {
   usetime: '이용시간',
   usetimeculture: '이용시간',
@@ -75,7 +81,9 @@ export default function PlaceDetailPage() {
       setCandidate(found ?? null);
       setLoaded(true);
 
-      if (!found) return;
+      // 차단 판정이면 상세를 조회하지 않는다 — 이 화면이 안전 차단의
+      // 우회 경로가 되면 안 된다 (D03-NAV004, ADR-0001 보완 조건 4)
+      if (!found || isBlocked(saved?.decision)) return;
 
       setLoadingDetails(true);
       fetch('/api/place', {
@@ -140,6 +148,33 @@ export default function PlaceDetailPage() {
           </div>
           <button type="button" className="btn" onClick={() => router.push('/plan')}>
             조건 입력으로 이동
+          </button>
+        </main>
+      </>
+    );
+  }
+
+  // 차단 판정 상태에서 이 화면으로 들어오면 상세 대신 차단 사유와 복귀를 안내한다
+  if (isBlocked(session?.decision)) {
+    return (
+      <>
+        <header className="top-bar">
+          <button type="button" className="back" aria-label="결과로 돌아가기" onClick={() => router.push('/result')}>
+            ‹
+          </button>
+          <h1 className="brand">장소 상세</h1>
+        </header>
+        <main className="page">
+          <div className="state-banner state-NO_TOURISM">
+            <span className="state-label">관광 미추천</span>
+            <h2>지금은 관광을 권하지 않습니다</h2>
+            <p>
+              현재 판정에서는 이 장소를 포함해 어떤 관광도 추천하지 않습니다. 장소 정보 대신
+              복귀 안내를 확인해 주세요.
+            </p>
+          </div>
+          <button type="button" className="btn" onClick={() => router.push('/result')}>
+            결과 화면에서 복귀 안내 보기
           </button>
         </main>
       </>
