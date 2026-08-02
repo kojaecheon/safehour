@@ -106,6 +106,22 @@ function buildRequestUrl(service, operation, parameters) {
   )}&${query}`;
 }
 
+/**
+ * 캐시 파일명을 만드는 키. E2E 가 외부 호출 없이 돌도록 fixture 를 같은 규칙으로
+ * 심기 위해 공개한다 (scripts/seed-e2e-cache.mjs).
+ */
+export function tourApiCacheKey(serviceName, operation, parameters) {
+  return createCacheKey(serviceName, operation, parameters);
+}
+
+/** 캐시 파일 경로 — 시드 스크립트가 같은 위치에 쓰도록 공개한다 */
+export function tourApiCachePath(serviceName, operation, parameters) {
+  return path.join(
+    TOUR_API_PATHS.cache,
+    `${createCacheKey(serviceName, operation, parameters)}.json`,
+  );
+}
+
 function createCacheKey(serviceName, operation, parameters) {
   return crypto
     .createHash("sha256")

@@ -11,3 +11,8 @@ logs/
 .claude/
 .codex/
 coverage/
+
+# E2E 산출물
+.e2e-data/
+playwright-report/
+test-results/
