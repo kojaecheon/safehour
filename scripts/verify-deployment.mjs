@@ -157,10 +157,27 @@ if (paused) {
 }
 
 // ── 5. 비밀정보 노출 ──
+//
+// 검사 대상은 키 "값" 이지 키 "이름" 이 아니다. health 는 어느 키를 쓰는지
+// (weatherKeySource) 를 의도적으로 알리는데, 이름만 보고 실패로 판정하면
+// 진짜 노출과 구분되지 않는다.
 console.log('\n5. 비밀정보 노출');
 const bodies = [JSON.stringify(health), JSON.stringify(plan.data ?? {}), await pageRes.text()];
-const leaked = bodies.some((b) => /serviceKey=|TOUR_API_KEY|KMA_API_KEY/.test(b));
-record('인증키·serviceKey 미노출', !leaked);
+const joined = bodies.join('\n');
+
+// (1) URL 에 serviceKey 가 값과 함께 실려 나간 경우
+const keyInUrl = /serviceKey=[A-Za-z0-9%+/=]{10,}/.test(joined);
+record('URL 에 serviceKey 값 미노출', !keyInUrl);
+
+// (2) 로컬에 키가 있으면 그 값 자체가 응답에 있는지 대조한다 (가장 확실한 검사)
+const localKeys = [process.env.TOUR_API_KEY, process.env.KMA_API_KEY]
+  .map((k) => k?.trim())
+  .filter((k) => k && k.length >= 10);
+if (localKeys.length > 0) {
+  record('인증키 값 미노출', !localKeys.some((k) => joined.includes(k)));
+} else {
+  warn('인증키 값 대조 생략', '로컬에 키가 없어 값 비교 불가 — URL 패턴 검사만 수행');
+}
 
 // ── 요약 ──
 const failed = results.filter((r) => !r.passed);
