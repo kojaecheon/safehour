@@ -23,7 +23,7 @@ E2E 25건이 CI에서 통과하고, 추천을 즉시 중단할 kill switch와 �
 | 프로덕션 빌드 | `npm run build` | 통과 |
 | 운영 의존성 감사 | `npm run audit` | High 이상 0건 |
 | Git | `kojaecheon/safehour` (비공개), PR 9건 병합 | 준비 |
-| CI | lint → test → build → audit → **E2E** | 준비 — **branch protection 미설정** |
+| CI | lint → test → build → audit → **E2E** | 준비 — branch protection 은 **플랜 제약으로 불가**, `npm run merge` 로 대체 |
 | 실API | TourAPI 증거 있음 / **기상은 활용신청 미완료(HTTP 403)** | 부분 |
 | 배포 | 설정·문서·kill switch 준비 완료 / **실제 배포 없음** | 준비만 |
 | 실기기·스크린리더 | 자동 검증만 존재 | 미준비 |
@@ -90,7 +90,7 @@ Notion 갱신은 사람 승인 사항이므로 에이전트가 직접 수정하�
 - 사용자 인터뷰, KPI 목표값, project key, RACI
 - 기상청 활용신청 (즉시 가능)
 - Vercel 프로젝트 연결·환경변수·배포 URL
-- GitHub branch protection (`quality` 필수 지정)
+- GitHub Pro 업그레이드 또는 저장소 공개 여부 결정 (branch protection 사용 조건)
 
 ### 남은 구현
 
