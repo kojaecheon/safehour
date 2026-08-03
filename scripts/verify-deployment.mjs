@@ -35,7 +35,18 @@ async function postJson(path, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  return { res, data: await res.json() };
+  // 서버가 500 을 내면 Next 가 HTML 오류 페이지를 준다. 진단 도구가 여기서
+  // 죽으면 정작 원인을 못 본다 — 파싱 실패를 결과로 돌려준다.
+  const raw = await res.text();
+  try {
+    return { res, data: JSON.parse(raw) };
+  } catch {
+    return {
+      res,
+      data: null,
+      parseError: `HTTP ${res.status} — JSON 이 아닌 응답 (앞 120자: ${raw.slice(0, 120)})`,
+    };
+  }
 }
 
 function condition(overrides = {}) {
@@ -95,8 +106,8 @@ const blocked = await postJson('/api/recommend', {
 });
 record(
   '외출 미허용 → 미추천',
-  blocked.data.decision?.state === 'NO_TOURISM' && blocked.data.decision.course.length === 0,
-  blocked.data.decision?.state,
+  blocked.data?.decision?.state === 'NO_TOURISM' && blocked.data.decision.course.length === 0,
+  blocked.parseError ?? blocked.data?.decision?.state,
 );
 
 const stale = await postJson('/api/recommend', {
@@ -105,8 +116,8 @@ const stale = await postJson('/api/recommend', {
 });
 record(
   '25시간 지난 조건 → 미추천',
-  stale.data.decision?.state === 'NO_TOURISM',
-  stale.data.decision?.reasons?.join(','),
+  stale.data?.decision?.state === 'NO_TOURISM',
+  stale.parseError ?? stale.data?.decision?.reasons?.join(','),
 );
 
 const badOrigin = await postJson('/api/recommend', {
@@ -120,11 +131,15 @@ console.log('\n4. 판정과 재판정');
 const paused = health.flags?.recommendationKilled === true;
 const plan = await postJson('/api/recommend', planBody());
 if (paused) {
-  record('kill switch 적용됨', plan.data.servicePaused === true && plan.data.decision.state === 'NO_TOURISM');
+  record('kill switch 적용됨', plan.data?.servicePaused === true && plan.data.decision.state === 'NO_TOURISM', plan.parseError);
 } else {
-  const decision = plan.data.decision;
-  record('추천 생성', plan.data.ok === true, `state=${decision?.state} 후보=${plan.data.diagnostics?.candidateCount}`);
-  record('화면 노출 3개 제한', plan.data.displayLimit === 3);
+  const decision = plan.data?.decision;
+  record(
+    '추천 생성',
+    plan.data?.ok === true,
+    plan.parseError ?? `state=${decision?.state} 후보=${plan.data?.diagnostics?.candidateCount}`,
+  );
+  record('화면 노출 3개 제한', plan.data?.displayLimit === 3);
 
   if (decision?.course?.length > 0) {
     const recalc = await postJson('/api/recalculate', {
@@ -133,7 +148,8 @@ if (paused) {
     });
     record(
       '환자 호출 → 즉시 복귀 전환',
-      recalc.data.recalc?.result?.state === 'NO_TOURISM' && recalc.data.recalc.result.returnNow === true,
+      recalc.data?.recalc?.result?.state === 'NO_TOURISM' && recalc.data.recalc.result.returnNow === true,
+      recalc.parseError,
     );
   } else {
     record('재판정 검사', true, '추천 0건이라 생략 (조건상 정상일 수 있음)');
@@ -142,7 +158,7 @@ if (paused) {
 
 // ── 5. 비밀정보 노출 ──
 console.log('\n5. 비밀정보 노출');
-const bodies = [JSON.stringify(health), JSON.stringify(plan.data), await pageRes.text()];
+const bodies = [JSON.stringify(health), JSON.stringify(plan.data ?? {}), await pageRes.text()];
 const leaked = bodies.some((b) => /serviceKey=|TOUR_API_KEY|KMA_API_KEY/.test(b));
 record('인증키·serviceKey 미노출', !leaked);
 
