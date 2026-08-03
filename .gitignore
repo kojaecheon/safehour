@@ -16,3 +16,8 @@ coverage/
 .e2e-data/
 playwright-report/
 test-results/
+
+# Vercel
+.vercel/
+.vercel
+.env*

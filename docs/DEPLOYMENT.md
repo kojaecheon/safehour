@@ -1,5 +1,6 @@
 # SafeHour 배포·운영 절차 (AX-105)
 
+- **운영 URL: https://safehour.vercel.app** (최초 배포 2026-08-04)
 - 대상: Vercel (Next.js)
 - 연결: D09-RG007·RG008, D06-E014, D07-POL006·POL009
 - 리전: `icn1` (서울) — 사용자와 TourAPI 모두 국내다
@@ -19,8 +20,37 @@ Vercel → Settings → Environment Variables 에 등록한다.
 | 변수 | 필수 | 환경 | 설명 |
 | --- | --- | --- | --- |
 | `TOUR_API_KEY` | 필수 | Production, Preview | 공공데이터포털 인증키. 없으면 추천이 전부 실패한다. |
-| `KMA_API_KEY` | 선택 | Production, Preview | 기상청 단기예보 키. 없으면 기상은 "확인 불가"로 표기되고 판정에 반영되지 않는다. |
+| `SAFEHOUR_DATA_ROOT` | **필수** | Production, Preview | `/tmp/safehour`. 아래 1.3 참고 — 없으면 모든 API 가 500 이다. |
+| `KMA_API_KEY` | 선택 | Production, Preview | 기상청 전용 키. **없으면 `TOUR_API_KEY` 로 폴백한다** — 공공데이터포털은 계정당 인증키가 하나이므로, 기상청 서비스만 활용신청하면 같은 키로 호출된다. |
 | `SAFEHOUR_KILL_RECOMMENDATION` | 선택 | Production | 추천 전면 중단 스위치. 아래 3장 참고. |
+
+### 1.3 서버리스 파일시스템 — `SAFEHOUR_DATA_ROOT` 가 필수인 이유
+
+TourAPI 클라이언트는 호출 카운터·로그·캐시를 파일로 쓴다. **Vercel 서버리스는
+`/var/task` 가 읽기 전용**이라 기본 경로(`PROJECT_ROOT`)로는 디렉터리 생성부터 실패한다.
+
+```
+Error: ENOENT: no such file or directory, mkdir '/var/task/.cache/tour-api'
+```
+
+이 오류는 모듈 로드 시점에 나므로 **모든 API 가 500** 이 된다. `SAFEHOUR_DATA_ROOT`
+를 `/tmp/safehour` 로 지정해 쓰기 가능한 경로를 쓰게 한다.
+
+#### 남는 한계 — 인스턴스별 카운터 격리
+
+`/tmp` 는 **서버리스 인스턴스마다 독립**이다. 인스턴스가 N개면 호출 카운터도 N벌로
+쪼개진다. 즉 D07-POL005 의 "operation별 1,000회 자체 차단"이 **전역으로는 보장되지
+않는다.** 최악의 경우 실제 호출량이 한도의 N배까지 나갈 수 있다.
+
+현재는 다음 근거로 수용한다.
+
+- 심사·시연 규모의 트래픽에서는 동시 인스턴스가 1–2개에 그친다
+- 자체 한도(1,000)는 공급자 쿼터보다 보수적으로 잡은 값이라 여유가 있다
+- 한도를 넘겨도 공급자가 `resultCode 22` 로 거부하고, 그것은 실패로 처리되어
+  D06-E005 "안전한 미추천"으로 수렴한다 — **위험 추천이 나오는 방향은 아니다**
+
+운영 트래픽이 늘면 공유 저장소(Vercel KV 등)로 카운터를 옮겨야 한다. AX-201 에서
+계측·알림과 함께 다룬다.
 
 `TOUR_API_KEY` 를 Preview 에도 넣는 이유는 PR 미리보기에서 실제 흐름을 확인하기
 위해서다. 다만 Preview 는 호출 한도를 Production 과 공유하므로, 리허설을 반복할
@@ -36,12 +66,25 @@ curl -s https://<배포주소>/api/health | jq
 {
   "ok": true,
   "service": "safehour",
-  "config": { "tourApiKeyConfigured": true, "weatherApiKeyConfigured": false },
+  "config": {
+    "tourApiKeyConfigured": true,
+    "weatherApiKeyConfigured": true,
+    "weatherKeySource": "TOUR_API_KEY"
+  },
   "flags": { "recommendationKilled": false }
 }
 ```
 
-키 값은 절대 노출되지 않고 **설정 여부만** 확인된다.
+키 값은 절대 노출되지 않고 **설정 여부만** 확인된다. `weatherKeySource` 는 기상 호출에
+실제로 쓰이는 키가 전용 키인지 폴백인지 알려준다.
+
+전체 검증은 스크립트로 한 번에 한다.
+
+```bash
+npm run verify:deploy -- https://safehour.vercel.app
+```
+
+헬스·보안 헤더·안전 게이트 3종·판정과 재판정·비밀정보 노출을 확인한다.
 
 ## 2. 배포 흐름
 
