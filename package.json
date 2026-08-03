@@ -18,7 +18,9 @@
     "audit": "npm audit --omit=dev --audit-level=high",
     "check": "npm run lint && npm test && npm run build && npm run audit",
     "e2e": "playwright test",
-    "e2e:ui": "playwright test --ui"
+    "e2e:ui": "playwright test --ui",
+    "merge": "node scripts/safe-merge.mjs",
+    "verify:deploy": "node scripts/verify-deployment.mjs"
   },
   "engines": {
     "node": ">=20.9.0"

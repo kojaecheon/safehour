@@ -51,8 +51,30 @@ curl -s https://<배포주소>/api/health | jq
 | `main` 병합 | Production 배포 |
 
 `main` 은 CI(`lint → test → build → audit → E2E`)를 통과한 코드만 병합한다.
-**GitHub branch protection 에서 `quality` 체크를 필수로 지정할 것** — 이 설정이
-없으면 실패한 체크로도 병합이 가능하다(실제로 PR #4 에서 발생했다).
+
+### CI 강제 수단 — 현재 제약과 대안
+
+**비공개 저장소 + GitHub 무료 플랜에서는 branch protection 과 auto-merge 를 쓸 수 없다.**
+`PUT /branches/main/protection` 은 HTTP 403(Upgrade to GitHub Pro)을 반환하고,
+`allow_auto_merge` 는 PATCH 해도 `false` 로 남는다. 실제로 PR #4 가 CI 실패 상태로
+병합돼 main 이 깨진 적이 있다.
+
+그래서 병합은 **항상 아래 스크립트로 한다.** CI 결과를 확인하고 통과했을 때만 병합한다.
+
+```bash
+npm run merge -- <PR번호>          # 지금 결과로 판정
+npm run merge -- <PR번호> --wait   # 실행 중이면 완료까지 대기(최대 15분)
+```
+
+체크가 하나도 없거나, 실행 중이거나, 하나라도 실패하면 병합을 거부한다.
+
+근본 해결은 둘 중 하나다. 동결(9/18) 전에 결정한다.
+
+| 선택지 | 비용 | 비고 |
+| --- | --- | --- |
+| GitHub Pro 업그레이드 | 유료(월 단위) | branch protection·auto-merge 사용 가능 |
+| 저장소 공개 전환 | 무료 | 심사 전 공개가 적절한지 판단 필요 |
+| 현행 유지(스크립트 + 규율) | 무료 | 사람이 `gh pr merge` 를 직접 쓰면 방어가 뚫린다 |
 
 ## 3. Kill switch — 추천 전면 중단
 
