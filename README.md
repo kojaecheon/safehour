@@ -109,6 +109,7 @@ API 인증키는 호출 로그에 기록하지 않습니다. 일별·오퍼레�
 - [배포·운영 절차](docs/DEPLOYMENT.md)
 - [결정 기록 (ADR)](docs/decisions/)
 - [전문 승인 체크리스트](docs/SIGNOFF_CHECKLIST.md)
+- [공공 API 활용표와 화면 대응](docs/API_USAGE_TABLE.md)
 - [구현 방향과 다음 단계](docs/IMPLEMENTATION_DIRECTION.md)
 - [TourAPI 연결 검증](docs/TOUR_API_VALIDATION.md)
 - [강남 고정좌표 데이터 분석](docs/GANGNAM_DATA_ANALYSIS.md)
