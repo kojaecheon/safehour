@@ -21,7 +21,9 @@ const EVENT_LABEL = {
 
 export default function DeltaSheet({ recalc, titles = {}, onClose }) {
   const { event, before, after, delta } = recalc;
-  const sheetRef = useModalSheet(onClose);
+  // 확인 버튼도 requestClose 를 거친다 — 뒤로가기와 같은 경로로 닫아야
+  // 히스토리에 잉여 항목이 남지 않는다 (ADR-0001 보완 조건 3)
+  const { sheetRef, requestClose } = useModalSheet(onClose);
 
   function titleOf(id) {
     const key = String(id);
@@ -101,7 +103,7 @@ export default function DeltaSheet({ recalc, titles = {}, onClose }) {
           </div>
         )}
 
-        <button type="button" className="btn" style={{ marginTop: 16 }} onClick={onClose}>
+        <button type="button" className="btn" style={{ marginTop: 16 }} onClick={requestClose}>
           확인
         </button>
       </div>

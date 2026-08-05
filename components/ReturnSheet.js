@@ -9,7 +9,9 @@ import { useModalSheet } from '@/lib/useModalSheet.js';
 
 export default function ReturnSheet({ origin, returnBy, latestDepartureAt, onClose }) {
   const [copyState, setCopyState] = useState('idle'); // idle | ok | fail
-  const sheetRef = useModalSheet(onClose);
+  // 즉시 복귀는 안전 지시다. 뒤로가기로 페이지를 떠나 지시를 잃지 않도록
+  // 모든 닫기가 같은 경로(requestClose)를 거친다 (ADR-0001 보완 조건 3)
+  const { sheetRef, requestClose } = useModalSheet(onClose);
 
   async function copyCoords() {
     try {
@@ -54,7 +56,7 @@ export default function ReturnSheet({ origin, returnBy, latestDepartureAt, onClo
           연락하세요.
         </p>
 
-        <button type="button" className="btn" style={{ marginTop: 4 }} onClick={onClose}>
+        <button type="button" className="btn" style={{ marginTop: 4 }} onClick={requestClose}>
           확인
         </button>
       </div>
