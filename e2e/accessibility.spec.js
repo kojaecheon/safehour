@@ -135,6 +135,50 @@ test.describe('키보드 전용 조작 (QA034)', () => {
     await expect(returnButton).toBeFocused();
   });
 
+  test('뒤로가기는 시트만 닫고 페이지를 떠나지 않는다 (ADR-0001)', async ({ page }) => {
+    await submitPlan(page);
+
+    await page.getByRole('button', { name: '즉시 복귀 안내' }).click();
+    await expect(page.getByText('지금 복귀하세요')).toBeVisible();
+
+    // 안드로이드 뒤로가기에 해당한다. 여기서 페이지를 떠나면 안전 지시를 잃는다.
+    await page.goBack();
+
+    await expect(page.locator('.sheet-backdrop')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/result/);
+    await expect(page.getByText('복귀 마감')).toBeVisible();
+  });
+
+  test('확인 버튼으로 닫으면 히스토리에 잉여 항목이 남지 않는다', async ({ page }) => {
+    await submitPlan(page);
+
+    await page.getByRole('button', { name: '즉시 복귀 안내' }).click();
+    await expect(page.getByText('지금 복귀하세요')).toBeVisible();
+    await page.locator('.sheet').getByRole('button', { name: '확인' }).click();
+    await expect(page.locator('.sheet-backdrop')).toHaveCount(0);
+
+    // 시트가 항목을 남겼다면 이 뒤로가기가 아무 일도 하지 않는다.
+    // 정상이라면 결과 화면을 떠나 조건 입력으로 돌아간다.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/plan/);
+  });
+
+  test('겹친 시트는 뒤로가기로 하나씩 닫힌다', async ({ page }) => {
+    await submitPlan(page);
+
+    // 환자 호출 → 델타 시트 + 즉시 복귀 시트가 함께 뜬다
+    await page.getByRole('button', { name: /환자 호출/ }).click();
+    await expect(page.getByText('지금 복귀하세요')).toBeVisible();
+    await expect(page.locator('.sheet-backdrop')).toHaveCount(2);
+
+    await page.goBack();
+    await expect(page.locator('.sheet-backdrop')).toHaveCount(1);
+
+    await page.goBack();
+    await expect(page.locator('.sheet-backdrop')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/result/);
+  });
+
   test('모달이 열린 동안 포커스가 시트 밖으로 나가지 않는다', async ({ page }) => {
     await submitPlan(page);
     await page.getByRole('button', { name: '즉시 복귀 안내' }).click();
