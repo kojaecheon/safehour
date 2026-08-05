@@ -56,7 +56,7 @@ Notion 갱신은 사람 승인 사항이므로 에이전트가 직접 수정하�
 | AC008 | 엔진 최대 5, 화면 최대 3 (E2E 카드 수 단언) | 통과 |
 | AC009 | `slaCalculator` 테스트, 폴백 "추정" 배지 E2E 확인 | **현장 측정 필요** |
 | AC010 | CLOSURE 회귀 + E2E 대체 확인 + `LIVE_SCENARIO_EVIDENCE.md` | 통과 |
-| AC011 | WEATHER fixture·어댑터 테스트 8건 | **실API 증거 필요 (403)** |
+| AC011 | 어댑터 테스트 8건 + **배포본 실관측 응답**(`observedAt` 확인, `unknown=false`) | 통과 |
 | AC012 | TRAFFIC_SURGE/APPOINTMENT 누적 계약 테스트 | 실제 공급자 미검증 |
 | AC013 | PATIENT_RECALL 엔진 + E2E(추천 무효화·복귀 시트 자동 표시) | 통과 |
 | AC014–AC016 | mapper/detail/candidate 테스트 + `place-api.test.js` 10건 | 통과 |
