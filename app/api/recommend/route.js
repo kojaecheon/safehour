@@ -17,6 +17,7 @@ import {
   normalizeRoles,
 } from '../../../lib/server/engine-io.js';
 import { isRecommendationKilled, killSwitchDecision } from '../../../lib/server/runtime-flags.js';
+import { OUTCOME, logDecision } from '../../../lib/server/decision-log.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,10 +25,17 @@ export const dynamic = 'force-dynamic';
 const CANDIDATE_RADIUS_METERS = 3000;
 
 export async function POST(request) {
+  const startedAt = Date.now();
   let body;
   try {
     body = await request.json();
   } catch {
+    return Response.json({ ok: false, errorCode: 'SAFEHOUR_BAD_REQUEST', message: '요청 본문이 올바르지 않습니다.' }, { status: 400 });
+  }
+
+  // `null` 이나 문자열도 유효한 JSON 이라 위 파싱은 통과한다. 그대로 두면
+  // 아래에서 속성 접근이 터져 500 이 나가므로, 계약대로 400 으로 막는다.
+  if (body === null || typeof body !== 'object') {
     return Response.json({ ok: false, errorCode: 'SAFEHOUR_BAD_REQUEST', message: '요청 본문이 올바르지 않습니다.' }, { status: 400 });
   }
 
@@ -47,10 +55,18 @@ export async function POST(request) {
   // ── kill switch — 판정도 외부 호출도 하지 않고 즉시 미추천으로 응답한다 ──
   // 위험 추천이 발견됐을 때 배포를 기다리지 않고 차단하기 위한 경로다 (D06-E014).
   if (isRecommendationKilled()) {
+    const paused = killSwitchDecision();
+    logDecision({
+      route: 'recommend',
+      outcome: OUTCOME.PAUSED,
+      decision: paused,
+      conditionIssuedAt: condition.issuedAt,
+      elapsedMs: Date.now() - startedAt,
+    });
     return Response.json({
       ok: true,
       displayLimit: DISPLAY_LIMIT,
-      decision: killSwitchDecision(),
+      decision: paused,
       origin,
       returnBy: returnBy.toISOString(),
       travelTimeSource: 'none',
@@ -85,6 +101,13 @@ export async function POST(request) {
   } catch (error) {
     // 안전 판정 입력을 확보할 수 없으면 추천하지 않는다 (D06-E005)
     console.error('[recommend] candidate load failed:', error.message);
+    logDecision({
+      route: 'recommend',
+      outcome: OUTCOME.FAILED,
+      errorCode: 'SAFEHOUR_EXTERNAL_API',
+      conditionIssuedAt: condition.issuedAt,
+      elapsedMs: Date.now() - startedAt,
+    });
     return Response.json({
       ok: false,
       errorCode: 'SAFEHOUR_EXTERNAL_API',
@@ -110,6 +133,17 @@ export async function POST(request) {
     ctx,
   });
   const decision = recommend(engineInput);
+
+  // 판정이 어떻게 나왔는지 남긴다 — D07 4절 감사 증적, POL001 위반 탐지 수단.
+  // 좌표·조건 원문·장소 이름은 나가지 않는다 (ADR-0002).
+  logDecision({
+    route: 'recommend',
+    outcome: OUTCOME.DECIDED,
+    decision,
+    candidateCount: candidateResult.candidates.length,
+    conditionIssuedAt: condition.issuedAt,
+    elapsedMs: Date.now() - startedAt,
+  });
 
   return Response.json({
     ok: true,
