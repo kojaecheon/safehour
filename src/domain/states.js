@@ -80,6 +80,18 @@ export const REASON = {
   NO_CANDIDATE: 'NO_CANDIDATE',
   /** 운영자가 추천을 전면 중단시킨 상태 (kill switch) */
   SERVICE_PAUSED: 'SERVICE_PAUSED',
+
+  // ── 병원 회복 지침 연결 게이트 (AX-215) ──
+  /** 연결된 병원 계획이 없다 */
+  NO_HOSPITAL_PLAN: 'NO_HOSPITAL_PLAN',
+  /** 계획 유효기간이 지났다 */
+  PLAN_EXPIRED: 'PLAN_EXPIRED',
+  /** 병원이 계획을 철회했다 */
+  PLAN_REVOKED: 'PLAN_REVOKED',
+  /** 확인하지 않은 중요 변경이 있다 — 확인해야 판정이 풀린다 */
+  PLAN_UNCONFIRMED_UPDATE: 'PLAN_UNCONFIRMED_UPDATE',
+  /** 복약 시각이 외출 창을 자른다 */
+  MEDICATION_WINDOW: 'MEDICATION_WINDOW',
 };
 
 export const REASON_TEXT = {
@@ -107,5 +119,25 @@ export const REASON_TEXT = {
   [REASON.SERVICE_PAUSED]: {
     ko: '점검을 위해 추천을 일시 중단했습니다. 병원 안내를 먼저 따르세요',
     en: 'Recommendations are paused for maintenance. Please follow your hospital guidance',
+  },
+  [REASON.NO_HOSPITAL_PLAN]: {
+    ko: '연결된 병원 회복 지침이 없습니다',
+    en: 'No hospital recovery plan is connected',
+  },
+  [REASON.PLAN_EXPIRED]: {
+    ko: '병원 회복 지침의 유효기간이 지났습니다',
+    en: 'Your hospital recovery plan has expired',
+  },
+  [REASON.PLAN_REVOKED]: {
+    ko: '병원이 회복 지침을 거둬들였습니다',
+    en: 'Your hospital withdrew the recovery plan',
+  },
+  [REASON.PLAN_UNCONFIRMED_UPDATE]: {
+    ko: '확인하지 않은 병원 안내 변경이 있습니다',
+    en: 'There is a hospital update you have not reviewed',
+  },
+  [REASON.MEDICATION_WINDOW]: {
+    ko: '복약 시각까지 돌아와야 합니다',
+    en: 'You must be back before your medication time',
   },
 };

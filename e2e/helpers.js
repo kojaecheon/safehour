@@ -3,16 +3,27 @@
 import { expect } from '@playwright/test';
 
 /**
- * 병원 조건을 채우고 판정 결과까지 진행한다.
- * 외출 허용은 기본값이 없으므로 반드시 명시적으로 선택해야 제출된다.
+ * 병원 회복 지침을 연결하고 판정 결과까지 진행한다 (AX-221).
+ *
+ * 조건은 더 이상 사용자가 입력하지 않는다 — 병원이 발행한 것을 그대로 쓴다.
+ * 그래서 흐름이 `로그인 → 지침 연결 → 안내 확인 → 판정` 이 된다.
  */
-export async function submitPlan(page, { outingAllowed = true } = {}) {
-  await page.goto('/plan');
-  await page.getByRole('button', { name: '방금 받음' }).click();
-  await expect(page.locator('#issued-at')).not.toHaveValue('');
+export async function connectPlan(page, { outingAllowed = true } = {}) {
+  await page.goto('/api/auth/login?provider=demo&returnTo=/link');
+  await expect(page).toHaveURL(/\/link/);
   await page
-    .getByText(outingAllowed ? '외출이 허용되었습니다' : '외출이 허용되지 않았습니다')
+    .getByRole('button', { name: outingAllowed ? '예시 A — 외출 가능' : '예시 B — 외출 제한' })
     .click();
+  await expect(page.getByRole('button', { name: '오늘의 회복 상태 보기' })).toBeVisible();
+
+  // 확인하지 않은 중요 안내가 있으면 판정이 STANDBY 로 강등된다 (정의 §7)
+  await page.goto('/guide');
+  await page.getByRole('button', { name: '전체 확인 처리' }).click();
+}
+
+export async function submitPlan(page, { outingAllowed = true } = {}) {
+  await connectPlan(page, { outingAllowed });
+  await page.goto('/plan');
   await page.getByRole('button', { name: '안전 판정으로 추천 받기' }).click();
   await page.waitForURL('**/result');
 }
