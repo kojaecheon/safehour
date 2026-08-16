@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 820" width="1240" height="820" role="img" aria-labelledby="t d">
+  <title id="t">H1 실시간 변화 대응 상세 흐름</title>
+  <desc id="d">지정과제 1번이 명시한 변수 3종과 회복기 고유 변수 3종이 들어오면 안전 게이트를 다시 통과시켜 유지·축소·대체·취소 중 하나로 확정하는 재판정 흐름.</desc>
+
+  <style>
+    .bg    { fill: #FAF8F5; }
+    .box   { fill: #FFFFFF; stroke: #D8D0C3; stroke-width: 1.5; }
+    .boxk  { fill: #FFFFFF; stroke: #1F4D3D; stroke-width: 2.5; }
+    .grp   { fill: #F4F1EC; stroke: #D8D0C3; stroke-width: 1.5; }
+    .grpk  { fill: #EDF3F3; stroke: #CFE0E1; stroke-width: 1.5; }
+    .keep  { fill: #EFF4F0; stroke: #CFE2D6; stroke-width: 2; }
+    .shrink{ fill: #FBF5E8; stroke: #EADCBC; stroke-width: 2; }
+    .swap  { fill: #EDF3F3; stroke: #CFE0E1; stroke-width: 2; }
+    .stop  { fill: #FBF0EC; stroke: #EBD2C6; stroke-width: 2; }
+
+    text   { font-family: 'Pretendard','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif; fill: #2C2A26; }
+    .h1t   { font-size: 27px; font-weight: 700; }
+    .sub   { font-size: 15px; fill: #6B6660; }
+    .grpt  { font-size: 14px; font-weight: 700; fill: #6B6660; letter-spacing: .04em; }
+    .ev    { font-size: 16px; font-weight: 700; }
+    .evs   { font-size: 13px; fill: #6B6660; }
+    .ttl   { font-size: 19px; font-weight: 700; }
+    .body  { font-size: 15px; fill: #6B6660; }
+    .small { font-size: 13.5px; fill: #6B6660; }
+    .outt  { font-size: 17px; font-weight: 700; }
+    .note  { font-size: 14px; font-weight: 700; fill: #1F4D3D; }
+
+    .flow  { stroke: #1F4D3D; stroke-width: 2.5; fill: none; }
+    .alt   { stroke: #8C3A24; stroke-width: 2.5; fill: none; }
+    .rule  { stroke: #C9A227; stroke-width: 3; }
+  </style>
+
+  <rect class="bg" width="1240" height="820"/>
+
+  <text class="h1t" x="40" y="52">H1 · 실시간 변화 대응</text>
+  <line class="rule" x1="40" y1="68" x2="118" y2="68"/>
+  <text class="sub" x="40" y="96">변수가 들어오면 알림이 아니라 코스를 다시 판정한다 — 유지 · 축소 · 대체 · 취소/복귀</text>
+
+  <defs>
+    <marker id="a2" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#1F4D3D"/>
+    </marker>
+    <marker id="a3" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#8C3A24"/>
+    </marker>
+  </defs>
+
+  <!-- ── 왼쪽: 변수 6종 ── -->
+  <rect class="grpk" x="36" y="132" width="330" height="212" rx="10"/>
+  <text class="grpt" x="56" y="160">지정과제 1번이 명시한 변수</text>
+  <rect class="box" x="56" y="172" width="290" height="46" rx="8"/>
+  <text class="ev" x="74" y="192">날씨 변화</text>
+  <text class="evs" x="74" y="210">기상 실황 → 실외 후보 제외</text>
+  <rect class="box" x="56" y="226" width="290" height="46" rx="8"/>
+  <text class="ev" x="74" y="246">혼잡도 상승</text>
+  <text class="evs" x="74" y="264">교통 지연을 이동시간에 누적 반영</text>
+  <rect class="box" x="56" y="280" width="290" height="46" rx="8"/>
+  <text class="ev" x="74" y="300">동선 꼬임</text>
+  <text class="evs" x="74" y="318">휴무 장소 제거 → 다음 후보 승격</text>
+
+  <rect class="grp" x="36" y="360" width="330" height="212" rx="10"/>
+  <text class="grpt" x="56" y="388">회복기 고유 변수 (SafeHour 추가)</text>
+  <rect class="box" x="56" y="400" width="290" height="46" rx="8"/>
+  <text class="ev" x="74" y="420">진료시간 변경</text>
+  <text class="evs" x="74" y="438">복귀 마감을 앞당김</text>
+  <rect class="box" x="56" y="454" width="290" height="46" rx="8"/>
+  <text class="ev" x="74" y="474">환자 호출</text>
+  <text class="evs" x="74" y="492">모든 추천 무효화</text>
+  <rect class="box" x="56" y="508" width="290" height="46" rx="8"/>
+  <text class="ev" x="74" y="528">지침 만료 · 철회</text>
+  <text class="evs" x="74" y="546">유효기간 경과 또는 병원 철회</text>
+
+  <!-- ── 가운데: 재판정 ── -->
+  <path class="flow" d="M366 250 L440 250 L440 330 L494 330" marker-end="url(#a2)"/>
+  <path class="flow" d="M366 425 L440 425 L440 340 L494 340"/>
+
+  <rect class="boxk" x="500" y="252" width="250" height="156" rx="10"/>
+  <text class="ttl" x="522" y="284">재판정</text>
+  <text class="small" x="522" y="308">안전 게이트부터</text>
+  <text class="small" x="522" y="326">다시 통과시킨다</text>
+  <text class="small" x="522" y="352">수치 변수는 누적 총량으로</text>
+  <text class="small" x="522" y="370">판정한다</text>
+  <text class="note" x="522" y="396">공공 API 재호출 0건</text>
+
+  <!-- 만료·철회는 재판정을 건너뛴다 -->
+  <path class="alt" d="M346 531 L420 531 L420 660 L900 660 L900 604" marker-end="url(#a3)"/>
+  <text class="small" x="440" y="682" style="fill:#8C3A24; font-weight:700">지침 만료·철회는 재판정 없이 즉시 복귀로 전환</text>
+
+  <!-- 재판정 → 네 가지 결과 (하나로 확정되지만, 가능한 결과는 넷이다) -->
+  <path class="flow" d="M750 330 L790 330"/>
+  <path class="flow" d="M790 181 L790 397"/>
+  <path class="flow" d="M790 181 L820 181" marker-end="url(#a2)"/>
+  <path class="flow" d="M790 253 L820 253" marker-end="url(#a2)"/>
+  <path class="flow" d="M790 325 L820 325" marker-end="url(#a2)"/>
+  <path class="flow" d="M790 397 L820 397" marker-end="url(#a2)"/>
+
+  <!-- ── 오른쪽: 결과 4가지 ── -->
+  <rect class="keep" x="826" y="150" width="378" height="62" rx="10"/>
+  <text class="outt" x="850" y="178">유지</text>
+  <text class="small" x="850" y="198">조건과 복귀 SLA 를 계속 충족한다</text>
+
+  <rect class="shrink" x="826" y="222" width="378" height="62" rx="10"/>
+  <text class="outt" x="850" y="250">축소</text>
+  <text class="small" x="850" y="270">체류시간을 줄여 복귀가 가능해진다</text>
+
+  <rect class="swap" x="826" y="294" width="378" height="62" rx="10"/>
+  <text class="outt" x="850" y="322">대체</text>
+  <text class="small" x="850" y="342">부적합 장소를 빼고 다음 안전 후보를 넣는다</text>
+
+  <rect class="stop" x="826" y="366" width="378" height="62" rx="10"/>
+  <text class="outt" x="850" y="394" style="fill:#8C3A24">취소 · 복귀</text>
+  <text class="small" x="850" y="414">관광을 중단하고 즉시 복귀 안내를 띄운다</text>
+
+  <!-- 네 결과 모두 같은 표시 계약을 따른다 -->
+  <path class="flow" d="M840 442 L1190 442"/>
+  <path class="flow" d="M1015 442 L1015 470" marker-end="url(#a2)"/>
+
+  <!-- ── 하단: 결과 표시 계약 ── -->
+  <rect class="boxk" x="826" y="476" width="378" height="128" rx="10"/>
+  <text class="ttl" x="850" y="506">변화 결과 표시</text>
+  <text class="small" x="850" y="530">전후 비교 · 무엇이 왜 바뀌었는지</text>
+  <text class="small" x="850" y="550">시트를 닫아도 결과 화면에 요약이 남는다</text>
+  <text class="small" x="850" y="576" style="font-weight:700; fill:#2C2A26">알림만 띄우고 기존 코스를 유지하는</text>
+  <text class="small" x="850" y="594" style="font-weight:700; fill:#2C2A26">동작은 금지 (D07-BAN008)</text>
+
+  <line class="rule" x1="40" y1="736" x2="118" y2="736"/>
+  <text class="small" x="40" y="766">변화 이벤트 재계산은 후보를 클라이언트가 되돌려 보내 재판정만 하므로, 이벤트를 여러 번 주입해도 공공 API 호출량이 늘지 않는다.</text>
+  <text class="small" x="40" y="788">관광정보 출처: ⓒ한국관광공사 · 기상정보 출처: ⓒ기상청</text>
+</svg>

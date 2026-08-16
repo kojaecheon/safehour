@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1360" width="1000" height="1360" role="img" aria-labelledby="t d">
+  <title id="t">SafeHour 전체 흐름과 해시태그 연계</title>
+  <desc id="d">로그인에서 시작해 병원 지침 연결, 오늘의 회복 상태, 연결 게이트와 안전 게이트 2단, 후보 조회, 판정, 변화 대응까지의 흐름과 각 단계에 연결된 해시태그를 보여준다.</desc>
+
+  <style>
+    .bg    { fill: #FAF8F5; }
+    .box   { fill: #FFFFFF; stroke: #D8D0C3; stroke-width: 1.5; }
+    .boxk  { fill: #FFFFFF; stroke: #1F4D3D; stroke-width: 2.5; }
+    .gate  { fill: #F4F1EC; stroke: #1F4D3D; stroke-width: 2.5; }
+    .stop  { fill: #FBF0EC; stroke: #EBD2C6; stroke-width: 1.5; }
+    .side  { fill: #F4F1EC; stroke: #D8D0C3; stroke-width: 1.5; }
+    .chip  { fill: #EDF3F3; stroke: #CFE0E1; stroke-width: 1.5; }
+
+    text   { font-family: 'Pretendard','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',sans-serif; fill: #2C2A26; }
+    .h1t   { font-size: 27px; font-weight: 700; }
+    .sub   { font-size: 15px; fill: #6B6660; }
+    .ttl   { font-size: 19px; font-weight: 700; }
+    .body  { font-size: 15px; fill: #6B6660; }
+    .small { font-size: 13.5px; fill: #6B6660; }
+    .tag   { font-size: 15px; font-weight: 700; fill: #1F4E58; }
+    .stopt { font-size: 16px; font-weight: 700; fill: #8C3A24; }
+    .lbl   { font-size: 13.5px; fill: #6B6660; }
+    .num   { font-size: 13px; font-weight: 700; fill: #FFFFFF; }
+
+    .flow  { stroke: #1F4D3D; stroke-width: 2.5; fill: none; }
+    .thin  { stroke: #948B7C; stroke-width: 1.5; fill: none; stroke-dasharray: 5 4; }
+    .rule  { stroke: #C9A227; stroke-width: 3; }
+  </style>
+
+  <rect class="bg" width="1000" height="1360"/>
+
+  <!-- 제목 -->
+  <text class="h1t" x="40" y="52">SafeHour 전체 흐름</text>
+  <line class="rule" x1="40" y1="68" x2="118" y2="68"/>
+  <text class="sub" x="40" y="96">지정과제 1번 · 여행 중 실시간 변수 대응 — 단계별 연계 해시태그</text>
+
+  <defs>
+    <marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="4.5" orient="auto">
+      <path d="M0,0 L9,4.5 L0,9 z" fill="#1F4D3D"/>
+    </marker>
+    <marker id="arw" markerWidth="8" markerHeight="8" refX="6.5" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 z" fill="#948B7C"/>
+    </marker>
+  </defs>
+
+  <!-- ── 1. 로그인 ── -->
+  <rect class="box" x="230" y="130" width="480" height="66" rx="10"/>
+  <text class="ttl" x="256" y="160">로그인 · Google / Kakao</text>
+  <text class="small" x="256" y="182">본인 확인이 아니다 — 계정 식별만. 이메일·이름 미수집</text>
+  <path class="flow" d="M470 196 L470 232" marker-end="url(#ar)"/>
+
+  <!-- ── 2. 병원 연결 ── -->
+  <rect class="boxk" x="230" y="238" width="480" height="72" rx="10"/>
+  <text class="ttl" x="256" y="270">병원 지침 연결 · QR / 발행 코드</text>
+  <text class="small" x="256" y="292">사용자는 조건을 입력하지 않는다</text>
+  <rect class="chip" x="756" y="252" width="210" height="44" rx="8"/>
+  <text class="tag" x="772" y="280">H2 #병원지침_연동</text>
+  <path class="flow" d="M470 310 L470 346" marker-end="url(#ar)"/>
+
+  <!-- ── 3. 게이트웨이 (채널 분리) ── -->
+  <rect class="boxk" x="150" y="352" width="640" height="132" rx="10"/>
+  <text class="ttl" x="176" y="382">SafeHour 연동 게이트웨이 — 최소화 · 버전 · 유효기간</text>
+  <rect class="side" x="176" y="396" width="288" height="70" rx="8"/>
+  <text class="body" x="192" y="420" style="font-weight:700; fill:#2C2A26">채널 A · 제한조건</text>
+  <text class="small" x="192" y="440">외출허용 · 보행한도 · 복귀마감 · 복약시각</text>
+  <text class="small" x="192" y="458">→ 판정에 쓰인다 · 서버 전송 O</text>
+  <rect class="side" x="478" y="396" width="290" height="70" rx="8"/>
+  <text class="body" x="494" y="420" style="font-weight:700; fill:#2C2A26">채널 B · 병원 안내문</text>
+  <text class="small" x="494" y="440">병원이 쓴 주의 문장 (원문 그대로)</text>
+  <text class="small" x="494" y="458">→ 표시 전용 · 서버 전송 X</text>
+  <path class="flow" d="M470 484 L470 520" marker-end="url(#ar)"/>
+
+  <!-- ── 4. 오늘의 회복 ── -->
+  <rect class="boxk" x="230" y="526" width="480" height="72" rx="10"/>
+  <text class="ttl" x="256" y="558">오늘의 회복 — 외출 가능 · 대기 · 불가</text>
+  <text class="small" x="256" y="580">복귀·복약·진료 중 가장 이른 마감을 표시</text>
+  <rect class="chip" x="756" y="540" width="210" height="44" rx="8"/>
+  <text class="tag" x="772" y="568">H3 #복귀시간_보장</text>
+
+  <!-- 좌측 분기: 병원 회복 안내 -->
+  <path class="thin" d="M230 562 L120 562 L120 640" marker-end="url(#arw)"/>
+  <rect class="side" x="20" y="646" width="200" height="76" rx="8"/>
+  <text class="body" x="36" y="672" style="font-weight:700; fill:#2C2A26">병원 회복 안내</text>
+  <text class="small" x="36" y="692">읽기 전용 7종</text>
+  <text class="small" x="36" y="710">확인해야 대기가 풀린다</text>
+  <text class="tag" x="36" y="744" style="font-size:13.5px">H2 #병원지침_연동</text>
+
+  <path class="flow" d="M470 598 L470 634" marker-end="url(#ar)"/>
+
+  <!-- ── 5. 연결 게이트 ── -->
+  <rect class="gate" x="230" y="640" width="480" height="72" rx="10"/>
+  <text class="ttl" x="256" y="670">① 연결 게이트</text>
+  <text class="small" x="256" y="692">유효한 병원 지침이 있는가</text>
+  <path class="thin" d="M710 664 L800 664" marker-end="url(#arw)"/>
+  <rect class="stop" x="806" y="638" width="170" height="76" rx="8"/>
+  <text class="stopt" x="822" y="664">미추천 · 대기</text>
+  <text class="small" x="822" y="684">없음 · 만료 · 철회</text>
+  <text class="small" x="822" y="702">미확인 중요변경 → 대기</text>
+  <text class="tag" x="806" y="736" style="font-size:13.5px">H4 #안전한_미추천</text>
+
+  <path class="flow" d="M470 712 L470 754" marker-end="url(#ar)"/>
+  <text class="lbl" x="482" y="740">통과</text>
+
+  <!-- ── 6. 안전 게이트 ── -->
+  <rect class="gate" x="230" y="760" width="480" height="72" rx="10"/>
+  <text class="ttl" x="256" y="790">② 안전 게이트</text>
+  <text class="small" x="256" y="812">병원 조건 · 복귀 SLA · 위험신호</text>
+  <path class="thin" d="M710 784 L800 784" marker-end="url(#arw)"/>
+  <rect class="stop" x="806" y="762" width="170" height="56" rx="8"/>
+  <text class="stopt" x="822" y="788">미추천</text>
+  <text class="small" x="822" y="808">조건 미충족</text>
+
+  <path class="flow" d="M470 832 L470 874" marker-end="url(#ar)"/>
+  <text class="lbl" x="482" y="860">통과</text>
+
+  <!-- ── 7. 후보 조회 ── -->
+  <rect class="box" x="230" y="880" width="480" height="80" rx="10"/>
+  <text class="ttl" x="256" y="910">후보 조회 — 병렬 3콜 + 기상 1콜</text>
+  <text class="small" x="256" y="932">한국관광공사 국문 · 영문 · 무장애</text>
+  <text class="small" x="256" y="950">기상청 초단기실황</text>
+  <rect class="chip" x="756" y="898" width="210" height="44" rx="8"/>
+  <text class="tag" x="772" y="926">H5 #무장애_접근성</text>
+  <path class="flow" d="M470 960 L470 996" marker-end="url(#ar)"/>
+
+  <!-- ── 8. 판정 ── -->
+  <rect class="boxk" x="230" y="1002" width="480" height="72" rx="10"/>
+  <text class="ttl" x="256" y="1032">조건 · SLA 판정 → 4상태 + 추천 3건</text>
+  <text class="small" x="256" y="1054">미추천 / 대기 / 보호자 근거리 / 동행 가능</text>
+  <rect class="chip" x="756" y="1002" width="210" height="36" rx="8"/>
+  <text class="tag" x="772" y="1026" style="font-size:13.5px">H3 #복귀시간_보장</text>
+  <rect class="chip" x="756" y="1042" width="210" height="36" rx="8"/>
+  <text class="tag" x="772" y="1066" style="font-size:13.5px">H6 #환자_보호자_분리</text>
+
+  <path class="flow" d="M470 1074 L470 1106"/>
+  <path class="flow" d="M470 1106 L270 1106 L270 1142" marker-end="url(#ar)"/>
+  <path class="flow" d="M470 1106 L670 1106 L670 1142" marker-end="url(#ar)"/>
+
+  <!-- ── 9. 분기 ── -->
+  <rect class="box" x="140" y="1148" width="260" height="86" rx="10"/>
+  <text class="ttl" x="164" y="1178">장소 상세</text>
+  <text class="small" x="164" y="1200">관광 원문 · 운영정보 · 접근성</text>
+  <text class="small" x="164" y="1218">원문과 추정값을 분리 표시</text>
+  <text class="tag" x="140" y="1256" style="font-size:13.5px">H5 #무장애_접근성</text>
+
+  <rect class="boxk" x="540" y="1148" width="290" height="86" rx="10"/>
+  <text class="ttl" x="564" y="1178">변화 이벤트 → 재판정</text>
+  <text class="small" x="564" y="1200">유지 · 축소 · 대체 · 취소/복귀</text>
+  <text class="small" x="564" y="1218" style="font-weight:700; fill:#1F4D3D">공공 API 재호출 0건</text>
+  <text class="tag" x="540" y="1256">H1 #실시간_변화대응</text>
+
+  <line class="rule" x1="40" y1="1296" x2="118" y2="1296"/>
+  <text class="small" x="40" y="1326">관광정보 출처: ⓒ한국관광공사 · 기상정보 출처: ⓒ기상청</text>
+</svg>

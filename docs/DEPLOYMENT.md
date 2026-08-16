@@ -23,6 +23,15 @@ Vercel → Settings → Environment Variables 에 등록한다.
 | `SAFEHOUR_DATA_ROOT` | **필수** | Production, Preview | `/tmp/safehour`. 아래 1.3 참고 — 없으면 모든 API 가 500 이다. |
 | `KMA_API_KEY` | 선택 | Production, Preview | 기상청 전용 키. **없으면 `TOUR_API_KEY` 로 폴백한다** — 공공데이터포털은 계정당 인증키가 하나이므로, 기상청 서비스만 활용신청하면 같은 키로 호출된다. |
 | `SAFEHOUR_KILL_RECOMMENDATION` | 선택 | Production | 추천 전면 중단 스위치. 아래 3장 참고. |
+| `SAFEHOUR_SESSION_SECRET` | **필수** | Production, Preview | 세션 서명 키(32자 이상). **없으면 로그인 기능 전체가 비활성**된다 — 서명 없는 세션은 위조 가능하므로 켜지 않는 편이 안전하다 (ADR-0004). |
+| `SAFEHOUR_BASE_URL` | **필수** | Production, Preview | 배포 도메인. OAuth `redirect_uri` 를 **이 값으로 조립**한다. 요청 헤더로 만들면 호스트 헤더 주입에 열린다. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 선택 | Production, Preview | 둘 다 있어야 Google 로그인이 켜진다. 요청 범위는 `openid` 뿐(이메일·프로필 미수집). |
+| `KAKAO_CLIENT_ID` / `KAKAO_CLIENT_SECRET` | 선택 | Production, Preview | 둘 다 있어야 카카오 로그인이 켜진다. 선택 동의 항목을 요청하지 않는다. |
+| `SAFEHOUR_ALLOW_DEMO_LOGIN` | 선택 | Production | `1` 일 때만 데모 진입 경로가 열린다. **심사위원이 소셜 로그인을 통과하지 못할 경우의 보험** (정의 §9-3). |
+
+**Preview 에도 인증 변수를 넣을 때 주의**: `SAFEHOUR_BASE_URL` 은 환경마다 도메인이 다르다.
+Preview 배포 URL 은 매번 바뀌므로, Preview 에서 소셜 로그인을 쓰려면 고정 도메인을 붙이거나
+데모 경로로만 확인한다.
 
 ### 1.3 서버리스 파일시스템 — `SAFEHOUR_DATA_ROOT` 가 필수인 이유
 
@@ -176,9 +185,10 @@ Vercel 은 이전 배포를 보존하므로 롤백에 재빌드가 필요 없다
 
 ## 5. 배포 전 체크리스트
 
-- [ ] CI `quality` 통과 (lint · 단위 143 · build · audit · E2E 25)
+- [ ] CI `quality` 통과 (lint · 단위 271 · build · audit · E2E 91)
 - [ ] `/api/health` 에서 `tourApiKeyConfigured: true`
-- [ ] 핵심 흐름 수동 1회: 입력 → 추천 3개 → 휴무 이벤트로 대체 → 즉시 복귀
+- [ ] `/api/auth/session` 에서 `auth.ready: true`, 쓰려는 공급자가 `configured: true`
+- [ ] 핵심 흐름 수동 1회: 로그인 → 병원 지침 연결 → 안내 확인 → 외출 판정 → 휴무 이벤트 → 즉시 복귀
 - [ ] 현재 GPS 요청 0건 (브라우저 개발자도구 → Application → Permissions)
 - [ ] 360px 에서 가로 스크롤 없음
 - [ ] kill switch 발동·해제 리허설 1회 (실제 사고 때 처음 해보면 늦다)
