@@ -317,9 +317,13 @@ test.describe('시각 표시는 단말 시간대를 따르지 않는다', () => 
   }
 
   test('시차 19시간 단말에서도 같은 복귀 마감을 보여준다', async ({ browser }) => {
+    // `browser.newContext` 는 config 의 `use` 를 물려받지 않는다. 로케일을 명시하지 않으면
+    // 러너 기본값(CI 는 en-US)으로 열려 화면이 영문으로 나온다 — 한국어 문구로 단언하므로 고정한다.
+    const context = (timezoneId) => browser.newContext({ locale: 'ko-KR', timezoneId });
+
     // 예시 지침은 지금 기준으로 발행되므로 두 컨텍스트를 같은 순간에 열어 비교한다.
-    const seoul = await browser.newContext({ timezoneId: 'Asia/Seoul' });
-    const honolulu = await browser.newContext({ timezoneId: 'Pacific/Honolulu' }); // KST-19h
+    const seoul = await context('Asia/Seoul');
+    const honolulu = await context('Pacific/Honolulu'); // KST-19h
     try {
       const [fromSeoul, fromHonolulu] = await Promise.all([
         seoul.newPage().then(readDeadline),
