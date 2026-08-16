@@ -261,13 +261,31 @@ export function planToCondition(plan) {
   };
 }
 
-/** `HH:MM` 을 오늘(또는 내일) 날짜에 붙여 Date 로 만든다 */
+/** KST 는 서머타임이 없어 고정 오프셋으로 다뤄도 된다. */
+const KST_OFFSET_MS = 9 * 3600_000;
+
+/**
+ * `HH:MM` 을 다음에 오는 그 시각(KST)으로 바꾼다.
+ *
+ * 병원이 발행한 복약 시각은 **한국 벽시계 시각**이다. 실행 환경의 시간대로 해석하면
+ * 두 곳에서 어긋난다 — 서버는 UTC 로 돌고(Vercel), 외국인 이용자의 단말은 현지 시간대다.
+ * 어느 쪽이든 마감이 몇 시간씩 밀려 "가장 이른 마감으로 복귀를 보장한다" 는 약속이 깨진다.
+ * 그래서 실행 환경과 무관하게 KST 로 고정해 해석한다.
+ */
 export function nextClockOccurrence(clock, now = new Date()) {
   if (!isClockTime(clock)) return null;
   const [h, m] = clock.split(':').map(Number);
-  const candidate = new Date(now);
-  candidate.setHours(h, m, 0, 0);
-  if (candidate.getTime() <= now.getTime()) candidate.setDate(candidate.getDate() + 1);
+
+  // now 를 KST 벽시계로 옮겨 "오늘이 KST 로 며칠인지" 를 읽는다.
+  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
+  const candidate = new Date(
+    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate(), h, m, 0, 0) -
+      KST_OFFSET_MS,
+  );
+
+  if (candidate.getTime() <= now.getTime()) {
+    candidate.setUTCDate(candidate.getUTCDate() + 1);
+  }
   return candidate;
 }
 

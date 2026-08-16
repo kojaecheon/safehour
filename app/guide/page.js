@@ -14,6 +14,7 @@ import LanguageToggle from '@/components/LanguageToggle.js';
 import FooterLinks from '@/components/FooterLinks.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import { acknowledgeAll, acknowledgeInstruction, readPlan } from '@/lib/recovery-store.js';
+import { fmtDateTime } from '@/lib/format.js';
 import { CRITICAL_CATEGORIES, INSTRUCTION_CATEGORIES } from '@/src/recovery/plan.js';
 
 const CATEGORY_KEY = {
@@ -40,14 +41,7 @@ export default function GuidePage() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const fmt = (iso) =>
-    new Date(iso).toLocaleString(locale, {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
+  const fmt = (iso) => fmtDateTime(iso, locale);
 
   const instructions = plan?.instructions ?? [];
   // 병원이 준 순서를 흔들지 않되, 분류가 섞여 오면 정의된 순서로 묶는다

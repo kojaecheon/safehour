@@ -14,6 +14,7 @@ import LanguageToggle from '@/components/LanguageToggle.js';
 import FooterLinks from '@/components/FooterLinks.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import { readPlan, writePlan } from '@/lib/recovery-store.js';
+import { fmtDateTime } from '@/lib/format.js';
 import { PLAN_KEY } from '@/lib/session.js';
 
 const ERROR_KEY = {
@@ -82,14 +83,7 @@ export default function LinkPage() {
     setPlan(null);
   }
 
-  const fmt = (iso) =>
-    new Date(iso).toLocaleString(locale, {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
+  const fmt = (iso) => fmtDateTime(iso, locale);
 
   return (
     <>

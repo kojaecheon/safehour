@@ -21,6 +21,7 @@ import FooterLinks from '@/components/FooterLinks.js';
 import StateBanner from '@/components/StateBanner.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import { readPlan } from '@/lib/recovery-store.js';
+import { fmtDateTime } from '@/lib/format.js';
 import { effectiveDeadline, gateRecoveryPlan, planToCondition } from '@/src/recovery/plan.js';
 
 const DEADLINE_REASON_KEY = {
@@ -163,14 +164,7 @@ export default function PlanPage() {
 
   const c = plan.constraints;
   const deadline = effectiveDeadline(plan);
-  const fmt = (date) =>
-    date.toLocaleString(locale, {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
+  const fmt = (date) => fmtDateTime(date, locale);
 
   // 병원이 켠 제한만 보여준다 — 꺼진 항목을 나열하면 무엇이 제한인지 흐려진다
   const flags = [

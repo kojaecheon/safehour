@@ -296,3 +296,39 @@ test.describe('무효화 진입 경로 (AX-220 회귀)', () => {
     await expect(page.locator('.state-banner').first()).toContainText('거둬들였습니다');
   });
 });
+
+/**
+ * 병원이 발행한 시각은 한국 벽시계 시각이다. 외국인 이용자의 폰은 고국 시간대로
+ * 설정돼 있을 수 있는데, 그 시간대로 렌더하면 **복귀 마감이 다른 시각으로 보인다.**
+ * 시차만큼 늦게 돌아오게 만드는 결함이라 라벨이 아니라 값을 고정한다.
+ */
+test.describe('시각 표시는 단말 시간대를 따르지 않는다', () => {
+  const DEADLINE = /복귀 마감 (\d{1,2})\. (\d{1,2})\. (\d{2}:\d{2})/;
+
+  async function readDeadline(page) {
+    await page.goto('/api/auth/login?provider=demo&returnTo=/link');
+    await page.getByRole('button', { name: '예시 A — 외출 가능' }).click();
+    await page.getByRole('button', { name: '오늘의 회복 상태 보기' }).click();
+    await expect(page).toHaveURL(/\/today/);
+    const text = await page.locator('main').innerText();
+    const match = text.match(DEADLINE);
+    expect(match, `복귀 마감을 찾지 못했다:\n${text}`).not.toBeNull();
+    return match[0];
+  }
+
+  test('시차 19시간 단말에서도 같은 복귀 마감을 보여준다', async ({ browser }) => {
+    // 예시 지침은 지금 기준으로 발행되므로 두 컨텍스트를 같은 순간에 열어 비교한다.
+    const seoul = await browser.newContext({ timezoneId: 'Asia/Seoul' });
+    const honolulu = await browser.newContext({ timezoneId: 'Pacific/Honolulu' }); // KST-19h
+    try {
+      const [fromSeoul, fromHonolulu] = await Promise.all([
+        seoul.newPage().then(readDeadline),
+        honolulu.newPage().then(readDeadline),
+      ]);
+      expect(fromHonolulu).toBe(fromSeoul);
+    } finally {
+      await seoul.close();
+      await honolulu.close();
+    }
+  });
+});

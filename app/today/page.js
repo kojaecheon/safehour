@@ -16,6 +16,7 @@ import FooterLinks from '@/components/FooterLinks.js';
 import StateBanner from '@/components/StateBanner.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import { readPlan } from '@/lib/recovery-store.js';
+import { fmtDateTime as formatDateTime, fmtTime as formatTime } from '@/lib/format.js';
 import {
   effectiveDeadline,
   nextClockOccurrence,
@@ -69,16 +70,8 @@ export default function TodayPage() {
     };
   }, []);
 
-  const fmtTime = (date) =>
-    date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
-  const fmtDateTime = (date) =>
-    date.toLocaleString(locale, {
-      month: 'numeric',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    });
+  const fmtTime = (date) => formatTime(date, locale);
+  const fmtDateTime = (date) => formatDateTime(date, locale);
 
   if (!loaded) {
     return (

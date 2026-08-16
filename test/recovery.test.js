@@ -224,9 +224,23 @@ describe('가장 이른 마감', () => {
   });
 
   test('지난 복약 시각은 다음 날로 넘긴다 — 이미 지난 시각을 마감으로 쓰지 않는다', () => {
-    const at = nextClockOccurrence('09:00', NOW); // NOW 는 10:00
+    const at = nextClockOccurrence('09:00', NOW); // NOW 는 KST 10:00
     assert.ok(at > NOW);
-    assert.equal(at.getHours(), 9);
+    // 다음 날 KST 09:00 = 2026-08-15T00:00Z. 실행 시간대와 무관하게 같은 순간이어야 한다.
+    assert.equal(at.toISOString(), '2026-08-15T00:00:00.000Z');
+  });
+
+  /**
+   * 복약 시각은 병원이 발행한 **한국 벽시계 시각**이다.
+   * 예전 구현은 `setHours` 로 실행 환경의 시간대를 따랐다 — UTC 로 도는 서버와
+   * 해외 이용자의 단말에서 마감이 9시간 밀렸다. 절대 시각으로 고정한다.
+   */
+  test('복약 시각은 실행 시간대와 무관하게 KST 로 해석한다', () => {
+    // NOW 는 KST 08-14 10:00. 아직 오지 않은 15:00 은 같은 날 KST 15:00 = 06:00Z.
+    assert.equal(nextClockOccurrence('15:00', NOW).toISOString(), '2026-08-14T06:00:00.000Z');
+    // 자정 직전·직후도 날짜 경계에서 밀리지 않는다.
+    assert.equal(nextClockOccurrence('23:59', NOW).toISOString(), '2026-08-14T14:59:00.000Z');
+    assert.equal(nextClockOccurrence('00:00', NOW).toISOString(), '2026-08-14T15:00:00.000Z');
   });
 });
 
