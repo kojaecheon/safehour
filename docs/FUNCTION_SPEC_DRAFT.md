@@ -296,7 +296,7 @@ HL7 FHIR 의 `CarePlan`(관리 계획)·`Consent`(공유 동의)·`Provenance`(�
 | 1 | 지정 양식 사용 · PDF 변환 | 양식 배포 확인 완료 |
 | 2 | 지정과제 번호 | **1번 확정** — 접수 화면과 대조만 |
 | 3 | 서비스명 | **SafeHour 확정** — 접수 시스템 표기와 대조만 |
-| 4 | 흐름도 도식화 | 🔴 미착수 |
+| 4 | 흐름도 도식화 | 완료 — `docs/diagrams/flow-overall.svg`, `flow-change-response.svg` |
 | 5 | 대표 1 + 상세 3~5 이미지 | 캡처 완료 — 선택만 |
 | 6 | 활용 API 리스트 | 확정 |
 | 7 | 인증키(인코딩·디코딩) | 🔴 제출용 키 확정 필요 — `COMPETITION_SUBMISSION.md` 2.C2 참조 |
