@@ -376,6 +376,48 @@ describe('로그 안전성 (AGENTS.md 불변조건)', () => {
     assert.equal(entry.endpoint.includes('?'), false, 'endpoint 에 query 가 포함됐다');
   });
 
+  test('기준점 좌표가 호출 로그에 남지 않는다 (D07-POL002)', async () => {
+    const { impl } = countingFetch();
+    // 위치기반 조회가 넘기는 형태 — mapX/mapY 는 사용자가 선택한 고정 기준점이다.
+    // 그대로 쌓이면 "언제 어느 좌표를 조회했는지"가 시계열로 남아 위치 이력이 된다.
+    await callTourApi({
+      ...OP,
+      parameters: { ...uniqueParams(52), mapX: '127.0276', mapY: '37.4979', radius: '3000' },
+      useCache: false,
+      fetchImpl: impl,
+    });
+
+    const raw = fs.readFileSync(logFile(), 'utf8');
+    assert.equal(raw.includes('127.0276'), false, '경도가 호출 로그에 남았다');
+    assert.equal(raw.includes('37.4979'), false, '위도가 호출 로그에 남았다');
+
+    const entry = readLogEntries().at(-1);
+    assert.equal(entry.parameters.mapX, 'REDACTED', '좌표가 가려졌다는 사실이 보이지 않는다');
+    assert.equal(entry.parameters.mapY, 'REDACTED');
+    // 좌표가 아닌 파라미터는 심사 증빙에 필요하므로 그대로 남는다
+    assert.equal(entry.parameters.radius, '3000', '좌표가 아닌 파라미터까지 지워졌다');
+  });
+
+  test('로그 쓰기가 실패해도 호출 결과는 정상 반환된다', async () => {
+    const { impl } = countingFetch();
+    const original = fs.appendFileSync;
+    fs.appendFileSync = () => {
+      throw new Error('ENOSPC');
+    };
+    try {
+      // 로그는 관측 수단이다. 여기서 터지면 사용자가 안전 판정을 못 받는다.
+      const result = await callTourApi({
+        ...OP,
+        parameters: uniqueParams(53),
+        useCache: false,
+        fetchImpl: impl,
+      });
+      assert.ok(result, '로그 실패가 호출 결과를 삼켰다');
+    } finally {
+      fs.appendFileSync = original;
+    }
+  });
+
   test('반환값에도 인증키가 포함되지 않는다', async () => {
     const { impl } = countingFetch();
     const result = await callTourApi({

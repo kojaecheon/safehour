@@ -85,8 +85,38 @@ function reserveCallSlot(operationKey, day) {
   return counter[operationKey];
 }
 
+/**
+ * 호출 파라미터에서 좌표를 지운다.
+ *
+ * 위치기반 조회는 mapX/mapY 로 사용자가 선택한 기준점을 넘긴다. 그대로 로그에
+ * 쌓으면 "언제 어느 좌표를 조회했는지"가 시계열로 남아 D07-POL002 가 금지한
+ * 위치 이력이 된다. 심사 증빙(API 활용표)에 필요한 것은 operation·횟수·성공
+ * 여부이지 좌표가 아니므로, 값만 가리고 키는 남겨 가려졌다는 사실을 보인다.
+ */
+const LOCATION_PARAM_KEYS = new Set(["mapX", "mapY"]);
+
+function redactParameters(parameters) {
+  if (!parameters || typeof parameters !== "object") return parameters;
+  const safe = {};
+  for (const [key, value] of Object.entries(parameters)) {
+    safe[key] = LOCATION_PARAM_KEYS.has(key) ? "REDACTED" : value;
+  }
+  return safe;
+}
+
 function appendCallLog(entry) {
-  fs.appendFileSync(callLogPath(entry.kstDate), `${JSON.stringify(entry)}\n`, "utf8");
+  // 로그 쓰기 실패가 추천을 막지 않는다 — 관측 때문에 사용자가 안전 판정을
+  // 못 받는 일은 없어야 한다. 한도 카운터는 별도 파일이라 여기서 실패해도
+  // 차단 로직은 그대로 동작한다.
+  try {
+    fs.appendFileSync(
+      callLogPath(entry.kstDate),
+      `${JSON.stringify({ ...entry, parameters: redactParameters(entry.parameters) })}\n`,
+      "utf8",
+    );
+  } catch (error) {
+    console.error("[tour-api] call log write failed:", error.message);
+  }
 }
 
 function encodeServiceKey(serviceKey) {

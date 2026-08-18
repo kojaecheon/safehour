@@ -21,11 +21,13 @@ import {
   toCumulativeEvent,
 } from '../../../lib/server/engine-io.js';
 import { isRecommendationKilled, killSwitchDecision } from '../../../lib/server/runtime-flags.js';
+import { OUTCOME, logDecision } from '../../../lib/server/decision-log.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
+  const startedAt = Date.now();
   let body;
   try {
     body = await request.json();
@@ -33,10 +35,23 @@ export async function POST(request) {
     return Response.json({ ok: false, errorCode: 'SAFEHOUR_BAD_REQUEST', message: '요청 본문이 올바르지 않습니다.' }, { status: 400 });
   }
 
+  // `null` 이나 문자열도 유효한 JSON 이라 위 파싱은 통과한다. 그대로 두면
+  // 아래에서 속성 접근이 터져 500 이 나가므로, 계약대로 400 으로 막는다.
+  if (body === null || typeof body !== 'object') {
+    return Response.json({ ok: false, errorCode: 'SAFEHOUR_BAD_REQUEST', message: '요청 본문이 올바르지 않습니다.' }, { status: 400 });
+  }
+
   // kill switch 가 켜져 있으면 재판정도 하지 않는다. 이벤트 종류와 무관하게
   // 더 안전한 쪽(미추천)으로만 응답한다 (D06-E014).
   if (isRecommendationKilled()) {
     const paused = killSwitchDecision();
+    logDecision({
+      route: 'recalculate',
+      outcome: OUTCOME.PAUSED,
+      decision: paused,
+      trigger: body.event?.type,
+      elapsedMs: Date.now() - startedAt,
+    });
     return Response.json({
       ok: true,
       displayLimit: DISPLAY_LIMIT,
@@ -93,6 +108,18 @@ export async function POST(request) {
 
   try {
     const recalc = applyEvent(engineInput, event);
+    // 변화가 필요한데 hasVisibleChange=false 면 D07-BAN008(알림만 하는 재계산)
+    // 위반 신호다. 로그에 남겨야 사후에 찾을 수 있다.
+    logDecision({
+      route: 'recalculate',
+      outcome: OUTCOME.DECIDED,
+      decision: recalc.result,
+      recalc,
+      trigger: event.type,
+      candidateCount: engineInput.candidates.length,
+      conditionIssuedAt: engineInput.condition?.issuedAt,
+      elapsedMs: Date.now() - startedAt,
+    });
     return Response.json({
       ok: true,
       displayLimit: DISPLAY_LIMIT,
@@ -108,6 +135,13 @@ export async function POST(request) {
   } catch (error) {
     // 재계산 실패 시 기존 코스를 신뢰하지 않는다 (D06-E013)
     console.error('[recalculate] engine failed:', error.message);
+    logDecision({
+      route: 'recalculate',
+      outcome: OUTCOME.FAILED,
+      errorCode: 'SAFEHOUR_RECALCULATION_FAILED',
+      trigger: event.type,
+      elapsedMs: Date.now() - startedAt,
+    });
     return Response.json({
       ok: false,
       errorCode: 'SAFEHOUR_RECALCULATION_FAILED',
