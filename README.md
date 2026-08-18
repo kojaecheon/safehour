@@ -50,12 +50,24 @@ npm install
 npm run dev
 ```
 
-- `/` 시작 화면 → `/plan` 조건 입력 → `/result` 추천·변화 대응·즉시 복귀 → `/place/{id}` 장소 상세
-- 내부 API: `POST /api/recommend`(조건 → 후보 조회 → 판정), `POST /api/recalculate`(이벤트 → 재판정 델타),
-  `POST /api/place`(장소 상세), `GET /api/health`(배포·운영 스위치 상태)
+**흐름**: `/login` 로그인 → `/link` 병원 지침 연결 → `/today` 오늘의 회복 →
+`/guide` 병원 안내 확인 → `/plan` 계획 확인·외출 판정 → `/result` 추천·변화 대응·즉시 복귀 →
+`/place/{id}` 장소 상세. `/` 시작 안내와 `/privacy` 개인정보·면책 고지는 판정 흐름 밖의 정적 화면입니다.
+
+- **조건은 사용자가 입력하지 않습니다.** 병원이 발행한 제한조건을 읽기 전용으로 받습니다 —
+  구조와 경계는 `docs/PRODUCT_DEFINITION.md`
+- 내부 API: `POST /api/plan/link`(지침 연결), `POST /api/today`(게이트 판정),
+  `POST /api/recommend`(후보 조회 → 판정), `POST /api/recalculate`(이벤트 → 재판정 델타),
+  `POST /api/place`(장소 상세), `GET /api/health`, `/api/auth/*`(로그인)
+- 로그인은 **Google·Kakao** 이며 서버 DB가 없습니다 — PKCE + 서명 쿠키 세션
+  (`docs/decisions/0004-authentication.md`)
 - 판정은 stateless — 서버는 세션·조건을 저장하지 않고, 클라이언트가 재계산 payload를 되돌려 보냅니다
 - 엔진은 후보 최대 5개를 산출하고 화면은 상위 3개만 노출합니다
-- 병원 안내문 원문은 수집하지 않으며, 현재 GPS는 사용하지 않습니다
+- **병원 안내문 원문(채널 B)은 서버로 보내지 않습니다.** 판정에는 코드값 제한조건(채널 A)만 씁니다
+- 현재 GPS는 사용하지 않습니다
+- **한국어·영어를 지원합니다.** 영어권 브라우저는 조작 없이 영어로 열리고, 안전 판정 문구는
+  두 언어를 함께 보여줍니다 — `docs/decisions/0003-language-strategy.md`
+- 단말에 남은 조건·결과는 화면 하단 **"이 기기에서 내 정보 지우기"** 로 즉시 삭제할 수 있습니다
 - 라우트 구조는 `docs/decisions/0001-route-contract.md`에서 확정했습니다
 
 `npm run demo:live`는 실데이터 추천 3건을 생성하고, 1순위 장소 휴무 이벤트 후
@@ -72,9 +84,18 @@ npm run build
 npm run e2e
 ```
 
-- 핵심 흐름 6건: 입력 → 추천 → 휴무 대체 → 즉시 복귀, 환자 호출, 차단 우회 방지, 입력 유지, 안전 게이트
-- 접근성 19건: axe 8화면(WCAG 2.1 A/AA), 키보드 전용 4건, 320~1280px 반응형, 텍스트 200% 확대, 터치 44px
-- 전 구간에서 현재 GPS 요청 0건과 가로 스크롤 없음을 단언합니다
+**91건 / 6개 파일**입니다.
+
+| 파일 | 건수 | 무엇을 고정하나 |
+| --- | --- | --- |
+| `core-flow.spec.js` | 7 | 판정 → 추천 → 휴무 대체 → 즉시 복귀, 환자 호출, 차단 우회 방지, 안전 게이트 |
+| `recovery.spec.js` | 23 | 병원 지침 연결·오늘의 회복·병원 안내, 만료·철회 시 즉시 복귀 전환 |
+| `accessibility.spec.js` | 22 | axe 9화면(WCAG 2.1 A/AA), 키보드 전용, 320~1280px 반응형, 200% 확대, 터치 44px |
+| `login.spec.js` | 18 | 소셜 로그인 시작·콜백·로그아웃, 미설정 공급자 처리, 데모 경로 |
+| `i18n.spec.js` | 11 | 영어권 브라우저 자동 진입, 전환 유지, 안전 문구 병기 |
+| `privacy.spec.js` | 10 | 고지 화면 접근성, 삭제 확인·취소, 삭제 후 저장소가 실제로 비었는지 |
+
+전 구간에서 현재 GPS 요청 0건과 가로 스크롤 없음을 단언합니다.
 
 ## 배포와 운영
 
@@ -107,7 +128,10 @@ API 인증키는 호출 로그에 기록하지 않습니다. 일별·오퍼레�
 - [우선순위 백로그](docs/AX_BACKLOG.md)
 - [내부 API 계약](docs/API_CONTRACT.md)
 - [배포·운영 절차](docs/DEPLOYMENT.md)
-- [결정 기록 (ADR)](docs/decisions/)
+- [결정 기록 (ADR)](docs/decisions/) — 라우트·계측·다국어·인증
+- [기능정의서 — 환자·보호자 플랫폼](docs/PRODUCT_DEFINITION.md)
+- [공모전 제출 준비](docs/COMPETITION_SUBMISSION.md)
+- [해시태그와 기능 매핑](docs/HASHTAG_MAP.md)
 - [전문 승인 체크리스트](docs/SIGNOFF_CHECKLIST.md)
 - [공공 API 활용표와 화면 대응](docs/API_USAGE_TABLE.md)
 - [구현 방향과 다음 단계](docs/IMPLEMENTATION_DIRECTION.md)

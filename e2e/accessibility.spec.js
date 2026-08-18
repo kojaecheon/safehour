@@ -6,7 +6,7 @@
 
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { submitPlan, assertNoHorizontalScroll } from './helpers.js';
+import { connectPlan, submitPlan, assertNoHorizontalScroll } from './helpers.js';
 
 /** WCAG 2.1 A/AA 규칙만 본다 — 실험적·모범사례 규칙은 게이트로 쓰지 않는다 */
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
@@ -28,16 +28,17 @@ test.describe('axe 자동 검사 (AC019)', () => {
     await scan(page, '시작 화면');
   });
 
-  test('조건 입력 화면에 WCAG A/AA 위반이 없다', async ({ page }) => {
+  test('외출 계획 확인 화면에 WCAG A/AA 위반이 없다', async ({ page }) => {
+    await connectPlan(page);
     await page.goto('/plan');
-    await scan(page, '조건 입력 화면');
+    await expect(page.getByRole('heading', { name: '병원이 정한 조건' })).toBeVisible();
+    await scan(page, '외출 계획 확인 화면');
   });
 
-  test('입력 오류 상태에 WCAG A/AA 위반이 없다', async ({ page }) => {
+  test('지침 미연결 상태에 WCAG A/AA 위반이 없다', async ({ page }) => {
     await page.goto('/plan');
-    await page.getByRole('button', { name: '안전 판정으로 추천 받기' }).click();
-    await expect(page.locator('.state-banner[role="alert"]')).toBeVisible();
-    await scan(page, '입력 오류 상태');
+    await expect(page.getByText('병원 지침을 먼저 연결하세요')).toBeVisible();
+    await scan(page, '지침 미연결 상태');
   });
 
   test('판정 결과 화면에 WCAG A/AA 위반이 없다', async ({ page }) => {
@@ -76,27 +77,18 @@ test.describe('axe 자동 검사 (AC019)', () => {
 });
 
 test.describe('키보드 전용 조작 (QA034)', () => {
-  test('마우스 없이 조건 입력을 제출할 수 있다', async ({ page }) => {
+  test('마우스 없이 외출 판정을 제출할 수 있다', async ({ page }) => {
+    await connectPlan(page);
     await page.goto('/plan');
+    await expect(page.getByRole('heading', { name: '지금 상황' })).toBeVisible();
 
-    // Tab 으로 이동해 "방금 받음" 버튼에 도달한다
-    let reached = false;
-    for (let i = 0; i < 40 && !reached; i += 1) {
-      await page.keyboard.press('Tab');
-      reached = await page.evaluate(
-        () => document.activeElement?.textContent?.trim() === '방금 받음',
-      );
-    }
-    expect(reached, 'Tab 으로 "방금 받음" 버튼에 도달하지 못했다').toBe(true);
-
-    // 키보드로 활성화
-    await page.keyboard.press('Enter');
-    await expect(page.locator('#issued-at')).not.toHaveValue('');
-
-    // 라디오는 방향키로 선택한다
-    await page.locator('input[name="outing"]').first().focus();
+    // 체크박스는 Space 로 조작한다
+    const companion = page.locator('#role input[type="checkbox"]').first();
+    await companion.focus();
     await page.keyboard.press('Space');
-    await expect(page.locator('input[name="outing"]').first()).toBeChecked();
+    await expect(companion).not.toBeChecked();
+    await page.keyboard.press('Space');
+    await expect(companion).toBeChecked();
 
     // 제출 버튼까지 Tab 으로 도달해 Enter 로 제출
     let onSubmit = false;

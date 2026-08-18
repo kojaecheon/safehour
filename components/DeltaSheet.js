@@ -6,20 +6,11 @@
 // 세션에 적용되어 있다. 알림만 표시하고 기존 코스를 유지하는 선택지는
 // 존재하지 않는다 (D07-BAN008).
 
-import { STATE_MESSAGE, REASON_TEXT } from '@/src/domain/states.js';
-import { minutesLabel } from '@/lib/format.js';
 import { useModalSheet } from '@/lib/useModalSheet.js';
-
-const EVENT_LABEL = {
-  CLOSURE: '장소 휴무',
-  WEATHER: '기상 악화',
-  TRAFFIC_SURGE: '교통 지연',
-  APPOINTMENT: '진료시간 변경',
-  PATIENT_RECALL: '환자 호출',
-  RISK_SIGNAL: '위험신호 입력',
-};
+import { useLang } from './LanguageProvider.js';
 
 export default function DeltaSheet({ recalc, titles = {}, onClose }) {
+  const { t, minutesLabel, stateMessage, reasonText } = useLang();
   const { event, before, after, delta } = recalc;
   // 확인 버튼도 requestClose 를 거친다 — 뒤로가기와 같은 경로로 닫아야
   // 히스토리에 잉여 항목이 남지 않는다 (ADR-0001 보완 조건 3)
@@ -34,26 +25,29 @@ export default function DeltaSheet({ recalc, titles = {}, onClose }) {
     return excluded?.title ?? id;
   }
 
+  function stateLabelOf(state) {
+    return stateMessage(state)?.message ?? state;
+  }
+
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="delta-h">
       <div className="sheet" ref={sheetRef} tabIndex={-1}>
         <h2 id="delta-h" style={{ marginBottom: 4 }}>
-          {EVENT_LABEL[event.type] ?? event.type} 발생
+          {t('delta.title', { event: t(`event.${event.type}`) })}
         </h2>
         <p style={{ marginBottom: 14 }}>
-          코스를 처음부터 다시 판정해 아래 결과를 <strong>이미 적용했습니다</strong>.
-          {delta.hasVisibleChange ? ' 변화 내용을 확인하세요.' : ' 기존 코스가 조건을 계속 충족합니다.'}
+          {t('delta.lead')}
+          {delta.hasVisibleChange ? t('delta.leadChanged') : t('delta.leadKept')}
         </p>
 
         {delta.stateChanged && (
           <div className="delta-row">
-            <span className="delta-tag delta-state">상태 변경</span>
+            <span className="delta-tag delta-state">{t('delta.tagState')}</span>
             <span>
-              {STATE_MESSAGE[before.state]?.ko ?? before.state} →{' '}
-              <strong>{STATE_MESSAGE[after.state]?.ko ?? after.state}</strong>
+              {stateLabelOf(before.state)} → <strong>{stateLabelOf(after.state)}</strong>
               {after.reasons?.length > 0 && (
                 <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 14 }}>
-                  {after.reasons.map((r) => REASON_TEXT[r]?.ko ?? r).join(' · ')}
+                  {after.reasons.map(reasonText).join(' · ')}
                 </span>
               )}
             </span>
@@ -64,12 +58,12 @@ export default function DeltaSheet({ recalc, titles = {}, onClose }) {
           const excludedEntry = recalc.result.excluded.find((e) => String(e.id) === String(id));
           return (
             <div className="delta-row" key={`removed-${id}`}>
-              <span className="delta-tag delta-removed">제거</span>
+              <span className="delta-tag delta-removed">{t('delta.tagRemoved')}</span>
               <span>
                 {titleOf(id)}
                 {excludedEntry && (
                   <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 14 }}>
-                    {excludedEntry.reasons.map((r) => REASON_TEXT[r]?.ko ?? r).join(' · ')}
+                    {excludedEntry.reasons.map(reasonText).join(' · ')}
                   </span>
                 )}
               </span>
@@ -79,14 +73,14 @@ export default function DeltaSheet({ recalc, titles = {}, onClose }) {
 
         {delta.added.map((id) => (
           <div className="delta-row" key={`added-${id}`}>
-            <span className="delta-tag delta-added">대체 투입</span>
+            <span className="delta-tag delta-added">{t('delta.tagAdded')}</span>
             <span>{titleOf(id)}</span>
           </div>
         ))}
 
         {delta.shortened.map((s) => (
           <div className="delta-row" key={`short-${s.id}`}>
-            <span className="delta-tag delta-shortened">체류 축소</span>
+            <span className="delta-tag delta-shortened">{t('delta.tagShortened')}</span>
             <span>
               {titleOf(s.id)}
               <span style={{ display: 'block', color: 'var(--ink-soft)', fontSize: 14 }}>
@@ -98,13 +92,13 @@ export default function DeltaSheet({ recalc, titles = {}, onClose }) {
 
         {!delta.hasVisibleChange && (
           <div className="delta-row">
-            <span className="delta-tag delta-added">유지</span>
-            <span>조건과 복귀 SLA를 계속 충족해 코스가 유지됩니다.</span>
+            <span className="delta-tag delta-added">{t('delta.tagKept')}</span>
+            <span>{t('delta.keptBody')}</span>
           </div>
         )}
 
         <button type="button" className="btn" style={{ marginTop: 16 }} onClick={requestClose}>
-          확인
+          {t('common.confirm')}
         </button>
       </div>
     </div>

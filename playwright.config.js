@@ -50,6 +50,10 @@ export default defineConfig({
       TOUR_API_KEY: process.env.TOUR_API_KEY || 'e2e-dummy-key',
       // 기상은 판정에 반영되지 않는 보강 정보다. E2E 에서 외부로 나가지 않게 비운다.
       KMA_API_KEY: ' ',
+      // 로그인 검증용 — 실제 공급자 자격증명은 두지 않는다 (AX-219).
+      // 데모 경로만 열어 "로그인 → 내 정보 지우기 → 로그아웃" 순환을 검증한다.
+      SAFEHOUR_SESSION_SECRET: 'e2e-session-secret-e2e-session-secret-0123456789',
+      SAFEHOUR_ALLOW_DEMO_LOGIN: '1',
     },
   },
 });

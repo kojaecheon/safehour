@@ -4,7 +4,7 @@
 // 360px 화면에서 끊김 없이 동작하고, 현재 GPS 를 한 번도 요구하지 않는다.
 
 import { test, expect } from '@playwright/test';
-import { submitPlan, assertNoHorizontalScroll } from './helpers.js';
+import { connectPlan, submitPlan, assertNoHorizontalScroll } from './helpers.js';
 
 /** 현재 GPS 요청을 감시한다 — 한 번이라도 호출되면 D07-BAN002 위반이다 */
 async function watchGeolocation(page) {
@@ -120,39 +120,39 @@ test.describe('핵심 흐름 (AC018)', () => {
   });
 });
 
-test.describe('입력 유지 (D03-NAV004)', () => {
-  test('결과에서 돌아와도 입력한 조건이 남는다', async ({ page }) => {
-    await watchGeolocation(page);
+// D03-NAV004(입력 유지)는 AX-221 로 대상이 사라졌다 — 조건이 사용자 입력이
+// 아니라 병원 발행값이므로 뒤로가기로 잃을 입력이 없다. 대신 지켜야 할 것은
+// **사용자가 병원 조건을 고칠 수 없다** 는 것이다.
+test.describe('병원 조건은 읽기 전용 (AX-221)', () => {
+  test('조건을 고치는 입력 수단이 화면에 없다', async ({ page }) => {
+    await connectPlan(page);
     await page.goto('/plan');
+    await expect(page.getByRole('heading', { name: '병원이 정한 조건' })).toBeVisible();
 
-    await page.getByRole('button', { name: '방금 받음' }).click();
-    await page.getByText('외출이 허용되었습니다').click();
-    await page.locator('#anchor-label').fill('테스트 병원');
-    await page.locator('#max-walk').fill('12');
+    // 예전 수기 입력 필드가 하나라도 남아 있으면 "병원이 정한 조건" 이 거짓이 된다
+    for (const id of ['#anchor-label', '#max-walk', '#max-travel', '#issued-at', '#return-by']) {
+      await expect(page.locator(id), `${id} 가 아직 편집 가능하다`).toHaveCount(0);
+    }
+    await expect(page.locator('input[name="outing"]')).toHaveCount(0);
+  });
 
-    await page.getByRole('button', { name: '안전 판정으로 추천 받기' }).click();
-    await page.waitForURL('**/result');
+  test('결과에서 돌아와도 병원 조건이 그대로다', async ({ page }) => {
+    await watchGeolocation(page);
+    await submitPlan(page);
 
-    // 결과에서 조건 입력으로 돌아간다
     await page.getByRole('button', { name: '조건 입력으로 돌아가기' }).click();
     await page.waitForURL('**/plan');
 
-    await expect(page.locator('#anchor-label')).toHaveValue('테스트 병원');
-    await expect(page.locator('#max-walk')).toHaveValue('12');
-    await expect(page.locator('#issued-at')).not.toHaveValue('');
-    await expect(page.getByText(/이전에 입력한 조건을 복원했습니다/)).toBeVisible();
+    await expect(page.getByText('보행 20분 이내')).toBeVisible();
+    await expect(page.getByText('편도 이동 30분 이내')).toBeVisible();
+    await assertNoGpsRequest(page);
   });
 });
 
 test.describe('안전 게이트 (QA033–QA040)', () => {
-  test('외출이 허용되지 않으면 관광을 추천하지 않는다', async ({ page }) => {
+  test('병원이 외출을 제한하면 관광을 추천하지 않는다', async ({ page }) => {
     await watchGeolocation(page);
-    await page.goto('/plan');
-
-    await page.getByRole('button', { name: '방금 받음' }).click();
-    await page.getByText('외출이 허용되지 않았습니다').click();
-    await page.getByRole('button', { name: '안전 판정으로 추천 받기' }).click();
-    await page.waitForURL('**/result');
+    await submitPlan(page, { outingAllowed: false });
 
     await expect(page.locator('.state-banner').first()).toContainText('관광을 권하지 않습니다');
     await expect(page.getByText('병원이 외출을 제한했습니다')).toBeVisible();
@@ -160,15 +160,66 @@ test.describe('안전 게이트 (QA033–QA040)', () => {
     await assertNoGpsRequest(page);
   });
 
-  test('외출 허용을 선택하지 않으면 제출이 막힌다', async ({ page }) => {
+  test('지침을 연결하지 않으면 판정 자체를 하지 않는다', async ({ page }) => {
     await page.goto('/plan');
-    await page.getByRole('button', { name: '방금 받음' }).click();
-    await page.getByRole('button', { name: '안전 판정으로 추천 받기' }).click();
 
-    // Next 의 라우트 안내자도 role=alert 라 화면 배너로 좁힌다
-    await expect(page.locator('.state-banner[role="alert"]')).toContainText(
-      '외출 허용 여부를 선택해 주세요',
-    );
+    await expect(page.getByText('병원 지침을 먼저 연결하세요')).toBeVisible();
+    await expect(page.getByRole('button', { name: '안전 판정으로 추천 받기' })).toHaveCount(0);
     await expect(page).toHaveURL(/\/plan/);
+  });
+});
+
+/**
+ * 하단 고정 복귀 CTA 는 회복기 환자가 "지금 돌아가야 한다" 를 눌러야 하는 버튼이다.
+ * 무엇에도 가려서는 안 된다.
+ *
+ * 실제 있었던 결함: `.sticky-return` 이 `position: fixed` 인데 z-index 가 없었다.
+ * 탭 순서 때문에 DOM 상 main 앞쪽에 두는데, 뒤따르는 카드 제목이 골드 규칙선 때문에
+ * `position: relative` 라 DOM 순서상 이 바 위에 그려졌다. 카드 제목이 고정 바와
+ * 겹치는 스크롤 위치에서 제목이 클릭을 가로채 버튼이 눌리지 않았다. CI 에서만 났다.
+ *
+ * 스크롤 운에 기대면 이 결함을 놓친다. 그래서 카드 제목을 **하나씩 고정 바 위치로
+ * 끌어와** 겹침을 강제로 만든 뒤, 그 지점의 최상위 요소가 버튼인지 확인한다.
+ */
+test.describe('즉시 복귀 버튼은 가려지지 않는다', () => {
+  test('카드 제목이 고정 바와 겹쳐도 버튼이 최상위다', async ({ page }) => {
+    await submitPlan(page);
+    await expect(page.locator('.course-card').first()).toBeVisible();
+
+    const button = page.getByRole('button', { name: '즉시 복귀 안내' });
+    await expect(button).toBeVisible();
+
+    const headings = page.locator('.card > h2, .card > h3');
+    const count = await headings.count();
+    expect(count, '겹칠 후보 제목이 없으면 이 검사는 의미가 없다').toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      // 제목을 고정 바가 있는 높이로 끌어와 겹침을 만든다
+      await headings.nth(i).evaluate((heading) => {
+        const bar = document.querySelector('.sticky-return');
+        const barTop = bar.getBoundingClientRect().top;
+        const headingTop = heading.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo(0, Math.max(0, headingTop - barTop));
+      });
+
+      const covering = await button.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return [
+          [r.left + r.width / 2, r.top + r.height / 2],
+          [r.left + 6, r.top + 6],
+          [r.right - 6, r.bottom - 6],
+        ]
+          .map(([x, y]) => document.elementFromPoint(x, y))
+          .filter((hit) => hit !== el && !el.contains(hit))
+          .map((hit) => `${hit?.tagName}#${hit?.id || ''}.${hit?.className || ''}`);
+      });
+
+      const label = await headings.nth(i).innerText();
+      expect(covering, `"${label}" 과 겹칠 때 버튼이 가려졌다`).toEqual([]);
+    }
+
+    // 가려짐 검사와 실제 클릭 가능성은 다른 실패 모드다 — 둘 다 본다
+    await button.click();
+    await expect(page.locator('.sheet').getByText('지금 복귀하세요')).toBeVisible();
   });
 });

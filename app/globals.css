@@ -1,35 +1,66 @@
-/* SafeHour 모바일 웹 — D08 안전 우선 원칙
-   - 본문 최소 16px, 터치 대상 최소 44px
-   - 상태는 색상만으로 구분하지 않는다 (텍스트 라벨 병행)
-   - NO_TOURISM은 오류가 아닌 정상 결과 — error 스타일 금지 */
+/* SafeHour 디자인 시스템 — 클리닉 프리미엄
+ *
+ * 톤: 성형외과·피부과 브랜드의 차분한 프리미엄. 웜 아이보리 바탕에 딥 그린,
+ *     골드는 얇은 액센트로만. 여백을 넓게 두고 헤드라인에 세리프를 쓴다.
+ *
+ * 안전 우선 원칙은 그대로다 (D08)
+ *   - 본문 최소 16px, 터치 대상 최소 44px
+ *   - 상태는 색상만으로 구분하지 않는다 (텍스트 라벨·굵기 병행)
+ *   - NO_TOURISM 은 오류가 아닌 정상 결과 — error 스타일 금지
+ *
+ * 색 선택 근거
+ *   - 골드(--accent)는 흰 배경 위 2.4:1 이라 **본문 색으로 쓰지 않는다.**
+ *     배지 배경(어두운 글자와 6.6:1)이나 2px 규칙선으로만 쓴다.
+ *   - --line-input 은 흰 배경 위 3.36:1 — UI 경계 최소 3:1 (WCAG 1.4.11).
+ */
 
 :root {
-  --bg: #f6f7f9;
+  /* 바탕 */
+  --bg: #faf8f5;
   --surface: #ffffff;
-  --ink: #1a2233;
-  --ink-soft: #55617a;
-  --line: #e3e7ee;
+  --surface-alt: #f4f1ec;
+
+  /* 글자 */
+  --ink: #2c2a26;
+  --ink-soft: #6b6660;
+
+  /* 경계 */
+  --line: #e8e2d9;
+  --line-strong: #d8d0c3;
   /* 입력 필드 경계 전용 — 흰 배경 위 3:1 이상 (WCAG 1.4.11) */
-  --line-input: #8a94a8;
-  --brand: #1554c4;
+  --line-input: #948b7c;
+
+  /* 브랜드 */
+  --brand: #1f4d3d;
+  --brand-hover: #163a2d;
   --brand-ink: #ffffff;
+  /* 액센트 — 규칙선·배지 배경 전용. 본문 색 금지 */
+  --accent: #c9a227;
+  --accent-soft: #f2e6c4;
 
-  /* 판정 상태 색 — 의료 경고처럼 보이지 않도록 차분한 톤 */
-  --state-no-tourism-bg: #fdf0f2;
-  --state-no-tourism-ink: #8f2440;
-  --state-no-tourism-line: #f0c8d1;
-  --state-standby-bg: #fdf6e8;
-  --state-standby-ink: #7a5410;
-  --state-standby-line: #efdcb2;
-  --state-split-bg: #eef5fd;
-  --state-split-ink: #1a4f8a;
-  --state-split-line: #c8ddf2;
-  --state-together-bg: #eef8f0;
-  --state-together-ink: #1f6b39;
-  --state-together-line: #c6e6cf;
+  /* 판정 상태 — 웜 팔레트로 맞추되 4색 구분은 유지 */
+  --state-no-tourism-bg: #fbf0ec;
+  --state-no-tourism-ink: #8c3a24;
+  --state-no-tourism-line: #ebd2c6;
+  --state-standby-bg: #fbf5e8;
+  --state-standby-ink: #7a5a12;
+  --state-standby-line: #eadcbc;
+  --state-split-bg: #edf3f3;
+  --state-split-ink: #1f4e58;
+  --state-split-line: #cfe0e1;
+  --state-together-bg: #eff4f0;
+  --state-together-ink: #1f4d3d;
+  --state-together-line: #cfe2d6;
 
-  --radius: 14px;
-  --radius-sm: 10px;
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow-card: 0 1px 2px rgba(44, 42, 38, 0.04), 0 8px 24px -16px rgba(44, 42, 38, 0.18);
+
+  /* 헤드라인 세리프 — 없는 기기에서는 조용히 산세리프로 떨어진다 */
+  --font-display: 'Nanum Myeongjo', 'Noto Serif KR', AppleMyungjo, 'Apple SD Gothic Neo',
+    Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
+    'Noto Sans KR', 'Segoe UI', sans-serif;
 }
 
 * {
@@ -45,10 +76,10 @@ html {
 body {
   background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard',
-    'Noto Sans KR', 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   font-size: 16px;
-  line-height: 1.55;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
 }
 
 .app-shell {
@@ -62,71 +93,134 @@ body {
 
 main.page {
   flex: 1;
-  padding: 20px 16px 120px;
+  padding: 24px 18px 128px;
 }
 
-h1 { font-size: 24px; line-height: 1.3; }
-h2 { font-size: 18px; margin-bottom: 10px; }
-h3 { font-size: 16px; }
-p  { color: var(--ink-soft); }
-strong { color: var(--ink); }
+/* ── 타이포 ──
+   헤드라인만 세리프. 장소명·수치 같은 조밀한 정보는 산세리프로 둔다. */
+h1 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  font-weight: 700;
+}
+h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  line-height: 1.4;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+h3 {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+p {
+  color: var(--ink-soft);
+}
+strong {
+  color: var(--ink);
+  font-weight: 700;
+}
 
-a { color: inherit; text-decoration: none; }
+a {
+  color: inherit;
+  text-decoration: none;
+}
 
 /* ── 카드 ── */
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 20px 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-card);
+}
+
+/* 섹션 제목 아래 얇은 골드 규칙선 — 클리닉 브랜드의 시각적 서명 */
+.card > h2:first-of-type,
+.card > h3:first-of-type {
+  position: relative;
+  padding-bottom: 12px;
   margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.card > h2:first-of-type::after,
+.card > h3:first-of-type::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 34px;
+  height: 2px;
+  background: var(--accent);
 }
 
 /* ── 의료 경계 콜아웃 (D08-CMP002) ── */
 .medical-callout {
   border: 1px solid var(--line);
-  border-left: 4px solid var(--brand);
-  background: var(--surface);
+  border-left: 3px solid var(--brand);
+  background: var(--surface-alt);
   border-radius: var(--radius-sm);
-  padding: 12px 14px;
+  padding: 14px 16px;
   font-size: 15px;
+  line-height: 1.65;
   color: var(--ink-soft);
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 /* ── 상태 배너 (D08-CMP006) ── */
 .state-banner {
   border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 14px;
+  padding: 18px;
+  margin-bottom: 16px;
   border: 1px solid;
 }
 .state-banner .state-label {
   display: inline-block;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.04em;
-  margin-bottom: 6px;
+  letter-spacing: 0.12em;
+  margin-bottom: 8px;
   text-transform: uppercase;
 }
-.state-banner h2 { margin-bottom: 4px; }
+.state-banner h2 {
+  margin-bottom: 6px;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.state-banner h2::after {
+  display: none;
+}
 /* opacity 감산 금지 — 15px 본문이 STANDBY·TOGETHER 배경 위에서 4.5:1 미달됨 */
-.state-banner p { font-size: 15px; color: inherit; }
+.state-banner p {
+  font-size: 15px;
+  color: inherit;
+}
 
-.state-NO_TOURISM  { background: var(--state-no-tourism-bg);  color: var(--state-no-tourism-ink);  border-color: var(--state-no-tourism-line); }
-.state-STANDBY     { background: var(--state-standby-bg);     color: var(--state-standby-ink);     border-color: var(--state-standby-line); }
-.state-SPLIT_NEARBY{ background: var(--state-split-bg);       color: var(--state-split-ink);       border-color: var(--state-split-line); }
-.state-TOGETHER    { background: var(--state-together-bg);    color: var(--state-together-ink);    border-color: var(--state-together-line); }
+.state-NO_TOURISM   { background: var(--state-no-tourism-bg); color: var(--state-no-tourism-ink); border-color: var(--state-no-tourism-line); }
+.state-STANDBY      { background: var(--state-standby-bg);    color: var(--state-standby-ink);    border-color: var(--state-standby-line); }
+.state-SPLIT_NEARBY { background: var(--state-split-bg);      color: var(--state-split-ink);      border-color: var(--state-split-line); }
+.state-TOGETHER     { background: var(--state-together-bg);   color: var(--state-together-ink);   border-color: var(--state-together-line); }
 
 /* ── 폼 ── */
-.field { margin-bottom: 14px; }
+.field { margin-bottom: 16px; }
 .field > label {
   display: block;
   font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 6px;
+  font-weight: 700;
+  margin-bottom: 8px;
 }
-.field .hint { font-size: 13px; color: var(--ink-soft); margin-top: 4px; }
+.field .hint,
+.hint {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
 
 input[type='text'],
 input[type='number'],
@@ -134,12 +228,19 @@ input[type='datetime-local'],
 select {
   width: 100%;
   min-height: 48px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   font-size: 16px;
+  font-family: inherit;
   border: 1px solid var(--line-input);
   border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--ink);
+}
+input[type='text']:focus,
+input[type='number']:focus,
+input[type='datetime-local']:focus,
+select:focus {
+  border-color: var(--brand);
 }
 ::placeholder { color: var(--ink-soft); }
 
@@ -163,14 +264,20 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  min-height: 48px;
-  padding: 6px 0;
+  gap: 14px;
+  min-height: 52px;
+  padding: 8px 0;
   border-bottom: 1px solid var(--line);
 }
 .toggle-row:last-child { border-bottom: none; }
-.toggle-row .label { font-size: 16px; }
-.toggle-row .sub { display: block; font-size: 13px; color: var(--ink-soft); }
+.toggle-row .label { font-size: 16px; font-weight: 500; }
+.toggle-row .sub {
+  display: block;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+  font-weight: 400;
+}
 .toggle-row input[type='checkbox'] {
   width: 28px;
   height: 28px;
@@ -178,20 +285,35 @@ select {
   flex-shrink: 0;
 }
 
-.radio-group { display: flex; flex-direction: column; gap: 8px; }
+.radio-group { display: flex; flex-direction: column; gap: 10px; }
 .radio-option {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: flex-start;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
-  padding: 12px;
-  min-height: 48px;
+  padding: 14px;
+  min-height: 52px;
   background: var(--surface);
 }
-.radio-option input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--brand); flex-shrink: 0; }
-.radio-option .sub { display: block; font-size: 13px; color: var(--ink-soft); }
-.radio-option.selected { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+.radio-option input {
+  width: 22px;
+  height: 22px;
+  margin-top: 2px;
+  accent-color: var(--brand);
+  flex-shrink: 0;
+}
+.radio-option .sub {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+/* 선택 상태는 테두리 색 + 두께 + 배경으로 이중 표시한다 (색상 단독 구분 금지) */
+.radio-option.selected {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand);
+  background: var(--state-together-bg);
+}
 
 /* ── 버튼 ── */
 .btn {
@@ -199,31 +321,59 @@ select {
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 52px;
-  padding: 12px 16px;
+  min-height: 54px;
+  padding: 14px 18px;
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.01em;
   border-radius: var(--radius);
   border: 1px solid transparent;
   cursor: pointer;
   background: var(--brand);
   color: var(--brand-ink);
 }
+.btn:hover { background: var(--brand-hover); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-secondary {
   background: var(--surface);
   color: var(--ink);
-  border-color: var(--line);
+  border-color: var(--line-strong);
 }
+.btn-secondary:hover { background: var(--surface-alt); }
 .btn-small {
   min-height: 44px;
   font-size: 15px;
   width: auto;
-  padding: 8px 14px;
+  padding: 10px 16px;
 }
 .btn-return {
-  background: #8f2440;
+  background: var(--state-no-tourism-ink);
   color: #fff;
+}
+.btn-return:hover { background: #74301e; }
+
+/* 소셜 로그인 — 공급자 브랜드 규정을 따르되 톤을 최대한 낮춘다 (AX-219).
+   카카오 노랑 위 어두운 글자는 14.3:1, 구글 흰 버튼은 테두리 3.36:1 로 경계가 보인다. */
+.btn-kakao {
+  background: #fee500;
+  color: #191600;
+  border-color: #e6cf00;
+}
+.btn-kakao:hover { background: #f2db00; }
+.btn-google {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line-input);
+}
+.btn-google:hover { background: var(--surface-alt); }
+/* 자격증명이 없는 공급자 — 버튼을 없애지 않고 비활성으로 남긴다 */
+.btn-kakao[aria-disabled='true'],
+.btn-google[aria-disabled='true'] {
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+  border-color: var(--line-strong);
+  cursor: not-allowed;
 }
 
 /* ── 추천 카드 (D08-CMP008) ── */
@@ -231,42 +381,105 @@ select {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 10px;
+  padding: 18px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-card);
 }
-.course-card .title-row { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.course-card h3 { font-size: 17px; }
-.course-card .meta {
+.course-card .title-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.course-card h3 { font-size: 18px; }
+
+/* 수치 나열 — 추천 카드 밖(장소 상세·오늘의 회복)에서도 쓰인다.
+   `.course-card .meta` 로만 두면 다른 화면에서 항목이 붙어 나온다. */
+.meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  margin-top: 8px;
+  gap: 8px 16px;
   font-size: 16px; /* 이동시간·복귀 여유 등 안전 판단 정보 — 본문 최소 16px */
   color: var(--ink-soft);
+}
+.course-card .meta {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .badge {
   display: inline-block;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--line-strong);
   color: var(--ink-soft);
-  background: var(--bg);
+  background: var(--surface-alt);
   white-space: nowrap;
 }
-.badge-estimate { border-color: var(--state-standby-line); color: var(--state-standby-ink); background: var(--state-standby-bg); }
-.badge-lang { border-color: var(--state-split-line); color: var(--state-split-ink); background: var(--state-split-bg); }
+/* "추정" 은 골드 배경 + 어두운 글자 (6.6:1) — 골드를 글자색으로 쓰지 않는다 */
+.badge-estimate {
+  border-color: var(--accent);
+  color: var(--ink);
+  background: var(--accent-soft);
+}
+.badge-lang {
+  border-color: var(--state-split-line);
+  color: var(--state-split-ink);
+  background: var(--state-split-bg);
+}
+
+/* ── 병원 연동 표시 (AX-216 · AX-217 · AX-218) ──
+   출처가 세 갈래가 된다 — 병원 원문 / SafeHour 판정 / 관광정보.
+   병원 원문은 틸 계열로 묶어 나머지와 시각적으로 분리한다 (정의 §9-4). */
+.verified-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid var(--state-split-line);
+  background: var(--state-split-bg);
+  color: var(--state-split-ink);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+}
+.verified-strip .verified-mark {
+  font-weight: 700;
+}
+/* 데모임을 숨기지 않는다 — 실제 연동으로 오인되면 허위 제출이다 (정의 §9-3) */
+.badge-demo {
+  border-color: var(--state-standby-line);
+  color: var(--state-standby-ink);
+  background: var(--state-standby-bg);
+}
+.badge-hospital {
+  border-color: var(--state-split-line);
+  color: var(--state-split-ink);
+  background: var(--state-split-bg);
+}
+/* 병원 원문 블록 — SafeHour 문구와 섞이지 않게 묶는다 */
+.hospital-note {
+  border-left: 3px solid var(--state-split-ink);
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-top: 4px;
+}
 
 /* ── 제외 사유 ── */
 .excluded-item {
-  padding: 10px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--line);
   font-size: 14px;
 }
 .excluded-item:last-child { border-bottom: none; }
-.excluded-item .name { font-weight: 600; color: var(--ink); }
+.excluded-item .name { font-weight: 700; color: var(--ink); }
 .excluded-item .reasons { color: var(--ink-soft); }
 
 details.disclosure > summary {
@@ -276,67 +489,83 @@ details.disclosure > summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-weight: 600;
+  font-weight: 700;
 }
 details.disclosure > summary::after { content: '▾' / ''; color: var(--ink-soft); }
 details.disclosure[open] > summary::after { content: '▴' / ''; }
 
-/* ── 탭 ── */
-.tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+/* ── 탭 — 박스 대신 밑줄형(에디토리얼) ── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
 .tabs button {
   flex: 1;
-  min-height: 46px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  border-bottom: 3px solid transparent;
-  background: var(--surface);
+  min-height: 48px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
   font-size: 15px;
+  font-family: inherit;
   font-weight: 500;
   color: var(--ink-soft);
   cursor: pointer;
+  margin-bottom: -1px;
 }
 /* 선택 상태는 색상 외에 하단 바 + 굵기로도 구분한다 (D08 색상 단독 구분 금지) */
 .tabs button[aria-selected='true'] {
-  border-color: var(--brand);
-  border-bottom: 3px solid var(--brand);
+  border-bottom-color: var(--brand);
   color: var(--brand);
   font-weight: 700;
-  background: #f0f5ff;
 }
 
 /* ── 변화 델타 ── */
 .delta-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   align-items: flex-start;
-  padding: 8px 0;
+  padding: 12px 0;
   font-size: 16px; /* 무엇이 왜 바뀌었는지 전달하는 본문 — 최소 16px */
   border-bottom: 1px solid var(--line);
 }
 .delta-row:last-child { border-bottom: none; }
-.delta-tag { flex-shrink: 0; font-weight: 700; font-size: 13px; padding: 2px 8px; border-radius: 6px; }
-.delta-removed  { background: var(--state-no-tourism-bg); color: var(--state-no-tourism-ink); }
-.delta-added    { background: var(--state-together-bg);   color: var(--state-together-ink); }
-.delta-shortened{ background: var(--state-standby-bg);    color: var(--state-standby-ink); }
-.delta-state    { background: var(--state-split-bg);      color: var(--state-split-ink); }
+.delta-tag {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 4px;
+}
+.delta-removed   { background: var(--state-no-tourism-bg); color: var(--state-no-tourism-ink); }
+.delta-added     { background: var(--state-together-bg);   color: var(--state-together-ink); }
+.delta-shortened { background: var(--state-standby-bg);    color: var(--state-standby-ink); }
+.delta-state     { background: var(--state-split-bg);      color: var(--state-split-ink); }
 
 /* ── 하단 고정 복귀 CTA (D08-CMP012) ── */
 .sticky-return {
   position: fixed;
+  /* 안전 CTA 는 무엇에도 가리면 안 된다.
+     이 바는 탭 순서 때문에 main 앞쪽에 두는데, 뒤따르는 카드 제목이
+     골드 규칙선 때문에 position:relative 라 DOM 순서상 이 바 위에 그려진다.
+     z-index 없이 두면 제목이 버튼의 클릭을 가로챈다. 시트(50) 아래, 헤더(10) 위. */
+  z-index: 20;
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
   max-width: 480px;
-  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--bg) 70%, transparent);
+  padding: 12px 18px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 72%, transparent);
 }
 
 /* ── 모달 시트 ── */
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(20, 26, 40, 0.45);
+  background: rgba(44, 42, 38, 0.42);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -346,32 +575,88 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
   width: 100%;
   max-width: 480px;
   background: var(--surface);
-  border-radius: 18px 18px 0 0;
-  padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  padding: 24px 18px calc(24px + env(safe-area-inset-bottom));
   max-height: 85dvh;
   overflow-y: auto;
 }
+.sheet > h2:first-child {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  position: relative;
+}
+.sheet > h2:first-child::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 34px;
+  height: 2px;
+  background: var(--accent);
+}
 
-/* ── 기타 ── */
+/* ── 상단 바 ── */
 .top-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 16px;
+  padding: 16px 18px;
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
   z-index: 10;
 }
-.top-bar .brand { font-weight: 800; font-size: 17px; color: var(--brand); }
+/* 언어 전환이 함께 놓이므로 제목이 좁은 화면에서 줄바꿈 대신 줄어들게 한다.
+   접근 가능한 이름은 DOM 에 그대로 남는다. */
+.top-bar .brand {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.01em;
+  color: var(--brand);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 언어 전환 — 외국인 환자가 한국어를 못 읽어도 찾을 수 있도록 상단에 상시 노출.
+   언어명은 번역하지 않는다 (한국어 / English). */
+.lang-toggle {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.lang-toggle button {
+  min-height: 44px;
+  padding: 0 9px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.lang-toggle button + button {
+  border-left: 1px solid var(--line-input);
+}
+.lang-toggle button.selected {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
 .top-bar .back {
   min-width: 44px;
   min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  font-size: 22px;
+  font-size: 24px;
   background: none;
   border: none;
   cursor: pointer;
@@ -393,23 +678,49 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 
 .source-note {
   font-size: 13px;
+  line-height: 1.65;
   color: var(--ink-soft);
-  padding: 12px 4px;
+  padding: 14px 4px;
+}
+
+/* 내 정보 지우기 — 눈에 띄되 주 동선을 가리지 않는다 (AX-210) */
+.clear-session {
+  padding: 4px 4px 20px;
+}
+.clear-session .hint {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+}
+.link-button {
+  min-height: 44px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  background: none;
+  border: none;
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+  cursor: pointer;
 }
 
 .loading-block {
   text-align: center;
-  padding: 48px 16px;
+  padding: 56px 18px;
   color: var(--ink-soft);
 }
 
 /* 스피너 기본 형태는 항상 보이고, 회전만 모션 허용 시 적용한다 */
 .spinner {
-  width: 28px; height: 28px;
+  width: 28px;
+  height: 28px;
   border: 3px solid var(--line);
   border-top-color: var(--brand);
   border-radius: 50%;
-  margin: 0 auto 12px;
+  margin: 0 auto 14px;
 }
 @media (prefers-reduced-motion: no-preference) {
   .spinner { animation: spin 0.9s linear infinite; }
@@ -419,8 +730,8 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 /* aria-disabled 버튼 — 포커스는 유지하되(키보드 위치 보존) 시각적으로 비활성 표시.
    opacity 감산 대신 색 교체로 텍스트 대비를 유지한다 */
 .btn[aria-disabled='true'] {
-  background: var(--bg);
+  background: var(--surface-alt);
   color: var(--ink-soft);
-  border-color: var(--line);
+  border-color: var(--line-strong);
   cursor: not-allowed;
 }

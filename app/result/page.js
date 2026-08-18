@@ -6,8 +6,9 @@
 //   - 추천 0건(NO_TOURISM·STANDBY)은 오류 화면이 아니라 정상 결과로 표시한다.
 //   - 추천은 상위 3개만 노출한다 (엔진은 최대 5개 산출).
 //   - 이동시간이 추정값이면 반드시 표시한다.
+//   - 변화 요약은 **구조로** 저장하고 렌더 시점에 번역한다 — 언어를 바꿔도 함께 바뀐다.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import StateBanner from '@/components/StateBanner.js';
@@ -15,63 +16,109 @@ import CourseCard from '@/components/CourseCard.js';
 import EventPanel from '@/components/EventPanel.js';
 import DeltaSheet from '@/components/DeltaSheet.js';
 import ReturnSheet from '@/components/ReturnSheet.js';
-import { REASON_TEXT, STATE_MESSAGE } from '@/src/domain/states.js';
+import LanguageToggle from '@/components/LanguageToggle.js';
+import FooterLinks from '@/components/FooterLinks.js';
+import { useLang } from '@/components/LanguageProvider.js';
 import { fmtDateTime, fmtTime } from '@/lib/format.js';
-
-const EVENT_LABEL = {
-  CLOSURE: '장소 휴무',
-  WEATHER: '기상 악화',
-  TRAFFIC_SURGE: '교통 지연',
-  APPOINTMENT: '진료시간 변경',
-  PATIENT_RECALL: '환자 호출',
-  RISK_SIGNAL: '위험신호 입력',
-};
+import { usePlanExpiry } from '@/lib/usePlanExpiry.js';
+import { gateRecoveryPlan, invalidateForReturn } from '@/src/recovery/plan.js';
+import { readPlan } from '@/lib/recovery-store.js';
 
 /**
  * 재판정 결과를 화면에 남길 요약으로 압축한다.
  * 시트는 닫히지만 "무엇이 왜 바뀌었는지"는 결과 화면에 계속 보여야 한다 (AC010·AC012 증빙).
+ * 문구가 아니라 키·값을 담아 언어 전환에 반응하게 한다.
  */
 function summarizeChange(recalc, titles) {
   const { event, before, after, delta } = recalc;
   const nameOf = (id) => titles[String(id)] ?? String(id);
   const parts = [];
   if (delta.stateChanged) {
-    parts.push(
-      `상태 ${STATE_MESSAGE[before.state]?.ko ?? before.state} → ${STATE_MESSAGE[after.state]?.ko ?? after.state}`,
-    );
+    parts.push({ key: 'result.sumState', states: { before: before.state, after: after.state } });
   }
-  if (delta.removed.length > 0) parts.push(`제거 ${delta.removed.map(nameOf).join(', ')}`);
-  if (delta.added.length > 0) parts.push(`대체 투입 ${delta.added.map(nameOf).join(', ')}`);
+  if (delta.removed.length > 0) {
+    parts.push({ key: 'result.sumRemoved', vars: { names: delta.removed.map(nameOf).join(', ') } });
+  }
+  if (delta.added.length > 0) {
+    parts.push({ key: 'result.sumAdded', vars: { names: delta.added.map(nameOf).join(', ') } });
+  }
   if (delta.shortened.length > 0) {
-    parts.push(`체류 축소 ${delta.shortened.map((s) => nameOf(s.id)).join(', ')}`);
+    parts.push({
+      key: 'result.sumShortened',
+      vars: { names: delta.shortened.map((s) => nameOf(s.id)).join(', ') },
+    });
   }
-  return {
-    eventLabel: EVENT_LABEL[event.type] ?? event.type,
-    summary: parts.length > 0 ? parts.join(' · ') : '조건과 복귀 SLA를 계속 충족해 코스가 유지됐습니다.',
-    hasVisibleChange: delta.hasVisibleChange,
-  };
+  return { eventType: event.type, parts, hasVisibleChange: delta.hasVisibleChange };
 }
 
 export default function ResultPage() {
   const router = useRouter();
+  const { t, locale, stateMessage, reasonText } = useLang();
 
   const [session, setSession] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [mode, setMode] = useState('patient');
   const [busy, setBusy] = useState(false);
   const [recalc, setRecalc] = useState(null);
-  const [recalcError, setRecalcError] = useState(null);
+  const [recalcErrorKey, setRecalcErrorKey] = useState(null);
+  const [recalcErrorText, setRecalcErrorText] = useState(null);
   const [showReturn, setShowReturn] = useState(false);
   const [returnNowDismissed, setReturnNowDismissed] = useState(false);
   // 시트를 닫아도 결과 화면에 남는 마지막 변화 요약 (ADR-0001 보완 조건 5)
   const [lastChange, setLastChange] = useState(null);
+  // 외출 중 지침이 무효가 되면 더 이상 변화 이벤트를 받지 않는다 (AX-220)
+  const [planInvalid, setPlanInvalid] = useState(false);
+
+  const recalcError = recalcErrorKey ? t(recalcErrorKey) : recalcErrorText;
+
+  /**
+   * 외출 중 지침 만료·철회 — 추천을 비우고 즉시 복귀로 전환한다 (정의 §7 개선 1).
+   * 새 판정을 만들지 않는다. 안전한 방향으로 무효화만 한다.
+   */
+  const handlePlanInvalid = useCallback((reasons) => {
+    setPlanInvalid(true);
+    setRecalc(null);
+    setLastChange(null);
+    // 자동 복귀 시트를 다시 띄운다 — 앞서 닫았더라도 이번엔 다른 사유다
+    setReturnNowDismissed(false);
+    setSession((prev) => {
+      if (!prev?.decision) return prev;
+      const next = { ...prev, decision: invalidateForReturn(prev.decision, reasons) };
+      try {
+        sessionStorage.setItem('safehour.result', JSON.stringify(next));
+      } catch {
+        // 저장이 실패해도 화면에는 이미 무효화가 적용됐다
+      }
+      return next;
+    });
+  }, []);
+
+  usePlanExpiry(handlePlanInvalid);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
         const raw = sessionStorage.getItem('safehour.result');
         if (raw) {
-          const savedSession = JSON.parse(raw);
+          let savedSession = JSON.parse(raw);
+
+          // 진입 시점에 이미 무효인 지침이면 저장된 추천을 그대로 믿지 않는다 (AX-220).
+          // 감시 훅은 "보고 있는 도중" 을 담당하고, 이 경로가 "이미 지난 뒤 열었을 때" 를
+          // 담당한다. 둘 다 같은 게이트를 쓰므로 판정이 갈리지 않는다.
+          const gate = gateRecoveryPlan(readPlan());
+          if (gate.expired && savedSession.decision) {
+            savedSession = {
+              ...savedSession,
+              decision: invalidateForReturn(savedSession.decision, gate.reasons),
+            };
+            setPlanInvalid(true);
+            try {
+              sessionStorage.setItem('safehour.result', JSON.stringify(savedSession));
+            } catch {
+              // 저장이 실패해도 화면에는 무효화가 적용된다
+            }
+          }
+
           setSession(savedSession);
           if (savedSession.decision?.state === 'SPLIT_NEARBY') setMode('companion');
         }
@@ -99,12 +146,13 @@ export default function ResultPage() {
     return (
       <>
         <header className="top-bar">
-          <h1 className="brand">안심 코스</h1>
+          <h1 className="brand">{t('result.header')}</h1>
+          <LanguageToggle />
         </header>
         <main className="page">
           <div className="loading-block" role="status">
             <div className="spinner" aria-hidden="true" />
-            결과를 불러오는 중입니다…
+            {t('result.loading')}
           </div>
         </main>
       </>
@@ -115,16 +163,17 @@ export default function ResultPage() {
     return (
       <>
         <header className="top-bar">
-          <h1 className="brand">안심 코스</h1>
+          <h1 className="brand">{t('result.header')}</h1>
+          <LanguageToggle />
         </header>
         <main className="page">
           <div className="state-banner state-STANDBY">
-            <span className="state-label">결과 없음</span>
-            <h2>표시할 추천 결과가 없습니다</h2>
-            <p>조건 입력부터 다시 시작해 주세요.</p>
+            <span className="state-label">{t('result.emptyLabel')}</span>
+            <h2>{t('result.emptyTitle')}</h2>
+            <p>{t('result.emptyBody')}</p>
           </div>
           <Link href="/plan" className="btn">
-            조건 입력으로 이동
+            {t('result.emptyCta')}
           </Link>
         </main>
       </>
@@ -150,7 +199,8 @@ export default function ResultPage() {
 
   async function handleEvent(event) {
     setBusy(true);
-    setRecalcError(null);
+    setRecalcErrorKey(null);
+    setRecalcErrorText(null);
     try {
       const res = await fetch('/api/recalculate', {
         method: 'POST',
@@ -159,7 +209,8 @@ export default function ResultPage() {
       });
       const data = await res.json();
       if (!data.ok) {
-        setRecalcError(data.message ?? '재계산에 실패했습니다.');
+        if (data.message) setRecalcErrorText(data.message);
+        else setRecalcErrorKey('result.recalcErrDefault');
         return;
       }
       // 재판정 결과는 즉시 적용한다 — 알림만 표시하고 기존 코스를 유지하는
@@ -180,7 +231,7 @@ export default function ResultPage() {
       }
       setRecalc(data.recalc);
     } catch {
-      setRecalcError('네트워크 오류로 재계산하지 못했습니다. 기존 추천을 계속 신뢰하지 마세요.');
+      setRecalcErrorKey('result.recalcErrNetwork');
     } finally {
       setBusy(false);
     }
@@ -201,6 +252,22 @@ export default function ResultPage() {
     document.getElementById(`tab-${next}`)?.focus();
   }
 
+  /** 변화 요약 조각을 현재 언어로 렌더한다 */
+  function renderChangeSummary(change) {
+    if (change.parts.length === 0) return t('result.sumKept');
+    return change.parts
+      .map((part) => {
+        if (part.states) {
+          return t(part.key, {
+            before: stateMessage(part.states.before)?.message ?? part.states.before,
+            after: stateMessage(part.states.after)?.message ?? part.states.after,
+          });
+        }
+        return t(part.key, part.vars);
+      })
+      .join(' · ');
+  }
+
   // 전체 후보의 제목 맵 — 델타 표시에서 원시 contentid 가 노출되지 않게 한다
   const candidateTitles = Object.fromEntries(
     (session.recalcPayload?.candidates ?? []).map((c) => [String(c.id), c.title]),
@@ -209,10 +276,16 @@ export default function ResultPage() {
   return (
     <>
       <header className="top-bar">
-        <button type="button" className="back" aria-label="조건 입력으로 돌아가기" onClick={() => router.push('/plan')}>
+        <button
+          type="button"
+          className="back"
+          aria-label={t('result.backAria')}
+          onClick={() => router.push('/plan')}
+        >
           ‹
         </button>
-        <h1 className="brand">안심 코스</h1>
+        <h1 className="brand">{t('result.header')}</h1>
+        <LanguageToggle />
       </header>
 
       <main className="page">
@@ -220,52 +293,59 @@ export default function ResultPage() {
             DOM 상 main 앞부분에 두어 탭 순서·랜드마크 탐색에서 먼저 도달하게 한다 */}
         <div className="sticky-return">
           <button type="button" className="btn btn-return" onClick={() => setShowReturn(true)}>
-            즉시 복귀 안내
+            {t('result.returnCta')}
           </button>
         </div>
 
         <StateBanner state={decision.state} reasons={decision.reasons} live />
 
         {/* 복귀 정보 — 모든 결과 화면에서 항상 보인다 */}
-        <section className="card" aria-label="복귀 정보">
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+        <section className="card" aria-label={t('result.returnInfoAria')}>
+          <div
+            style={{ display: 'flex', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}
+          >
             <div>
-              <strong>복귀 마감</strong>
-              <p style={{ fontSize: 15 }}>{fmtDateTime(displayReturnBy)}</p>
+              <strong>{t('result.returnDeadline')}</strong>
+              <p style={{ fontSize: 15 }}>{fmtDateTime(displayReturnBy, locale)}</p>
             </div>
             {decision.latestDepartureAt && (
               <div>
-                <strong>늦어도 출발</strong>
-                <p style={{ fontSize: 15 }}>{fmtTime(decision.latestDepartureAt)}</p>
+                <strong>{t('result.latestDeparture')}</strong>
+                <p style={{ fontSize: 15 }}>{fmtTime(decision.latestDepartureAt, locale)}</p>
               </div>
             )}
             <div>
-              <strong>기준점</strong>
+              <strong>{t('result.anchor')}</strong>
               <p style={{ fontSize: 15 }}>{session.origin?.label}</p>
             </div>
           </div>
           {session.weather && (
             <p style={{ fontSize: 14, color: 'var(--ink-soft)', marginTop: 10 }}>
               {session.weather.outdoorUnsafe
-                ? `기상 실황: ${session.weather.reasons.join(' · ')} — 실외 후보를 제외했습니다.`
+                ? t('result.weatherUnsafe', { reasons: session.weather.reasons.join(' · ') })
                 : session.weather.unknown
-                  ? '기상 실황 확인 불가 — 기상은 이번 판정에 반영되지 않았습니다.'
-                  : `기상 실황 이상 없음 (기상청 ${session.weather.observedAt} 발표)`}
+                  ? t('result.weatherUnknown')
+                  : t('result.weatherOk', { observedAt: session.weather.observedAt })}
             </p>
           )}
           {(session.diagnostics?.degraded?.english || session.diagnostics?.degraded?.barrierFree) && (
             <p style={{ fontSize: 14, color: 'var(--ink-soft)', marginTop: 6 }}>
-              {session.diagnostics.degraded.english && '영문 관광정보를 불러오지 못해 국문 정보로 표시합니다. '}
-              {session.diagnostics.degraded.barrierFree && '무장애 정보를 확인하지 못했습니다. '}
-              확인되지 않은 정보는 사실로 표시하지 않습니다.
+              {session.diagnostics.degraded.english && t('result.degradedEnglish')}
+              {session.diagnostics.degraded.barrierFree && t('result.degradedBarrierFree')}
+              {t('result.degradedTail')}
             </p>
           )}
         </section>
 
         {/* 추천 코스 */}
         {hasAnyCourse && !returnNow && (
-          <section aria-label="추천 코스">
-            <div className="tabs" role="tablist" aria-label="환자·보호자 코스 전환" onKeyDown={handleTabKeyDown}>
+          <section aria-label={t('result.courseAria')}>
+            <div
+              className="tabs"
+              role="tablist"
+              aria-label={t('result.tabsAria')}
+              onKeyDown={handleTabKeyDown}
+            >
               <button
                 type="button"
                 role="tab"
@@ -275,7 +355,10 @@ export default function ResultPage() {
                 tabIndex={mode === 'patient' ? 0 : -1}
                 onClick={() => setMode('patient')}
               >
-                환자 코스 {courses.patient.length > 0 ? `(${courses.patient.length})` : '(없음)'}
+                {t('result.tabPatient')}{' '}
+                {courses.patient.length > 0
+                  ? `(${courses.patient.length})`
+                  : `(${t('common.none')})`}
               </button>
               <button
                 type="button"
@@ -286,7 +369,10 @@ export default function ResultPage() {
                 tabIndex={mode === 'companion' ? 0 : -1}
                 onClick={() => setMode('companion')}
               >
-                보호자 코스 {courses.companion.length > 0 ? `(${courses.companion.length})` : '(없음)'}
+                {t('result.tabCompanion')}{' '}
+                {courses.companion.length > 0
+                  ? `(${courses.companion.length})`
+                  : `(${t('common.none')})`}
               </button>
             </div>
 
@@ -297,16 +383,15 @@ export default function ResultPage() {
               aria-labelledby={mode === 'patient' ? 'tab-patient' : 'tab-companion'}
             >
               {decision.state === 'SPLIT_NEARBY' && mode === 'patient' && (
-                <div className="medical-callout">
-                  지금은 환자 휴식이 우선입니다. 환자 코스 대신 보호자 근거리 코스를 확인하세요.
-                </div>
+                <div className="medical-callout">{t('result.splitCallout')}</div>
               )}
 
               {activeCourse.length === 0 ? (
                 <div className="card">
                   <p>
-                    {mode === 'patient' ? '환자' : '보호자'}에게는 지금 조건을 통과한 활동이 없습니다.
-                    이것은 안전을 위한 정상 결과입니다.
+                    {mode === 'patient'
+                      ? t('result.noCoursePatient')
+                      : t('result.noCourseCompanion')}
                   </p>
                 </div>
               ) : (
@@ -322,19 +407,19 @@ export default function ResultPage() {
         {excluded.length > 0 && (
           <section className="card">
             <details className="disclosure">
-              <summary>제외된 장소와 이유 ({excluded.length}곳)</summary>
+              <summary>{t('result.excludedSummary', { count: excluded.length })}</summary>
               <div style={{ marginTop: 8 }}>
                 {excluded.slice(0, 30).map((item) => (
                   <div className="excluded-item" key={item.id}>
                     <span className="name">{item.title}</span>
                     <br />
-                    <span className="reasons">
-                      {item.reasons.map((r) => REASON_TEXT[r]?.ko ?? r).join(' · ')}
-                    </span>
+                    <span className="reasons">{item.reasons.map(reasonText).join(' · ')}</span>
                   </div>
                 ))}
                 {excluded.length > 30 && (
-                  <p style={{ fontSize: 13, marginTop: 8 }}>외 {excluded.length - 30}곳</p>
+                  <p style={{ fontSize: 13, marginTop: 8 }}>
+                    {t('result.excludedMore', { count: excluded.length - 30 })}
+                  </p>
                 )}
               </div>
             </details>
@@ -346,43 +431,46 @@ export default function ResultPage() {
         {lastChange && (
           <section className="card" aria-labelledby="last-change-h">
             <h3 id="last-change-h">
-              마지막 변화: {lastChange.eventLabel}{' '}
+              {t('result.lastChange', { event: t(`event.${lastChange.eventType}`) })}{' '}
               {lastChange.hasVisibleChange ? (
-                <span className="badge badge-estimate">코스 변경됨</span>
+                <span className="badge badge-estimate">{t('result.badgeChanged')}</span>
               ) : (
-                <span className="badge">코스 유지</span>
+                <span className="badge">{t('result.badgeKept')}</span>
               )}
             </h3>
-            <p style={{ marginTop: 6 }}>{lastChange.summary}</p>
+            <p style={{ marginTop: 6 }}>{renderChangeSummary(lastChange)}</p>
           </section>
         )}
 
-        <EventPanel topCandidateId={topCandidateId} busy={busy} onEvent={handleEvent} />
+        {!planInvalid && (
+          <EventPanel topCandidateId={topCandidateId} busy={busy} onEvent={handleEvent} />
+        )}
 
         {/* 상주형 라이브 리전 — 조건부 마운트는 일부 스크린리더가 고지를 놓친다 */}
         <div role="status" className={busy ? 'loading-block' : undefined}>
           {busy && (
             <>
               <div className="spinner" aria-hidden="true" />
-              코스를 처음부터 다시 판정하고 있습니다…
+              {t('result.recalcBusy')}
             </>
           )}
         </div>
 
         {recalcError && (
           <div className="state-banner state-STANDBY" role="alert">
-            <span className="state-label">재계산 실패</span>
+            <span className="state-label">{t('result.recalcErrLabel')}</span>
             <p style={{ color: 'inherit' }}>{recalcError}</p>
           </div>
         )}
 
-        <p className="source-note">
-          관광정보 출처: 한국관광공사 TourAPI (국문·영문·무장애). 이동시간은 경로 API 연결 전까지
-          보수적 추정값입니다. SafeHour는 의료진의 판단을 대체하지 않습니다.
-        </p>
+        <p className="source-note">{t('result.footer')}</p>
+
+        <FooterLinks />
       </main>
 
-      {recalc && <DeltaSheet recalc={recalc} titles={candidateTitles} onClose={() => setRecalc(null)} />}
+      {recalc && (
+        <DeltaSheet recalc={recalc} titles={candidateTitles} onClose={() => setRecalc(null)} />
+      )}
 
       {(showReturn || (returnNow && !returnNowDismissed)) && (
         <ReturnSheet

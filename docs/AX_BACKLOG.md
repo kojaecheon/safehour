@@ -26,8 +26,21 @@
 | AX-102 | 접근성·반응형 검증 | AC019, QA033–036 | axe, 키보드, 200%, 스크린리더, 실기기 | 자동 검증 완료 (axe 8화면·키보드 4·반응형 7) — **스크린리더·실기기는 사람 검증 필요**. 절차는 `docs/DEVICE_TEST_CHECKLIST.md` (15분, 미수행) |
 | AX-103 | 지도·Directions ADR | F012, POL002 | 위치정보 검토, 공급자·폴백·비용 결정 | HUMAN |
 | AX-104 | 보존·동의 ADR | DB001–006, POL008 | 데이터별 보존·파기·동의 승인 | HUMAN |
-| AX-105 | 배포·feature flag·rollback | RG007–008 | preview/production, kill switch, canary, rollback 리허설 | 준비 완료 — `docs/DEPLOYMENT.md`, kill switch, `/api/health`. **Vercel 프로젝트 연결·환경변수·리허설은 운영자 실행 필요** |
+| AX-105 | 배포·feature flag·rollback | RG007–008 | preview/production, kill switch, canary, rollback 리허설 | 준비 완료 — `docs/DEPLOYMENT.md`(인증 변수 5종 추가), **실행 순서는 `docs/DEPLOY_CHECKLIST.md`**. Vercel 환경변수·OAuth 앱 등록은 **운영자 실행 필요** |
 | AX-106 | 전문 signoff 패키지 | D07, AC020 | 의료·개인정보·위치·법무·콘텐츠 승인 증거 | HUMAN |
+| AX-209 | 화면 다국어(한국어·영어) | D01 대상 사용자, D03, AC019 | 영어권 브라우저 자동 진입, 전 화면 영문, 안전 문구 병기 | 완료 — ADR-0003, `src/i18n/`, 단위 31건 + E2E 10건. **영문 검수는 AX-106 5절 HUMAN** |
+| AX-210 | 단말 데이터 삭제 수단 | SIGNOFF 2.4, POL008 | 확인 후 삭제, 메모리 사본까지 폐기, 저장소 비었음 검증 | 완료 — `lib/session.js`, `components/ClearSessionButton.js`, E2E 5건 |
+| AX-211 | 개인정보·면책 고지 화면 | SIGNOFF 2.7·4.2 | 수집·미수집·저장위치·제3자·면책·출처, 전 화면 링크 | 완료 — `/privacy`, `src/i18n/legal.js`, E2E 5건. **법무 검토와 책임자 지정은 HUMAN** |
+| AX-212 | 클리닉 프리미엄 디자인 시스템 | D08, AC019 | 웜 아이보리·딥그린·골드 토큰, 세리프 헤드라인, axe 9화면 위반 0 유지 | 완료 — `app/globals.css` 전면 개편. JSX 무변경, E2E 48건 통과 |
+| AX-213 | 회복 지침 데이터 계약과 채널 A/B 분리 | 정의 §2·§4 | 제한조건 7그룹, 판정용 축약본(안내문 서버 미전송), 형식 검증 | 완료 — `src/recovery/plan.js`, 단위 42건. **제한조건 목록 의료진 확인과 서명 방식은 HUMAN** |
+| AX-214 | 가상 병원 연동 게이트웨이와 비식별 fixture | 정의 §3·§10 | 허용목록 최소화, 데모 어댑터, 보호자 축약 발행 | 완료 — `src/recovery/gateway.js`·`fixtures.js`, 예시 3종 |
+| AX-215 | 연결 게이트와 사유 코드 5종 | 정의 §7 | 사유 코드 5종, 미확인 중요 변경은 STANDBY 강등 | 완료 — `gateDecisionPayload`. **외출 중 만료 시 즉시 복귀 전환은 미구현** |
+| AX-216 | `/link` 연결 화면 + 병원 연동 데모 표시 | 정의 §9-3 | 코드 입력·예시 3종 1클릭, 데모 배지 상시 표시 | 완료 — `/link`, `/api/plan/link`, E2E 4건 |
+| AX-217 | `/today` 홈 대시보드 | 정의 §5·§9-5 | 기존 게이트 재사용, 가장 이른 마감, 상태별 단일 액션 | 완료 — `/today`, `/api/today`(공공 API 0콜), E2E 7건 |
+| AX-218 | `/guide` 읽기 전용 병원 안내 | 정의 §4.3 | 7종 카드, 발행 시각, 확인 상태, 병원 원문 시각 분리 | 완료 — `/guide`, E2E 4건 |
+| AX-219 | 소셜 로그인 (Google·Kakao) | ADR-0004, 정의 §9-1 | PKCE+state, 서명 쿠키 세션(서버 DB 없음), 최소 scope, 데모 경로 | 완료 — `src/auth/`, 라우트 4종, `/login`, 단위 36건 + E2E 18건. **실제 자격증명은 운영자 발급 필요** |
+| AX-220 | 외출 중 지침 만료·철회 시 즉시 복귀 전환 | 정의 §7 개선 1 | 만료·철회 감지 → 추천 무효화 + 복귀 시트 자동 표시, 시연 패널 차단 | 완료 — `lib/usePlanExpiry.js`, `invalidateForReturn`, 단위 6건 + E2E 5건 |
+| AX-221 | `/plan` 을 계획 확인 화면으로 교체 | 정의 §5·§9-3 | 수기 입력 제거, 병원 조건 읽기 전용, 미연결 시 차단 | 완료 — 사전 키 47개 정리, E2E 재작성. **D03-NAV004(입력 유지)는 대상 소멸** |
 
 ## P2 · 공모전 제출 완성도
 
@@ -35,4 +48,11 @@
 | --- | --- | --- | --- | --- |
 | AX-201 | 계측 dashboard와 운영 alert | D02 이벤트, RG007 | 퍼널·변화율·API 성공률·누락 경고 | **범위 축소** — ADR-0002 로 별도 대시보드를 만들지 않는다. 플랫폼 로그에서 `"evt":"decision"` 조회 (`docs/DEPLOYMENT.md` 1.3) |
 | AX-202 | 운영계정·API 활용표 | RG004, RG008 | 배포 URL, 호출 증적, 화면 대응표 | 완료 — `docs/API_USAGE_TABLE.md` |
-| AX-203 | 제출 리허설과 증거 동결 | HOLD008 | 9/18 동결, 9/20 패키지, 9/21 리허설 | 대기 |
+| AX-203 | 제출 리허설과 증거 동결 | HOLD008 | **9/8 기능 동결, 9/18(금) 전량 제출 완료, 9/21 16:00 까지 수정만** | 대기 — 일정 재배치 (리허설을 마감일에 두지 않는다) |
+| AX-204 | 출처 표기를 공식 형식으로 통일 | D07-POL004, 요강 FAQ | 화면 4곳 `ⓒ한국관광공사`, API 서비스명 화면 미노출, 문서 동기화 | 완료 — `app/page.js`, `app/result/page.js`, `app/place/[candidateId]/page.js`, `docs/API_USAGE_TABLE.md` 6절 |
+| AX-205 | 제출 키 호출 이력 축적과 스냅샷 | RG004, 요강 1차심사 제출항목 4 | 제출 키 확정, 주 1회 실API 검증, 오퍼레이션별 누적 호출표 | 도구 완료 — `npm run usage:weekly`, `docs/API_USAGE_SNAPSHOT.md`(자동 생성, 인증키 비기록 검사 포함). **현재 24콜/2일 — 제출 키로 주 1회 실행해 두껍게 만드는 것은 운영자 실행** |
+| AX-206 | 해시태그 정의와 기능 매핑표 | D01·D02, 기능설명서 1-⑧⑨·2 | 태그 6개, 태그별 연계 기능·화면·API 표, 흐름도 | 완료 — `docs/HASHTAG_MAP.md` **v2** (병원 연동 반영, **지정과제 1번 정렬**). 대표 태그 `#실시간_변화대응` |
+| AX-207 | 서비스 대표·상세 이미지 제작 | 기능설명서 3 | 대표 1장 + 상세 3~5장, 실제 화면 기반 | 대기 |
+| AX-208 | 기능설명서 작성 | 기능설명서 전 항목 | 지정 양식 사용, 필수 항목 누락 없음, PDF 변환 | **초안 완료** — `docs/FUNCTION_SPEC_DRAFT.md`. 지정과제 1번·서비스명·흐름도 반영. 🔴 **인증키 확정만 남음** |
+
+제출 절차·일정·규정 충돌은 `docs/COMPETITION_SUBMISSION.md` 가 소유한다.
