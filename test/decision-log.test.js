@@ -102,6 +102,12 @@ const PII_MARKERS = [
   '눈 주위가 붓고 열감이 있음', // 증상 원문
   'test-service-key', // 인증키
   '강남 스타 성형외과', // 병원명
+  // 아래 셋은 공공 관광데이터라 그 자체는 개인정보가 아니다. 다만 같은 줄의
+  // 사유 코드(금식·외출제한 등)와 붙으면 "어느 지역의 누가 어떤 제약을
+  // 받았는지"로 좁혀지므로, D02-EVT005 에 따라 로그에 넣지 않는다.
+  '봉은사 명상 프로그램', // 후보 장소 이름
+  '서울특별시 강남구 봉은사로 531', // 후보 주소
+  '127.0590', // 후보 좌표
 ];
 
 function piiLadenBody(overrides = {}) {
@@ -131,7 +137,34 @@ function piiLadenBody(overrides = {}) {
   };
 }
 
-/** 외부 호출 없이 후보 조회가 성공하도록 TourAPI 응답을 흉내낸다 */
+/**
+ * 외부 호출 없이 후보 조회가 성공하도록 TourAPI 응답을 흉내낸다.
+ *
+ * 후보를 **실제로 채워서** 돌려준다. 빈 목록으로 스텁하면 course·excluded 가
+ * 비어 있어, 장소 이름·주소가 로그로 새는 경로를 테스트가 아예 밟지 못한다.
+ * (allowlist 를 무력화하는 뮤테이션을 심었을 때 이 테스트만 통과해 발견했다.)
+ */
+function tourItem(contentid, title, extra = {}) {
+  return {
+    contentid: String(contentid),
+    title,
+    mapx: '127.0590',
+    mapy: '37.5110',
+    contenttypeid: '12',
+    addr1: '서울특별시 강남구 봉은사로 531',
+    ...extra,
+  };
+}
+
+function tourBody(items) {
+  return JSON.stringify({
+    response: {
+      header: { resultCode: '0000', resultMsg: 'OK' },
+      body: { items: { item: items }, totalCount: items.length },
+    },
+  });
+}
+
 function stubTourApi() {
   globalThis.fetch = async (url) => {
     const href = String(url);
@@ -141,15 +174,14 @@ function stubTourApi() {
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    return new Response(
-      JSON.stringify({
-        response: {
-          header: { resultCode: '0000', resultMsg: 'OK' },
-          body: { totalCount: 0, items: '' },
-        },
-      }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } },
-    );
+    // 국문 목록에만 후보를 싣는다 — 영문·무장애는 폴백 경로를 그대로 태운다
+    const items = href.includes('KorService2')
+      ? [tourItem(1, '봉은사 명상 프로그램'), tourItem(2, '코엑스 아쿠아리움')]
+      : [];
+    return new Response(tourBody(items), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   };
 }
 
