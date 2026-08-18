@@ -547,6 +547,11 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 /* ── 하단 고정 복귀 CTA (D08-CMP012) ── */
 .sticky-return {
   position: fixed;
+  /* 안전 CTA 는 무엇에도 가리면 안 된다.
+     이 바는 탭 순서 때문에 main 앞쪽에 두는데, 뒤따르는 카드 제목이
+     골드 규칙선 때문에 position:relative 라 DOM 순서상 이 바 위에 그려진다.
+     z-index 없이 두면 제목이 버튼의 클릭을 가로챈다. 시트(50) 아래, 헤더(10) 위. */
+  z-index: 20;
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);

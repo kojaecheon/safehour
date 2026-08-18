@@ -168,3 +168,58 @@ test.describe('안전 게이트 (QA033–QA040)', () => {
     await expect(page).toHaveURL(/\/plan/);
   });
 });
+
+/**
+ * 하단 고정 복귀 CTA 는 회복기 환자가 "지금 돌아가야 한다" 를 눌러야 하는 버튼이다.
+ * 무엇에도 가려서는 안 된다.
+ *
+ * 실제 있었던 결함: `.sticky-return` 이 `position: fixed` 인데 z-index 가 없었다.
+ * 탭 순서 때문에 DOM 상 main 앞쪽에 두는데, 뒤따르는 카드 제목이 골드 규칙선 때문에
+ * `position: relative` 라 DOM 순서상 이 바 위에 그려졌다. 카드 제목이 고정 바와
+ * 겹치는 스크롤 위치에서 제목이 클릭을 가로채 버튼이 눌리지 않았다. CI 에서만 났다.
+ *
+ * 스크롤 운에 기대면 이 결함을 놓친다. 그래서 카드 제목을 **하나씩 고정 바 위치로
+ * 끌어와** 겹침을 강제로 만든 뒤, 그 지점의 최상위 요소가 버튼인지 확인한다.
+ */
+test.describe('즉시 복귀 버튼은 가려지지 않는다', () => {
+  test('카드 제목이 고정 바와 겹쳐도 버튼이 최상위다', async ({ page }) => {
+    await submitPlan(page);
+    await expect(page.locator('.course-card').first()).toBeVisible();
+
+    const button = page.getByRole('button', { name: '즉시 복귀 안내' });
+    await expect(button).toBeVisible();
+
+    const headings = page.locator('.card > h2, .card > h3');
+    const count = await headings.count();
+    expect(count, '겹칠 후보 제목이 없으면 이 검사는 의미가 없다').toBeGreaterThan(0);
+
+    for (let i = 0; i < count; i++) {
+      // 제목을 고정 바가 있는 높이로 끌어와 겹침을 만든다
+      await headings.nth(i).evaluate((heading) => {
+        const bar = document.querySelector('.sticky-return');
+        const barTop = bar.getBoundingClientRect().top;
+        const headingTop = heading.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo(0, Math.max(0, headingTop - barTop));
+      });
+
+      const covering = await button.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return [
+          [r.left + r.width / 2, r.top + r.height / 2],
+          [r.left + 6, r.top + 6],
+          [r.right - 6, r.bottom - 6],
+        ]
+          .map(([x, y]) => document.elementFromPoint(x, y))
+          .filter((hit) => hit !== el && !el.contains(hit))
+          .map((hit) => `${hit?.tagName}#${hit?.id || ''}.${hit?.className || ''}`);
+      });
+
+      const label = await headings.nth(i).innerText();
+      expect(covering, `"${label}" 과 겹칠 때 버튼이 가려졌다`).toEqual([]);
+    }
+
+    // 가려짐 검사와 실제 클릭 가능성은 다른 실패 모드다 — 둘 다 본다
+    await button.click();
+    await expect(page.locator('.sheet').getByText('지금 복귀하세요')).toBeVisible();
+  });
+});
