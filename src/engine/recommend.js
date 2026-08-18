@@ -15,6 +15,12 @@ import { gateHospitalCondition, gateCandidate, rankCandidates } from './safetyGa
 import { checkSla, shrinkToFit } from './slaCalculator.js';
 
 /**
+ * 판정 규칙 버전. 운영 로그만 보고 "어떤 규칙으로 판정했는지" 알기 위한 값이다
+ * (ADR-0002). 게이트 순서·SLA 버퍼·순위 규칙이 바뀌면 올린다.
+ */
+export const ENGINE_VERSION = '1.0.0';
+
+/**
  * @param {object} input
  * @param {object} input.condition        병원 주의조건
  * @param {object} input.plan             { now, returnBy, origin:{lat,lng}, hospital:{lat,lng} }
