@@ -108,7 +108,23 @@ const PII_MARKERS = [
   '봉은사 명상 프로그램', // 후보 장소 이름
   '서울특별시 강남구 봉은사로 531', // 후보 주소
   '127.0590', // 후보 좌표
+  // condition.version 은 클라이언트가 제출마다 새로 만드는 값이라 사실상 세션 키다.
+  // ADR-0002 가 session 식별자를 남기지 않기로 했으므로 이것도 남기면 안 된다.
+  'sess-abc123xyz',
 ];
+
+/** 세션처럼 요청을 이어붙일 수 있는 필드 이름 — 어느 것도 로그에 있으면 안 된다 */
+const SESSION_FIELD_NAMES = [
+  'session', 'sessionId', 'session_id',
+  'version', 'conditionVersion', 'condition_version',
+  'requestId', 'traceId',
+];
+
+function assertNoSessionFields(entry, where) {
+  for (const name of SESSION_FIELD_NAMES) {
+    assert.equal(name in entry, false, `${where}: 세션성 필드 ${name} 가 로그에 있다`);
+  }
+}
 
 function piiLadenBody(overrides = {}) {
   const issuedAt = new Date(Date.now() - 30 * 60_000).toISOString();
@@ -117,7 +133,7 @@ function piiLadenBody(overrides = {}) {
     returnBy: new Date(Date.now() + 4 * 3_600_000).toISOString(),
     roles: { hasCompanion: true, companionSeparateAllowed: true, patientResting: false },
     condition: {
-      version: 'v1',
+      version: 'sess-abc123xyz',
       issuedAt,
       outingAllowed: true,
       fasting: false,
@@ -333,8 +349,8 @@ describe('라우트 통합 — 개인정보 0건 (D07-POL008)', () => {
     assert.equal(entry.conditionAge, 'FRESH');
     assert.equal(typeof entry.state, 'string');
     assert.equal(Number.isFinite(entry.ms), true);
-    assert.equal('session' in entry, false, 'session 식별자가 로그에 있다');
     assert.equal('origin' in entry, false, '기준점이 로그에 있다');
+    assertNoSessionFields(entry, '추천');
   });
 
   test('재계산 요청도 개인정보를 남기지 않고 변화량만 남긴다', async () => {
@@ -361,6 +377,7 @@ describe('라우트 통합 — 개인정보 0건 (D07-POL008)', () => {
 
     const entry = JSON.parse(logged);
     assert.equal(entry.route, 'recalculate');
+    assertNoSessionFields(entry, '재계산');
     assert.equal(entry.trigger, 'CLOSURE');
     assert.equal(typeof entry.visibleChange, 'boolean');
     assert.equal(Number.isFinite(entry.removedCount), true);
@@ -379,6 +396,7 @@ describe('라우트 통합 — 개인정보 0건 (D07-POL008)', () => {
     const entry = JSON.parse(lines[0]);
     assert.equal(entry.outcome, 'PAUSED');
     assert.deepEqual(entry.reasons, [REASON.SERVICE_PAUSED]);
+    assertNoSessionFields(entry, 'kill switch');
     for (const marker of PII_MARKERS) {
       assert.equal(lines[0].includes(marker), false, `개인정보가 kill switch 로그로 샜다: ${marker}`);
     }
@@ -401,6 +419,92 @@ describe('라우트 통합 — 개인정보 0건 (D07-POL008)', () => {
     assert.equal(entry.errorCode, 'SAFEHOUR_EXTERNAL_API');
     assert.equal(lines[0].includes('serviceKey'), false, '인증키 파라미터가 로그로 샜다');
     assert.equal(lines[0].includes('test-service-key'), false, '인증키 값이 로그로 샜다');
+
+    // 실패 경로는 장애 때 디버깅 정보를 붙이고 싶어지는 자리라 회귀 확률이 가장 높다.
+    // 다른 경로와 같은 기준으로 검사한다.
+    for (const marker of PII_MARKERS) {
+      assert.equal(lines[0].includes(marker), false, `개인정보가 실패 로그로 샜다: ${marker}`);
+    }
+    assertNoSessionFields(entry, '외부 API 실패');
+  });
+
+  test('추천이 실제로 나온 판정도 후보 정보를 남기지 않는다', async () => {
+    // course 항목은 후보 객체 **전체**({...c})를 담는다 — 좌표·주소를 실제로
+    // 들고 있는 쪽이다. excluded 는 {id, title, reasons} 뿐이라 이 경로를
+    // 따로 덮지 않으면 가장 위험한 유출원이 미검증으로 남는다.
+    const payload = {
+      origin: { lat: 37.5105, lng: 127.059, label: '강남 스타 성형외과' },
+      returnBy: new Date(Date.now() + 4 * 3_600_000).toISOString(),
+      condition: {
+        version: 'sess-abc123xyz',
+        issuedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
+        issuedBy: 'medical_staff',
+        outingAllowed: true,
+      },
+      roles: { hasCompanion: true, patientResting: false, companionSeparateAllowed: false },
+      candidates: [
+        {
+          id: 'c1',
+          title: '봉은사 명상 프로그램',
+          address: '서울특별시 강남구 봉은사로 531',
+          lat: 37.511,
+          lng: 127.0590,
+          indoor: true,
+          walkMin: 10,
+          stayMin: 40,
+          openNow: true,
+          tourismEligible: true,
+          dataFresh: true,
+        },
+      ],
+      ctx: {},
+    };
+
+    const lines = captureDecisionLogs();
+    const res = await recalculatePost(
+      jsonRequest('http://test/api/recalculate', {
+        recalcPayload: payload,
+        event: { type: 'TRAFFIC_SURGE', extraMin: 5 },
+      }),
+    );
+    process.stdout.write = originalWrite;
+
+    assert.equal(res.status, 200);
+    const entry = JSON.parse(lines[0]);
+    assert.ok(entry.courseCount > 0, '추천이 나오지 않아 course 경로를 검증하지 못했다');
+
+    for (const marker of PII_MARKERS) {
+      assert.equal(lines[0].includes(marker), false, `추천 후보 정보가 로그로 샜다: ${marker}`);
+    }
+    assertNoSessionFields(entry, '추천 성공');
+  });
+
+  test('비정상 수치가 실린 후보가 와도 판정이 멈추지 않는다', async () => {
+    // JSON 의 1e999 는 Infinity 로 파싱된다. 이 값이 체류시간으로 들어가면
+    // shrinkToFit 의 `stay -= 5` 가 영원히 줄지 않아 이벤트 루프가 멈춘다.
+    // 예외가 아니라 멈춤이라 라우트 try/catch 도 판정 로그도 작동하지 않는다.
+    const body = {
+      recalcPayload: {
+        origin: { lat: 37.5105, lng: 127.059 },
+        returnBy: new Date(Date.now() + 3 * 3_600_000).toISOString(),
+        condition: {
+          version: 'sess-abc123xyz',
+          issuedAt: new Date(Date.now() - 30 * 60_000).toISOString(),
+          outingAllowed: true,
+        },
+        roles: { hasCompanion: true },
+        candidates: [
+          { id: 'x', lat: 37.51, lng: 127.06, stayMin: 1e999, walkMin: 10, openNow: true, tourismEligible: true, dataFresh: true, indoor: true },
+        ],
+        ctx: {},
+      },
+      event: { type: 'WEATHER' },
+    };
+
+    const res = await recalculatePost(jsonRequest('http://test/api/recalculate', body));
+    assert.equal(res.status, 200, '비정상 수치로 판정이 실패했다');
+    const data = await res.json();
+    assert.equal(data.ok, true);
   });
 
   test('입력 검증 실패는 판정 로그를 남기지 않는다', async () => {

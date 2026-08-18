@@ -398,6 +398,65 @@ describe('로그 안전성 (AGENTS.md 불변조건)', () => {
     assert.equal(entry.parameters.radius, '3000', '좌표가 아닌 파라미터까지 지워졌다');
   });
 
+  test('캐시 파일에도 기준점 좌표가 남지 않는다 (D07-POL002)', async () => {
+    const { impl } = countingFetch();
+    // 로그만 가리고 캐시에 원본 좌표를 남기면 통제가 반쪽이다 —
+    // 두 파일이 같은 데이터 루트에 나란히 쌓인다.
+    await callTourApi({
+      ...OP,
+      parameters: { ...uniqueParams(54), mapX: '127.0276', mapY: '37.4979' },
+      useCache: true,
+      fetchImpl: impl,
+    });
+
+    const files = fs.readdirSync(TOUR_API_PATHS.cache).filter((f) => f.endsWith('.json'));
+    assert.ok(files.length > 0, '캐시 파일이 만들어지지 않아 검증할 수 없다');
+    const raw = files
+      .map((f) => fs.readFileSync(path.join(TOUR_API_PATHS.cache, f), 'utf8'))
+      .join('\n');
+
+    assert.equal(raw.includes('127.0276'), false, '경도가 캐시 파일에 남았다');
+    assert.equal(raw.includes('37.4979'), false, '위도가 캐시 파일에 남았다');
+  });
+
+  test('상세 조회의 contentId 도 로그에 남지 않는다', async () => {
+    const { impl } = countingFetch();
+    // 좌표를 넘기지 않는 오퍼레이션이지만, 공개 식별자라 그것만으로 장소
+    // 좌표를 조회할 수 있고 그 장소는 기준점 반경 3km 의 상위 후보다.
+    await callTourApi({
+      ...OP,
+      parameters: { ...uniqueParams(55), contentId: '2733967' },
+      useCache: false,
+      fetchImpl: impl,
+    });
+
+    const raw = fs.readFileSync(logFile(), 'utf8');
+    assert.equal(raw.includes('2733967'), false, 'contentId 가 호출 로그에 남았다');
+    assert.equal(readLogEntries().at(-1).parameters.contentId, 'REDACTED');
+  });
+
+  test('만료된 캐시는 쌓이지 않고 정리된다', async () => {
+    const { impl } = countingFetch();
+    // 만료본이 계속 남으면 "언제 어디를 조회했는지"의 시계열이 누적된다.
+    // 서버리스에서는 /tmp 라 배포마다 사라지지만, 로컬은 이 정리가 유일한 방어선이다.
+    await callTourApi({ ...OP, parameters: uniqueParams(56), useCache: true, fetchImpl: impl });
+
+    const before = fs.readdirSync(TOUR_API_PATHS.cache).filter((f) => f.endsWith('.json'));
+    assert.ok(before.length > 0);
+
+    // 기존 캐시 파일을 이틀 전으로 되돌린다
+    const stale = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    for (const f of before) fs.utimesSync(path.join(TOUR_API_PATHS.cache, f), stale, stale);
+
+    await callTourApi({ ...OP, parameters: uniqueParams(57), useCache: true, fetchImpl: impl });
+
+    const after = fs.readdirSync(TOUR_API_PATHS.cache).filter((f) => f.endsWith('.json'));
+    for (const f of before) {
+      assert.equal(after.includes(f), false, `만료된 캐시 ${f} 가 남아 있다`);
+    }
+    assert.equal(after.length, 1, '방금 쓴 캐시만 남아야 한다');
+  });
+
   test('로그 쓰기가 실패해도 호출 결과는 정상 반환된다', async () => {
     const { impl } = countingFetch();
     const original = fs.appendFileSync;

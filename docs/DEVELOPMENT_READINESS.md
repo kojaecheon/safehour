@@ -4,8 +4,8 @@
 
 ## 판정 요약
 
-엔진·TourAPI·모바일 웹·E2E·배포 준비는 실행 가능한 수준에 도달했다. 자동 테스트 156건과
-E2E 25건이 CI에서 통과하고, 추천을 즉시 중단할 kill switch와 롤백 절차가 있다.
+엔진·TourAPI·모바일 웹·E2E·배포 준비는 실행 가능한 수준에 도달했다. 자동 테스트 180건과
+E2E 28건이 CI에서 통과하고, 추천을 즉시 중단할 kill switch와 롤백 절차가 있다.
 
 **그러나 Release Ready는 아니다.** D01–D09가 모두 사람 검토 전 `WORKING`이고,
 전문 signoff·데이터 보존 정책·Figma 정본·실기기 검증·실제 배포 증거가 없다.
@@ -16,8 +16,8 @@ E2E 25건이 CI에서 통과하고, 추천을 즉시 중단할 kill switch와 �
 | 항목 | 실제 증거 | 상태 |
 | --- | --- | --- |
 | 런타임 | Node.js 20.9+, Next.js 16.2, React 19.2 | 준비 |
-| 단위·통합 테스트 | `npm test` | **175/175 통과** (46 suites) |
-| 테스트 커버리지 | `npm run test:coverage` | **line 95.71%, branch 86.88%, function 94.33%** |
+| 단위·통합 테스트 | `npm test` | **180/180 통과** (46 suites) |
+| 테스트 커버리지 | `npm run test:coverage` | **line 95.63%, branch 87.07%, function 94.44%** |
 | E2E | `npm run e2e` (Playwright, 360px) | **28/28 통과**, 외부 API 호출 0건 |
 | 정적 검사 | `npm run lint` | 통과 |
 | 프로덕션 빌드 | `npm run build` | 통과 |

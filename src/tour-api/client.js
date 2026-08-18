@@ -92,8 +92,13 @@ function reserveCallSlot(operationKey, day) {
  * 쌓으면 "언제 어느 좌표를 조회했는지"가 시계열로 남아 D07-POL002 가 금지한
  * 위치 이력이 된다. 심사 증빙(API 활용표)에 필요한 것은 operation·횟수·성공
  * 여부이지 좌표가 아니므로, 값만 가리고 키는 남겨 가려졌다는 사실을 보인다.
+ *
+ * contentId 도 같이 가린다. 좌표를 넘기지 않는 상세 조회(detailWithTour2)의
+ * 파라미터지만, 공개 TourAPI 식별자라 그것만으로 장소 좌표를 조회할 수 있고,
+ * 그 장소들은 기준점 반경 3km 의 상위 후보다. 좌표를 가려도 같은 정보가
+ * 복원되면 가린 의미가 없다.
  */
-const LOCATION_PARAM_KEYS = new Set(["mapX", "mapY"]);
+const LOCATION_PARAM_KEYS = new Set(["mapX", "mapY", "contentId"]);
 
 function redactParameters(parameters) {
   if (!parameters || typeof parameters !== "object") return parameters;
@@ -323,8 +328,45 @@ export async function callTourApi({
   };
 
   if (useCache) {
-    fs.writeFileSync(cacheFile, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+    writeCache(cacheFile, result);
   }
 
   return result;
+}
+
+/**
+ * 응답을 캐시에 쓴다. 파라미터는 로그와 같은 기준으로 가린다 — 로그만 가리고
+ * 캐시에 원본 좌표를 남기면 통제가 반쪽이 된다(같은 데이터 루트에 나란히 쌓인다).
+ *
+ * 남는 한계는 정직하게 적어 둔다. 위치기반 조회의 **응답 본문**은 기준점 주변
+ * 장소 목록이므로, 파라미터를 가려도 대략적인 지역은 드러난다. 캐시의 목적이
+ * 그 응답을 재사용하는 것이라 이건 지울 수 없다. 그래서 남기는 대신 **오래
+ * 쌓이지 않게** 한다 — 만료본을 지워 "언제 어디를" 의 시계열이 누적되는 것을
+ * 막는다 (D07-POL002 위치 이력 금지). 서버리스에서는 /tmp 라 배포마다 사라지고,
+ * 로컬 개발에서는 이 정리가 유일한 방어선이다.
+ */
+const CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function writeCache(cacheFile, result) {
+  try {
+    const safe = { ...result, parameters: redactParameters(result.parameters) };
+    fs.writeFileSync(cacheFile, `${JSON.stringify(safe, null, 2)}\n`, "utf8");
+    purgeExpiredCache(path.dirname(cacheFile));
+  } catch (error) {
+    // 캐시는 최적화 수단이다. 쓰기 실패로 추천을 막지 않는다.
+    console.error("[tour-api] cache write failed:", error.message);
+  }
+}
+
+function purgeExpiredCache(dir) {
+  const cutoff = Date.now() - CACHE_MAX_AGE_MS;
+  for (const name of fs.readdirSync(dir)) {
+    if (!name.endsWith(".json")) continue;
+    const file = path.join(dir, name);
+    try {
+      if (fs.statSync(file).mtimeMs < cutoff) fs.unlinkSync(file);
+    } catch {
+      // 다른 요청이 방금 지웠거나 읽을 수 없는 파일 — 다음 기회에 정리된다
+    }
+  }
 }

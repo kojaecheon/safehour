@@ -60,11 +60,17 @@ Error: ENOENT: no such file or directory, mkdir '/var/task/.cache/tour-api'
 | --- | --- | --- |
 | 어디에 | 파일 (`$SAFEHOUR_DATA_ROOT/logs/tour-api/`) | **stdout** → 플랫폼 런타임 로그 |
 | 서버리스에서 | `/tmp`, 인스턴스별 격리, 재배포 시 소멸 | 플랫폼이 수집, 인스턴스 무관하게 조회 가능 |
-| 무엇이 | operation·성공여부·소요시간·일일 카운트. 기준점 좌표는 `REDACTED` | 판정 상태·사유 코드·후보 수·소요시간 |
+| 무엇이 | operation·성공여부·소요시간·일일 카운트. 기준점 좌표와 `contentId` 는 `REDACTED` | 판정 상태·사유 코드·후보 수·소요시간 |
 | 보존 | 인스턴스 수명 | 플랫폼 기본 정책 (AX-104 에서 확인) |
 
 **판정 로그는 파일이 아니다.** 저장소를 두면 보존 정책이 선행 조건이 되고,
 서버리스에서는 어차피 흩어져 집계되지 않기 때문이다.
+
+세 번째 기록이 하나 더 있다 — **TourAPI 응답 캐시**(`$SAFEHOUR_DATA_ROOT/.cache/tour-api/`).
+호출 로그와 같은 기준으로 파라미터를 가리지만, 위치기반 조회의 *응답 본문* 자체가
+기준점 주변 장소 목록이라 대략적인 지역은 남는다. 캐시의 목적이 그 응답 재사용이라
+지울 수 없으므로, 대신 만료본(24시간)을 정리해 시계열이 누적되지 않게 한다.
+서버리스에서는 `/tmp` 라 배포마다 사라진다 (ADR-0002).
 
 `TOUR_API_KEY` 를 Preview 에도 넣는 이유는 PR 미리보기에서 실제 흐름을 확인하기
 위해서다. 다만 Preview 는 호출 한도를 Production 과 공유하므로, 리허설을 반복할
@@ -190,7 +196,7 @@ Vercel 은 이전 배포를 보존하므로 롤백에 재빌드가 필요 없다
 
 ## 5. 배포 전 체크리스트
 
-- [ ] CI `quality` 통과 (lint · 단위 175 · build · audit · E2E 28)
+- [ ] CI `quality` 통과 (lint · 단위 180 · build · audit · E2E 28)
 - [ ] `/api/health` 에서 `tourApiKeyConfigured: true`
 - [ ] 핵심 흐름 수동 1회: 입력 → 추천 3개 → 휴무 이벤트로 대체 → 즉시 복귀
 - [ ] 현재 GPS 요청 0건 (브라우저 개발자도구 → Application → Permissions)

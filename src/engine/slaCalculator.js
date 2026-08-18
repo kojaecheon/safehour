@@ -82,6 +82,11 @@ export function checkSla({
  */
 export function shrinkToFit(params, minStayMin = 15) {
   let stay = params.stayMin;
+  // 유한하지 않은 체류시간은 축소할 수 없다. `stay -= 5` 가 Infinity 를 줄이지
+  // 못해 루프가 끝나지 않고, 예외가 아니라 멈춤이라 상위 try/catch 도 못 잡는다.
+  // 입력 경계(normalizeCandidates)에서 이미 걸러내지만 여기서도 막는다 —
+  // 판정이 멈추면 그 인스턴스의 다른 사용자 요청까지 함께 죽는다.
+  if (!Number.isFinite(stay)) return null;
   while (stay >= minStayMin) {
     const sla = checkSla({ ...params, stayMin: stay });
     if (sla.ok) return { ok: true, stayMin: stay, sla, shrunk: stay < params.stayMin };
