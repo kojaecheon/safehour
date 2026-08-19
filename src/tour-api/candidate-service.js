@@ -7,6 +7,7 @@ import {
   matchTourItems,
   normalizeTourCandidate,
 } from "./mapper.js";
+import { openNowFromSchedule } from "./schedule.js";
 
 export const ORIGIN_KIND = Object.freeze({
   USER_SELECTED_FIXED: "USER_SELECTED_FIXED",
@@ -117,6 +118,78 @@ async function fetchBarrierDetails(items, detailLimit, useCache) {
   return { details, failedIds };
 }
 
+/** detailIntro2 에서 운영·휴무 필드만 뽑는다 */
+const SCHEDULE_FIELDS = Object.freeze([
+  "usetime",
+  "usetimeculture",
+  "usetimeleports",
+  "opentime",
+  "opentimefood",
+  "opentimeshopping",
+  "restdate",
+  "restdateculture",
+  "restdateleports",
+  "restdatefood",
+  "restdateshopping",
+  "eventstartdate",
+  "eventenddate",
+]);
+
+/**
+ * 추천 후보의 운영·휴무 정보를 조회한다.
+ *
+ * 목록 조회(`locationBasedList2`)는 운영시간을 주지 않는다. 끝난 축제나 정기 휴무일에
+ * 회복기 환자를 보내지 않으려면 상세를 따로 봐야 한다. 전체가 아니라 **가까운 순으로
+ * 상위 몇 건만** 본다 — 실제로 추천될 수 있는 범위다.
+ *
+ * 조회 실패는 닫힘이 아니다. 실패하면 그 후보의 openNow 는 null 로 남는다.
+ */
+async function fetchSchedules(items, limit, useCache) {
+  const selected = items.slice(0, limit);
+  const entries = await Promise.all(
+    selected.map(async (item) => {
+      try {
+        const result = await callTourApi({
+          serviceName: "korean",
+          operation: "detailIntro2",
+          parameters: {
+            contentId: String(item.contentid),
+            contentTypeId: String(item.contenttypeid ?? ""),
+            numOfRows: "10",
+            pageNo: "1",
+          },
+          useCache,
+        });
+        const [intro] = extractTourItems(result);
+        if (!intro) return null;
+        const schedule = {};
+        for (const field of SCHEDULE_FIELDS) {
+          const value = intro[field];
+          if (value !== null && value !== undefined && String(value).trim()) {
+            schedule[field] = value;
+          }
+        }
+        return [String(item.contentid), schedule];
+      } catch {
+        // 상세 조회 실패로 후보를 지우지 않는다 (D06-E005 안전한 미추천의 반대 방향)
+        return null;
+      }
+    }),
+  );
+  return new Map(entries.filter(Boolean));
+}
+
+/**
+ * 운영·휴무 원문에서 읽은 닫힘을 태그에 실어 보낸다.
+ * **닫힘만 덮어쓴다** — "열려 있다" 는 어디서도 만들지 않는다.
+ */
+function withScheduleClosure(tags, schedule, koreanId, closedIds, now) {
+  if (!schedule) return tags;
+  if (openNowFromSchedule(schedule, now) !== false) return tags;
+  closedIds.add(koreanId);
+  return { ...tags, openNow: false };
+}
+
 /**
  * 실시간 TourAPI 응답을 SafeHour 엔진 후보로 바꾸는 정상 서비스 경로.
  */
@@ -125,6 +198,8 @@ export async function loadSafeHourCandidates({
   radiusMeters = 3_000,
   numOfRows = 100,
   barrierDetailLimit = 3,
+  scheduleDetailLimit = 5,
+  now = new Date(),
   tagsByKoreanContentId = {},
   useCache = true,
 }) {
@@ -195,6 +270,13 @@ export async function loadSafeHourCandidates({
       useCache,
     );
 
+  const schedules = await fetchSchedules(
+    koreanItems,
+    Math.max(0, Number(scheduleDetailLimit) || 0),
+    useCache,
+  );
+  const closedIds = new Set();
+
   const candidates = koreanItems.map((korean) => {
     const koreanId = String(korean.contentid);
     const english = englishByKoreanId.get(koreanId);
@@ -207,7 +289,13 @@ export async function loadSafeHourCandidates({
       barrierFreeDetail: barrierFree
         ? barrierDetails.get(String(barrierFree.contentid))
         : null,
-      tags: tagsByKoreanContentId[koreanId] ?? {},
+      tags: withScheduleClosure(
+        tagsByKoreanContentId[koreanId] ?? {},
+        schedules.get(koreanId),
+        koreanId,
+        closedIds,
+        now,
+      ),
     });
   });
 
@@ -233,6 +321,8 @@ export async function loadSafeHourCandidates({
         barrierFree: summarizeMatches(barrierMatches),
       },
       // 조회에 성공한 건수만 센다 (실패는 barrierDetailFailed 로 분리)
+      scheduleCount: schedules.size,
+      scheduleClosedCount: closedIds.size,
       barrierDetailCount: barrierDetails.size,
       barrierDetailFailed: barrierDetailFailedIds.length,
     },

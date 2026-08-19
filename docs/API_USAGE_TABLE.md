@@ -26,7 +26,7 @@
 | `locationBasedList2` | 국문·영문·무장애 | 추천 생성 1회당 **3콜** (병렬) | `mapX`(경도) `mapY`(위도) `radius=3000` `arrange=E`(거리순) `numOfRows=100` |
 | `detailWithTour2` | 무장애 | 무장애 매칭 후보 **상위 3건** | `contentId` |
 | `detailCommon2` | 국문·영문 | 장소 상세 진입 시 | `contentId` |
-| `detailIntro2` | 국문·영문 | 〃 | `contentId` `contentTypeId` |
+| `detailIntro2` | 국문·영문 | 장소 상세 진입 시 + **추천 시 상위 5건 운영·휴무 확인** | `contentId` `contentTypeId` |
 | `detailImage2` | 국문·영문 | 〃 | `contentId` `imageYN=Y` |
 | `getUltraSrtNcst` | 기상청 | 추천 생성 시 후보 조회와 **병렬** | `nx` `ny`(격자 변환) `base_date` `base_time` |
 
@@ -34,7 +34,7 @@
 
 | 사용자 행동 | 발생 호출 |
 | --- | --- |
-| 추천 1회 생성 | 관광 3 + 무장애 상세 최대 3 + 기상 1 = **최대 7콜** |
+| 추천 1회 생성 | 관광 3 + 무장애 상세 최대 3 + **운영·휴무 상세 최대 5** + 기상 1 = **최대 12콜** |
 | 변화 이벤트 재계산 | **0콜** — 후보를 클라이언트가 되돌려 보내 재판정만 한다 |
 | 장소 상세 1건 | 국문 3 + 영문 3 = **최대 6콜** |
 
@@ -69,7 +69,8 @@
 | `title` | 추천 카드 제목 | 영문 우선·국문 폴백. **원문 그대로**, 폴백 시 "번역 필요" 배지와 `lang` 속성 표기 |
 | `overview` | 장소 상세 관광정보 원문 | **원문 그대로.** SafeHour 문구를 섞지 않음 |
 | `addr1`·`addr2` | 장소 상세 주소 | 결합만 |
-| `usetime`·`restdate` 등 | 운영·휴무 정보 | 원문 그대로 + 사용자 언어 라벨(한국어·영어). **원문은 번역하지 않고 영업 여부도 판단하지 않음** |
+| `usetime`·`opentime` 등 | 운영시간 | 원문 그대로 + 사용자 언어 라벨. **번역하지 않고, 이 텍스트로 "지금 영업 중"을 판단하지 않음** |
+| `restdate` 계열 · `eventstartdate`·`eventenddate` | 휴무·행사 기간 | **닫힘 근거가 명백할 때만 후보에서 제외** (끝난 행사, 오늘과 맞는 정기 휴무 요일). 그 외에는 `openNow=null` 유지 |
 | `originimgurl` | 사진 | **URL 참조만.** 다운로드·재가공 없음 |
 | `cpyrhtDivCd` | 사진 캡션 저작권 구분 | 코드 → 라벨 변환 (제1유형/제3유형) |
 | `mapx`·`mapy` | 거리·이동시간 계산 입력 | 화면에 좌표를 직접 표시하지 않음 |
