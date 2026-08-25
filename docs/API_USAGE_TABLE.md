@@ -7,12 +7,16 @@
 
 ## 1. 활용한 공공 API
 
-| 제공기관 | 서비스 | Base URL | 용도 |
-| --- | --- | --- | --- |
-| 한국관광공사 | 국문 관광정보 | `apis.data.go.kr/B551011/KorService2` | 후보 목록·상세의 **근간** |
-| 한국관광공사 | 영문 관광정보 | `apis.data.go.kr/B551011/EngService2` | 외국인 사용자용 영문 원문 |
-| 한국관광공사 | 무장애 여행정보 | `apis.data.go.kr/B551011/KorWithService2` | 접근성 신호 |
-| 기상청 | 단기예보 조회서비스 | `apis.data.go.kr/1360000/VilageFcstInfoService_2.0` | 실외 활동 적합성 판정 |
+| 제공기관 | 서비스 (포털 등록명) | Base URL | 계정 | 용도 |
+| --- | --- | --- | --- | --- |
+| 한국관광공사 | 국문 관광정보 서비스_GW | `apis.data.go.kr/B551011/KorService2` | **운영** | 후보 목록·상세의 **근간** |
+| 한국관광공사 | 영문 관광정보서비스_GW | `apis.data.go.kr/B551011/EngService2` | 개발 | 외국인 사용자용 영문 원문 |
+| 한국관광공사 | 무장애 여행 정보 | `apis.data.go.kr/B551011/KorWithService2` | 개발 | 접근성 신호 |
+| 기상청 | 단기예보 조회서비스 | `apis.data.go.kr/1360000/VilageFcstInfoService_2.0` | 개발 | 실외 활동 적합성 판정 |
+
+활용신청 **4건 전부 승인**(2026-08-25 확인). 만료예정일은 2028년으로 공모전 기간 내내 유효하다.
+운영계정은 요강이 정한 **대표 1개**로 국문 관광정보 서비스_GW 하나다 — 한국관광공사
+대외개방운영팀 실사를 거쳐 승인됐다 (증적 `docs/KNTO_REPLY_DRAFT.md`).
 
 공통 요청 파라미터: `MobileOS=ETC`, `MobileApp=SafeHour`, `_type=json`
 
