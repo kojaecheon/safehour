@@ -1,5 +1,3 @@
-# 04. D04 기능 명세 · API·데이터
-
 > **문서 상태: WORKING** · 실제 구현 완료와 계획을 구분한다. 모바일 웹 런타임은 구현 완료이며(9화면·내부 API 10종), 남은 미구현은 실제 경로 연동과 보호자 화면이다.
 
 ## 문서 메타데이터
@@ -229,8 +227,8 @@ v1.0 초안(2026-07-30)은 **환자가 병원 안내문을 읽고 앱 폼에 조
 - v1.0 상태 "NOT_STARTED" 는 사실과 다르다.
 - 화면 9종: `/` · `/login` · `/link` · `/today` · `/guide` · `/plan` · `/result` ·
   `/place/{candidateId}` · `/privacy`
-- 라우트 계약은 ADR-0001 로 확정 — SCR002–004 는 `/plan` 통합 (앵커는 `#role` 하나뿐이고 나머지는 `aria-labelledby` 대상이다) (`#location
-  `#condition` `#role`), SCR007(변화 전후)·SCR008(즉시 복귀)은 `/result` 내 모달.
+- 라우트 계약은 ADR-0001 로 확정 — SCR002–004 는 `/plan` 통합. 앵커는 `#role` 하나뿐이고
+  나머지는 `aria-labelledby` 대상이다. SCR007(변화 전후)·SCR008(즉시 복귀)은 `/result` 내 모달.
   `/result/change` · `/return` 라우트는 **폐기**.
 - 검증: E2E 93건(360px 기준, 외부 API 호출 0건), axe 9화면 위반 0, 키보드 7건,
   200% 확대, 44px 터치 대상, 320/430/768/1280px 가로 스크롤 없음
