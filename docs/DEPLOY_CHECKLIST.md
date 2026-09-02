@@ -11,7 +11,7 @@
 
 | | 상태 |
 | --- | --- |
-| 코드 | 로그인 · 병원 연결 · 오늘의 회복 · 병원 안내 · 외출 판정까지 완성. 단위 295 · E2E 93 통과 |
+| 코드 | 로그인 · 병원 연결 · 오늘의 회복 · 병원 안내 · 외출 판정까지 완성. 단위 322 · E2E 93 통과 |
 | 배포본 (`safehour.vercel.app`) | **옛 화면** — 수기 입력 방식. 로그인·병원 연동 없음 |
 | 막고 있는 것 | Vercel 환경변수 + OAuth 앱 등록. **둘 다 운영자 계정이 필요해 대행 불가** |
 
@@ -119,7 +119,7 @@ Vercel → 프로젝트 → Settings → Environment Variables.
 현재 작업은 `claude/competition-prep-process-a1a2fa` 브랜치에 있다.
 
 1. 변경분을 커밋하고 PR 을 연다
-2. CI `quality` 통과 확인 (lint · 단위 295 · build · audit · E2E 93)
+2. CI `quality` 통과 확인 (lint · 단위 322 · build · audit · E2E 93)
 3. `main` 에 머지 → Vercel 이 Production 배포
 
 `npm run merge` 가 안전 머지 스크립트다 (branch protection 이 플랜 제약으로 불가한 대신).

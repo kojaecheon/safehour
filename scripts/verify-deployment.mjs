@@ -90,6 +90,40 @@ if (health.flags?.recommendationKilled) {
   console.log('\n  ⚠ kill switch 가 켜져 있습니다. 아래 판정 검사는 미추천이 정상입니다.\n');
 }
 
+// ── 1-1. 로그인 가능 여부 ──
+//
+// 이 검사가 없던 시절, 배포본에 로그인 수단이 하나도 없어 지침 연결부터 막혔는데
+// 검증 13건이 전부 통과했다. 제품은 이미 /api/auth/session 으로 그 사실을 정확히
+// 보고하고 있었다 — 사람이 눈으로 볼 때만 보였고 자동 검증이 보지 않았을 뿐이다.
+//
+// 로그인이 막히면 병원 지침을 연결할 수 없고, 지침이 없으면 연결 게이트가 관광지
+// 표시 자체를 막는다. 즉 로그인 불가는 "일부 기능 제한" 이 아니라 **제품 전체가
+// 도달 불가능** 하다는 뜻이라, 경고가 아니라 실패로 다룬다.
+const sessionRes = await fetch(`${baseUrl}/api/auth/session`);
+const session = await sessionRes.json();
+const auth = session.auth ?? {};
+
+// `auth.ready` 만 보면 안 된다. 그것은 "세션 키와 콜백 주소가 있다" 는 뜻이고
+// 로그인 **수단**이 있는지는 보지 않는다 — 실제로 ready=true 인데 아무도 로그인할
+// 수 없는 조합이 존재한다. 여기서는 "지금 누군가 로그인을 끝낼 수 있는가" 로 판정한다.
+const loginMethods = (auth.providers ?? []).filter((p) => p.configured).map((p) => p.id);
+if (auth.demoLogin) loginMethods.push('demo');
+const loginUsable = auth.ready === true && loginMethods.length > 0;
+
+record('로그인 가능', loginUsable, describeLogin(auth, loginMethods, loginUsable));
+
+function describeLogin(a, open, usable) {
+  if (usable) return `사용 가능: ${open.join(', ')}`;
+
+  const missing = [];
+  if (!a.sessionSecretConfigured) missing.push('SAFEHOUR_SESSION_SECRET (32자 이상)');
+  if (!a.callbackConfigured) missing.push('SAFEHOUR_BASE_URL');
+  if (open.length === 0) {
+    missing.push('로그인 수단 (GOOGLE_/KAKAO_CLIENT_ID·SECRET 또는 SAFEHOUR_ALLOW_DEMO_LOGIN=1)');
+  }
+  return `없는 것: ${missing.join(' / ')} — 심사위원이 지침 연결부터 막힌다`;
+}
+
 // ── 2. 보안 헤더 ──
 console.log('\n2. 보안 헤더');
 const pageRes = await fetch(baseUrl);

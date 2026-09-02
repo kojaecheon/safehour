@@ -364,3 +364,80 @@ describe('Secure 플래그 판단 (회귀)', () => {
     assert.equal(secureCookies(null, {}), false);
   });
 });
+
+// 로그인이 실제로 가능한 조건 — 배포 검증이 판정하는 기준
+//
+// 배포본에 로그인 수단이 하나도 없어 지침 연결부터 막혔는데, 배포 검증이 그것을
+// 보지 않아 13건이 전부 통과한 적이 있다. 지금은 `npm run verify:deploy` 가
+// 아래와 같은 복합 조건으로 판정한다. 그 기준을 여기서 고정한다.
+//
+// 주의: `authReadiness().ready` 만으로는 부족하다. 그것은 "세션 키와 콜백 주소가
+// 있다" 는 뜻이고 로그인 **수단**이 있는지는 보지 않는다. 아래 첫 테스트가
+// 그 간극을 드러낸다.
+describe('로그인 가능 판정 (배포 검증 기준)', () => {
+  const SECRET = 'x'.repeat(32);
+  const BASE = { SAFEHOUR_SESSION_SECRET: SECRET, SAFEHOUR_BASE_URL: 'https://example.test' };
+
+  /** 배포 검증과 같은 기준 — 기반이 갖춰졌고 로그인 수단이 하나 이상 있어야 한다 */
+  function loginUsable(env) {
+    const infraReady = Boolean(sessionSecret(env)) && Boolean(callbackUrl(env));
+    const methods = PROVIDER_IDS.filter((id) => providerConfigured(id, env));
+    if (demoLoginEnabled(env)) methods.push('demo');
+    return { infraReady, methods, usable: infraReady && methods.length > 0 };
+  }
+
+  test('기반만 갖춰지고 로그인 수단이 없으면 아무도 로그인할 수 없다', () => {
+    const { infraReady, usable } = loginUsable({ ...BASE });
+
+    assert.equal(infraReady, true, '세션 키와 콜백이 있으므로 기반은 준비된 상태다');
+    assert.equal(usable, false, '기반만으로 로그인 가능하다고 판정하면 배포 사고를 놓친다');
+  });
+
+  test('공급자가 있으면 로그인할 수 있다', () => {
+    const { usable, methods } = loginUsable({
+      ...BASE,
+      GOOGLE_CLIENT_ID: 'id',
+      GOOGLE_CLIENT_SECRET: 'secret',
+    });
+
+    assert.equal(usable, true);
+    assert.deepEqual(methods, ['google']);
+  });
+
+  test('데모 경로만 열어도 로그인할 수 있다 — 심사 대비 보험이다', () => {
+    const { usable, methods } = loginUsable({ ...BASE, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' });
+
+    assert.equal(usable, true, '데모 경로가 열렸는데 로그인 불가로 판정했다');
+    assert.deepEqual(methods, ['demo']);
+  });
+
+  test('공급자가 있어도 세션 키가 없으면 로그인을 끝낼 수 없다', () => {
+    const { usable } = loginUsable({
+      SAFEHOUR_BASE_URL: 'https://example.test',
+      GOOGLE_CLIENT_ID: 'id',
+      GOOGLE_CLIENT_SECRET: 'secret',
+    });
+
+    assert.equal(usable, false, '세션 서명 키 없이 로그인이 가능하다고 판정했다');
+  });
+
+  test('공급자가 있어도 콜백 주소가 없으면 인가 요청을 보낼 수 없다', () => {
+    const { usable } = loginUsable({
+      SAFEHOUR_SESSION_SECRET: SECRET,
+      GOOGLE_CLIENT_ID: 'id',
+      GOOGLE_CLIENT_SECRET: 'secret',
+    });
+
+    assert.equal(usable, false, '콜백 주소 없이 로그인이 가능하다고 판정했다');
+  });
+
+  test('아무것도 없으면 당연히 불가하고, 무엇이 없는지 셋 다 드러난다', () => {
+    const env = {};
+    const { infraReady, methods } = loginUsable(env);
+
+    assert.equal(infraReady, false);
+    assert.deepEqual(methods, []);
+    assert.equal(Boolean(sessionSecret(env)), false);
+    assert.equal(Boolean(callbackUrl(env)), false);
+  });
+});
