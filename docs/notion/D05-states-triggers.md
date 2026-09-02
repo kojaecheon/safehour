@@ -272,7 +272,7 @@ NO_TOURISM → STANDBY → SPLIT_NEARBY → TOGETHER
 - 출력: 해당 후보 `CLOSED` 제외, 대체 후보
 - 중복 방지: eventId
 - Fallback: 대체 없음 → STANDBY
-- 현재: 시연 패널에서 **화면 활성 탭의 1순위 장소**를 대상으로 주입한다. 실제 운영 자동 감지 출처는 [확인필요]
+- 현재: 시연 패널에서 **화면 활성 탭의 1순위 장소**를 대상으로 주입한다. 이와 별개로 **후보 생성 단계에서 닫힘이 명백한 곳은 이미 제외된다** (`src/tour-api/schedule.js` — 끝난 행사, 오늘과 맞는 정기 휴무 요일). 그 밖의 실시간 휴무 감지 출처는 [확인필요]
 - Kill switch: closure source 신뢰 실패 시 자동 휴무 차단 비활성화
 
 ### D05-SM001-AUTO002 기상 악화 재판정
