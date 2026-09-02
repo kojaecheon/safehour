@@ -227,3 +227,100 @@ describe('입력 경계 (D07-BAN002)', () => {
     );
   });
 });
+
+/**
+ * 운영·휴무 조회 (`detailIntro2`) — 끝난 축제·정기 휴무일에 회복기 환자를 보내지 않는다.
+ *
+ * 목록 조회는 운영시간을 주지 않으므로 상위 후보에 한해 상세를 본다.
+ * 닫힘 근거가 명백할 때만 `openNow: false` 가 되고, 그 외에는 null 로 남는다 —
+ * "지금 열려 있다" 는 어디서도 만들지 않는다 (SIGNOFF 5.3).
+ */
+describe('운영·휴무로 닫힌 후보 제외', () => {
+  /** detailIntro2 만 따로 응답하는 스텁 */
+  function stubWithSchedules(koreanItems, schedulesByContentId) {
+    const state = { introCalls: [] };
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      const ok = (items) => ({ ok: true, status: 200, text: async () => body(items) });
+
+      if (target.includes('detailIntro2')) {
+        const id = new URL(target).searchParams.get('contentId');
+        state.introCalls.push(id);
+        const schedule = schedulesByContentId[id];
+        return schedule ? ok([{ contentid: id, ...schedule }]) : ok([]);
+      }
+      if (target.includes('KorWithService2')) return ok([]);
+      if (target.includes('EngService2')) return ok([]);
+      if (target.includes('KorService2')) return ok(koreanItems);
+      return { ok: false, status: 500, text: async () => '{}' };
+    };
+    return state;
+  }
+
+  test('끝난 축제는 openNow=false 로 내려간다', async () => {
+    stubWithSchedules([listItem(1, '지난 축제'), listItem(2, '상시 운영')], {
+      1: { eventstartdate: '20260701', eventenddate: '20260731' },
+      2: { restdate: '연중무휴' },
+    });
+
+    // KST 08-17 (월). 축제는 07-31 에 끝났고, 상시 운영은 연중무휴다.
+    const result = await loadSafeHourCandidates({
+      origin: ORIGIN,
+      useCache: false,
+      now: new Date('2026-08-17T01:00:00Z'),
+    });
+
+    const byId = new Map(result.candidates.map((c) => [c.title, c]));
+    assert.equal(byId.get('지난 축제').openNow, false);
+    // 닫힘 근거가 없으면 null 이다 — true 가 아니다
+    assert.equal(byId.get('상시 운영').openNow, null);
+    assert.equal(result.diagnostics.scheduleClosedCount, 1);
+  });
+
+  test('정기 휴무는 주입한 시각의 요일로 판정한다', async () => {
+    const schedules = { 1: { restdateculture: '매주 월요일 휴관' } };
+
+    stubWithSchedules([listItem(1, '월요일 휴관 시설')], schedules);
+    const onMonday = await loadSafeHourCandidates({
+      origin: ORIGIN,
+      useCache: false,
+      now: new Date('2026-08-17T01:00:00Z'), // KST 월요일
+    });
+    assert.equal(onMonday.candidates[0].openNow, false);
+
+    stubWithSchedules([listItem(1, '월요일 휴관 시설')], schedules);
+    const onTuesday = await loadSafeHourCandidates({
+      origin: ORIGIN,
+      useCache: false,
+      now: new Date('2026-08-18T01:00:00Z'), // KST 화요일
+    });
+    assert.equal(onTuesday.candidates[0].openNow, null);
+  });
+
+  test('상세 조회에 실패해도 후보를 지우지 않는다', async () => {
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      const ok = (items) => ({ ok: true, status: 200, text: async () => body(items) });
+      if (target.includes('detailIntro2')) return { ok: false, status: 500, text: async () => '{}' };
+      if (target.includes('KorWithService2')) return ok([]);
+      if (target.includes('EngService2')) return ok([]);
+      if (target.includes('KorService2')) return ok([listItem(1, '조회 실패')]);
+      return { ok: false, status: 500, text: async () => '{}' };
+    };
+
+    const result = await loadSafeHourCandidates({ origin: ORIGIN, useCache: false });
+
+    assert.equal(result.candidates.length, 1);
+    assert.equal(result.candidates[0].openNow, null, '실패는 닫힘이 아니다');
+    assert.equal(result.diagnostics.scheduleClosedCount, 0);
+  });
+
+  test('상위 몇 건만 조회한다 — 후보 전체를 상세 조회하지 않는다', async () => {
+    const many = Array.from({ length: 20 }, (_, i) => listItem(i + 1, `장소${i + 1}`));
+    const state = stubWithSchedules(many, {});
+
+    await loadSafeHourCandidates({ origin: ORIGIN, useCache: false, scheduleDetailLimit: 5 });
+
+    assert.equal(state.introCalls.length, 5);
+  });
+});

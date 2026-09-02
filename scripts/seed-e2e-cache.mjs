@@ -137,6 +137,38 @@ function writeCache(serviceName, operation, parameters, items) {
   return file;
 }
 
+/**
+ * 추천 경로가 후보 상위 몇 건에 대해 운영·휴무를 조회한다(`detailIntro2`).
+ * 캐시에 심지 않으면 E2E 가 외부로 나가므로 전부 심는다.
+ *
+ * 값은 **닫히지 않는 형태**로 둔다 — 이 시드의 목적은 외부 호출을 막는 것이지
+ * 휴무 판정을 시연하는 것이 아니다. 휴무 판정 자체는 단위 테스트가 덮는다.
+ */
+function seedSchedules(written) {
+  for (const item of KOREAN_ITEMS) {
+    written.push(
+      writeCache(
+        'korean',
+        'detailIntro2',
+        {
+          contentId: String(item.contentid),
+          contentTypeId: String(item.contenttypeid ?? ''),
+          numOfRows: '10',
+          pageNo: '1',
+        },
+        [
+          {
+            contentid: item.contentid,
+            contenttypeid: item.contenttypeid,
+            usetime: '09:00~18:00',
+            restdate: '연중무휴',
+          },
+        ],
+      ),
+    );
+  }
+}
+
 export function seedE2eCache() {
   const params = locationParams();
   const written = [
@@ -145,6 +177,7 @@ export function seedE2eCache() {
     // 무장애 목록은 비워 detailWithTour2 후속 호출까지 막는다
     writeCache('barrierFree', 'locationBasedList2', params, []),
   ];
+  seedSchedules(written);
   return written;
 }
 

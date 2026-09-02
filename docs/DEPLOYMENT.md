@@ -207,7 +207,7 @@ Vercel 은 이전 배포를 보존하므로 롤백에 재빌드가 필요 없다
 
 ## 5. 배포 전 체크리스트
 
-- [ ] CI `quality` 통과 (lint · 단위 301 · build · audit · E2E 93)
+- [ ] CI `quality` 통과 (lint · 단위 322 · build · audit · E2E 93)
 - [ ] `/api/health` 에서 `tourApiKeyConfigured: true`
 - [ ] `/api/auth/session` 에서 `auth.ready: true`, 쓰려는 공급자가 `configured: true`
 - [ ] 핵심 흐름 수동 1회: 로그인 → 병원 지침 연결 → 안내 확인 → 외출 판정 → 휴무 이벤트 → 즉시 복귀
