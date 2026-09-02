@@ -524,7 +524,7 @@ axe 스캔은 **13건**이며 9개 라우트(`/` `/login` `/link` `/today` `/gui
 - QA041 추천 kill switch → **PASS** (`test/kill-switch.test.js` 13건, 리허설 수행 이력 있음)
 - QA042 외부 API fallback → **PASS**
 - QA043 stale 결과 최신 위장 금지 → **PASS**
-- QA044 rollback 후 전체 회귀 → **기준 갱신**: 46개가 아니라 **단위 301 + E2E 93**
+- QA044 rollback 후 전체 회귀 → **기준 갱신**: 46개가 아니라 **단위 322 + E2E 93**
 - QA045 배포 canary 와 운영 alert → **NOT_RUN** — alert·owner·SLA 미지정
 
 ### D09-QA046–QA052 연결·인증 (신설)
@@ -601,7 +601,7 @@ axe 스캔은 **13건**이며 9개 라우트(`/` `/login` `/link` `/today` `/gui
 
 ### 6. QA·회귀
 
-- **단위·통합 301 + E2E 93** · Critical 예외 · 변경 후 전체 회귀 (CI: lint → test → build → audit → E2E)
+- **단위·통합 322 + E2E 93** · Critical 예외 · 변경 후 전체 회귀 (CI: lint → test → build → audit → E2E)
 - branch protection 은 **플랜 제약으로 불가**, `npm run merge` 로 대체
 - **실기기 미수행**
 
@@ -755,7 +755,7 @@ axe 스캔은 **13건**이며 9개 라우트(`/` `/login` `/link` `/today` `/gui
 - 영향: 추천 전체
 - 탐지: Critical test·현장 검증
 - 처리: kill switch
-- 해제: 원인 수정, 전체 회귀(단위 301 + E2E 93), 의료·QA 승인
+- 해제: 원인 수정, 전체 회귀(단위 322 + E2E 93), 의료·QA 승인
 - Waiver: 불가
 - 현재: **자동 재현 0건.** 다만 SLA 임계값의 임상 근거가 없어 §6.1 2순위에 걸린다
 
