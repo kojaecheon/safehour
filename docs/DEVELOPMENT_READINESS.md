@@ -118,8 +118,7 @@ Notion 갱신은 사람 승인 사항이므로 에이전트가 직접 수정하�
 
 - **호출 이력 축적** — `npm run usage:weekly` 주 1회 이상. 08.20~09.01 공백, 소급 불가
 - **Google·Kakao OAuth 앱 등록** — 현재 데모 경로로만 진입 가능. `docs/DEPLOY_CHECKLIST.md`
-- 배포 후 서비스 이미지 재캡처 (`npm run capture:images -- <배포 URL>`)
-- 기능설명서 인증키 항목 기입 — `docs/FUNCTION_SPEC_DRAFT.md` 의 마지막 🔴
+- 배포 후 서비스 이미지 재캡처 (`npm run capture:images -- <배포 URL>`) — 중복 제거 반영 후
 
 ### 남은 구현
 
