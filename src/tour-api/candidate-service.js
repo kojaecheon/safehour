@@ -7,6 +7,7 @@ import {
   matchTourItems,
   normalizeTourCandidate,
 } from "./mapper.js";
+import { dedupeSamePlace } from "./dedupe.js";
 import { openNowFromSchedule } from "./schedule.js";
 
 export const ORIGIN_KIND = Object.freeze({
@@ -277,7 +278,7 @@ export async function loadSafeHourCandidates({
   );
   const closedIds = new Set();
 
-  const candidates = koreanItems.map((korean) => {
+  const rawCandidates = koreanItems.map((korean) => {
     const koreanId = String(korean.contentid);
     const english = englishByKoreanId.get(koreanId);
     const barrierFree = barrierByKoreanId.get(koreanId);
@@ -298,6 +299,10 @@ export async function loadSafeHourCandidates({
       ),
     });
   });
+
+  // 같은 장소가 contentId 를 달리해 두 번 등록된 경우를 합친다.
+  // 추천은 3건뿐이라 중복 하나가 선택지를 실질 하나 줄인다.
+  const { candidates, merged: mergedDuplicates } = dedupeSamePlace(rawCandidates);
 
   return {
     origin: query.origin,
@@ -321,6 +326,8 @@ export async function loadSafeHourCandidates({
         barrierFree: summarizeMatches(barrierMatches),
       },
       // 조회에 성공한 건수만 센다 (실패는 barrierDetailFailed 로 분리)
+      duplicatesMerged: mergedDuplicates.length,
+      duplicates: mergedDuplicates,
       scheduleCount: schedules.size,
       scheduleClosedCount: closedIds.size,
       barrierDetailCount: barrierDetails.size,
