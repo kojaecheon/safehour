@@ -324,3 +324,55 @@ describe('운영·휴무로 닫힌 후보 제외', () => {
     assert.equal(state.introCalls.length, 5);
   });
 });
+
+/**
+ * 같은 장소 중복 등록 — 국문 관광정보에 코엑스 아쿠아리움이 contentId 두 개로
+ * 올라와 추천 3건 중 2건이 같은 장소가 된 적이 있다. 서비스 경로에서 합쳐지는지 본다.
+ */
+describe('같은 장소 중복 제거', () => {
+  test('이름과 위치가 같으면 하나로 합치고 진단에 남긴다', async () => {
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      const ok = (items) => ({ ok: true, status: 200, text: async () => body(items) });
+      if (target.includes('detailIntro2')) return ok([]);
+      if (target.includes('KorWithService2')) return ok([]);
+      if (target.includes('EngService2')) return ok([]);
+      if (target.includes('KorService2')) {
+        return ok([
+          listItem(229901, '한국종합무역센터(코엑스)', { mapx: '127.0595', mapy: '37.5115' }),
+          listItem(2507822, '코엑스 아쿠아리움', { mapx: '127.0587', mapy: '37.5126' }),
+          listItem(130284, '코엑스 아쿠아리움', { mapx: '127.0588', mapy: '37.5126' }),
+        ]);
+      }
+      return { ok: false, status: 500, text: async () => '{}' };
+    };
+
+    const result = await loadSafeHourCandidates({ origin: ORIGIN, useCache: false });
+
+    assert.equal(result.candidates.length, 2, '중복 한 건이 합쳐져야 한다');
+    assert.equal(result.diagnostics.duplicatesMerged, 1);
+    assert.equal(result.diagnostics.duplicates[0].dropped, '130284');
+  });
+
+  test('이름이 같아도 멀면 남긴다 — 같은 브랜드의 다른 지점을 잃지 않는다', async () => {
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      const ok = (items) => ({ ok: true, status: 200, text: async () => body(items) });
+      if (target.includes('detailIntro2')) return ok([]);
+      if (target.includes('KorWithService2')) return ok([]);
+      if (target.includes('EngService2')) return ok([]);
+      if (target.includes('KorService2')) {
+        return ok([
+          listItem(1, '같은 이름 카페', { mapx: '127.0590', mapy: '37.5100' }),
+          listItem(2, '같은 이름 카페', { mapx: '127.0900', mapy: '37.5300' }),
+        ]);
+      }
+      return { ok: false, status: 500, text: async () => '{}' };
+    };
+
+    const result = await loadSafeHourCandidates({ origin: ORIGIN, useCache: false });
+
+    assert.equal(result.candidates.length, 2);
+    assert.equal(result.diagnostics.duplicatesMerged, 0);
+  });
+});
