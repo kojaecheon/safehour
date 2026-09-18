@@ -215,10 +215,13 @@ describe('규칙 30 — 지난 날짜·고정·삭제', () => {
     const edits = { '2026-10-07': { pinned: [], deleted: [victim], clearedMeals: [] } };
     const result = trip(s, { previous: first.days, edits, now: at('2026-10-06', '08:00') });
     assert.ok(!contentIdsOf(result.days['2026-10-07']).includes(victim));
+    // 사용자가 직접 지운 것은 재계획이 만든 변화가 아니다 — '변경됨'(전후 비교)으로 알리지 않는다.
+    // (AX-307 재검토: 이전 기대값은 사용자 삭제를 변화로 기록했다. 최소 변경 결정에 따라 바꾼다)
     const delta = result.days['2026-10-07'].delta;
-    assert.equal(delta.hasVisibleChange, true);
-    const gone = [...delta.removed, ...delta.replaced.map((r) => r.from)];
-    assert.ok(gone.includes(`2026-10-07:P:${victim}`) || gone.includes(`2026-10-07:G:${victim}`));
+    assert.ok(!delta || !delta.removed.some((id) => id.endsWith(`:${victim}`)));
+    // 나머지 정거장은 제자리에 남는다
+    const rest = contentIdsOf(first.days['2026-10-07']).filter((id) => id !== victim);
+    for (const id of rest) assert.ok(contentIdsOf(result.days['2026-10-07']).includes(id), `${id} 는 남는다`);
   });
 });
 

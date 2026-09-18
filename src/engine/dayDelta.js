@@ -75,23 +75,38 @@ function overlaps(a, b) {
  * @param {object} [opts]
  * @param {string[]} [opts.reasons]          변화를 일으킨 사유(사건 등) — 맨 앞에 둔다
  * @param {string[]} [opts.requiredStopIds]  게이트를 더는 통과하지 못해 반드시 바뀌어야 하는 before 정거장
+ * @param {Iterable<string>} [opts.userDrivenIds]  사용자 편집으로 빠지거나 들어온 정거장 — 변화로 세지 않는다
+ * @param {Array<{from: string, to: string}>} [opts.replacements]  재계획이 같은 자리에 넣은 대체 짝
+ * @param {boolean} [opts.userEditOnly]  이번 변화의 원인이 사용자 편집뿐이다 — 보이는 변화로 알리지 않는다
  * @returns {DayDelta}
  * @throws {SilentReplanError} 바뀌어야 하는 정거장이 남아 있거나, 변화가 필요한데 보이는 변화가 없을 때
  */
-export function computeDayDelta(before, after, { reasons = [], requiredStopIds = [] } = {}) {
+export function computeDayDelta(before, after, { reasons = [], requiredStopIds = [], userDrivenIds = [], replacements = [], userEditOnly = false } = {}) {
   const beforeEntries = entriesOf(before);
   const afterEntries = entriesOf(after);
   const beforeById = new Map(beforeEntries.map((e) => [e.stop.id, e]));
   const afterById = new Map(afterEntries.map((e) => [e.stop.id, e]));
+  // 사용자가 직접 한 편집(삭제·교체·비움)으로 빠지거나 들어온 정거장은 '변경됨'으로 알리지 않는다
+  const userDriven = new Set(userDrivenIds);
 
-  const removedEntries = beforeEntries.filter((e) => !afterById.has(e.stop.id));
-  const addedEntries = afterEntries.filter((e) => !beforeById.has(e.stop.id));
+  const goneEntries = beforeEntries.filter((e) => !afterById.has(e.stop.id));
+  const removedEntries = goneEntries.filter((e) => !userDriven.has(e.stop.id));
+  const addedEntries = afterEntries.filter((e) => !beforeById.has(e.stop.id) && !userDriven.has(e.stop.id));
 
-  // 대체: 같은 역할, 같은 종류(식사 칸/일반), 시간이 겹치거나 같은 외출 — 앞에서부터 짝짓는다
+  // 대체: 재계획이 같은 자리에 넣은 짝을 먼저 쓰고, 나머지는 같은 역할·같은 종류(식사 칸/일반)이면서
+  // 시간이 겹치거나 같은 외출인 것끼리 앞에서부터 짝짓는다
   const paired = new Set();
   const replaced = [];
   const replacedFrom = new Set();
+  for (const { from, to } of replacements) {
+    if (!removedEntries.some((e) => e.stop.id === from) || !addedEntries.some((e) => e.stop.id === to)) continue;
+    if (replacedFrom.has(from) || paired.has(to)) continue;
+    paired.add(to);
+    replacedFrom.add(from);
+    replaced.push({ from, to });
+  }
   for (const r of removedEntries) {
+    if (replacedFrom.has(r.stop.id)) continue;
     const match = addedEntries.find(
       (a) =>
         !paired.has(a.stop.id) &&
@@ -121,8 +136,9 @@ export function computeDayDelta(before, after, { reasons = [], requiredStopIds =
     ...(after?.guardianOutings ?? []).map((o) => ({ role: 'G', outing: o })),
   ];
 
+  const goneSet = new Set(goneEntries.map((e) => e.stop.id));
   const cancelledOutings = beforeOutings
-    .filter(({ outing }) => outing.stops.length > 0 && outing.stops.every((s) => removedSet.has(s.id)))
+    .filter(({ outing }) => outing.stops.length > 0 && outing.stops.every((s) => goneSet.has(s.id)) && outing.stops.some((s) => removedSet.has(s.id)))
     .map(({ outing }) => outing.id);
 
   // 새 마감: after 외출마다 짝이 되는 before 외출(같은 정거장·대체 짝, 없으면 같은 id)과 비교한다
@@ -145,24 +161,34 @@ export function computeDayDelta(before, after, { reasons = [], requiredStopIds =
   const goneReasons = [...removedEntries]
     .flatMap((e) => excludedReasons.get(String(e.stop.candidateId)) ?? excludedReasons.get(String(e.stop.contentId)) ?? []);
   const beforeReasons = new Set(before?.reasons ?? []);
-  const deltaReasons = uniq([
+  const afterReasons = new Set(after?.reasons ?? []);
+  let deltaReasons = uniq([
     ...reasons,
     ...goneReasons,
     ...(shortened.length > 0 ? [REASON.SLA_INSUFFICIENT] : []),
-    ...(after?.reasons ?? []).filter((r) => !beforeReasons.has(r)),
+    // 날짜 사유의 변화(새로 생긴 사유, 풀린 사유)도 원인이다
+    ...[...afterReasons].filter((r) => !beforeReasons.has(r)),
+    ...[...beforeReasons].filter((r) => !afterReasons.has(r)),
   ]);
 
   const stateChanged = before?.dayState !== after?.dayState;
   const returnNowChanged = Boolean(before?.returnNow) !== Boolean(after?.returnNow);
+  // 사용자 편집만이 원인이면(사건·게이트 실패·시간 부족 없음) 그 결과(시각·마감 변화 포함)는 '변경됨'이 아니다
   const hasVisibleChange =
-    stateChanged ||
+    !userEditOnly &&
+    (stateChanged ||
     returnNowChanged ||
     removed.length > 0 ||
     added.length > 0 ||
     replaced.length > 0 ||
     shortened.length > 0 ||
     cancelledOutings.length > 0 ||
-    newDeadlines.length > 0;
+    newDeadlines.length > 0);
+
+  // 보이는 변화에는 사유가 있어야 한다 — 원인을 찾지 못하면 그날 사유, 그것도 없으면 NO_CANDIDATE
+  if (hasVisibleChange && deltaReasons.length === 0) {
+    deltaReasons = afterReasons.size > 0 ? [...afterReasons] : [REASON.NO_CANDIDATE];
+  }
 
   const date = after?.date ?? before?.date ?? '';
   const survivors = requiredStopIds.filter((id) => afterById.has(id));

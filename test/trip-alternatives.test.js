@@ -27,7 +27,8 @@ const WALK_LIMIT = 45;
 const TRAVEL_LIMIT = 15;
 
 const s = tripStay({ walkLimit: SET(WALK_LIMIT), travelLimit: SET(TRAVEL_LIMIT) }, { pace: 'NORMAL' });
-const pool = tripPool('en', 80);
+// 그날 두 역할의 장소와 다른 날짜의 장소가 모두 빠지므로 후보가 넉넉해야 한다
+const pool = tripPool('en', 120);
 const base = planTrip({ stay: s, candidatesByLodging: byLodging(pool), airportTravel: AIRPORT_TRAVEL, lang: 'en', now: NOW });
 const day = base.days[DATE];
 const usedElsewhere = Object.entries(base.days)
@@ -79,15 +80,22 @@ describe('규칙 33 — 교체 후보', () => {
     assert.equal(new Set(alternatives.map((a) => a.stop.contentId)).size, alternatives.length);
   });
 
-  test('그날 이미 있는 장소와 다른 날짜에 배치된 장소는 후보가 아니다 — 고정한 장소는 예외', () => {
+  test('그날 이미 있는 장소(환자·보호자)와 다른 날짜에 배치된 장소는 후보가 아니다 — 고정한 장소는 예외', () => {
     const alternatives = alternativesFor(input(outing, stop));
-    const inDay = day.outings.flatMap((o) => o.stops.map((x) => x.contentId));
+    const inDay = [...day.outings, ...day.guardianOutings].flatMap((o) => o.stops.map((x) => x.contentId));
     for (const { stop: alt } of alternatives) {
       assert.ok(!inDay.includes(alt.contentId));
       assert.ok(!usedElsewhere.includes(alt.contentId));
     }
-    const favourite = usedElsewhere.find((id) => pool.find((c) => c.stop.contentId === id && c.signals.isFoodPlace !== true));
-    const pinned = alternativesFor(input(outing, stop, { edits: { [DATE]: { pinned: [favourite], deleted: [], clearedMeals: [] } } }));
+    // 다른 날짜에 배치된 일반 장소 중 이 자리에 맞는 것을 고정한다
+    const pinnedEdits = (id) => ({ edits: { [DATE]: { pinned: [id], deleted: [], clearedMeals: [] } } });
+    const favourite = usedElsewhere.find(
+      (id) =>
+        pool.find((c) => c.stop.contentId === id && c.signals.isFoodPlace !== true) &&
+        previewSwap({ ...input(outing, stop, pinnedEdits(id)), contentId: id }).ok,
+    );
+    assert.ok(favourite, '맞는 고정 후보가 있다');
+    const pinned = alternativesFor(input(outing, stop, pinnedEdits(favourite)));
     assert.equal(pinned[0]?.stop.contentId, favourite, '고정 장소는 다른 날짜에 있어도 먼저 나온다');
   });
 

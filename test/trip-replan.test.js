@@ -127,8 +127,11 @@ describe('규칙 50 — 데모 사건 6종은 오늘에만 효과를 낸다', ()
   const base = plan(s);
 
   test('CLOSURE — 닫힌 장소를 빼고 다른 후보로 대체한다(대체된 자리가 기록된다, 규칙 31)', () => {
-    const target = base.days[TODAY].outings[0].stops[0];
-    const day = replanToday(s, base, { events: [{ type: 'CLOSURE', closedIds: [target.contentId] }] });
+    // 최소 변경은 그날·다른 날짜의 정거장을 옮기지 않으므로 남는 후보가 있어야 대체할 수 있다
+    const pool = tripPool('en', 120);
+    const wide = plan(s, { pool });
+    const target = wide.days[TODAY].outings[0].stops[0];
+    const day = replanToday(s, wide, { pool, events: [{ type: 'CLOSURE', closedIds: [target.contentId] }] });
     assert.ok(!contentIdsOf(day).includes(target.contentId));
     assert.equal(day.delta.hasVisibleChange, true);
     assert.ok(day.delta.replaced.some((r) => r.from === target.id), '대체된 자리');
@@ -361,6 +364,17 @@ describe('규칙 13 — 외출 중 지침 철회·만료는 즉시 복귀', () =
     assert.equal(base.days[TODAY].returnNow, false, '입력을 바꾸지 않는다');
     assert.throws(() => applyImmediateReturn(base.days[TODAY], { now, cause: 'WHATEVER' }), RangeError);
     assert.throws(() => applyImmediateReturn(base.days['2026-10-07'], { now, cause: 'PLAN_REVOKED' }), RangeError);
+  });
+
+  test('applyImmediateReturn — 체류를 주면 비운 외출의 예상 귀가·이동 합계를 남은 정거장으로 다시 계산한다', () => {
+    const day = applyImmediateReturn(base.days[TODAY], { now, cause: 'PLAN_REVOKED', stay: linked() });
+    const cutOuting = day.outings.find((o) => o.id === outing.id);
+    assert.deepEqual(cutOuting.stops, [first]);
+    assert.ok(mins(cutOuting.plannedReturnAt) < mins(outing.plannedReturnAt), '남은 정거장에서 바로 돌아온다');
+    assert.ok(cutOuting.travelTotalMin < outing.travelTotalMin);
+    const back = cutOuting.travelTotalMin - first.legIn.min;
+    assert.equal(mins(cutOuting.plannedReturnAt), mins(first.leaveAt) + back);
+    assert.equal(mins(cutOuting.returnBy) - mins(cutOuting.departAt) - requiredMin(cutOuting, { recovery: true }), cutOuting.slackMin);
   });
 });
 

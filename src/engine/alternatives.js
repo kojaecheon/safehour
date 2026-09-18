@@ -4,7 +4,7 @@
 // 각 후보는 그 자리에 넣은 **외출 전체**를 다시 검증한 것이다(복귀 계산, 보행 누적, 이동 한도,
 // 식사 칸 시간, 금식 시각) — 판정은 planDay 와 같은 함수(rolePool·evaluateOuting·selectBest)로 한다.
 //   - 종류가 같다: 식사 칸 식당 자리에는 식당만(카페 제외), 일반 자리에는 일반 정거장만
-//   - 그날 같은 역할에 이미 있는 장소, 다른 날짜에 배치된 장소(고정한 장소는 예외), 삭제한 장소는 빠진다
+//   - 그날 이미 있는 장소(두 역할 모두), 다른 날짜에 배치된 장소(고정한 장소는 예외), 삭제한 장소는 빠진다
 //   - 순위는 planDay 와 같다(고정 → 관심사 → 복귀 여유 → 보행 부담 → 같은 날 새 유형 → contentId)
 //   - 지난 날짜, 도착 시각이 지난 정거장은 교체할 수 없다(빈 목록)
 //   - 오늘 이미 출발한 외출이면 출발 시각과 시작된 정거장의 시각이 그대로인 후보만 낸다
@@ -21,6 +21,7 @@ import {
   chainedAppointmentIds,
   computeBlocks,
   gateReasons,
+  guardianBounds,
   guardianDeadlineAt,
   kindPool,
   mealSlotOf,
@@ -29,6 +30,7 @@ import {
   patientDeadlineAt,
   recFromStop,
   selectBestAccepted,
+  settledAt,
 } from './dayContext.js';
 import { foldDemoEvents, shiftAppointmentsOnDate } from './tripEvents.js';
 import { kstClock } from './tripPlan.js';
@@ -135,7 +137,7 @@ function prepare(input) {
     align = 'LATE';
     startMin = Math.max(
       context.frame.startMin,
-      ...others.filter((o) => toMinutes(o.departAt) < departMin).map(occupancyEnd),
+      ...others.filter((o) => toMinutes(o.departAt) < departMin).map(settledAt),
       ...blocks.filter((b) => b.endMin <= departMin).map((b) => b.endMin),
       isToday ? clock.minutes : -Infinity,
     );
@@ -167,21 +169,28 @@ function prepare(input) {
   if (stop.isMeal && !meal?.allowed) return { blocked: 'MEAL_NOT_ALLOWED' };
 
   const sameRole = (role === 'P' ? day.outings : day.guardianOutings).flatMap((o) => o.stops);
-  const inDay = new Set(sameRole.map((s) => String(s.contentId)));
+  // 그날 이미 있는 장소는 역할과 상관없이 빠진다 — 보호자는 같은 날 환자가 가는 곳과 다른 곳으로 간다(planDay 와 같다)
+  const inDay = new Set([...(day.outings ?? []), ...(day.guardianOutings ?? [])].flatMap((o) => o.stops.map((s) => String(s.contentId))));
   const pool = kindPool(context, role, stop.isMeal).filter((r) => !inDay.has(r.contentId));
   const rank = { usedCategories: new Set(sameRole.filter((s) => s.id !== stop.id).map((s) => s.category)) };
-  const plan = {
+  const planOf = (v) => ({
     seq,
-    startMin,
-    slaDeadlineMin: Math.min(deadline.deadlineMin, nextDepart),
+    startMin: v.startMin,
+    slaDeadlineMin: align === 'LATE' ? deadline.deadlineMin : Math.min(deadline.deadlineMin, nextDepart),
     returnPoint: deadline.returnPoint,
     mustLeaveByMin,
     align,
-  };
-  const accept = (ev) =>
+  });
+  const prefixOk = (ev) =>
     !inProgress ||
     (ev.departMin === departMin &&
       startedStops.every((s, i) => ev.items[i].arriveMin === toMinutes(s.arriveAt) && ev.items[i].leaveMin === toMinutes(s.leaveAt)));
+  // 재계획(dayRepair)과 같은 두 단계 — 먼저 보호자 외출을 건드리지 않는 범위, 안 되면 외출 자체의 마감만
+  const soft = role === 'P' && !inProgress ? guardianBounds(day.guardianOutings ?? [], outing) : null;
+  const variants = [
+    ...(soft ? [{ startMin: Math.max(startMin, soft.startMin), returnBy: soft.returnBy }] : []),
+    { startMin, returnBy: Infinity },
+  ].map((v) => ({ plan: planOf(v), accept: (ev) => prefixOk(ev) && ev.returnArriveMin <= v.returnBy }));
   const original = new Map(outing.stops.filter((s) => s.id !== stop.id).map((s) => [s.contentId, s]));
   const build = (best) => {
     const outingPreview = assembleOuting(best.ev, outingMeta(context, role, { id: outing.id, deadline }), {
@@ -191,7 +200,7 @@ function prepare(input) {
     });
     return { stop: outingPreview.stops[index], outingPreview };
   };
-  return { context, role, stop, index, pool, rank, plan, meal, accept, build, inDay };
+  return { context, role, stop, index, pool, rank, variants, meal, build, inDay };
 }
 
 /**
@@ -204,13 +213,20 @@ export function alternativesFor(input) {
   const s = prepare(input);
   if (s.blocked) return [];
   const limit = Math.min(MAX_ALTERNATIVES, Math.max(0, Number(input.limit ?? MAX_ALTERNATIVES)));
+  // 고정한 장소가 먼저, 그다음 보호자 외출을 건드리지 않는 후보, 그다음 외출 자체만 맞는 후보 — 각 단계 안에서는 planDay 순위
   const out = [];
-  let pool = s.pool;
-  while (out.length < limit && pool.length > 0) {
-    const best = selectBestAccepted(s.context.ctx[s.role], s.plan, s.index, pool, s.meal, s.rank, s.accept);
-    if (!best) break;
-    out.push(s.build(best));
-    pool = pool.filter((r) => r.contentId !== best.rec.contentId);
+  const chosen = new Set();
+  for (const group of [s.pool.filter((r) => r.pinned), s.pool.filter((r) => !r.pinned)]) {
+    for (const v of s.variants) {
+      let pool = group.filter((r) => !chosen.has(r.contentId));
+      while (out.length < limit && pool.length > 0) {
+        const best = selectBestAccepted(s.context.ctx[s.role], v.plan, s.index, pool, s.meal, s.rank, v.accept);
+        if (!best) break;
+        out.push(s.build(best));
+        chosen.add(best.rec.contentId);
+        pool = pool.filter((r) => r.contentId !== best.rec.contentId);
+      }
+    }
   }
   return out;
 }
@@ -232,7 +248,11 @@ export function previewSwap({ contentId, ...input }) {
     return { ok: false, reasons: [outOfRadius ? REASON.TRAVEL_LIMIT_EXCEEDED : REASON.NO_CANDIDATE] };
   }
   const failures = new Map();
-  const best = selectBestAccepted(s.context.ctx[s.role], s.plan, s.index, [rec], s.meal, s.rank, s.accept, failures);
+  let best = null;
+  for (const v of s.variants) {
+    best = selectBestAccepted(s.context.ctx[s.role], v.plan, s.index, [rec], s.meal, s.rank, v.accept, failures);
+    if (best) break;
+  }
   if (!best) return { ok: false, reasons: [failures.get(id) ?? REASON.SLA_INSUFFICIENT] };
   return { ok: true, ...s.build(best) };
 }

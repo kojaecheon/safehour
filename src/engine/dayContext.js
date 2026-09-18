@@ -13,6 +13,7 @@ import { classifyDate } from '../stay/coverage.js';
 import { dayWindow, medicationBlocks } from '../stay/dayFrame.js';
 import { DEFAULTS } from '../stay/defaults.js';
 import { appointmentsOnDate, lodgingForDate, pointOf } from '../stay/stay.js';
+import { REASON } from '../domain/states.js';
 import { fromMinutes, toMinutes } from '../stay/time.js';
 import { cachedEstimate, mealWindow, prepareCandidates, rolePool, toOuting } from './dayPlan.js';
 import { appointmentEvents, freeIntervals, patientEvents, patientWindows } from './dayTimeline.js';
@@ -140,6 +141,11 @@ export function buildDayContext({
 
   return {
     date,
+    stay,
+    appointments,
+    hospitals,
+    paceLimits: DEFAULTS.stopsPerPace[stay.pace] ?? DEFAULTS.stopsPerPace.RELAXED,
+    edits: { pinned, deleted, cleared: new Set(edits?.clearedMeals ?? []) },
     classification,
     frame,
     lodging,
@@ -408,3 +414,136 @@ export function mealSlotOf(day, stop) {
     }) ?? null
   );
 }
+
+/**
+ * 정거장이 지금 게이트를 통과하지 못한 사유 — 전후 비교·식사 칸 사유에 쓴다. 비지 않는다.
+ * 게이트 사유 → 반경 밖(TRAVEL_LIMIT_EXCEEDED) → 금식 → 역할이 막힌 날의 분류 사유 → NO_CANDIDATE
+ */
+export function failReasons(context, role, stop, meal = null) {
+  const id = String(stop.contentId);
+  const gate = gateReasons(context, role, id);
+  if (gate.length > 0) return gate;
+  const pool = context.pools[role];
+  if (pool?.outOfRadius.has(id)) return [REASON.TRAVEL_LIMIT_EXCEEDED];
+  if (stop.isMeal && meal && !meal.allowed) return [REASON.FASTING_REQUIRED];
+  if (!pool) {
+    const reasons = context.classification.reasons ?? [];
+    return reasons.length > 0 ? [...reasons] : [REASON.NO_CANDIDATE];
+  }
+  return [REASON.NO_CANDIDATE];
+}
+
+/** 병원에서 끝나는 외출의 병원 일정 id — 그 날짜 일정에서 외출 마감과 시작이 같은 병원 일정 블록 */
+export function hospitalTargetId(dayRef, outing) {
+  if (outing.returnPlace !== 'HOSPITAL' || outing.deadlineReason !== 'APPOINTMENT') return null;
+  const block = (dayRef?.blocks ?? []).find((b) => b.kind === 'APPOINTMENT' && b.start === outing.returnBy);
+  return block?.appointmentId ?? null;
+}
+
+function lodgingDeadlineOf(context, w) {
+  if (w.event.place !== 'HOSPITAL') return w.endMin;
+  return w.endMin - context.dayEstimate(context.lodgingPoint, w.event.point).min - DEFAULTS.buffers.arrivalMarginMin;
+}
+
+/**
+ * 환자 외출의 지금 마감과 짜는 방식 (spec 4.3·4.7, 지금 입력으로 다시 만든 창 기준).
+ * - 병원에서 끝나는 외출: 같은 병원 일정(또는 병원 복귀 시각)의 창 — 마감에 맞춰 거꾸로(LATE).
+ * - 숙소로 돌아오는 외출: 출발 시각이 든 창, 없으면(블록이 옮겨 와 덮음) 그 뒤 첫 창 — 앞에서부터(EARLY).
+ * 이미 출발한 외출(departed)은 출발 시각을 옮기지 않는다. 창을 찾지 못하면 출발 전 마지막 창의 마감이다(이미 늦음).
+ * @returns {{deadline: object, startMin: number, align: 'EARLY'|'LATE'} | null}
+ */
+export function locatePatient(context, outing, { lower, departed, dayRef }) {
+  const departMin = toMinutes(outing.departAt);
+  const windows = context.windows;
+  if (windows.length === 0) return null;
+  if (outing.returnPlace === 'HOSPITAL') {
+    const targetId = hospitalTargetId(dayRef, outing);
+    const w = windows.find(
+      (x) =>
+        x.event.place === 'HOSPITAL' &&
+        (targetId ? x.event.appointmentId === targetId : x.event.kind === outing.deadlineReason && !x.event.appointmentId),
+    );
+    if (w) {
+      const deadline = { deadlineMin: w.endMin, returnPlace: 'HOSPITAL', returnPoint: w.event.point, deadlineReason: w.event.kind };
+      if (departed) return { deadline, startMin: departMin, align: 'EARLY' };
+      return { deadline, startMin: Math.max(w.startMin, lower), align: 'LATE' };
+    }
+    if (!departed) return null;
+  }
+  const from = departed ? departMin : Math.max(departMin, lower);
+  let w = windows.find((x) => x.startMin <= from && from < x.endMin);
+  if (!w && !departed) w = windows.find((x) => x.startMin > from);
+  if (!w && departed) w = windows.filter((x) => x.startMin <= from).at(-1) ?? windows[0];
+  if (!w) return null;
+  const deadline = {
+    deadlineMin: lodgingDeadlineOf(context, w),
+    returnPlace: 'LODGING',
+    returnPoint: context.lodgingPoint,
+    deadlineReason: w.event.kind,
+  };
+  return { deadline, startMin: departed ? departMin : Math.max(from, w.startMin), align: 'EARLY' };
+}
+
+/**
+ * 보호자 외출의 지금 마감 — 환자가 숙소에 있는 구간(블록·환자 외출·병원 복귀 시각 밖).
+ * 출발 시각이 든 구간, 없으면 그 뒤 첫 구간(45분 이상). 이미 출발했으면 출발 시각을 옮기지 않는다.
+ */
+export function locateGuardian(context, outing, { lower, departed, patientBusy, blocks }) {
+  const { frame, limits } = context;
+  const departMin = toMinutes(outing.departAt);
+  const busy = [...blocks.map((b) => [b.startMin, b.endMin]), ...patientBusy];
+  if (limits?.returnTime?.place === 'HOSPITAL') busy.push([toMinutes(limits.returnTime.time), frame.endMin]);
+  const free = freeIntervals([frame.startMin, frame.endMin], busy);
+  const from = departed ? departMin : Math.max(departMin, lower);
+  let iv = free.find(([s, e]) => s <= from && from < e);
+  if (!iv && !departed) iv = free.find(([s, e]) => s > from && e - s >= DEFAULTS.minOutingWindowMin);
+  if (!iv && departed) iv = free.filter(([s]) => s <= from).at(-1) ?? null;
+  if (!iv) return null;
+  const end = iv[1];
+  return {
+    deadline: {
+      deadlineMin: end,
+      returnPlace: 'LODGING',
+      returnPoint: context.lodgingPoint,
+      deadlineReason: end === frame.endMin ? frame.endReason : 'PATIENT_SCHEDULE',
+    },
+    startMin: departed ? departMin : Math.max(from, iv[0]),
+    align: 'EARLY',
+  };
+}
+
+/** 저장된 외출의 복귀 좌표 — 숙소, 또는 마감과 시작이 같은 병원 일정·병원 복귀 시각의 병원 */
+export function returnPointOf(context, outing) {
+  if (outing.returnPlace !== 'HOSPITAL') return context.lodgingPoint;
+  const at = toMinutes(outing.returnBy);
+  const appt = context.apptEvents.find((e) => e.deadlineMin === at);
+  if (appt) return appt.point;
+  const rt = context.limits?.returnTime;
+  const hospital = (context.hospitals ?? []).find((h) => h?.id === rt?.hospitalId) ?? (context.hospitals ?? [])[0];
+  return hospital ? pointOf(hospital) : context.lodgingPoint;
+}
+
+/**
+ * 환자 외출을 고칠 때 보호자 외출을 그대로 두는 범위 — 앞 보호자 외출이 복귀 계산식을 지키며 돌아온 뒤 출발하고,
+ * 다음 보호자 외출이 나가기 전에 계획상 돌아온다.
+ */
+export function guardianBounds(guardianOutings, outing) {
+  const depart = toMinutes(outing.departAt);
+  const before = guardianOutings.filter((g) => toMinutes(g.departAt) < depart);
+  const after = guardianOutings.filter((g) => toMinutes(g.departAt) > depart);
+  if (before.length === 0 && after.length === 0) return null;
+  return {
+    startMin: Math.max(-Infinity, ...before.map((g) => Math.max(occupancyEnd(g), toMinutes(g.returnBy) - Math.max(0, g.slackMin ?? 0)))),
+    returnBy: Math.min(Infinity, ...after.map((g) => toMinutes(g.departAt))),
+  };
+}
+
+
+/**
+ * 다음 외출이 출발해도 되는 가장 이른 시각 — 앞 외출이 돌아온 뒤이면서, 앞 외출의 복귀 계산식(버퍼 포함)이 끝난 뒤.
+ * planDay 는 창을 나눠 이것을 보장한다. 고치면서 뒤 외출을 앞당길 때도 같은 조건을 지킨다.
+ */
+export function settledAt(outing) {
+  return Math.max(occupancyEnd(outing), toMinutes(outing.returnBy) - Math.max(0, outing.slackMin ?? 0));
+}
+
