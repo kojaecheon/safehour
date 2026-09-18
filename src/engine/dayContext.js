@@ -452,7 +452,7 @@ function lodgingDeadlineOf(context, w) {
  * 이미 출발한 외출(departed)은 출발 시각을 옮기지 않는다. 창을 찾지 못하면 출발 전 마지막 창의 마감이다(이미 늦음).
  * @returns {{deadline: object, startMin: number, align: 'EARLY'|'LATE'} | null}
  */
-export function locatePatient(context, outing, { lower, departed, dayRef }) {
+export function locatePatient(context, outing, { lower, departed, dayRef, nowMin = null }) {
   const departMin = toMinutes(outing.departAt);
   const windows = context.windows;
   if (windows.length === 0) return null;
@@ -465,15 +465,25 @@ export function locatePatient(context, outing, { lower, departed, dayRef }) {
     );
     if (w) {
       const deadline = { deadlineMin: w.endMin, returnPlace: 'HOSPITAL', returnPoint: w.event.point, deadlineReason: w.event.kind };
-      if (departed) return { deadline, startMin: departMin, align: 'EARLY' };
+      if (departed) return { deadline: overdueSafe(deadline, departMin, nowMin), startMin: departMin, align: 'EARLY' };
       return { deadline, startMin: Math.max(w.startMin, lower), align: 'LATE' };
     }
     if (!departed) return null;
   }
   const from = departed ? departMin : Math.max(departMin, lower);
   let w = windows.find((x) => x.startMin <= from && from < x.endMin);
-  if (!w && !departed) w = windows.find((x) => x.startMin > from);
-  if (!w && departed) w = windows.filter((x) => x.startMin <= from).at(-1) ?? windows[0];
+  if (!w && departed) {
+    // 이미 출발했는데 출발 시각을 (옮긴) 블록이 덮는다 — 이미 늦었다. 마감은 지금(출발보다 이르지 않게)이다
+    const covering = context.apptEvents.find((e) => e.standaloneStartMin <= departMin && departMin < e.blockEndMin);
+    const deadline = {
+      deadlineMin: departMin,
+      returnPlace: 'LODGING',
+      returnPoint: context.lodgingPoint,
+      deadlineReason: covering ? 'APPOINTMENT' : (windows.filter((x) => x.startMin <= from).at(-1) ?? windows[0]).event.kind,
+    };
+    return { deadline: overdueSafe(deadline, departMin, nowMin), startMin: departMin, align: 'EARLY' };
+  }
+  if (!w) w = windows.find((x) => x.startMin > from);
   if (!w) return null;
   const deadline = {
     deadlineMin: lodgingDeadlineOf(context, w),
@@ -481,14 +491,24 @@ export function locatePatient(context, outing, { lower, departed, dayRef }) {
     returnPoint: context.lodgingPoint,
     deadlineReason: w.event.kind,
   };
-  return { deadline, startMin: departed ? departMin : Math.max(from, w.startMin), align: 'EARLY' };
+  if (departed) return { deadline: overdueSafe(deadline, departMin, nowMin), startMin: departMin, align: 'EARLY' };
+  return { deadline, startMin: Math.max(from, w.startMin), align: 'EARLY' };
+}
+
+/**
+ * 이미 출발한 외출의 마감은 출발 시각보다 이르지 않다. 새 마감이 출발보다 이르면(블록이 옮겨 와 덮음) 이미 늦은 것이므로
+ * 마감을 지금(없으면 출발 시각)으로 둔다 — 여유가 음수가 되어 '시간 부족'으로 드러난다.
+ */
+function overdueSafe(deadline, departMin, nowMin) {
+  if (deadline.deadlineMin >= departMin) return deadline;
+  return { ...deadline, deadlineMin: Math.max(departMin, nowMin ?? departMin) };
 }
 
 /**
  * 보호자 외출의 지금 마감 — 환자가 숙소에 있는 구간(블록·환자 외출·병원 복귀 시각 밖).
  * 출발 시각이 든 구간, 없으면 그 뒤 첫 구간(45분 이상). 이미 출발했으면 출발 시각을 옮기지 않는다.
  */
-export function locateGuardian(context, outing, { lower, departed, patientBusy, blocks }) {
+export function locateGuardian(context, outing, { lower, departed, patientBusy, blocks, nowMin = null }) {
   const { frame, limits } = context;
   const departMin = toMinutes(outing.departAt);
   const busy = [...blocks.map((b) => [b.startMin, b.endMin]), ...patientBusy];
@@ -497,16 +517,17 @@ export function locateGuardian(context, outing, { lower, departed, patientBusy, 
   const from = departed ? departMin : Math.max(departMin, lower);
   let iv = free.find(([s, e]) => s <= from && from < e);
   if (!iv && !departed) iv = free.find(([s, e]) => s > from && e - s >= DEFAULTS.minOutingWindowMin);
-  if (!iv && departed) iv = free.filter(([s]) => s <= from).at(-1) ?? null;
+  if (!iv && departed) iv = free.filter(([s]) => s <= from).at(-1) ?? [departMin, departMin];
   if (!iv) return null;
   const end = iv[1];
+  const deadline = {
+    deadlineMin: end,
+    returnPlace: 'LODGING',
+    returnPoint: context.lodgingPoint,
+    deadlineReason: end === frame.endMin ? frame.endReason : 'PATIENT_SCHEDULE',
+  };
   return {
-    deadline: {
-      deadlineMin: end,
-      returnPlace: 'LODGING',
-      returnPoint: context.lodgingPoint,
-      deadlineReason: end === frame.endMin ? frame.endReason : 'PATIENT_SCHEDULE',
-    },
+    deadline: departed ? overdueSafe(deadline, departMin, nowMin) : deadline,
     startMin: departed ? departMin : Math.max(from, iv[0]),
     align: 'EARLY',
   };

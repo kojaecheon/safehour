@@ -46,6 +46,17 @@ export const ITINERARY_ENGINE_VERSION = '2.0.0';
 const WARNING_ORDER = Object.freeze(['MEDICATION_TIMES_MISSING', 'DEFAULTS_APPLIED', 'TRAVEL_TIMES_ESTIMATED']);
 const LABEL_ORDER = Object.freeze(['ESTIMATED', 'HOURS_UNCONFIRMED', 'NEEDS_TRANSLATION', 'DIET_ESTIMATED', 'ORDER_CARD']);
 const IMMEDIATE_RETURN_CAUSES = Object.freeze([REASON.PATIENT_RECALLED, REASON.PLAN_REVOKED, REASON.PLAN_EXPIRED]);
+/** 풀리면 남은 시간을 다시 짜는 원인 — 날짜 사유에 남아 있다가 사라지면 풀린 것이다 */
+const LIFTABLE_CAUSES = Object.freeze([
+  REASON.PATIENT_RECALLED,
+  REASON.RISK_SIGNAL,
+  REASON.PLAN_REVOKED,
+  REASON.PLAN_EXPIRED,
+  REASON.APPOINTMENT_DELAYED,
+  REASON.CLOSED,
+  REASON.WEATHER_BLOCKED,
+  REASON.SLA_INSUFFICIENT,
+]);
 
 function uniq(list) {
   return [...new Set(list)];
@@ -174,10 +185,23 @@ const needsFresh = (day, fresh) => !hasPatient(day) && (!hasGuardian(day) || has
  * 새로 만든다. 오늘이면 이미 출발한 외출은 previous 에서 이어 받아(시작된 정거장 그대로) 고치고,
  * 나머지는 그 외출이 끝난 뒤·지금 이후부터 새로 짠다. 합친 하루도 한도를 지킨다(repairDay 가 남은 한도로 자른다).
  */
-function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log }) {
+function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log, adopt = false }) {
   const departed = (o) => nowMin !== null && toMinutes(o.departAt) <= nowMin;
-  const keptP = (prevDay?.outings ?? []).filter(departed);
-  const keptG = (prevDay?.guardianOutings ?? []).filter(departed);
+  // 원인이 풀렸을 때(adopt): 이미 출발한 외출이 원인 없는 하루(fresh)의 같은 외출이면(출발 시각이 같고 시작된 정거장이
+  // 그 앞부분) 그 외출의 남은 정거장을 되살린다. 시작된 정거장은 그대로이고 남은 정거장은 repairDay 가 다시 검증한다
+  const restore = (o, list) => {
+    if (!adopt) return o;
+    const started = o.stops.filter((x) => toMinutes(x.arriveAt) <= nowMin);
+    const same = list.find(
+      (f) =>
+        f.departAt === o.departAt &&
+        f.returnPlace === o.returnPlace &&
+        started.every((x, i) => f.stops[i]?.id === x.id && f.stops[i].arriveAt === x.arriveAt && f.stops[i].leaveAt === x.leaveAt),
+    );
+    return same ? { ...same, id: o.id, stops: [...started, ...same.stops.slice(started.length)] } : o;
+  };
+  const keptP = (prevDay?.outings ?? []).filter(departed).map((o) => restore(o, fresh.outings));
+  const keptG = (prevDay?.guardianOutings ?? []).filter(departed).map((o) => restore(o, fresh.guardianOutings));
   const kept = [...keptP, ...keptG];
   let planned = fresh;
   if (nowMin !== null) {
@@ -187,8 +211,13 @@ function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons,
   }
   const futureP = emptyReasons.length > 0 ? [] : planned.outings;
   const futureG = emptyReasons.length > 0 ? [] : planned.guardianOutings;
+  const keptStopIds = new Set(kept.flatMap((o) => o.stops.map((s) => s.id)));
   const dayRef = {
-    mealSlots: [...(prevDay?.mealSlots ?? []).filter((m) => kept.some((o) => o.stops.some((s) => s.id === m.stopId))), ...planned.mealSlots],
+    mealSlots: [
+      ...(prevDay?.mealSlots ?? []).filter((m) => keptStopIds.has(m.stopId)),
+      ...(adopt ? fresh.mealSlots.filter((m) => keptStopIds.has(m.stopId)) : []),
+      ...planned.mealSlots,
+    ],
     blocks: [...(prevDay?.blocks ?? []), ...planned.blocks],
   };
   const repaired = repairDay({ context, dayRef, outings: [...keptP, ...futureP], guardianOutings: [...keptG, ...futureG], nowMin, emptyReasons, log });
@@ -308,6 +337,39 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
   const appointmentMoved = isToday && fold.appointmentDeltaMin !== 0 && context.apptEvents.length > 0;
   const eventReasons = [...emptyReasons, ...(appointmentMoved ? [REASON.APPOINTMENT_DELAYED] : [])];
 
+  // 원인 표시: 사건·예보가 계속되는 동안 그 원인이 일정을 바꿨으면 날짜 사유에 남긴다 — 원인이 풀린 것을 알아채는 데 쓴다
+  const markerActive = {
+    [REASON.CLOSED]: isToday && fold.closedContentIds.length > 0,
+    [REASON.WEATHER_BLOCKED]: common.weather?.outdoorUnsafe === true,
+    [REASON.SLA_INSUFFICIENT]: isToday && fold.extraBufferMin > 0,
+  };
+  const markersFor = (lg) =>
+    Object.keys(markerActive).filter((r) => markerActive[r] && (lg.reasons.has(r) || (prevDay?.reasons ?? []).includes(r)));
+  const buildDay = (isStructural, result, lg) => {
+    let d = assembleDay({
+      context,
+      fresh,
+      date,
+      repaired: result,
+      source: isStructural ? result.planned : prevDay,
+      structural: isStructural,
+      nowMin,
+      emptyReasons,
+      log: lg,
+    });
+    if (isToday && emptyReasons.length > 0) d = { ...d, dayState: STATE.NO_TOURISM };
+    d = { ...d, reasons: uniq([...eventReasons, ...markersFor(lg), ...d.reasons]) };
+    if (isToday) d = { ...d, returnNow: causes.length > 0 };
+    return d;
+  };
+  const carry = (from) => {
+    const to = newRepairLog();
+    from.reasons.forEach((r) => to.reasons.add(r));
+    from.userDriven.forEach((id) => to.userDriven.add(id));
+    from.clearedSlots.forEach((x) => to.clearedSlots.add(x));
+    return to;
+  };
+
   // 최소 변경: 확정 일정이 있으면 고친다. 고칠 것이 없으면(외출이 없음) 새로 만든다(오늘은 지금 이후)
   let log = newRepairLog();
   let structural = forceFresh || !prevDay || needsFresh(prevDay, fresh);
@@ -324,39 +386,34 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
     });
     if (emptyReasons.length === 0 && needsFresh(repaired, fresh)) {
       // 고친 결과 외출이 하나도 남지 않았다 — 새로 만든다(같은 입력이면 다음 재계획도 같은 결과)
-      const first = log;
-      log = newRepairLog();
-      first.reasons.forEach((r) => log.reasons.add(r));
-      first.userDriven.forEach((id) => log.userDriven.add(id));
-      first.clearedSlots.forEach((s) => log.clearedSlots.add(s));
+      log = carry(log);
       structural = true;
     }
   }
   if (structural) repaired = planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log });
+  let day = buildDay(structural, repaired, log);
 
-  let day = assembleDay({
-    context,
-    fresh,
-    date,
-    repaired,
-    source: structural ? repaired.planned : prevDay,
-    structural,
-    nowMin,
-    emptyReasons,
-    log,
-  });
-  if (isToday) {
-    if (emptyReasons.length > 0) day = { ...day, dayState: STATE.NO_TOURISM };
-    day = { ...day, reasons: uniq([...eventReasons, ...day.reasons]), returnNow: causes.length > 0 };
+  // 원인이 풀렸다(사건 초기화, 유효한 지침이 다시 덮음, 예보가 풀림) — 그 원인으로 비우거나 줄인 남은 시간을
+  // 지금 이후로 다시 짠다. 이미 출발한 외출과 도착한 정거장은 그대로다(spec 4.9 returnNow 해제·사건 초기화)
+  let lifted = [];
+  if (!structural && prevDay && emptyReasons.length === 0) {
+    lifted = LIFTABLE_CAUSES.filter((r) => (prevDay.reasons ?? []).includes(r) && !day.reasons.includes(r));
+    if (lifted.length > 0) {
+      log = carry(log);
+      structural = true;
+      repaired = planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log, adopt: true });
+      day = buildDay(true, repaired, log);
+    }
   }
   if (!prevDay) return day;
 
   const delta = computeDayDelta(prevDay, day, {
-    reasons: [...eventReasons, ...log.reasons],
+    reasons: [...eventReasons, ...lifted, ...log.reasons],
     requiredStopIds: requiredStopIds(prevDay, context, nowMin, emptyReasons.length > 0),
     userDrivenIds: log.userDriven,
     replacements: log.replacements,
-    userEditOnly: eventReasons.length === 0 && log.reasons.size === 0 && log.userDriven.size > 0,
+    // 사용자 편집(삭제·교체·비움)만이 원인일 때만 '변경됨'을 만들지 않는다 — 원인이 풀린 재계획은 사용자 편집이 아니다
+    userEditOnly: eventReasons.length === 0 && lifted.length === 0 && log.reasons.size === 0 && log.userDriven.size > 0,
   });
   if (delta.hasVisibleChange) day = { ...day, delta };
   else if (prevDay.delta) day = { ...day, delta: prevDay.delta };
@@ -479,24 +536,27 @@ function runPlan(input, { forceFresh }) {
   }
 
   const fold = foldDemoEvents(events ?? []);
-  const requestedSet = new Set(requested);
-  // 요청하지 않은 날짜의 배치는 그대로 남는다 — 체류 중 1회 규칙에서 이미 쓴 것으로 본다
-  const used = new Set((usedContentIds ?? []).map(String));
-  for (const [date, day] of Object.entries(prev)) {
-    if (!requestedSet.has(date)) for (const id of dayContentIds(day)) used.add(id);
-  }
+  // 체류 중 1회 규칙(규칙 29): 날짜 D 는 다른 날짜에 이미 둔 장소를 쓰지 않는다 —
+  // 요청하지 않은 날짜의 배치(usedContentIds·previous), 다른 요청 날짜의 확정 일정(previous), 이번에 먼저 만든 날짜.
+  // 확정 일정을 예약해 두므로 오늘 사건으로 오늘을 고쳐도 다른 날짜의 장소를 가져가지 않는다(변화 원천 6: 오늘만).
+  const external = new Set((usedContentIds ?? []).map(String));
+  const previousIds = new Map(Object.entries(prev).map(([date, day]) => [date, dayContentIds(day)]));
+  const computed = new Map();
   // 고정한 장소는 그 날짜에서만 예외다 — 다른 날짜의 자동 배치는 그 장소를 피한다
   const pinnedByDate = Object.entries(edits ?? {}).map(([date, e]) => [date, (e?.pinned ?? []).map(String)]);
 
   for (const date of requested) {
-    const pinnedElsewhere = pinnedByDate.filter(([d]) => d !== date).flatMap(([, ids]) => ids);
+    const used = new Set(external);
+    for (const [d, ids] of previousIds) if (d !== date) ids.forEach((id) => used.add(id));
+    for (const [, ids] of computed) ids.forEach((id) => used.add(id));
+    for (const [d, ids] of pinnedByDate) if (d !== date) ids.forEach((id) => used.add(id));
     const day = planDate({
       stay,
       date,
       clock,
       prevDay: prev[date]?.date === date ? prev[date] : null,
       dayEdits: edits?.[date] ?? {},
-      usedContentIds: [...used, ...pinnedElsewhere],
+      usedContentIds: [...used],
       fold,
       weatherByDate,
       airportTravel,
@@ -505,7 +565,7 @@ function runPlan(input, { forceFresh }) {
       forceFresh,
     });
     days[date] = structuredClone(day);
-    for (const id of dayContentIds(day)) used.add(id);
+    computed.set(date, dayContentIds(day));
   }
   return { engineVersion: ITINERARY_ENGINE_VERSION, days };
 }

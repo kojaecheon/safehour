@@ -33,7 +33,7 @@ import {
   selectBestAccepted,
   settledAt,
 } from './dayContext.js';
-import { buildForwardOuting, evaluateOuting } from './outingBuilder.js';
+import { evaluateOuting } from './outingBuilder.js';
 
 const MIN_STAY = DEFAULTS.minStopStayMin;
 const SHRINK_STEP_MIN = 5;
@@ -51,7 +51,7 @@ function failureReason(failure) {
  * @typedef {object} RepairLog  재계획이 바꾼 것 — 전후 비교에 쓴다
  * @property {Set<string>} reasons       바꾼 원인 사유
  * @property {Array<{from: string, to: string}>} replacements  같은 자리 대체
- * @property {Set<string>} userDriven    사용자 편집(삭제·교체·비움·한도 조정·보호자 채움)으로 빠지거나 들어온 정거장 id
+ * @property {Set<string>} userDriven    사용자 편집(삭제·교체·비움·한도 조정)으로 빠지거나 들어온 정거장 id
  * @property {Set<string>} clearedSlots  식당을 지워 비운 식사 칸
  * @property {Map<string, string[]>} slotReasons  식당이 빠진 식사 칸 → 사유
  */
@@ -117,6 +117,9 @@ export function repairOuting({ context, role, outing, loc, nowMin, nextDepart, b
   }
 
   const ctx = context.ctx[role];
+  const isPinned = (x) => x.pinned === true || context.edits.pinned.has(String(x.contentId));
+  const holdsPinned =
+    pending.some(isPinned) || (pinnedLeft.size > 0 && pending.some((x) => deleted.has(String(x.contentId))));
   // 단계적으로 맞춘다 — 먼저 다른 역할의 외출(보호자)과 다음 외출을 건드리지 않는 범위(soft), 그다음 다음 외출 출발 전,
   // 이미 출발한 외출은 마지막으로 외출 자체의 마감만(시작된 정거장을 지키려고)
   // 병원에서 끝나는 외출(LATE)은 마감이 출발 시각을 정한다 — 다음 외출은 병원 일정 블록 뒤이므로 마감만 쓴다
@@ -124,7 +127,11 @@ export function repairOuting({ context, role, outing, loc, nowMin, nextDepart, b
   const variants = [
     ...(soft && !departed ? [{ startMin: Math.max(loc.startMin, soft.startMin ?? -Infinity), returnBy: soft.returnBy ?? Infinity, sla: bounded }] : []),
     { startMin: loc.startMin, returnBy: Infinity, sla: bounded },
-    ...(departed && bounded !== loc.deadline.deadlineMin ? [{ startMin: loc.startMin, returnBy: Infinity, sla: loc.deadline.deadlineMin }] : []),
+    // 이미 출발한 외출(시작된 정거장을 지키려고)과 고정한 장소를 든 외출(고정 장소를 잃지 않으려고)은 마지막으로 외출 자체의
+    // 마감까지 쓴다 — 다음 외출은 뒤에서 옮기거나(settledAt) 줄인다
+    ...((departed || holdsPinned) && bounded !== loc.deadline.deadlineMin
+      ? [{ startMin: loc.startMin, returnBy: Infinity, sla: loc.deadline.deadlineMin }]
+      : []),
   ];
   const planOf = (v) => (seq) => ({
     seq,
@@ -200,9 +207,15 @@ export function repairOuting({ context, role, outing, loc, nowMin, nextDepart, b
   }
 
   // 3) 한도: 외출·하루 남은 한도를 넘으면 일반 정거장부터 뒤에서 뺀다(강도 변경 등 사용자 입력 몫)
+  // 뺄 순서: 일반 정거장 → 식사 정거장 → 고정한 장소(각각 뒤에서부터)
   const removable = (items) => {
-    const idx = items.map((item, i) => i).filter((i) => i >= frozen.length);
-    return [...idx.filter((i) => !items[i].meal).reverse(), ...idx.filter((i) => items[i].meal).reverse()];
+    const idx = items.map((item, i) => i).filter((i) => i >= frozen.length).reverse();
+    const pinnedRec = (i) => items[i].rec.pinned === true;
+    return [
+      ...idx.filter((i) => !pinnedRec(i) && !items[i].meal),
+      ...idx.filter((i) => !pinnedRec(i) && items[i].meal),
+      ...idx.filter((i) => pinnedRec(i)),
+    ];
   };
   while (seq.length > Math.max(cap, frozen.length)) {
     const [i] = removable(seq);
@@ -287,7 +300,7 @@ export function repairDay({ context, dayRef, outings, guardianOutings, nowMin, e
         return;
       }
       const isDeparted = departed(outing);
-      const loc = locate(outing, { lower, departed: isDeparted });
+      const loc = locate(outing, { lower, departed: isDeparted, nowMin });
       const next = sorted[i + 1];
       const soft = role === 'P' ? guardianBounds(guardianOutings, outing) : null;
       const repaired = repairOuting({
@@ -322,69 +335,12 @@ export function repairDay({ context, dayRef, outings, guardianOutings, nowMin, e
     : run('P', outings, () => null, floor);
   const blocks = computeBlocks(context, chainedAppointmentIds(context, patient));
   const patientBusy = patient.map((o) => [toMinutes(o.departAt), occupancyEnd(o)]);
-  let guardian = run(
+  const guardian = run(
     'G',
     guardianOutings,
     (o, opts) => (context.guardianAllowed ? locateGuardian(context, o, { ...opts, patientBusy, blocks }) : null),
     floor,
   );
 
-  // 보호자 외출이 하나도 없으면(새로 가능해졌거나 고치다가 모두 취소됨) 환자가 숙소에 있는 구간을 채운다 —
-  // 같은 입력이면 다음 재계획도 같은 결과다. 보호자 외출이 원래 없던 날(동반 보호자 추가 등)은 사용자 입력 몫이다
-  if (emptyReasons.length === 0 && context.guardianAllowed && guardian.length === 0) {
-    // 이번에 빠진 장소는 다시 쓸 수 있다 — 남은 하루(고친 환자 외출)의 장소만 뺀다(다음 재계획과 같은 조건)
-    const kept = new Set(patient.flatMap((o) => o.stops.map((x) => String(x.contentId))));
-    guardian = fillGuardianOutings({ context, floor, patientBusy, blocks, taken: kept, log, userDriven: guardianOutings.length === 0 });
-  }
   return { outings: patient, guardianOutings: guardian, blocks: computeBlocks(context, chainedAppointmentIds(context, patient)), mealServed, log };
-}
-
-/**
- * 보호자 외출이 하나도 없을 때 — 환자가 숙소에 있는 구간을 planDay 와 같은 방식(buildForwardOuting)으로 채운다.
- * userDriven 이면(원래 보호자 외출이 없던 날) 사용자 입력이 만든 추가이므로 '변경됨'으로 표시하지 않는다.
- */
-function fillGuardianOutings({ context, floor, patientBusy, blocks, taken, log, userDriven }) {
-  const { frame, limits } = context;
-  const busy = [...blocks.map((b) => [b.startMin, b.endMin]), ...patientBusy];
-  if (limits?.returnTime?.place === 'HOSPITAL') busy.push([toMinutes(limits.returnTime.time), frame.endMin]);
-  const free = [];
-  let cursor = floor;
-  for (const [s, e] of busy.filter(([s, e]) => e > floor && s < frame.endMin).sort((a, b) => a[0] - b[0] || a[1] - b[1])) {
-    if (s > cursor) free.push([cursor, Math.min(s, frame.endMin)]);
-    cursor = Math.max(cursor, e);
-  }
-  if (cursor < frame.endMin) free.push([cursor, frame.endMin]);
-  const pool = kindPool(context, 'G', false);
-  const out = [];
-  let budget = context.paceLimits.perDay;
-  const usedCategories = new Set();
-  for (const [s, e] of free.filter(([a, b]) => b - a >= DEFAULTS.minOutingWindowMin)) {
-    if (budget <= 0) break;
-    const ev = buildForwardOuting(context.ctx.G, {
-      startMin: s,
-      slaDeadlineMin: e,
-      returnPoint: context.lodgingPoint,
-      allowance: Math.min(context.paceLimits.perOuting, budget),
-      pool,
-      usedToday: taken,
-      rank: { usedCategories },
-      failures: new Map(),
-    });
-    if (!ev) continue;
-    const deadline = {
-      deadlineMin: e,
-      returnPlace: 'LODGING',
-      returnPoint: context.lodgingPoint,
-      deadlineReason: e === frame.endMin ? frame.endReason : 'PATIENT_SCHEDULE',
-    };
-    const outing = assembleOuting(ev, outingMeta(context, 'G', { id: `${context.date}:G:outing-${out.length + 1}`, deadline }));
-    out.push(outing);
-    budget -= outing.stops.length;
-    for (const item of ev.items) {
-      taken.add(item.rec.contentId);
-      usedCategories.add(item.rec.category);
-    }
-    if (userDriven) outing.stops.forEach((x) => log.userDriven.add(x.id));
-  }
-  return out;
 }

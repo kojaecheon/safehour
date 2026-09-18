@@ -173,22 +173,20 @@ export function computeDayDelta(before, after, { reasons = [], requiredStopIds =
 
   const stateChanged = before?.dayState !== after?.dayState;
   const returnNowChanged = Boolean(before?.returnNow) !== Boolean(after?.returnNow);
-  // 사용자 편집만이 원인이면(사건·게이트 실패·시간 부족 없음) 그 결과(시각·마감 변화 포함)는 '변경됨'이 아니다
-  const hasVisibleChange =
-    !userEditOnly &&
-    (stateChanged ||
+  // 사용자 편집만이 원인이면(사건·게이트 실패·시간 부족 없음) 그 결과(시각·마감 변화 포함)는 '변경됨'이 아니다.
+  // 원인 사유가 없는 마감 이동만(정거장·상태 변화 없음)도 알리지 않는다 — 앞선 편집을 맞춘 것이지 새 변화가 아니다
+  const stopOrStateChange =
+    stateChanged ||
     returnNowChanged ||
     removed.length > 0 ||
     added.length > 0 ||
     replaced.length > 0 ||
     shortened.length > 0 ||
-    cancelledOutings.length > 0 ||
-    newDeadlines.length > 0);
+    cancelledOutings.length > 0;
+  const hasVisibleChange = !userEditOnly && (stopOrStateChange || (newDeadlines.length > 0 && deltaReasons.length > 0));
 
-  // 보이는 변화에는 사유가 있어야 한다 — 원인을 찾지 못하면 그날 사유, 그것도 없으면 NO_CANDIDATE
-  if (hasVisibleChange && deltaReasons.length === 0) {
-    deltaReasons = afterReasons.size > 0 ? [...afterReasons] : [REASON.NO_CANDIDATE];
-  }
+  // 보이는 변화에 원인을 찾지 못하면 그날 사유를 쓴다(사유를 지어내지 않는다)
+  if (hasVisibleChange && deltaReasons.length === 0) deltaReasons = [...afterReasons];
 
   const date = after?.date ?? before?.date ?? '';
   const survivors = requiredStopIds.filter((id) => afterById.has(id));
