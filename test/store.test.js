@@ -501,6 +501,66 @@ describe('체류 항목 — 기간·동의·연동 지침·보호자 공유', ()
     assert.deepEqual(store.writePeriods([selfPeriod()]), { ok: true });
     assert.equal(store.readPeriods().length, 1);
     assert.equal(store.grantSensitiveConsent({ version: '' }).code, STORE_ERROR.INVALID);
+    assert.equal(store.grantSensitiveConsent({ version: 1 }).code, STORE_ERROR.INVALID, '버전은 문자열이다');
+  });
+
+  test('기기 동의 기록은 {version: 문자열, agreedAt: ISO 시각} 또는 null 만 받는다 (spec 5.1)', () => {
+    const store = signedIn();
+    const AGREED = '2026-09-30T09:00:00+09:00';
+    const badShapes = [
+      true, // PlanStay 의 boolean 표현은 기기 모델이 아니다
+      false,
+      'yes',
+      1,
+      {},
+      { version: '', agreedAt: AGREED },
+      { version: '   ', agreedAt: AGREED },
+      { version: 1, agreedAt: AGREED },
+      { version: 'v1' },
+      { version: 'v1', agreedAt: 'not a date' },
+      { version: 'v1', agreedAt: '2026-09-30' }, // 시각이 아니다
+      { version: 'v1', agreedAt: '2026-09-30T09:00:00' }, // 시간대가 없다
+      { version: 'v1', agreedAt: 1_790_000_000_000 },
+    ];
+    for (const sensitive of badShapes) {
+      assert.equal(store.writeStay(makeStay({ consent: { sensitive } })).code, STORE_ERROR.INVALID, JSON.stringify(sensitive));
+      // 조건 기간과 함께여도 형식 오류가 먼저다 — boolean 동의로 게이트를 통과할 수 없다
+      assert.equal(
+        store.writeStay(makeStay({ consent: { sensitive }, periods: [selfPeriod()] })).code,
+        STORE_ERROR.INVALID,
+        `기간 저장: ${JSON.stringify(sensitive)}`,
+      );
+    }
+    for (const consent of ['yes', true, null, []]) {
+      assert.equal(store.writeStay(makeStay({ consent })).code, STORE_ERROR.INVALID, `consent=${JSON.stringify(consent)}`);
+    }
+    assert.equal(store.readStay(), null, '형식이 틀린 동의가 저장됐다');
+
+    assert.deepEqual(store.writeStay(makeStay({ consent: { sensitive: null } })), { ok: true });
+    assert.deepEqual(store.writeStay(makeStay({ consent: { sensitive: { version: 'v1', agreedAt: AGREED } }, periods: [selfPeriod()] })), { ok: true });
+    assert.deepEqual(store.readConsent(), { sensitive: { version: 'v1', agreedAt: AGREED } });
+    assert.deepEqual(store.writeStay(makeStay({ consent: { sensitive: { version: 'v1', agreedAt: '2026-09-30T00:00:00.000Z' } } })), { ok: true });
+  });
+
+  test('동의 기록에 정해진 두 필드 외에는 남기지 않는다', () => {
+    const store = signedIn();
+    store.writeStay(
+      makeStay({ consent: { sensitive: { version: 'v1', agreedAt: '2026-09-30T09:00:00+09:00', note: 'x' }, extra: 1 } }),
+    );
+    assert.deepEqual(store.readConsent(), { sensitive: { version: 'v1', agreedAt: '2026-09-30T09:00:00+09:00' } });
+  });
+
+  test('동의 게이트는 기기 형식의 동의만 인정한다 — 저장소에 boolean 동의가 들어 있어도 막는다', () => {
+    const store = signedIn();
+    // 다른 경로로 저장소에 들어온 옛 형식(boolean) 체류
+    local.setItem(
+      accountRecordKey(KEY_A, 'stay'),
+      JSON.stringify({ schemaVersion: SCHEMA_VERSION, data: makeStay({ consent: { sensitive: true } }) }),
+    );
+    assert.notEqual(store.writePeriods([selfPeriod()]).ok, true);
+    assert.notEqual(store.upsertLinkedPlan(linkedPlanFixture()).ok, true);
+    assert.deepEqual(store.readPeriods(), []);
+    assert.deepEqual(store.readLinkedPlans(), []);
   });
 
   test('체류가 없으면 체류 안의 항목을 쓸 수 없다', () => {
@@ -810,6 +870,162 @@ describe('규칙 41 — 이 기기에서 내 정보 지우기', () => {
   });
 });
 
+// ── 규칙 41: 로그아웃을 끝내지 못했을 때 ─────────────────────────────
+
+describe('규칙 41 — 오프라인에서 지웠으면 로그아웃이 끝날 때까지 로그인으로 보지 않는다', () => {
+  /** 서버 흉내 — 로그아웃 POST 가 닿아야 세션 쿠키가 사라진다 */
+  function fakeServer({ logoutStatus = 200 } = {}) {
+    const state = { reachable: true, cookie: true, posts: 0, gets: 0, logoutStatus };
+    const impl = async (url) => {
+      if (!state.reachable) throw new TypeError('offline');
+      if (url === '/api/auth/logout') {
+        state.posts += 1;
+        if (state.logoutStatus !== 200) return { ok: false, status: state.logoutStatus, json: async () => ({ ok: false }) };
+        state.cookie = false;
+        return { ok: true, status: 200, json: async () => ({ ok: true, authenticated: false }) };
+      }
+      state.gets += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () =>
+          state.cookie ? sessionFor(KEY_A) : { ok: true, authenticated: false, provider: null, expiresAt: null, accountKey: null },
+      };
+    };
+    return { state, impl };
+  }
+
+  async function wipeWhileOffline(server) {
+    const store = makeStore({ fetchImpl: server.impl });
+    store.setOnline(true);
+    store.setSession(sessionFor(KEY_A));
+    store.writeStay(makeStay());
+    server.state.reachable = false;
+    const result = await store.deleteAllMyData();
+    return { store, result };
+  }
+
+  function pendingMarker() {
+    return local.getItem(`${STORE_PREFIX}device.logoutPending`);
+  }
+
+  test('로그아웃 요청이 닿지 않으면 계정 정보 없는 보류 표시를 남긴다', async () => {
+    const server = fakeServer();
+    const { store, result } = await wipeWhileOffline(server);
+
+    assert.equal(result.ok, true);
+    assert.equal(result.loggedOut, false);
+    const marker = pendingMarker();
+    assert.ok(marker, '보류 표시가 없다');
+    assert.deepEqual(Object.keys(JSON.parse(marker).data), ['since']);
+    assert.equal(marker.includes(KEY_A), false, '보류 표시에 계정 키가 들어갔다');
+    assert.equal(store.getStatus().logoutPending, true);
+    assert.equal(accountKeysInStorage().length, 0);
+  });
+
+  test('보류 중에는 세션 응답이 로그인이어도 보기 전용(NO_SESSION)이고 마지막 계정을 기록하지 않는다', async () => {
+    const server = fakeServer();
+    await wipeWhileOffline(server);
+
+    const reopened = makeStore({ fetchImpl: server.impl }); // 앱을 다시 연다
+    assert.equal(reopened.getStatus().logoutPending, true);
+    reopened.setSession(sessionFor(KEY_A));
+    const status = reopened.getStatus();
+    assert.equal(status.readOnly, true);
+    assert.equal(status.reason, READ_ONLY_REASON.NO_SESSION);
+    assert.equal(status.authenticated, false);
+    assert.equal(status.accountKey, null);
+    assert.equal(reopened.readLastAccountKey(), null);
+    assert.equal(local.getItem(`${STORE_PREFIX}device.lastAccountKey`), null, '보류 중에 마지막 계정을 기록했다');
+    assert.equal(reopened.writeStay(makeStay()).code, STORE_ERROR.READ_ONLY);
+  });
+
+  test('오프라인 → 보류 → 새로고침해도 로그아웃 상태 → 온라인이 되면 다시 로그아웃하고 표시를 지운다', async () => {
+    const server = fakeServer();
+    await wipeWhileOffline(server);
+    assert.equal(server.state.posts, 0);
+
+    const reopened = makeStore({ fetchImpl: server.impl });
+    // 아직 오프라인 — 세션 확인도 로그아웃 재시도도 닿지 않는다
+    let status = await reopened.refreshSession();
+    assert.equal(status.readOnly, true);
+    assert.equal(status.accountKey, null);
+    assert.equal(status.logoutPending, true);
+    assert.ok(pendingMarker());
+
+    // 온라인 이벤트 → 로그아웃 재시도
+    const listeners = {};
+    const fakeWindow = {
+      navigator: { onLine: false },
+      addEventListener: (type, fn) => {
+        listeners[type] = fn;
+      },
+      removeEventListener: () => {},
+    };
+    reopened.attachWindow(fakeWindow);
+    server.state.reachable = true;
+    fakeWindow.navigator.onLine = true;
+    listeners.online({});
+    await new Promise((resolve) => setImmediate(resolve)); // 온라인 이벤트가 시작한 재시도가 끝날 때까지
+
+    assert.equal(server.state.posts, 1, '온라인이 됐는데 로그아웃을 다시 보내지 않았다(또는 두 번 보냈다)');
+    assert.equal(server.state.cookie, false);
+    assert.equal(pendingMarker(), null, '로그아웃이 끝났는데 보류 표시가 남았다');
+    assert.equal(await reopened.retryPendingLogout(), true, '보류가 없으면 바로 끝난 것으로 본다');
+    assert.equal(server.state.posts, 1, '보류가 없는데 로그아웃을 또 보냈다');
+
+    status = await reopened.refreshSession();
+    assert.equal(status.logoutPending, false);
+    assert.equal(status.authenticated, false);
+    assert.equal(status.reason, READ_ONLY_REASON.NO_SESSION);
+  });
+
+  test('세션 확인(refreshSession)이 먼저 로그아웃을 다시 보낸다 — 남은 쿠키로 다시 로그인되지 않는다', async () => {
+    const server = fakeServer();
+    await wipeWhileOffline(server);
+    server.state.reachable = true;
+
+    const reopened = makeStore({ fetchImpl: server.impl });
+    const status = await reopened.refreshSession();
+    assert.equal(server.state.posts, 1);
+    assert.equal(pendingMarker(), null);
+    assert.equal(status.authenticated, false);
+    assert.equal(status.accountKey, null);
+    assert.equal(reopened.readLastAccountKey(), null);
+  });
+
+  test('로그아웃 응답이 실패면 표시를 지우지 않고, 쿠키가 남아도 로그인으로 보지 않는다', async () => {
+    const server = fakeServer({ logoutStatus: 500 });
+    await wipeWhileOffline(server);
+    server.state.reachable = true;
+
+    const reopened = makeStore({ fetchImpl: server.impl });
+    const status = await reopened.refreshSession();
+    assert.equal(server.state.posts, 1);
+    assert.equal(server.state.cookie, true, '서버 쿠키가 남아 있는 상황');
+    assert.ok(pendingMarker(), '로그아웃이 끝나지 않았는데 표시를 지웠다');
+    assert.equal(status.authenticated, false);
+    assert.equal(status.accountKey, null);
+    assert.equal(local.getItem(`${STORE_PREFIX}device.lastAccountKey`), null);
+
+    // 서버가 회복되면 다음 시도에서 끝난다
+    server.state.logoutStatus = 200;
+    assert.equal(await reopened.retryPendingLogout(), true);
+    assert.equal(pendingMarker(), null);
+  });
+
+  test('로그아웃이 바로 성공하면 보류 표시가 남지 않는다', async () => {
+    const server = fakeServer();
+    const store = makeStore({ fetchImpl: server.impl });
+    store.setOnline(true);
+    store.setSession(sessionFor(KEY_A));
+    const result = await store.deleteAllMyData();
+    assert.equal(result.loggedOut, true);
+    assert.equal(pendingMarker(), null);
+    assert.equal(store.getStatus().logoutPending, false);
+  });
+});
+
 // ── 규칙 42: 출국 7일 후 첫 실행 삭제 ────────────────────────────────
 
 describe('규칙 42 — 출국일+7일이 지난 뒤 앱을 열면 그 계정 체류 데이터를 지운다', () => {
@@ -915,6 +1131,28 @@ describe('보호자 링크 로그인 왕복 임시 보관', () => {
     assert.equal(store.takePendingGuardianLink(), FRAGMENT, 'PIN 입력 중 새로고침하면 다시 읽을 수 있어야 한다');
     store.clearPendingGuardianLink();
     assert.equal(store.takePendingGuardianLink(), null);
+    assert.equal(tab.getItem(PENDING_GUARDIAN_LINK_KEY), null);
+  });
+
+  test('앱을 열 때 1시간이 지난 암호문을 실제로 지운다 — 읽지 않아도 남지 않는다', () => {
+    makeStore().holdPendingGuardianLink(FRAGMENT);
+    clock += 2 * HOUR;
+    const result = makeStore().onAppOpen(); // 새로 연 앱은 링크를 읽지 않는다
+    assert.equal(tab.getItem(PENDING_GUARDIAN_LINK_KEY), null, '만료된 암호문이 탭 저장소에 남았다');
+    assert.equal(result.expiredPendingGuardianLink, true);
+  });
+
+  test('앱을 열 때 1시간이 안 된 암호문은 남긴다 — 로그인 왕복 중이다', () => {
+    makeStore().holdPendingGuardianLink(FRAGMENT);
+    clock += 30 * 60 * 1000;
+    const result = makeStore().onAppOpen();
+    assert.equal(JSON.parse(tab.getItem(PENDING_GUARDIAN_LINK_KEY)).fragment, FRAGMENT);
+    assert.equal(result.expiredPendingGuardianLink, false);
+  });
+
+  test('앱을 열 때 형식이 깨진 임시 보관 기록도 지운다', () => {
+    tab.setItem(PENDING_GUARDIAN_LINK_KEY, '{"fragment":"pin=123456","savedAt":0}');
+    makeStore().onAppOpen();
     assert.equal(tab.getItem(PENDING_GUARDIAN_LINK_KEY), null);
   });
 
