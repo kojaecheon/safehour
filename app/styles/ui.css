@@ -1,0 +1,1006 @@
+/* 기본 부품과 앱 셸 스타일 (AX-304 · spec 7장)
+ *
+ * 소유: 디자인 시스템 작업(AX-304). 기능 화면 작업은 이 파일을 고치지 않고 자기 기능 파일
+ * (app/styles/<기능>.css)에서 배치만 더한다. 부품 모양을 바꿔야 하면 보고한다.
+ *
+ * 규칙
+ *   - 값은 app/globals.css 의 토큰 변수만 쓴다(hex·새 글자 크기 금지).
+ *   - 클래스는 `ui-` 로 시작한다. 기존 화면과 함께 쓰는 `.btn`·`.badge`·`.state-banner`·`.sheet`·`.top-bar`
+ *     는 globals.css 에 있다.
+ *   - 터치 대상 44px 이상, 상태는 색 + 문구 + 아이콘, 선택은 테두리·굵기·아이콘을 함께 바꾼다.
+ */
+
+/* ───────────────────────── 앱 셸 ───────────────────────── */
+
+/* 보기 전용 배너 자리 — 비어 있어도 DOM 에 남겨 상태 변화를 읽어 준다(role=status) */
+.ui-readonly {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3) var(--gutter);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--line-strong);
+}
+.ui-readonly-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--badge-readonly-bg);
+  color: var(--on-dark);
+}
+.ui-readonly-text {
+  min-width: 0;
+  flex: 1;
+}
+.ui-readonly-title {
+  display: block;
+  color: var(--ink);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-snug);
+}
+.ui-readonly-body {
+  margin-top: var(--space-1);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.ui-readonly.is-preview {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+.ui-readonly-login {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* 긴급 연락 — 모든 화면 오른쪽 아래에 고정. 하단 내비·고정 복귀 버튼 위에 선다 */
+.ui-emergency {
+  position: fixed;
+  z-index: 40;
+  right: max(var(--gutter), calc(50% - var(--shell-max) / 2 + var(--gutter)));
+  bottom: calc(var(--nav-offset) + var(--space-3));
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 48px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--emergency);
+  color: var(--emergency-ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-heavy);
+  box-shadow: var(--shadow-float);
+  white-space: nowrap;
+}
+.ui-emergency:hover {
+  background: var(--emergency-strong);
+}
+.app-shell[data-nav='off'] .ui-emergency {
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+/* 고정 복귀 버튼이 있는 화면에서는 그 위로 비켜 선다 — 두 안전 버튼이 겹치지 않게 */
+.app-shell:has(.sticky-return) .ui-emergency {
+  bottom: calc(var(--nav-offset) + 88px);
+}
+.app-shell[data-nav='off']:has(.sticky-return) .ui-emergency {
+  bottom: calc(88px + env(safe-area-inset-bottom));
+}
+.ui-emergency-dot {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--emergency-strong);
+}
+
+/* 하단 내비 4개 — 오늘 · 일정 · 조건 · 더보기 */
+.ui-bottom-nav {
+  position: fixed;
+  z-index: 30;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--shell-max);
+  background: var(--surface);
+  border-top: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sheet);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.ui-bottom-nav ul {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  list-style: none;
+  height: var(--nav-height);
+}
+.ui-bottom-nav a {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 100%;
+  min-height: var(--tap-min);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+  color: var(--ink-soft);
+  text-align: center;
+}
+.ui-nav-pill {
+  display: inline-grid;
+  place-items: center;
+  width: 52px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  transition: background-color var(--duration-fast) var(--ease-out);
+}
+/* 현재 화면: 포인트 색 + 굵기 + 알약 바탕 + 윗줄 (색 단독 금지). aria-current 로 스크린리더에도 알린다 */
+.ui-bottom-nav a[aria-current='page'] {
+  color: var(--accent-strong);
+  font-weight: var(--weight-heavy);
+}
+.ui-bottom-nav a[aria-current='page'] .ui-nav-pill {
+  background: var(--accent-soft);
+}
+.ui-bottom-nav a[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 36px;
+  height: 3px;
+  transform: translateX(-50%);
+  border-radius: 0 0 3px 3px;
+  background: var(--accent);
+}
+.ui-bottom-nav a:hover .ui-nav-pill {
+  background: var(--surface-alt);
+}
+
+/* 시안 보드용 미리보기 — 고정하지 않고 제자리에 그린다 */
+.ui-bottom-nav.is-preview,
+.ui-emergency.is-preview {
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  transform: none;
+}
+.ui-bottom-nav.is-preview {
+  z-index: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: none;
+  padding-bottom: 0;
+}
+.ui-emergency.is-preview {
+  z-index: auto;
+}
+
+/* ───────────────────────── 배지 5종 ───────────────────────── */
+/* 모양이 서로 다르다: 점선(추정) · 방패 아이콘 분홍(기본값) · 파선(운영 확인) · 띠 무늬(데모) · 짙은 면(보기 전용) */
+.ui-badge-estimate {
+  border-style: dotted;
+  border-color: var(--ink-soft);
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+}
+.ui-badge-defaulted {
+  border-color: var(--support-ink);
+  background: var(--support-soft);
+  color: var(--support-ink);
+}
+.ui-badge-hoursUnconfirmed {
+  border-style: dashed;
+  border-color: var(--line-input);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+.ui-badge-demo {
+  border-color: var(--state-standby-ink);
+  color: var(--ink);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--badge-demo-stripe-a) 0 6px,
+    var(--badge-demo-stripe-b) 6px 12px
+  );
+}
+.ui-badge-readOnly {
+  border-color: var(--badge-readonly-bg);
+  background: var(--badge-readonly-bg);
+  color: var(--on-dark);
+}
+
+/* ───────────────────────── 출처 영역 ───────────────────────── */
+/* 다섯 출처는 머리글 문구 + 아이콘 + 테두리 모양으로 나뉜다. 한 영역에 두 출처를 섞지 않는다. */
+.ui-source {
+  border-radius: var(--radius);
+  padding: var(--space-3) 14px 14px;
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+}
+.ui-source-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-snug);
+  margin-bottom: 6px;
+}
+.ui-source-title {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.ui-source-body {
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.ui-source-body p {
+  color: inherit;
+}
+.ui-source-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
+.ui-source-hospital {
+  background: var(--source-hospital-bg);
+  border: 1px solid var(--source-hospital);
+  border-left-width: 6px;
+}
+.ui-source-hospital .ui-source-head { color: var(--source-hospital); }
+.ui-source-self {
+  border: 2px dashed var(--source-self);
+}
+.ui-source-self .ui-source-head { color: var(--source-self); }
+.ui-source-estimate {
+  background: var(--surface-alt);
+  border: 2px dotted var(--source-estimate);
+}
+.ui-source-estimate .ui-source-head { color: var(--source-estimate); }
+.ui-source-tourism {
+  border: 1px solid var(--line-strong);
+  border-left: 6px double var(--source-tourism);
+}
+.ui-source-tourism .ui-source-head { color: var(--source-tourism); }
+/* AI 소개 — 말풍선 모서리. 판정 근거가 아니라 소개 문장임을 모양으로도 드러낸다 */
+.ui-source-ai {
+  background: var(--source-ai-bg);
+  border: 1px solid var(--support);
+  border-bottom-left-radius: var(--space-1);
+}
+.ui-source-ai .ui-source-head { color: var(--source-ai); }
+
+/* 항목 옆 작은 출처 표시 (spec 4.5: '병원 발행' / '본인 체크' / '기본값 적용') */
+.ui-source-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  line-height: 1.3;
+  white-space: nowrap;
+  background: var(--surface);
+}
+.ui-source-tag-hospital { border: 1px solid var(--source-hospital); color: var(--source-hospital); background: var(--source-hospital-bg); }
+.ui-source-tag-self { border: 1px dashed var(--source-self); color: var(--source-self); }
+.ui-source-tag-estimate { border: 1px dotted var(--source-estimate); color: var(--source-estimate); background: var(--surface-alt); }
+.ui-source-tag-tourism { border: 1px solid var(--line-input); color: var(--source-tourism); }
+.ui-source-tag-ai { border: 1px solid var(--support); color: var(--source-ai); background: var(--source-ai-bg); }
+
+/* ───────────────────────── 날짜 칩 ───────────────────────── */
+.ui-date-strip {
+  display: flex;
+  gap: var(--space-2);
+  list-style: none;
+  overflow-x: auto;
+  padding: var(--space-1) var(--space-1) var(--space-2);
+  scroll-snap-type: x proximity;
+}
+.ui-date-strip > li {
+  scroll-snap-align: start;
+  flex: none;
+}
+.ui-date-chip {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  min-width: 60px;
+  min-height: 92px;
+  padding: var(--space-2) 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+}
+.ui-date-chip:hover {
+  border-color: var(--line-input);
+}
+.ui-date-week {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--ink-soft);
+  line-height: 1.3;
+}
+.ui-date-day {
+  font-size: var(--text-title-2);
+  font-weight: var(--weight-heavy);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+.ui-date-marks {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+/* 상태 아이콘은 흰 원판 위 상태 색 — 선택된 칩(포인트 바탕)에서도 상태 색이 살아 있다 */
+.ui-date-state {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 1px solid currentColor;
+}
+.ui-date-state-TOGETHER { color: var(--state-together-ink); }
+.ui-date-state-SPLIT_NEARBY { color: var(--state-split-ink); }
+.ui-date-state-STANDBY { color: var(--state-standby-ink); }
+.ui-date-state-NO_TOURISM { color: var(--state-no-tourism-ink); }
+.ui-date-appt {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--source-hospital);
+  border: 1px solid currentColor;
+}
+/* 오늘: 첫 줄이 '오늘' 글자 + 굵은 포인트 테두리 */
+.ui-date-chip.is-today {
+  border: 2px solid var(--accent);
+}
+.ui-date-chip.is-today .ui-date-week {
+  color: var(--accent-strong);
+  font-weight: var(--weight-heavy);
+}
+/* 선택: 포인트 면 + 흰 글자(5.27:1) + 그림자 */
+.ui-date-chip.is-selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-card);
+}
+.ui-date-chip.is-selected .ui-date-week {
+  color: var(--accent-ink);
+}
+
+/* ─────────────────── 하루 타임라인 — 지하철 노선도 ───────────────────
+ * 외출은 굵은 노선, 정거장은 역 표시, 복귀 마감은 종착역이다.
+ * 외출 밖(숙소 휴식·병원 일정)은 노선에서 내려와 점선으로 이어진다. */
+.ui-timeline {
+  list-style: none;
+  --tl-line: var(--accent);
+  --tl-marker-top: 22px;
+}
+.ui-timeline-guardian {
+  --tl-line: var(--state-split-ink);
+}
+.ui-tl-item {
+  display: grid;
+  grid-template-columns: 56px 32px minmax(0, 1fr);
+  column-gap: var(--space-2);
+}
+.ui-tl-time {
+  padding-top: 11px;
+  text-align: right;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  font-weight: var(--weight-heavy);
+  line-height: 1.3;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ui-tl-end {
+  display: block;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--ink-soft);
+}
+.ui-tl-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.ui-tl-rail::before,
+.ui-tl-rail::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  transform: translateX(-50%);
+}
+.ui-tl-rail::before { top: 0; height: var(--tl-marker-top); }
+.ui-tl-rail::after { top: var(--tl-marker-top); bottom: 0; }
+.ui-tl-in-on .ui-tl-rail::before,
+.ui-tl-out-on .ui-tl-rail::after {
+  background: var(--tl-line);
+}
+.ui-tl-in-off .ui-tl-rail::before,
+.ui-tl-out-off .ui-tl-rail::after {
+  width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--line-input) 0 5px, transparent 5px 10px);
+}
+.ui-tl-item:first-child .ui-tl-rail::before,
+.ui-tl-item:last-child .ui-tl-rail::after {
+  display: none;
+}
+.ui-tl-marker {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 4px solid var(--tl-line);
+  color: var(--ink);
+}
+/* 역(정거장): 속이 빈 굵은 고리 */
+.ui-tl-stop .ui-tl-marker {
+  width: 24px;
+  height: 24px;
+  margin-top: 10px;
+  border-width: 6px;
+}
+.ui-tl-meal .ui-tl-marker { border-width: 4px; }
+/* 종착역(복귀 마감): 노선 색 사각 면 + 깃발 */
+.ui-tl-return .ui-tl-marker {
+  border-radius: var(--radius-xs);
+  background: var(--tl-line);
+  color: var(--accent-ink);
+}
+/* 노선 밖 고정 블록: 먹색 사각(병원) · 흰 원(복약·휴식) */
+.ui-tl-appointment .ui-tl-marker {
+  border-radius: var(--radius-xs);
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-dark);
+}
+.ui-tl-medication .ui-tl-marker,
+.ui-tl-rest .ui-tl-marker {
+  border: 2px solid var(--line-input);
+  color: var(--ink-soft);
+}
+.ui-tl-body {
+  min-width: 0;
+  padding: 10px 0 var(--space-5);
+}
+.ui-tl-leg {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ui-tl-kind {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  color: var(--ink-soft);
+  line-height: 1.3;
+}
+.ui-tl-title {
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+.ui-tl-stop .ui-tl-title,
+.ui-tl-meal .ui-tl-title {
+  font-size: var(--text-title-3);
+}
+.ui-tl-note {
+  margin-top: 2px;
+  font-size: var(--text-body);
+}
+.ui-tl-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ui-tl-content {
+  margin-top: var(--space-2);
+}
+/* 복귀 마감 — 역 이름판처럼 크게: 시각이 가장 먼저 읽힌다 */
+.ui-tl-return .ui-tl-time {
+  color: var(--accent-strong);
+  font-size: var(--text-title-3);
+}
+.ui-timeline-guardian .ui-tl-return .ui-tl-time {
+  color: var(--state-split-ink);
+}
+.ui-tl-return .ui-tl-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--tl-line);
+  color: var(--accent-ink);
+  font-size: var(--text-caption);
+}
+
+/* ───────────────────────── 장소 카드 ───────────────────────── */
+.ui-place {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+}
+.ui-place-media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--surface-alt);
+}
+.ui-place-media > img,
+.ui-place-media > .ui-place-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ui-place-pill {
+  position: absolute;
+  top: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  line-height: 1.4;
+  box-shadow: var(--shadow-card);
+}
+.ui-place-cat { left: var(--space-3); }
+.ui-place-time {
+  right: var(--space-3);
+  font-variant-numeric: tabular-nums;
+}
+.ui-place-body {
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+.ui-place-title {
+  font-size: var(--text-title-3);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+.ui-place-title > a,
+.ui-place-title > span {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
+/* 카드 전체를 누를 수 있게 제목 링크를 카드 크기로 넓힌다. 안의 다른 버튼은 그 위에 선다 */
+.ui-place-title > a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.ui-place-title > a:focus-visible {
+  outline: none;
+}
+.ui-place:has(.ui-place-title > a:focus-visible) {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.ui-place-body > :not(.ui-place-title) {
+  position: relative;
+  z-index: 1;
+}
+.ui-place-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  list-style: none;
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ui-place-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+.ui-place-credit {
+  margin-top: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
+.ui-place-extra {
+  margin-top: var(--space-3);
+}
+/* 작은 카드 — 하루 타임라인 안: 왼쪽 정사각 사진 + 오른쪽 글.
+   놓인 자리가 좁으면(320px 화면의 타임라인 안) 사진을 위로 올려 세로로 쌓는다 */
+.ui-place-frame {
+  container-type: inline-size;
+}
+.ui-place.is-compact {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  border-radius: var(--radius);
+}
+.ui-place.is-compact .ui-place-media {
+  aspect-ratio: auto;
+  min-height: 96px;
+  height: 100%;
+}
+.ui-place.is-compact .ui-place-pill {
+  top: auto;
+  bottom: var(--space-2);
+  left: var(--space-2);
+  right: auto;
+  max-width: calc(100% - var(--space-4));
+  padding: 2px var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-place.is-compact .ui-place-time { display: none; }
+.ui-place.is-compact .ui-place-body {
+  padding: var(--space-1) var(--space-3) var(--space-3);
+}
+.ui-place.is-compact .ui-place-title {
+  font-size: var(--text-body);
+}
+@container (max-width: 250px) {
+  .ui-place.is-compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ui-place.is-compact .ui-place-media {
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+  }
+}
+
+/* ───────────────────────── 식사 칸 ───────────────────────── */
+.ui-meal {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: var(--space-3) 14px;
+  background: var(--surface);
+}
+.ui-meal-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--ink);
+  font-weight: var(--weight-heavy);
+}
+.ui-meal-time {
+  font-weight: var(--weight-medium);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+/* 빈 식사 칸은 오류가 아니다 — 점선 칸 + 중립 회색 + 사유 문구 */
+.ui-meal.is-empty {
+  border-style: dashed;
+  border-color: var(--line-input);
+  background: var(--surface-alt);
+}
+.ui-meal-status {
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+.ui-meal-reasons {
+  margin-top: var(--space-1);
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* ─────────────────── 예 / 아니오 / 모르겠음 ─────────────────── */
+.ui-answer {
+  border: none;
+  margin-bottom: var(--space-5);
+  min-width: 0;
+}
+.ui-answer > legend {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  line-height: var(--leading-snug);
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+.ui-answer-hint {
+  margin: calc(var(--space-1) * -1) 0 var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
+.ui-answer-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: var(--space-2);
+}
+.ui-answer-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 48px;
+  padding: var(--space-2) 10px;
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  text-align: center;
+  line-height: 1.3;
+  cursor: pointer;
+}
+/* 라디오는 칸 전체를 덮는 투명 입력 — 키보드(방향키)·스크린리더는 표준 라디오로 다룬다 */
+.ui-answer-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.ui-answer-option:hover {
+  background: var(--surface-alt);
+}
+.ui-answer-option:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+/* 체크 표시는 칸 오른쪽 위 모서리 — 글자 폭을 빼앗지 않는다 */
+.ui-answer-mark {
+  display: none;
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  pointer-events: none;
+}
+/* 선택: 굵은 포인트 테두리 + 옅은 바탕 + 체크 아이콘 + 굵은 글자 */
+.ui-answer-option.is-selected {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: var(--weight-heavy);
+}
+.ui-answer-option.is-selected .ui-answer-mark {
+  display: inline-grid;
+}
+.ui-answer:disabled .ui-answer-option {
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+  border-color: var(--line-strong);
+  cursor: not-allowed;
+}
+.ui-answer-explain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* ───────────────────────── 조건 기간 편집기 틀 ───────────────────────── */
+.ui-period {
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--surface);
+}
+.ui-period-SELF {
+  border: 2px dashed var(--source-self);
+}
+.ui-period-HOSPITAL {
+  border: 1px solid var(--source-hospital);
+  border-left-width: 6px;
+  background: var(--source-hospital-bg);
+}
+.ui-period-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.ui-period-head h3 {
+  margin: 0;
+}
+.ui-period-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ui-period-dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0 var(--space-3);
+}
+.ui-period-items {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+}
+.ui-period-items:empty {
+  display: none;
+}
+.ui-period-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.ui-period-actions > .btn {
+  flex: 1 1 140px;
+}
+
+/* ───────────────────────── 시트 ───────────────────────── */
+.ui-sheet-grabber {
+  width: 40px;
+  height: 4px;
+  margin: calc(var(--space-3) * -1) auto var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+}
+.ui-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.ui-sheet-head h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding-top: 6px;
+}
+.ui-sheet-close {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex: none;
+  margin: 0 calc(var(--space-2) * -1) 0 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: var(--surface-alt);
+  color: var(--ink);
+  cursor: pointer;
+}
+.ui-sheet-foot {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+/* ───────────────────────── 빈 상태 ───────────────────────── */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--surface-alt);
+}
+.ui-empty-art {
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.ui-empty-title {
+  font-size: var(--text-title-3);
+  color: var(--ink);
+  margin: 0;
+}
+.ui-empty-action {
+  margin-top: var(--space-3);
+  width: 100%;
+  max-width: 320px;
+}
+
+/* ───────────────────────── 한국어 안내 카드 ───────────────────────── */
+.ui-kcard {
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+/* 윗띠 — 보조색(벚꽃) 면. 사용자 언어로 '보여 주세요'를 적는다 */
+.ui-kcard-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  padding: 10px var(--space-4);
+  background: var(--support-soft);
+  color: var(--support-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+}
+.ui-kcard-title {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  color: var(--support-ink);
+  margin: 0;
+}
+.ui-kcard-korean {
+  padding: var(--space-5) var(--space-4) var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-korean-card);
+  font-weight: var(--weight-heavy);
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
+}
+.ui-kcard-korean p {
+  color: inherit;
+}
+.ui-kcard-korean p + p {
+  margin-top: var(--space-3);
+}
+.ui-kcard-explain {
+  padding: 0 var(--space-4) var(--space-4);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.ui-kcard-extra {
+  padding: 0 var(--space-4) var(--space-4);
+}
