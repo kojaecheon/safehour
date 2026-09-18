@@ -78,9 +78,19 @@ export function kstInstantMs(date, time) {
   return requireDate(date).utc + (toMinutes(time) - KST_OFFSET_MIN) * 60 * 1000;
 }
 
-/** ISO8601 문자열 → ms. 읽을 수 없으면 null */
+/** 시각 문자열에 시간대 표기(Z 또는 ±HH:MM)가 있는가 */
+const HAS_OFFSET = /(Z|[+-]\d{2}:?\d{2})$/i;
+const DATE_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+/**
+ * ISO8601 문자열 → ms. 읽을 수 없으면 null.
+ * 시간대 표기가 없는 날짜·시각은 실행 기기의 시간대가 아니라 **KST** 로 읽는다 —
+ * 모든 시각은 KST 기준이라는 명세 규칙을 기기 설정과 무관하게 지키기 위해서다.
+ */
 export function parseInstantMs(value) {
   if (typeof value !== 'string' || value.trim() === '') return null;
-  const ms = Date.parse(value);
+  const text = value.trim();
+  const normalized = DATE_TIME.test(text) && !HAS_OFFSET.test(text) ? `${text}+09:00` : text;
+  const ms = Date.parse(normalized);
   return Number.isNaN(ms) ? null : ms;
 }

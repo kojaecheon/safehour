@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 
 import { validateStay } from '../src/stay/stay.js';
 import { ERROR_CODE, VALIDATION_ISSUE } from '../src/stay/errorCodes.js';
+import { parseInstantMs as parseInstantMsKst } from '../src/stay/time.js';
 import { deepFreeze, makePlanStay, makeStay, selfPeriod } from './stay-fixtures.js';
 
 function issueCodes(result) {
@@ -198,5 +199,26 @@ describe('체류 안의 조건 기간도 함께 검증한다', () => {
     const result = validateStay(makeStay({ periods: [period] }));
     assert.equal(result.ok, false);
     assert.ok(result.fields.includes('periods[0].items.returnTime.hospitalId'));
+  });
+});
+
+
+describe('parseInstantMs — 시간대 표기 없는 시각은 KST', () => {
+  test('오프셋 없는 날짜·시각을 KST 로 읽는다', () => {
+    assert.equal(
+      parseInstantMsKst('2026-09-20T21:00:00'),
+      Date.parse('2026-09-20T21:00:00+09:00'),
+    );
+  });
+  test('오프셋이 있으면 그대로 읽는다', () => {
+    assert.equal(parseInstantMsKst('2026-09-20T12:00:00Z'), Date.parse('2026-09-20T12:00:00Z'));
+    assert.equal(
+      parseInstantMsKst('2026-09-20T21:00:00+09:00'),
+      Date.parse('2026-09-20T12:00:00Z'),
+    );
+  });
+  test('읽을 수 없으면 null', () => {
+    assert.equal(parseInstantMsKst('not-a-date'), null);
+    assert.equal(parseInstantMsKst(''), null);
   });
 });
