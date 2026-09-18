@@ -92,6 +92,28 @@ export const REASON = {
   PLAN_UNCONFIRMED_UPDATE: 'PLAN_UNCONFIRMED_UPDATE',
   /** 복약 시각이 외출 창을 자른다 */
   MEDICATION_WINDOW: 'MEDICATION_WINDOW',
+
+  // ── 체류 동반 플랫폼 (AX-302 · spec 5.2 새 사유 코드) ──
+  /** 입국일 시작 전·출국일 마감 후라 일정을 만들지 않는다 */
+  OUTSIDE_STAY_WINDOW: 'OUTSIDE_STAY_WINDOW',
+  /** 그 날짜의 숙소가 없다 */
+  LODGING_REQUIRED: 'LODGING_REQUIRED',
+  /** 경계일 이후인데 적용되는 조건 기간이 없다 */
+  CONDITION_INPUT_REQUIRED: 'CONDITION_INPUT_REQUIRED',
+  /** 민감정보 동의가 없다 */
+  SENSITIVE_CONSENT_REQUIRED: 'SENSITIVE_CONSENT_REQUIRED',
+  /** 연동 지침이 만료된 날짜다 — 새 지침 또는 본인 체크가 필요하다 */
+  HOSPITAL_PLAN_EXPIRED_INPUT_REQUIRED: 'HOSPITAL_PLAN_EXPIRED_INPUT_REQUIRED',
+  /** 오늘 매일 확인을 아직 하지 않았다 */
+  DAILY_CHECK_PENDING: 'DAILY_CHECK_PENDING',
+  /** 열 노출(사우나·찜질 등) 단서가 있는 장소 */
+  HEAT_EXPOSURE: 'HEAT_EXPOSURE',
+  /** 물에 들어가는 활동(수영장·온천 등) 단서가 있는 장소 */
+  WATER_ACTIVITY: 'WATER_ACTIVITY',
+  /** 식이 항목에 걸리는 식당 (추정) */
+  DIET_RESTRICTED: 'DIET_RESTRICTED',
+  /** 식이 판단에 쓸 메뉴 단서가 없는 식당 */
+  MENU_UNKNOWN: 'MENU_UNKNOWN',
 };
 
 export const REASON_TEXT = {
@@ -139,5 +161,47 @@ export const REASON_TEXT = {
   [REASON.MEDICATION_WINDOW]: {
     ko: '복약 시각까지 돌아와야 합니다',
     en: 'You must be back before your medication time',
+  },
+
+  // 체류 동반 플랫폼 (AX-302). ja·zh 문구는 언어 작업(AX-303)이 채운다.
+  [REASON.OUTSIDE_STAY_WINDOW]: {
+    ko: '입국 후 일정 시작 전이거나 출국 준비 시간이라 일정을 만들지 않았습니다',
+    en: 'No plan here — this is before your arrival-day start or after your departure-day cutoff',
+  },
+  [REASON.LODGING_REQUIRED]: {
+    ko: '이 날짜의 숙소를 입력해 주세요',
+    en: 'Please enter your lodging for this date',
+  },
+  [REASON.CONDITION_INPUT_REQUIRED]: {
+    ko: '이 날짜에 적용할 조건을 입력해 주세요',
+    en: 'Please enter the conditions that apply to this date',
+  },
+  [REASON.SENSITIVE_CONSENT_REQUIRED]: {
+    ko: '조건을 입력하려면 민감정보 처리 동의가 필요합니다',
+    en: 'Consent to process sensitive information is needed before entering conditions',
+  },
+  [REASON.HOSPITAL_PLAN_EXPIRED_INPUT_REQUIRED]: {
+    ko: '병원 지침의 유효기간이 지났습니다. 병원에서 새 지침을 받거나 본인 체크로 입력하세요',
+    en: 'Your hospital plan has expired. Get a new plan from your hospital or enter a self-check',
+  },
+  [REASON.DAILY_CHECK_PENDING]: {
+    ko: '오늘 조건이 그대로인지 먼저 확인해 주세요',
+    en: "Please confirm first whether today's conditions are unchanged",
+  },
+  [REASON.HEAT_EXPOSURE]: {
+    ko: '열을 피해야 하는 조건이라 사우나·찜질 등 단서가 있는 장소를 제외했습니다',
+    en: 'Excluded — heat exposure (sauna, jjimjil, etc.) is to be avoided',
+  },
+  [REASON.WATER_ACTIVITY]: {
+    ko: '물에 들어가면 안 되는 조건이라 수영장·온천 등 단서가 있는 장소를 제외했습니다',
+    en: 'Excluded — water activities (pool, hot spring, etc.) are to be avoided',
+  },
+  [REASON.DIET_RESTRICTED]: {
+    ko: '식이 조건에 맞지 않는 것으로 추정되어 제외했습니다',
+    en: 'Excluded — estimated not to fit your dietary conditions',
+  },
+  [REASON.MENU_UNKNOWN]: {
+    ko: '식이 조건을 판단할 메뉴 정보가 없어 제외했습니다',
+    en: 'Excluded — no menu information to check against your dietary conditions',
   },
 };
