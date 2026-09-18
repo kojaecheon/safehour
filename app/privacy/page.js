@@ -6,17 +6,22 @@
 // 영향을 주지 않는 정적 안내 화면이며, 어느 화면에서도 하단 링크로만 진입한다.
 //
 // 본문은 `src/i18n/legal.js` 가 소유한다 — 코드에서 확인 가능한 사실만 적는다.
+// 고지는 안전 문구다. 본문은 safetyPair() 가 고른 주 언어로 보인다 (spec 4.17 · AX-303):
+// ja·zh 는 검수 스위치가 켜지기 전까지 영어로 대체된다.
 
 import { useRouter } from 'next/navigation';
 import LanguageToggle from '@/components/LanguageToggle.js';
 import ClearSessionButton from '@/components/ClearSessionButton.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import { LEGAL_SECTIONS } from '@/src/i18n/legal.js';
+import { pickText } from '@/src/i18n/index.js';
 
 export default function PrivacyPage() {
   const router = useRouter();
-  const { lang, t } = useLang();
-  const pick = (entry) => entry[lang] ?? entry.ko;
+  const { lang, safety, t } = useLang();
+  const pick = (entry) => pickText(entry, safety.primary) ?? '';
+  // 주 언어가 화면 언어와 다르면(ja·zh 검수 전 → en) 스크린리더가 맞는 음성으로 읽게 표시한다
+  const bodyLang = safety.primary === lang ? undefined : safety.primary;
 
   return (
     <>
@@ -34,12 +39,17 @@ export default function PrivacyPage() {
       </header>
 
       <main className="page">
-        <div className="medical-callout" role="note">
+        <div className="medical-callout" role="note" lang={bodyLang}>
           {t('privacy.intro')}
         </div>
 
         {LEGAL_SECTIONS.map((section) => (
-          <section className="card" key={section.id} aria-labelledby={`legal-${section.id}`}>
+          <section
+            className="card"
+            key={section.id}
+            lang={bodyLang}
+            aria-labelledby={`legal-${section.id}`}
+          >
             <h2 id={`legal-${section.id}`}>{pick(section.title)}</h2>
             {section.lead && <p style={{ marginTop: 8 }}>{pick(section.lead)}</p>}
             {section.items && (
@@ -59,7 +69,9 @@ export default function PrivacyPage() {
 
         <section className="card" aria-labelledby="legal-contact">
           <h2 id="legal-contact">{t('privacy.contactTitle')}</h2>
-          <p style={{ marginTop: 8 }}>{t('privacy.contactBody')}</p>
+          <p lang={bodyLang} style={{ marginTop: 8 }}>
+            {t('privacy.contactBody')}
+          </p>
         </section>
 
         <ClearSessionButton />
