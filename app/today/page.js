@@ -112,9 +112,12 @@ export default function TodayPage() {
     );
   }
 
-  const deadline = effectiveDeadline(plan);
+  // v2 지침(AX-311)에는 v1 의 단일 constraints 가 없다. 새 오늘 화면(AX-317) 전까지는 마감 카드를 그리지 않는다.
+  // v2 지침은 v1 판정 경로를 거치지 않으므로 /api/today 는 NO_TOURISM(NO_HOSPITAL_PLAN)을 돌려준다 — 외출 CTA 없음.
+  const legacyConstraints = plan.constraints ?? null;
+  const deadline = legacyConstraints ? effectiveDeadline(plan) : null;
   const unconfirmed = unconfirmedAll(plan);
-  const nextMed = (plan.constraints.medicationTimes ?? [])
+  const nextMed = (legacyConstraints?.medicationTimes ?? [])
     .map((clock) => nextClockOccurrence(clock))
     .filter(Boolean)
     .sort((a, b) => a - b)[0];
@@ -139,22 +142,24 @@ export default function TodayPage() {
 
         {today && <StateBanner state={today.state} reasons={today.reasons} live />}
 
-        <section className="card" aria-labelledby="today-outing">
-          <h2 id="today-outing">{t('today.outingTitle')}</h2>
-          <p style={{ fontSize: 17, color: 'var(--ink)' }}>
-            <strong>{t('today.deadline', { at: fmtDateTime(deadline.at) })}</strong>
-          </p>
-          <p className="hint">{t(DEADLINE_REASON_KEY[deadline.source])}</p>
+        {deadline && (
+          <section className="card" aria-labelledby="today-outing">
+            <h2 id="today-outing">{t('today.outingTitle')}</h2>
+            <p style={{ fontSize: 17, color: 'var(--ink)' }}>
+              <strong>{t('today.deadline', { at: fmtDateTime(deadline.at) })}</strong>
+            </p>
+            <p className="hint">{t(DEADLINE_REASON_KEY[deadline.source])}</p>
 
-          <div className="meta" style={{ marginTop: 14 }}>
-            {nextMed && <span>{t('today.nextMed', { at: fmtTime(nextMed) })}</span>}
-            {plan.constraints.nextVisitAt && (
-              <span>
-                {t('today.nextVisit', { at: fmtDateTime(new Date(plan.constraints.nextVisitAt)) })}
-              </span>
-            )}
-          </div>
-        </section>
+            <div className="meta" style={{ marginTop: 14 }}>
+              {nextMed && <span>{t('today.nextMed', { at: fmtTime(nextMed) })}</span>}
+              {legacyConstraints.nextVisitAt && (
+                <span>
+                  {t('today.nextVisit', { at: fmtDateTime(new Date(legacyConstraints.nextVisitAt)) })}
+                </span>
+              )}
+            </div>
+          </section>
+        )}
 
         {unconfirmed.length > 0 && (
           <section className="card" aria-labelledby="today-unconfirmed">
