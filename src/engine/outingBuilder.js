@@ -22,11 +22,12 @@ const SHRINK_STEP_MIN = 5;
 /** 줄이면 풀릴 수 있는 시간 부족 (보고할 때는 SLA_INSUFFICIENT) */
 const TIME = 'TIME';
 
-/** 원하는 체류부터 5분씩 줄여 15분까지 */
+/** 원하는 체류부터 5분씩 줄여 15분까지. 원하는 체류가 15분보다 짧아도 15분이다(규칙 19 — 정거장 체류 15분 이상) */
 function stayOptions(desired) {
-  if (desired <= MIN_STAY) return [desired];
+  if (!(desired > MIN_STAY)) return [MIN_STAY];
   const options = [];
   for (let s = desired; s >= MIN_STAY; s -= SHRINK_STEP_MIN) options.push(s);
+  if (options[options.length - 1] !== MIN_STAY) options.push(MIN_STAY);
   return options;
 }
 

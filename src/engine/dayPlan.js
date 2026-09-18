@@ -94,9 +94,10 @@ function prepareCandidates(candidates, { date, closedContentIds, lodgingPoint, i
       contentId,
       point: { lat: Number(cand.lat), lng: Number(cand.lng) },
       distanceKm: distanceFromKm(lodgingPoint, cand),
-      // 알 수 없는 보행 부담·체류는 관광 후보 모듈의 '유형 모름' 추정값(보행 30분·체류 45분)으로 본다
+      // 알 수 없는 보행 부담·체류는 관광 후보 모듈의 '유형 모름' 추정값(보행 30분·체류 45분)으로 본다.
+      // 체류는 15분 미만으로 두지 않는다(규칙 19)
       walkMin: finite(cand.walkMin, 30),
-      stayMin: finite(cand.stayMin, 45),
+      stayMin: Math.max(MIN_STAY, finite(cand.stayMin, 45)),
       hasFood: cand.hasFood === true || cand.signals?.isFoodPlace === true,
       category: stopCategory(cand),
       interest: interests.size > 0 && tags.some((tag) => interests.has(tag)),
@@ -655,11 +656,14 @@ export function planDay(input) {
   }
 
   // ── 날짜 상태와 사유 (spec 4.7 표) ──
+  // REST_DAY 는 NO_TOURISM 줄에 명시돼 있다 — 보호자 외출을 못 만든 쉬는 날은 STANDBY 가 아니다(사유 NO_CANDIDATE 는 남긴다)
   let dayState = STATE.NO_TOURISM;
+  const windowWithoutCandidate =
+    (patientAllowed && patientViable.length > 0) || (guardianAllowed && guardianViable.length > 0);
   if (outings.length > 0) dayState = STATE.TOGETHER;
   else if (guardianOutings.length > 0) dayState = STATE.SPLIT_NEARBY;
-  else if ((patientAllowed && patientViable.length > 0) || (guardianAllowed && guardianViable.length > 0)) {
-    dayState = STATE.STANDBY;
+  else if (windowWithoutCandidate) {
+    if (coverage !== 'REST_DAY') dayState = STATE.STANDBY;
     reasons.push(REASON.NO_CANDIDATE);
   }
   // 동행 필수라서 보호자 단독 외출이 잠긴 쉬는 날 — 잠금 이유를 남긴다

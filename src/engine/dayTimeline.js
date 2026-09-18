@@ -98,7 +98,28 @@ export function patientEvents({ limits, frame, appointmentEvts, lodging, hospita
 }
 
 /**
+ * 숙소로 돌아오는 창의 마감을 뒤따르는 병원 일정 블록 시작 앞으로 당긴다 (spec 4.3·4.7 — 블록 안에는 외출이 없다).
+ * 직전 외출이 병원에서 끝나지 않는 병원 일정의 블록은 '시작 − 숙소→병원 − 도착 여유'부터다. 그 시각이 이 창의
+ * 마감보다 이르면(예: 15:00 병원 일정 앞의 14:55 숙소 복약·숙소 복귀 시각) 숙소 복귀 마감은 블록 시작이고,
+ * 마감 이유는 APPOINTMENT 다. 복귀 장소는 숙소 그대로다.
+ */
+function capByAppointmentBlock(window, events) {
+  let cap = null;
+  for (const e of events) {
+    if (e.kind !== 'APPOINTMENT' || e.deadlineMin < window.endMin) continue;
+    if (e.standaloneStartMin < window.endMin && (!cap || e.standaloneStartMin < cap.standaloneStartMin)) cap = e;
+  }
+  if (!cap) return window;
+  return {
+    startMin: window.startMin,
+    endMin: cap.standaloneStartMin,
+    event: { ...window.event, kind: 'APPOINTMENT', deadlineMin: cap.standaloneStartMin, cappedByAppointmentId: cap.appointmentId },
+  };
+}
+
+/**
  * 환자 외출 창. 앞 블록이 끝난 뒤부터 다음 마감 후보까지다. 끝나는 마감(RETURN_TIME·DAY_END·DEPARTURE) 뒤로는 없다.
+ * 숙소로 돌아오는 창은 뒤따르는 병원 일정 블록 시작을 넘지 않는다(capByAppointmentBlock).
  * 창 길이가 0 이하인 구간은 넣지 않는다(45분 최소 창 판정은 엔진이 한다).
  * @returns {Array<{startMin: number, endMin: number, event: object}>}
  */
@@ -106,7 +127,11 @@ export function patientWindows(events, startMin) {
   const windows = [];
   let cursor = startMin;
   for (const event of events) {
-    if (event.deadlineMin > cursor) windows.push({ startMin: cursor, endMin: event.deadlineMin, event });
+    if (event.deadlineMin > cursor) {
+      let window = { startMin: cursor, endMin: event.deadlineMin, event };
+      if (event.place === 'LODGING') window = capByAppointmentBlock(window, events);
+      if (window.endMin > window.startMin) windows.push(window);
+    }
     if (event.terminal) break;
     cursor = Math.max(cursor, event.blockEndMin);
   }

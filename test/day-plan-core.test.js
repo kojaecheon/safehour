@@ -376,6 +376,62 @@ describe('Outing.plannedReturnAt — 계획상 복귀 도착 (returnBy 는 안�
   });
 });
 
+describe('검토 후속 — 체류 하한·병원 블록 안 복귀·쉬는 날 상태', () => {
+  test('A. 원하는 체류가 15분보다 짧아도 정거장 체류는 15분이다 (규칙 19)', () => {
+    const short = museum('351', { title: '테스트 작은 전시관', north: 1.0, tags: { stayMin: 10 } });
+    const day = plan(restrictedStay({}, { hasCompanion: false }), '2026-10-05', { candidates: [short] });
+    const stop = day.outings.flatMap((o) => o.stops).find((x) => x.contentId === '351');
+    assert.ok(stop, '배치되어야 한다');
+    assert.equal(stop.stayMin, 15);
+    assert.equal(mins(stop.leaveAt) - mins(stop.arriveAt), 15);
+    assertSlaHolds(day, { recovery: true });
+  });
+
+  const withVisit = (items, start = '15:00') =>
+    restrictedStay(items, {
+      appointments: [
+        { id: 'A-PROC', hospitalId: 'H1', type: 'PROCEDURE', date: '2026-10-04', start: '09:00' },
+        { id: 'A-VISIT', hospitalId: 'H1', type: 'VISIT', date: '2026-10-05', start },
+      ],
+    });
+
+  for (const [label, items] of [
+    ['숙소 복약 14:55', { medication: SET([{ time: '14:55', atLodging: true }]) }],
+    ['숙소 복귀 시각 14:55', { returnTime: { kind: 'SET', time: '14:55', place: 'LODGING' } }],
+  ]) {
+    test(`B. ${label} + 15:00 병원 일정: 숙소 복귀 마감이 병원 블록 시작으로 당겨진다`, () => {
+      const day = plan(withVisit(items), '2026-10-05', { candidates: basics() });
+      const block = day.blocks.find((b) => b.kind === 'APPOINTMENT');
+      const blockStart = mins('15:00') - taxi.estimate(HOME, CLINIC_POINT).min - 10;
+      assert.equal(block.start, fromMinutes(blockStart), '직전 외출이 병원에서 끝나지 않으므로 블록은 시작 − 이동 − 10분');
+      assert.ok(day.outings.length > 0);
+      for (const o of day.outings) {
+        if (mins(o.departAt) < blockStart) {
+          assert.ok(mins(o.returnBy) <= blockStart, `${o.id} returnBy ${o.returnBy} 가 블록 안이다`);
+          assert.ok(mins(o.plannedReturnAt) <= blockStart);
+        } else {
+          assert.ok(mins(o.departAt) >= mins(block.end), `${o.id} 는 블록이 끝난 뒤에 출발해야 한다`);
+        }
+      }
+      const capped = day.outings.find((o) => o.returnBy === fromMinutes(blockStart));
+      assert.ok(capped, '블록 시작이 마감인 외출이 있어야 한다');
+      assert.equal(capped.deadlineReason, 'APPOINTMENT');
+      assert.equal(capped.returnPlace, 'LODGING');
+      assertSlaHolds(day, { recovery: true });
+    });
+  }
+
+  test('C. 쉬는 날 보호자 외출을 하나도 못 만들면 NO_TOURISM (보호자 조건이 맞아도)', () => {
+    const s = restrictedStay({ outing: 'FORBIDDEN' });
+    const day = plan(s, '2026-10-05', { candidates: [] });
+    assert.equal(day.coverage, 'REST_DAY');
+    assert.equal(day.outings.length + day.guardianOutings.length, 0);
+    assert.equal(day.dayState, STATE.NO_TOURISM);
+    assert.ok(day.reasons.includes(REASON.OUTING_FORBIDDEN));
+    assert.ok(day.reasons.includes(REASON.NO_CANDIDATE));
+  });
+});
+
 describe('규칙 14·15 — 입국일·출국일', () => {
   test('입국일 첫 정거장 도착은 도착 + 90분 + 공항→숙소 추정보다 이르지 않다', () => {
     const s = stay({ arrival: { date: '2026-10-01', time: '09:00', airport: 'ICN' } });
