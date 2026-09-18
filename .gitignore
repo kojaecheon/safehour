@@ -2,7 +2,7 @@
 .env
 .env.*
 !.env.example
-node_modules/
+node_modules
 artifacts/
 .cache/
 .next/
@@ -21,3 +21,6 @@ test-results/
 .vercel/
 .vercel
 .env*
+
+# dryforge 실행 문서·작업 폴더 (로컬 전용)
+.dryforge/
