@@ -8,6 +8,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import {
   PROVIDER_IDS,
@@ -18,16 +19,19 @@ import {
   safeReturnTo,
 } from '../src/auth/config.js';
 import {
+  ACCOUNT_KEY_PATTERN,
   OAUTH_MAX_AGE_SEC,
   SESSION_MAX_AGE_SEC,
   clearCookieHeader,
   cookieHeader,
   createOAuthToken,
   createSessionToken,
+  deriveAccountKey,
   randomToken,
   readOAuthToken,
   readSessionToken,
   sessionSecret,
+  sessionView,
   stateMatches,
 } from '../src/auth/session.js';
 import { authorizeUrl, codeChallenge, exchangeCodeForIdentity, readIdTokenSubject } from '../src/auth/oauth.js';
@@ -91,6 +95,13 @@ describe('세션 토큰', () => {
     const token = createSessionToken({ provider: 'google', subject: 'sub-1' }, SECRET, NOW);
     const decoded = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8'));
     assert.deepEqual(Object.keys(decoded).sort(), ['exp', 'iat', 'p', 's', 'v']);
+  });
+
+  test('계정 키를 더해도 쿠키에 담는 필드는 5개 그대로다 (AX-312)', () => {
+    const token = createSessionToken({ provider: 'google', subject: 'sub-1' }, SECRET, NOW);
+    const decoded = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString('utf8'));
+    assert.equal('accountKey' in decoded, false, '계정 키는 쿠키가 아니라 응답 시점에 유도한다');
+    assert.equal(decoded.exp - decoded.iat, SESSION_MAX_AGE_SEC, '세션 12시간 규칙이 그대로다');
   });
 
   test('짧은 서명 키는 키 없음으로 취급한다', () => {
@@ -439,5 +450,144 @@ describe('로그인 가능 판정 (배포 검증 기준)', () => {
     assert.deepEqual(methods, []);
     assert.equal(Boolean(sessionSecret(env)), false);
     assert.equal(Boolean(callbackUrl(env)), false);
+  });
+});
+
+// 불투명 계정 키 (AX-312 · spec 4.19 · ADR-0009)
+//
+// 기기 저장소는 계정마다 이름공간을 나눈다. 그 이름은 서버가 세션에서 주는 **불투명 계정 키**다.
+//   - 같은 계정이면 언제나 같은 키 (안정)
+//   - 서버 비밀값 없이는 식별자에서 키를 만들 수도, 키에서 식별자를 되돌릴 수도 없다 (비가역)
+//   - 원래 식별자(provider + sub)는 세션 응답에 실리지 않는다
+describe('불투명 계정 키', () => {
+  const GOOGLE = { provider: 'google', subject: 'google-sub-000123' };
+  const KAKAO = { provider: 'kakao', subject: '987654321' };
+
+  test('같은 계정·같은 비밀값이면 언제나 같은 키다', () => {
+    const a = deriveAccountKey(GOOGLE, SECRET);
+    const b = deriveAccountKey({ ...GOOGLE }, SECRET);
+    assert.equal(a, b);
+    // 세션 발급 시각과 무관하다 — 다시 로그인해도 같은 이름공간을 연다
+    const later = readSessionToken(createSessionToken(GOOGLE, SECRET, NOW + 86_400_000), SECRET, NOW + 86_400_000);
+    assert.equal(deriveAccountKey(later, SECRET), a);
+  });
+
+  test('계정·공급자·비밀값 중 하나라도 다르면 키가 다르다', () => {
+    const base = deriveAccountKey(GOOGLE, SECRET);
+    assert.notEqual(deriveAccountKey({ ...GOOGLE, subject: 'google-sub-000124' }, SECRET), base);
+    assert.notEqual(deriveAccountKey({ provider: 'kakao', subject: GOOGLE.subject }, SECRET), base);
+    assert.notEqual(deriveAccountKey(GOOGLE, 'y'.repeat(48)), base);
+    assert.notEqual(deriveAccountKey(KAKAO, SECRET), base);
+  });
+
+  test('공급자와 식별자의 경계를 섞어 같은 키를 만들 수 없다', () => {
+    // "google"+"x:y" 와 "google:x"+"y" 처럼 이어 붙이면 같아지는 입력이 다른 키가 되어야 한다
+    assert.notEqual(
+      deriveAccountKey({ provider: 'google', subject: 'x:y' }, SECRET),
+      deriveAccountKey({ provider: 'google:x', subject: 'y' }, SECRET),
+    );
+  });
+
+  test('형식은 고정 길이 base64url 이다 — 식별자 길이가 드러나지 않는다', () => {
+    const short = deriveAccountKey({ provider: 'kakao', subject: '1' }, SECRET);
+    const long = deriveAccountKey({ provider: 'google', subject: 's'.repeat(500) }, SECRET);
+    assert.match(short, ACCOUNT_KEY_PATTERN);
+    assert.match(long, ACCOUNT_KEY_PATTERN);
+    assert.equal(short.length, 43);
+    assert.equal(long.length, 43);
+    // 기기 저장 키 `safehour.v2.<accountKey>.*` 를 깨뜨리는 문자가 없다
+    assert.equal(short.includes('.'), false);
+  });
+
+  test('키에 원래 식별자가 어떤 부호화로도 들어 있지 않다', () => {
+    const key = deriveAccountKey(GOOGLE, SECRET);
+    const encodings = [
+      GOOGLE.subject,
+      Buffer.from(GOOGLE.subject).toString('base64url'),
+      Buffer.from(GOOGLE.subject).toString('base64'),
+      Buffer.from(GOOGLE.subject).toString('hex'),
+      '000123',
+    ];
+    for (const encoded of encodings) {
+      assert.equal(key.includes(encoded), false, `키에 식별자 조각(${encoded})이 보인다`);
+    }
+  });
+
+  test('비밀값 없는 해시가 아니다 — 알고리즘을 알아도 사전 대입으로 식별자를 찾지 못한다', () => {
+    const target = deriveAccountKey(KAKAO, SECRET);
+    // 공격자가 비밀값 없이 시도할 수 있는 모든 후보 계산
+    const candidates = [];
+    for (let n = 987654300; n <= 987654399; n += 1) {
+      const subject = String(n);
+      for (const message of [
+        subject,
+        `kakao:${subject}`,
+        `kakao${subject}`,
+        JSON.stringify(['kakao', subject]),
+        JSON.stringify(['safehour/account-key/v1', 'kakao', subject]),
+      ]) {
+        for (const algo of ['sha256', 'sha1', 'md5']) {
+          const digest = createHash(algo).update(message).digest();
+          candidates.push(digest.toString('base64url'), digest.toString('hex'), digest.toString('base64'));
+        }
+      }
+    }
+    assert.equal(candidates.includes(target), false, '비밀값 없이 계정 키를 재현했다 — 되돌릴 수 있다');
+    // 비밀값이 다르면 같은 후보로도 재현되지 않는다
+    assert.notEqual(deriveAccountKey(KAKAO, 'z'.repeat(48)), target);
+  });
+
+  test('계정 키는 세션 서명으로 쓸 수 없다 — 쿠키 위조 재료가 되지 않는다', () => {
+    const token = createSessionToken(GOOGLE, SECRET, NOW);
+    const [payload, signature] = token.split('.');
+    const key = deriveAccountKey(GOOGLE, SECRET);
+    assert.notEqual(key, signature);
+    assert.equal(readSessionToken(`${payload}.${key}`, SECRET, NOW), null);
+  });
+
+  test('비밀값이나 식별자가 없으면 만들지 않는다', () => {
+    assert.throws(() => deriveAccountKey(GOOGLE, null));
+    assert.throws(() => deriveAccountKey(GOOGLE, ''));
+    assert.throws(() => deriveAccountKey({ provider: 'google' }, SECRET));
+    assert.throws(() => deriveAccountKey({ subject: 'x' }, SECRET));
+    assert.throws(() => deriveAccountKey(null, SECRET));
+  });
+});
+
+describe('세션 응답 본문 (GET /api/auth/session)', () => {
+  const identity = { provider: 'google', subject: 'raw-subject-must-not-leak' };
+
+  test('로그인 상태면 공급자·만료·계정 키만 담는다', () => {
+    const session = readSessionToken(createSessionToken(identity, SECRET, NOW), SECRET, NOW);
+    const view = sessionView(session, SECRET);
+
+    assert.deepEqual(Object.keys(view).sort(), ['accountKey', 'authenticated', 'expiresAt', 'provider']);
+    assert.equal(view.authenticated, true);
+    assert.equal(view.provider, 'google');
+    assert.equal(view.accountKey, deriveAccountKey(identity, SECRET));
+    assert.equal(view.expiresAt, new Date((Math.floor(NOW / 1000) + SESSION_MAX_AGE_SEC) * 1000).toISOString());
+  });
+
+  test('원래 식별자는 어떤 필드에도 실리지 않는다', () => {
+    const session = readSessionToken(createSessionToken(identity, SECRET, NOW), SECRET, NOW);
+    const text = JSON.stringify(sessionView(session, SECRET));
+    assert.equal(text.includes(identity.subject), false);
+    assert.equal(text.includes('"subject"'), false);
+    assert.equal(text.includes('"sub"'), false);
+  });
+
+  test('로그인 전이면 계정 키도 없다', () => {
+    assert.deepEqual(sessionView(null, SECRET), {
+      authenticated: false,
+      provider: null,
+      expiresAt: null,
+      accountKey: null,
+    });
+  });
+
+  test('서명 키가 없으면 세션이 있어도 로그인으로 보지 않는다', () => {
+    const session = readSessionToken(createSessionToken(identity, SECRET, NOW), SECRET, NOW);
+    assert.equal(sessionView(session, null).authenticated, false);
+    assert.equal(sessionView(session, null).accountKey, null);
   });
 });
