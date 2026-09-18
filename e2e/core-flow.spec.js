@@ -136,6 +136,28 @@ test.describe('병원 조건은 읽기 전용 (AX-221)', () => {
     await expect(page.locator('input[name="outing"]')).toHaveCount(0);
   });
 
+  /**
+   * 열 노출·수중 활동은 병원이 발행하지만 판정 엔진에 전달되지 않는다.
+   * 판정에 쓰이는 조건과 같은 배지로 섞으면 SafeHour 가 이 조건으로 추천을 거른다고
+   * 오해하게 된다 — 사용자는 수중 활동 금지인데 거르지 않은 장소를 믿고 갈 수 있다.
+   * 로직은 동결 중이라 화면에서 분리하고, 직접 확인하라고 알린다.
+   */
+  test('판정에 쓰지 않는 조건은 병원 조건과 분리해 참고로만 보여준다', async ({ page }) => {
+    await connectPlan(page);
+    await page.goto('/plan');
+
+    const hospitalBadges = page.locator('.badge-hospital');
+    await expect(hospitalBadges.first()).toBeVisible();
+    await expect(hospitalBadges.filter({ hasText: '열 노출 회피' })).toHaveCount(0);
+    await expect(hospitalBadges.filter({ hasText: '수중 활동 금지' })).toHaveCount(0);
+
+    const reference = page.locator('.reference-conditions');
+    await expect(reference.getByRole('heading', { name: '참고 조건 — 추천 판정에는 쓰지 않음' })).toBeVisible();
+    await expect(reference.getByText('열 노출 회피')).toBeVisible();
+    await expect(reference.getByText('수중 활동 금지')).toBeVisible();
+    await expect(reference.getByText(/직접 확인하세요/)).toBeVisible();
+  });
+
   test('결과에서 돌아와도 병원 조건이 그대로다', async ({ page }) => {
     await watchGeolocation(page);
     await submitPlan(page);

@@ -172,10 +172,17 @@ export default function PlanPage() {
     [!c.outingAllowed, 'plan.outingForbidden'],
     [c.indoorOnly, 'plan.indoorOnly'],
     [c.avoidUv, 'plan.avoidUv'],
-    [c.avoidHeat, 'plan.avoidHeat'],
-    [c.noWater, 'plan.noWater'],
     [c.escortRequired, 'plan.escortRequired'],
     [c.foodRestricted, 'plan.foodRestricted'],
+  ].filter(([on]) => on);
+
+  // 열 노출·수중 활동은 병원이 발행하지만 판정 엔진에 전달되지 않는다
+  // (`planToCondition` 이 넘기지 않는다). 같은 배지로 섞어 두면 SafeHour 가 이 조건으로
+  // 추천을 거른다고 오해하게 된다. 판정 로직은 9/8 동결이라 고치지 않고, 화면에서
+  // "참고 조건" 으로 분리해 사용자가 직접 확인하도록 알린다 — 기능설명서 '알려진 한계'.
+  const referenceFlags = [
+    [c.avoidHeat, 'plan.avoidHeat'],
+    [c.noWater, 'plan.noWater'],
   ].filter(([on]) => on);
 
   return (
@@ -208,6 +215,22 @@ export default function PlanPage() {
             <span>{t('plan.walkLimit', { value: minutesLabel(c.maxWalkMin) })}</span>
             <span>{t('plan.travelLimit', { value: minutesLabel(c.maxTravelMin) })}</span>
           </div>
+
+          {referenceFlags.length > 0 && (
+            <div className="reference-conditions" style={{ marginTop: 16 }}>
+              <h3 style={{ fontSize: 15, marginBottom: 8 }}>{t('plan.referenceTitle')}</h3>
+              <div className="meta">
+                {referenceFlags.map(([, key]) => (
+                  <span key={key} className="badge">
+                    {t(key)}
+                  </span>
+                ))}
+              </div>
+              <p className="hint" style={{ marginTop: 8 }}>
+                {t('plan.referenceNote')}
+              </p>
+            </div>
+          )}
         </section>
 
         <section className="card" aria-labelledby="anchor-h">

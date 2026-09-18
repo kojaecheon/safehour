@@ -195,6 +195,14 @@ export const UI_TEXT = {
   'plan.noWater': { ko: '수중 활동 금지', en: 'No water activities' },
   'plan.escortRequired': { ko: '동행 필수', en: 'Companion required' },
   'plan.foodRestricted': { ko: '식음 제한', en: 'Food and drink restricted' },
+  'plan.referenceTitle': {
+    ko: '참고 조건 — 추천 판정에는 쓰지 않음',
+    en: 'For reference — not used in the check',
+  },
+  'plan.referenceNote': {
+    ko: '병원 안내에 있는 조건이지만, SafeHour는 추천 장소를 거를 때 이 조건을 쓰지 않습니다. 추천된 장소가 이 조건에 맞는지 직접 확인하세요.',
+    en: 'These come from your hospital instructions, but SafeHour does not use them to filter places. Check each recommended place against them yourself.',
+  },
   'plan.walkLimit': { ko: '보행 {value} 이내', en: 'Walk within {value}' },
   'plan.travelLimit': { ko: '편도 이동 {value} 이내', en: 'One-way travel within {value}' },
   'plan.anchorTitle': { ko: '복귀 기준점', en: 'Return point' },
