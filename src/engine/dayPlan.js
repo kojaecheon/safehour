@@ -12,8 +12,10 @@
 //      45분 미만 창에는 외출을 만들지 않는다.
 //   2. 창 안의 식사 칸(점심·저녁, 식사가 가능할 때)이 외출의 기준점이다. 식사 칸이 둘인 창은
 //      두 식사 칸 사이의 가운데 시각에서 나눠 외출 두 개를 만든다. 앞 외출은 그 시각까지 숙소로 돌아오도록
-//      짠다(복귀 계산식 포함). 앞 외출의 returnBy·마감 이유는 창의 실제 마감이다.
-//      병원에서 끝나는 창은 마지막 외출 하나만 만든다(앞 외출이 병원 마감 이유를 가질 수 없으므로).
+//      짠다(복귀 계산식 포함). 앞 외출의 returnBy(안전 마감)·마감 이유는 창의 실제 마감이고,
+//      계획상 복귀는 plannedReturnAt 이다.
+//      병원에서 끝나는 창은 마지막 외출이 그 병원에서 끝나며 마감에 맞춰 거꾸로 짠다. 그 앞부분은
+//      숙소로 돌아오는 외출(식사 칸 포함)이고, 안전 마감은 '병원 마감 − 숙소→병원 − 도착 여유'다.
 //   3. 식사 칸 외출은 식당 1곳을 식사 칸 시간에 두고 남은 자리를 앞뒤로 채운다. 식당이 없으면
 //      식사 칸은 NONE_AVAILABLE 이고, 그 칸 시간은 다른 정거장으로 채우지 않는다(비운 칸 CLEARED 도 같다).
 //   4. 정거장 수 한도(외출·하루)는 식사 정거장을 포함한다. 뒤에 올 식사 칸 몫을 먼저 남겨 둔다.
@@ -143,27 +145,30 @@ function mealWindow(slot, mealRestriction) {
 /** 창 시작에 출발해 가장 빨리 닿을 수 있는 시각 — 호출·대기 + 추정기 최소값(3분) */
 const EARLIEST_ARRIVAL_OFFSET_MIN = DEFAULTS.buffers.hailingMin + 3;
 
-/**
- * 창을 식사 칸 기준으로 나눈다. 같은 식사 칸이 여러 창에 걸리면 채워질 때까지 뒤 창에서 다시 시도한다
- * (엔진 본문). 한 식사 칸에 식당은 하루 한 곳이다.
- */
-function splitWindow(window, meals) {
-  const anchors = meals.filter((m) => {
+/** 창 안에서 식사 칸 시간에 식당에 닿을 수 있는 식사 칸(식사 제한이 막지 않는 것) — 외출의 기준점 */
+function windowAnchors(window, meals) {
+  return meals.filter((m) => {
     if (!m.allowed) return false;
     const earliest = Math.max(m.startMin, window.startMin + EARLIEST_ARRIVAL_OFFSET_MIN);
     return earliest <= m.latestMin && earliest + MIN_STAY <= window.endMin;
   });
-  if (anchors.length <= 1) {
-    return [{ window, startMin: window.startMin, slaDeadlineMin: window.endMin, anchor: anchors[0] ?? null, build: true, final: true }];
-  }
+}
+
+/**
+ * 구간을 식사 칸 기준점으로 나눈다. 기준점이 둘이면 두 칸 사이 가운데 시각에서 나눈다.
+ * 같은 식사 칸이 여러 창에 걸리면 채워질 때까지 뒤 창에서 다시 시도한다(엔진 본문). 한 칸에 식당은 하루 한 곳이다.
+ * @returns {Array<{startMin: number, endMin: number, anchor: object|null}>}
+ */
+function splitByAnchors(region, anchors) {
+  if (anchors.length <= 1) return [{ startMin: region.startMin, endMin: region.endMin, anchor: anchors[0] ?? null }];
   const subs = [];
-  let start = window.startMin;
+  let start = region.startMin;
   anchors.forEach((anchor, i) => {
-    const last = i === anchors.length - 1;
-    const end = last
-      ? window.endMin
-      : Math.min(window.endMin, Math.floor((anchor.slotEnd + anchors[i + 1].slotStart) / 2));
-    subs.push({ window, startMin: start, slaDeadlineMin: end, anchor, final: last, build: last || window.event.place === 'LODGING' });
+    const end =
+      i === anchors.length - 1
+        ? region.endMin
+        : Math.min(region.endMin, Math.floor((anchor.slotEnd + anchors[i + 1].slotStart) / 2));
+    subs.push({ startMin: start, endMin: end, anchor });
     start = end;
   });
   return subs;
@@ -216,8 +221,24 @@ function toStop(item, { date, role, diet }) {
   return stop;
 }
 
-/** evaluateOuting 결과 → spec 5.2 Outing. returnBy·slack 은 창의 실제 마감 기준이다 */
-function toOuting(ev, { id, role, date, deadlineMin, returnPlace, deadlineReason, recovery, extraBufferMin, diet }) {
+/**
+ * @typedef {object} Outing  spec 5.2 Outing + plannedReturnAt(추가 필드)
+ * @property {string} id  `${date}:P|G:outing-N` — 역할별 출발 순 번호
+ * @property {string} departAt  "HH:MM" 계획상 출발(호출 시작)
+ * @property {string} returnBy  "HH:MM" **안전 마감**: 이 시각까지 returnPlace 에 닿아야 한다(복귀 계산식의 마감).
+ *   한 창에 외출이 여럿이면 앞 외출도 창의 실제 마감을 그대로 가진다 — 계획상 복귀는 plannedReturnAt 이다
+ * @property {'LODGING'|'HOSPITAL'} returnPlace
+ * @property {'RETURN_TIME'|'MEDICATION'|'APPOINTMENT'|'DAY_END'|'DEPARTURE'|'PATIENT_SCHEDULE'} deadlineReason
+ * @property {string} latestDepartureAt  "HH:MM" = returnBy − 복귀 계산식 필요 시간
+ * @property {number} slackMin  returnBy 기준 복귀 여유(분, 0 이상)
+ * @property {number} walkTotalMin  Σ정거장 보행 부담 + Σ도보 구간(복귀 포함)
+ * @property {number} travelTotalMin  Σ모든 구간 이동 추정(복귀 포함)
+ * @property {string} plannedReturnAt  "HH:MM" 계획상 복귀 도착(마지막 정거장 출발 + 복귀 구간). 버퍼는 넣지 않는다
+ * @property {object[]} stops  Stop[]
+ */
+
+/** evaluateOuting 결과 → Outing. returnBy·slack 은 그 외출의 안전 마감 기준이다. id 는 호출부가 붙인다 */
+function toOuting(ev, { id = null, role, date, deadlineMin, returnPlace, deadlineReason, recovery, extraBufferMin, diet }) {
   const sla = checkOutingSla({
     departMin: ev.departMin,
     deadlineMin,
@@ -236,6 +257,7 @@ function toOuting(ev, { id, role, date, deadlineMin, returnPlace, deadlineReason
     slackMin: sla.slackMin,
     walkTotalMin: ev.walkTotal,
     travelTotalMin: ev.travelTotalMin,
+    plannedReturnAt: fromMinutes(ev.returnArriveMin),
     stops: ev.items.map((item) => toStop(item, { date, role, diet })),
   };
 }
@@ -370,40 +392,39 @@ export function planDay(input) {
     patientViable = windows.filter((w) => w.endMin - w.startMin >= MIN_WINDOW);
     if (patientViable.length === 0) reasons.push(REASON.DEPARTURE_WINDOW_TOO_SHORT);
 
-    const subs = patientViable
-      .flatMap((w) => splitWindow(w, meals))
-      .filter((s) => s.build && s.slaDeadlineMin - s.startMin >= MIN_WINDOW);
     const filled = (name) => Boolean(attempts.get(name)?.stopId);
-    // 뒤 창에서 아직 채울 수 있는 식사 칸 수 — 하루 한도에서 그 몫을 먼저 남겨 둔다
-    const reservedAfter = (index, except = null) =>
-      new Set(
-        subs
-          .slice(index + 1)
-          .map((s) => s.anchor?.name)
-          .filter((name) => name && name !== except && !cleared.has(name) && !filled(name)),
-      ).size;
     let budget = limitsPace.perDay;
     const usedToday = new Set();
     const usedCategories = new Set();
 
-    for (let index = 0; index < subs.length; index += 1) {
-      const sub = subs[index];
-      if (budget <= 0) break;
-      const { anchor, window } = sub;
-      const returnPoint = sub.final ? window.event.point : lodgingPoint;
-      const common = { slaDeadlineMin: sub.slaDeadlineMin, returnPoint, usedToday, rank: { usedCategories }, failures };
-      // 이미 채운 식사 칸은 이 창의 기준점이 아니다
-      const openAnchor = anchor && !filled(anchor.name) ? anchor : null;
+    /**
+     * 외출 하나를 짠다.
+     * @param {object} unit  { startMin, slaDeadlineMin, anchor, returnPoint, returnPlace, reportDeadlineMin,
+     *                         deadlineReason, align: 'EARLY'|'LATE', appointmentId? }
+     * @param {Array<string|undefined>} pending  이 외출 뒤에 시도할 식사 칸 — 하루 한도에서 그 몫을 먼저 남긴다
+     * @returns {number|null} 만든 외출의 출발(분). 만들지 못하면 null
+     */
+    const planUnit = (unit, pending) => {
+      if (budget <= 0 || unit.slaDeadlineMin - unit.startMin < MIN_WINDOW) return null;
+      const reserved = (except = null) =>
+        new Set(pending.filter((name) => name && name !== except && !cleared.has(name) && !filled(name))).size;
+      // 이미 채운 식사 칸은 이 외출의 기준점이 아니다
+      const openAnchor = unit.anchor && !filled(unit.anchor.name) ? unit.anchor : null;
+      const common = {
+        slaDeadlineMin: unit.slaDeadlineMin,
+        returnPoint: unit.returnPoint,
+        align: unit.align,
+        usedToday,
+        rank: { usedCategories },
+        failures,
+      };
       let ev = null;
 
       if (openAnchor && !cleared.has(openAnchor.name)) {
-        const allowance = Math.max(
-          0,
-          Math.min(limitsPace.perOuting - 1, budget - 1 - reservedAfter(index, openAnchor.name)),
-        );
+        const allowance = Math.max(0, Math.min(limitsPace.perOuting - 1, budget - 1 - reserved(openAnchor.name)));
         const built = buildMealOuting(ctx, {
           ...common,
-          startMin: sub.startMin,
+          startMin: unit.startMin,
           meal: openAnchor,
           allowance,
           mealPool,
@@ -411,7 +432,7 @@ export function planDay(input) {
         });
         ev = built.ev;
         if (!ev) {
-          // 앞 창에서 실패한 사유와 합친다 — 뒤 창에서 채우면 FILLED 로 바뀐다
+          // 앞에서 실패한 사유와 합친다 — 뒤 외출에서 채우면 FILLED 로 바뀐다
           const r = uniq([
             ...(attempts.get(openAnchor.name)?.reasons ?? []),
             ...restaurantGateReasons,
@@ -424,44 +445,46 @@ export function planDay(input) {
       }
 
       if (!ev) {
-        const allowance = Math.min(limitsPace.perOuting, budget - reservedAfter(index));
+        const allowance = Math.min(limitsPace.perOuting, budget - reserved());
         if (allowance > 0) {
           if (openAnchor) {
             // 비었거나 비운 식사 칸 시간은 다른 정거장으로 채우지 않는다 — 칸 앞이나 칸 뒤에만 둔다
-            if (openAnchor.slotStart - sub.startMin >= MIN_WINDOW) {
-              ev = buildForwardOuting(ctx, {
-                ...common,
-                startMin: sub.startMin,
-                mustLeaveByMin: openAnchor.slotStart,
-                allowance,
-                pool: regularPool,
-              });
-            }
-            const after = Math.max(sub.startMin, openAnchor.slotEnd);
-            if (!ev && sub.slaDeadlineMin - after >= MIN_WINDOW) {
-              ev = buildForwardOuting(ctx, { ...common, startMin: after, allowance, pool: regularPool });
-            }
+            const beforeSlot = () =>
+              openAnchor.slotStart - unit.startMin >= MIN_WINDOW
+                ? buildForwardOuting(ctx, {
+                    ...common,
+                    startMin: unit.startMin,
+                    mustLeaveByMin: openAnchor.slotStart,
+                    allowance,
+                    pool: regularPool,
+                  })
+                : null;
+            const afterStart = Math.max(unit.startMin, openAnchor.slotEnd);
+            const afterSlot = () =>
+              unit.slaDeadlineMin - afterStart >= MIN_WINDOW
+                ? buildForwardOuting(ctx, { ...common, startMin: afterStart, allowance, pool: regularPool })
+                : null;
+            ev = unit.align === 'LATE' ? afterSlot() ?? beforeSlot() : beforeSlot() ?? afterSlot();
           } else {
-            ev = buildForwardOuting(ctx, { ...common, startMin: sub.startMin, allowance, pool: regularPool });
+            ev = buildForwardOuting(ctx, { ...common, startMin: unit.startMin, allowance, pool: regularPool });
           }
         }
       }
 
-      if (!ev) continue;
+      if (!ev) return null;
       const outing = toOuting(ev, {
-        id: `${date}:P:outing-${outings.length + 1}`,
         role: 'P',
         date,
-        deadlineMin: window.endMin,
-        returnPlace: sub.final ? window.event.place : 'LODGING',
-        deadlineReason: window.event.kind,
+        deadlineMin: unit.reportDeadlineMin,
+        returnPlace: unit.returnPlace,
+        deadlineReason: unit.deadlineReason,
         recovery,
         extraBufferMin,
         diet: limits.diet,
       });
-      // 환자가 숙소를 비우는 구간 — 병원에서 끝나는 외출은 그 마감(병원 일정 시작·병원 복귀 시각)까지 숙소에 없다
-      outing._awayUntilMin = outing.returnPlace === 'HOSPITAL' ? window.endMin : ev.returnArriveMin;
       outing._departMin = ev.departMin;
+      // 환자가 숙소를 비우는 구간 — 병원에서 끝나는 외출은 그 마감(병원 일정 시작·병원 복귀 시각)까지 숙소에 없다
+      outing._awayUntilMin = unit.returnPlace === 'HOSPITAL' ? unit.slaDeadlineMin : ev.returnArriveMin;
       outings.push(outing);
       budget -= outing.stops.length;
       for (const item of ev.items) {
@@ -470,8 +493,87 @@ export function planDay(input) {
       }
       const mealStop = outing.stops.find((s) => s.isMeal);
       if (mealStop && openAnchor) attempts.set(openAnchor.name, { stopId: mealStop.id, reasons: [] });
-      if (sub.final && window.event.kind === 'APPOINTMENT') chained.add(window.event.appointmentId);
-    }
+      if (unit.appointmentId) chained.add(unit.appointmentId);
+      return ev.departMin;
+    };
+
+    const lodgingUnits = (region, anchors, { reportDeadlineMin, deadlineReason }) =>
+      splitByAnchors(region, anchors).map((sub) => ({
+        startMin: sub.startMin,
+        slaDeadlineMin: sub.endMin,
+        anchor: sub.anchor,
+        returnPoint: lodgingPoint,
+        returnPlace: 'LODGING',
+        reportDeadlineMin,
+        deadlineReason,
+        align: 'EARLY',
+      }));
+    const planInOrder = (units, later) =>
+      units.forEach((unit, i) => planUnit(unit, [...units.slice(i + 1).map((u) => u.anchor?.name), ...later]));
+    const names = (anchors) => anchors.map((a) => a.name);
+
+    /**
+     * 병원에서 끝나는 창(다음 병원 일정·병원 복귀 시각). spec 4.3·규칙 13-2.
+     * - 마지막 외출이 그 병원에서 끝난다. 마감에 맞춰 거꾸로 짠다(LATE) — 병원에 일찍 닿아 기다리지 않게.
+     *   그 앞 식사 칸이 마감에 붙어 있으면(칸 끝 뒤 45분 미만) 마지막 외출이 그 식사를 맡는다.
+     * - 앞부분은 다른 창과 같이 숙소로 돌아오는 외출(식사 칸 포함)이다. 계획상 마지막 외출 출발 전까지 돌아오고,
+     *   안전 마감(returnBy)은 '병원 마감 − 숙소→병원 이동 − 도착 여유'다(마감 이유는 창과 같다).
+     */
+    const planHospitalWindow = (window, anchors, later) => {
+      const { event } = window;
+      const deadline = window.endMin;
+      const lodgingDeadline =
+        deadline - dayEstimate(lodgingPoint, event.point).min - DEFAULTS.buffers.arrivalMarginMin;
+      const last = anchors.at(-1) ?? null;
+      const finalMeal = last && deadline - last.slotEnd < MIN_WINDOW ? last : null;
+      const earlier = finalMeal ? anchors.slice(0, -1) : anchors;
+      let finalStart = window.startMin;
+      if (finalMeal && earlier.length > 0) {
+        finalStart = Math.max(window.startMin, Math.floor((earlier.at(-1).slotEnd + finalMeal.slotStart) / 2));
+      } else if (!finalMeal && last) {
+        finalStart = Math.max(window.startMin, last.slotEnd);
+      }
+      const finalDepart = planUnit(
+        {
+          startMin: finalStart,
+          slaDeadlineMin: deadline,
+          anchor: finalMeal,
+          returnPoint: event.point,
+          returnPlace: 'HOSPITAL',
+          reportDeadlineMin: deadline,
+          deadlineReason: event.kind,
+          align: 'LATE',
+          appointmentId: event.appointmentId ?? null,
+        },
+        [...names(earlier), ...later],
+      );
+
+      const regionEnd = Math.min(lodgingDeadline, finalDepart ?? lodgingDeadline);
+      const region = { startMin: window.startMin, endMin: regionEnd };
+      // 마지막 외출이 맡았다가 채우지 못한 식사 칸도 앞부분에서 다시 시도한다(칸 시간 보호 포함)
+      const retry = new Set([...names(earlier), ...(finalMeal && !filled(finalMeal.name) ? [finalMeal.name] : [])]);
+      const regionAnchors = windowAnchors(region, meals.filter((m) => retry.has(m.name)));
+      planInOrder(lodgingUnits(region, regionAnchors, { reportDeadlineMin: lodgingDeadline, deadlineReason: event.kind }), later);
+    };
+
+    const anchorsByWindow = patientViable.map((w) => windowAnchors(w, meals));
+    patientViable.forEach((window, index) => {
+      const later = anchorsByWindow.slice(index + 1).flatMap(names);
+      if (window.event.place === 'HOSPITAL') {
+        planHospitalWindow(window, anchorsByWindow[index], later);
+      } else {
+        planInOrder(
+          lodgingUnits(window, anchorsByWindow[index], { reportDeadlineMin: window.endMin, deadlineReason: window.event.kind }),
+          later,
+        );
+      }
+    });
+
+    // 병원 창은 마지막 외출을 먼저 짜므로 출발 순으로 정렬한 뒤 번호를 매긴다
+    outings.sort((a, b) => a._departMin - b._departMin);
+    outings.forEach((o, i) => {
+      o.id = `${date}:P:outing-${i + 1}`;
+    });
   }
 
   // ── 병원·복약 블록 (직전 외출이 병원에서 끝났으면 병원 블록은 일정 시작부터) ──

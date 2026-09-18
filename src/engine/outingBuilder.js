@@ -47,9 +47,11 @@ function stayOptions(desired) {
  * @param {number} plan.slaDeadlineMin  복귀 계산식의 마감
  * @param {{lat:number,lng:number}} plan.returnPoint
  * @param {number|null} [plan.mustLeaveByMin]  모든 정거장을 이 시각까지 떠난다(비운 식사 칸 보호)
+ * @param {'EARLY'|'LATE'} [plan.align]  EARLY: 창 시작에 출발(식사 칸이 있으면 칸 시작에 맞춤).
+ *   LATE: 복귀 계산식을 딱 만족하는 가장 늦은 출발 — 병원에서 끝나는 외출을 마감에 맞춰 거꾸로 짤 때 쓴다
  */
 export function evaluateOuting(ctx, plan) {
-  const { seq, startMin, slaDeadlineMin, returnPoint, mustLeaveByMin = null } = plan;
+  const { seq, startMin, slaDeadlineMin, returnPoint, mustLeaveByMin = null, align = 'EARLY' } = plan;
   const fail = (failure) => ({ ok: false, failure });
 
   const legs = [];
@@ -63,21 +65,43 @@ export function evaluateOuting(ctx, plan) {
     return fail(REASON.TRAVEL_LIMIT_EXCEEDED);
   }
 
-  // 식사 정거장이 있으면 식사 칸 시작에 도착하도록 출발을 늦춘다(창 시작보다 이르지는 않게)
-  let departMin = startMin;
+  const slaInput = {
+    deadlineMin: slaDeadlineMin,
+    legsMin: [...legs.map((l) => l.min), back.min],
+    staysMin: seq.map((item) => item.stayMin),
+    recoveryBuffer: ctx.recovery,
+    extraBufferMin: ctx.extraBufferMin,
+  };
+
+  // 출발 시각 기준 도착·출발 오프셋 (호출·대기 뒤 이동)
+  const arriveOffset = [];
+  let offset = BUFFER.hailingMin;
+  for (let i = 0; i < seq.length; i += 1) {
+    arriveOffset.push(offset + legs[i].min);
+    offset = arriveOffset[i] + seq[i].stayMin;
+  }
+  const lastLeaveOffset = offset;
   const mealIndex = seq.findIndex((item) => item.meal);
-  if (mealIndex >= 0) {
-    let offset = BUFFER.hailingMin;
-    for (let i = 0; i <= mealIndex; i += 1) offset += legs[i].min + (i < mealIndex ? seq[i].stayMin : 0);
-    departMin = Math.max(startMin, seq[mealIndex].meal.startMin - offset);
+
+  let departMin;
+  if (align === 'LATE') {
+    // 마감에 맞춰 거꾸로 짠다: 복귀 계산식을 딱 만족하는 가장 늦은 출발.
+    // 식사 칸·칸 보호 때문에 더 늦출 수 없으면 그만큼 앞당긴다. 창 시작보다 이르면 맞지 않는다
+    departMin = checkOutingSla({ ...slaInput, departMin: 0 }).latestDepartMin;
+    if (mealIndex >= 0) departMin = Math.min(departMin, seq[mealIndex].meal.latestMin - arriveOffset[mealIndex]);
+    if (mustLeaveByMin !== null) departMin = Math.min(departMin, mustLeaveByMin - lastLeaveOffset);
+    if (departMin < startMin) return fail(TIME);
+  } else {
+    // 창 시작에 출발한다. 식사 정거장이 있으면 식사 칸 시작에 도착하도록 늦춘다
+    departMin = startMin;
+    if (mealIndex >= 0) departMin = Math.max(startMin, seq[mealIndex].meal.startMin - arriveOffset[mealIndex]);
   }
 
   const items = [];
-  let t = departMin + BUFFER.hailingMin;
   let walkTotal = 0;
   for (let i = 0; i < seq.length; i += 1) {
     const { rec, stayMin, meal } = seq[i];
-    const arriveMin = t + legs[i].min;
+    const arriveMin = departMin + arriveOffset[i];
     if (meal && (arriveMin < meal.startMin || arriveMin > meal.latestMin)) return fail(TIME);
     if (rec.hasFood && ctx.fastingUntilMin !== null && arriveMin < ctx.fastingUntilMin) {
       return fail(REASON.FASTING_REQUIRED);
@@ -86,19 +110,11 @@ export function evaluateOuting(ctx, plan) {
     if (mustLeaveByMin !== null && leaveMin > mustLeaveByMin) return fail(TIME);
     walkTotal += rec.walkMin + (legs[i].mode === 'walk' ? legs[i].min : 0);
     items.push({ rec, stayMin, meal, arriveMin, leaveMin, leg: legs[i] });
-    t = leaveMin;
   }
   walkTotal += back.mode === 'walk' ? back.min : 0;
   if (ctx.walkLimitMin !== null && walkTotal > ctx.walkLimitMin) return fail(REASON.WALK_LIMIT_EXCEEDED);
 
-  const sla = checkOutingSla({
-    departMin,
-    deadlineMin: slaDeadlineMin,
-    legsMin: [...legs.map((l) => l.min), back.min],
-    staysMin: seq.map((item) => item.stayMin),
-    recoveryBuffer: ctx.recovery,
-    extraBufferMin: ctx.extraBufferMin,
-  });
+  const sla = checkOutingSla({ ...slaInput, departMin });
   if (!sla.ok) return fail(TIME);
 
   return {
@@ -108,8 +124,10 @@ export function evaluateOuting(ctx, plan) {
     back,
     walkTotal,
     sla,
+    // 순위용 복귀 여유: 거꾸로 짠 외출은 여유가 출발 앞쪽(창 시작까지)에 남는다
+    rankSlackMin: align === 'LATE' ? departMin - startMin + sla.slackMin : sla.slackMin,
     travelTotalMin: sla.travelMin,
-    returnArriveMin: t + back.min,
+    returnArriveMin: departMin + lastLeaveOffset + back.min,
   };
 }
 
@@ -152,7 +170,7 @@ function selectBest(ctx, plan, index, recs, meal, rank, failures) {
     const key = [
       rec.pinned ? 0 : 1,
       rec.interest ? 0 : 1,
-      -tried.ev.sla.slackMin,
+      -tried.ev.rankSlackMin,
       rec.walkMin,
       rank.usedCategories.has(rec.category) ? 1 : 0,
       rec.contentId,
@@ -175,8 +193,8 @@ function available(pool, usedToday, seq) {
  * 식사 칸이 없는 외출 — 창 시작에 출발해 정거장을 앞에서부터 채운다.
  * @returns {object|null} evaluateOuting 결과(정거장 1곳 이상) 또는 null
  */
-export function buildForwardOuting(ctx, { startMin, slaDeadlineMin, returnPoint, mustLeaveByMin = null, allowance, pool, usedToday, rank, failures }) {
-  let plan = { seq: [], startMin, slaDeadlineMin, returnPoint, mustLeaveByMin };
+export function buildForwardOuting(ctx, { startMin, slaDeadlineMin, returnPoint, mustLeaveByMin = null, align = 'EARLY', allowance, pool, usedToday, rank, failures }) {
+  let plan = { seq: [], startMin, slaDeadlineMin, returnPoint, mustLeaveByMin, align };
   let ev = null;
   while (plan.seq.length < allowance) {
     const best = selectBest(
@@ -201,9 +219,9 @@ export function buildForwardOuting(ctx, { startMin, slaDeadlineMin, returnPoint,
  * @param {number} allowance  식사 외 정거장 수 한도
  * @returns {{ev: object|null, mealFailures: Map<string,string>}}
  */
-export function buildMealOuting(ctx, { startMin, slaDeadlineMin, returnPoint, meal, allowance, mealPool, pool, usedToday, rank, failures }) {
+export function buildMealOuting(ctx, { startMin, slaDeadlineMin, returnPoint, align = 'EARLY', meal, allowance, mealPool, pool, usedToday, rank, failures }) {
   const mealFailures = new Map();
-  let plan = { seq: [], startMin, slaDeadlineMin, returnPoint, mustLeaveByMin: null };
+  let plan = { seq: [], startMin, slaDeadlineMin, returnPoint, mustLeaveByMin: null, align };
   const chosen = selectBest(
     ctx,
     plan,

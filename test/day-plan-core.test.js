@@ -242,10 +242,13 @@ describe('규칙 13-2 — 다음 고정 블록이 병원 일정인 외출', () =
 
   test('그 병원에서 끝나고 마감은 일정 시작, 블록은 일정 시작부터, 도착 여유는 한 번만', () => {
     const day = plan(withVisit('15:00'), '2026-10-05', { candidates: basics() });
-    const before = day.outings.find((o) => o.deadlineReason === 'APPOINTMENT');
+    // 병원 일정 바로 앞 외출(마지막 외출)이 그 병원에서 끝난다
+    const before = day.outings.find((o) => o.returnPlace === 'HOSPITAL');
     assert.ok(before, '병원 일정 전 외출이 있어야 한다');
-    assert.equal(before.returnPlace, 'HOSPITAL');
+    assert.equal(before.deadlineReason, 'APPOINTMENT');
     assert.equal(before.returnBy, '15:00');
+    const lastBefore = day.outings.filter((o) => mins(o.departAt) < mins('15:00')).at(-1);
+    assert.equal(lastBefore, before, '병원에서 끝나는 외출이 일정 전 마지막 외출이다');
     const lastStop = before.stops[before.stops.length - 1];
     assert.equal(returnLegMin(before), taxi.estimate(lastStop, CLINIC_POINT).min);
     // 도착 여유 10분 한 번 + 회복기 10분 — 블록에 이동·여유를 다시 넣지 않는다
@@ -257,8 +260,9 @@ describe('규칙 13-2 — 다음 고정 블록이 병원 일정인 외출', () =
     const back = taxi.estimate(CLINIC_POINT, HOME).min;
     assert.equal(block.end, fromMinutes(mins('15:00') + 90 + back));
     for (const outing of day.outings) {
-      if (outing === before) continue;
-      assert.ok(mins(outing.departAt) >= mins(block.end), '블록 안에는 외출을 만들지 않는다');
+      const end = mins(outing.plannedReturnAt);
+      const overlaps = mins(outing.departAt) < mins(block.end) && end > mins(block.start);
+      assert.ok(!overlaps, `${outing.id} 가 병원 일정 블록 안에 있다`);
     }
   });
 
@@ -268,6 +272,107 @@ describe('규칙 13-2 — 다음 고정 블록이 병원 일정인 외출', () =
     const to = taxi.estimate(HOME, CLINIC_POINT).min;
     assert.equal(block.start, fromMinutes(mins('09:40') - to - 10));
     assert.ok(!day.outings.some((o) => o.deadlineReason === 'APPOINTMENT'));
+  });
+});
+
+describe('병원에서 끝나는 창 — 마지막 외출은 마감에 맞춰 거꾸로 짜고, 앞부분은 숙소로 돌아오는 외출', () => {
+  const visitAt = (start, items = {}) =>
+    restrictedStay(items, {
+      appointments: [
+        { id: 'A-PROC', hospitalId: 'H1', type: 'PROCEDURE', date: '2026-10-04', start: '09:00' },
+        { id: 'A-VISIT', hospitalId: 'H1', type: 'VISIT', date: '2026-10-05', start },
+      ],
+    });
+  const lodgingDeadline = (start) => fromMinutes(mins(start) - taxi.estimate(HOME, CLINIC_POINT).min - 10);
+  /** 복귀 계산식의 버퍼(교통 변동 25%·도착 여유·회복기) — 계획 도착과 마감 사이에 남는 것은 이것뿐이다 */
+  const buffers = (o, recovery = true) => Math.ceil(o.travelTotalMin * 0.25) + 10 + (recovery ? 10 : 0);
+
+  function assertFinalHugsDeadline(day, deadline) {
+    const toHospital = day.outings.filter((o) => o.returnPlace === 'HOSPITAL');
+    assert.equal(toHospital.length, 1, '병원에서 끝나는 외출은 하나');
+    const final = toHospital[0];
+    assert.equal(final.returnBy, deadline);
+    assert.equal(final.slackMin, 0, '마감에 맞춰 거꾸로 짠다');
+    assert.equal(final.departAt, final.latestDepartureAt);
+    assert.equal(mins(final.returnBy) - mins(final.plannedReturnAt), buffers(final));
+    const lastStop = final.stops[final.stops.length - 1];
+    assert.equal(returnLegMin(final), taxi.estimate(lastStop, CLINIC_POINT).min, '병원 좌표로 복귀를 계산한다');
+    return final;
+  }
+
+  test('15:00 병원 일정: 오전 외출은 점심을 넣고 숙소로, 마지막 외출은 15:00 직전에 병원에 닿는다', () => {
+    const day = plan(visitAt('15:00'), '2026-10-05', { candidates: basics() });
+    const final = assertFinalHugsDeadline(day, '15:00');
+
+    const morning = day.outings.filter((o) => o.returnPlace === 'LODGING' && mins(o.departAt) < mins('15:00'));
+    assert.ok(morning.length >= 1, '앞부분에 숙소로 돌아오는 외출이 있어야 한다');
+    for (const o of morning) {
+      assert.equal(o.deadlineReason, 'APPOINTMENT');
+      assert.equal(o.returnBy, lodgingDeadline('15:00'), '숙소 복귀 마감 = 일정 시작 − 숙소→병원 − 도착 여유');
+      assert.ok(mins(o.plannedReturnAt) <= mins(final.departAt), '마지막 외출 출발 전에 숙소로 돌아온다');
+    }
+    const lunch = day.mealSlots.find((m) => m.slot === 'LUNCH');
+    assert.equal(lunch.status, 'FILLED', '병원에서 끝나는 창이라는 이유로 식사 칸을 비우지 않는다');
+    assert.ok(morning.some((o) => o.stops.some((x) => x.id === lunch.stopId && x.isMeal)));
+
+    const block = day.blocks.find((b) => b.kind === 'APPOINTMENT');
+    assert.equal(block.start, '15:00', '직전 외출이 병원에서 끝나므로 블록은 일정 시작부터');
+    assertSlaHolds(day, { recovery: true });
+  });
+
+  test('병원 복귀 시각(RETURN_TIME)도 같은 방식이다', () => {
+    const s = restrictedStay({ returnTime: { kind: 'SET', time: '15:00', place: 'HOSPITAL', hospitalId: 'H1' } });
+    const day = plan(s, '2026-10-05', { candidates: basics() });
+    const final = assertFinalHugsDeadline(day, '15:00');
+    assert.equal(final.deadlineReason, 'RETURN_TIME');
+    const morning = day.outings.filter((o) => o.returnPlace === 'LODGING');
+    assert.ok(morning.length >= 1);
+    for (const o of morning) {
+      assert.equal(o.deadlineReason, 'RETURN_TIME');
+      assert.equal(o.returnBy, lodgingDeadline('15:00'));
+    }
+    assert.equal(day.mealSlots.find((m) => m.slot === 'LUNCH').status, 'FILLED');
+    assertSlaHolds(day, { recovery: true });
+  });
+
+  test('식사 칸이 일정 바로 앞이면 마지막 외출이 식사를 하고 병원으로 간다', () => {
+    const day = plan(visitAt('13:00'), '2026-10-05', { candidates: basics() });
+    const final = day.outings.find((o) => o.returnPlace === 'HOSPITAL');
+    assert.ok(final);
+    const lunch = day.mealSlots.find((m) => m.slot === 'LUNCH');
+    assert.equal(lunch.status, 'FILLED');
+    assert.ok(final.stops.some((x) => x.id === lunch.stopId && x.isMeal));
+    assert.ok(mins(final.returnBy) - mins(final.plannedReturnAt) >= buffers(final));
+    assert.ok(mins(final.returnBy) - mins(final.plannedReturnAt) - buffers(final) < 60, '병원에 한참 일찍 닿지 않는다');
+    assertSlaHolds(day, { recovery: true });
+  });
+
+  test('식사가 없는 날에도 앞부분은 숙소 복귀 외출, 마지막은 마감에 맞춘다', () => {
+    const day = plan(visitAt('17:00', { mealRestriction: SET({ mode: 'ALL_DAY' }) }), '2026-10-05', {
+      candidates: basics(),
+    });
+    assertFinalHugsDeadline(day, '17:00');
+    assert.ok(day.outings.some((o) => o.returnPlace === 'LODGING' && mins(o.departAt) < mins('17:00')));
+    assertSlaHolds(day, { recovery: true });
+  });
+});
+
+describe('Outing.plannedReturnAt — 계획상 복귀 도착 (returnBy 는 안전 마감)', () => {
+  test('모든 외출에 있고, 마지막 정거장 출발 + 복귀 구간이며 returnBy 이하다', () => {
+    for (const [s, date] of [
+      [restrictedStay(), '2026-10-05'],
+      [stay(), '2026-10-02'],
+      [restrictedStay({ outing: 'FORBIDDEN' }), '2026-10-05'],
+    ]) {
+      const day = plan(s, date, { candidates: basics() });
+      const all = [...day.outings, ...day.guardianOutings];
+      assert.ok(all.length > 0);
+      for (const o of all) {
+        assert.match(o.plannedReturnAt, /^\d{2}:\d{2}$/);
+        assert.equal(mins(o.plannedReturnAt), actualReturnMin(o));
+        assert.ok(mins(o.plannedReturnAt) <= mins(o.returnBy));
+      }
+    }
   });
 });
 
