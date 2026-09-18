@@ -7,6 +7,14 @@
 //   심사 시연 중 외부 API 장애가 나도 서비스가 죽지 않아야 한다.
 
 import { haversineKm } from '../engine/slaCalculator.js';
+import { DEFAULTS } from '../stay/defaults.js';
+
+function straightKmBetween(from, to) {
+  return haversineKm(
+    { lat: Number(from.lat), lng: Number(from.lng) },
+    { lat: Number(to.lat), lng: Number(to.lng) }
+  );
+}
 
 /**
  * 폴백 추정기 — 외부 API 없이 동작하는 보수적 계산
@@ -19,16 +27,37 @@ export function createFallbackEstimator({ detourFactor = 1.4, kmphCar = 18, kmph
   return {
     name: 'fallback-haversine',
     estimate(from, to) {
-      const straight = haversineKm(
-        { lat: Number(from.lat), lng: Number(from.lng) },
-        { lat: Number(to.lat), lng: Number(to.lng) }
-      );
+      const straight = straightKmBetween(from, to);
       const road = straight * detourFactor;
       const isWalk = straight <= walkThresholdKm;
       const kmph = isWalk ? kmphWalk : kmphCar;
       // 보수적으로 올림
       const min = Math.max(3, Math.ceil((road / kmph) * 60));
       return { min, source: 'fallback', mode: isWalk ? 'walk' : 'car', straightKm: Number(straight.toFixed(2)) };
+    },
+  };
+}
+
+/**
+ * 대중교통 추정기 — 자유일(FREE·DECLARED_FREE)의 이동 추정 (spec 4.7 이동수단, 11장).
+ *
+ *   직선거리 × 1.3 ÷ 20km/h + 대기·환승 10분 (값은 DEFAULTS.transitEstimate 한곳)
+ *   짧은 거리는 기존 폴백 추정기와 같은 기준·속도로 도보
+ *
+ * 외부 API 없이 결정적으로 계산한다. 결과는 언제나 '추정'이다(화면에 추정 표시).
+ * @param {{fallbackOptions?: object}} [opts]  도보 판정에 쓰는 기존 추정기 옵션
+ */
+export function createTransitEstimator({ fallbackOptions } = {}) {
+  const walking = createFallbackEstimator(fallbackOptions);
+  const { detourFactor, speedKmh, waitTransferMin } = DEFAULTS.transitEstimate;
+  return {
+    name: 'fallback-transit',
+    estimate(from, to) {
+      const short = walking.estimate(from, to);
+      if (short.mode === 'walk') return short;
+      const straight = straightKmBetween(from, to);
+      const min = Math.ceil(((straight * detourFactor) / speedKmh) * 60) + waitTransferMin;
+      return { min, source: 'fallback', mode: 'transit', straightKm: Number(straight.toFixed(2)) };
     },
   };
 }

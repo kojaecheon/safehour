@@ -78,8 +78,12 @@ export function gateHospitalCondition(condition, ctx = {}) {
 
 /**
  * 후보 단위 게이트: 금지조건에 걸리는 후보를 제외
- * @param {object} candidate  { id, title, indoor, hasFood, uvExposed, walkMin, congestion, openNow, dataFresh }
- * @param {HospitalCondition} condition
+ * @param {object} candidate  { id, title, indoor, hasFood, uvExposed, walkMin, congestion, openNow, dataFresh,
+ *                              tourismEligible, medical?, heatExposure?, waterActivity?,
+ *                              food?: { isFoodPlace, isCafe, isBar, spicy, raw } }
+ *   하루 일정 엔진은 src/engine/stopCandidate.js 가 관광 후보를 이 모양으로 옮긴다.
+ * @param {HospitalCondition} condition  기존 필드 + (AX-306) avoidHeat?, avoidWater?,
+ *                                       diet?: { spicy, alcohol, hard, hot, raw }
  * @param {object} ctx        { weather, now }
  * @returns {{pass:boolean, reasons:string[]}}
  */
@@ -87,8 +91,24 @@ export function gateCandidate(candidate, condition, ctx = {}) {
   const reasons = [];
 
   // 숙박시설 등 관광 활동이 아닌 후보는 가까워도 추천하지 않는다.
-  if (candidate.tourismEligible === false) {
+  // 의료 시설(병원·의원·클리닉)도 관광 활동이 아니다 — 병원을 정거장으로 두면 병원 알선이 된다 (spec 9.1).
+  if (candidate.tourismEligible === false || candidate.medical === true) {
     reasons.push(REASON.NON_TOURISM_ACTIVITY);
+  }
+
+  // 열 노출 (spec 4.8, AX-306) — 단서가 있는 장소만. 단서가 없으면 노출 없음으로 본다
+  if (condition.avoidHeat && candidate.heatExposure === true) {
+    reasons.push(REASON.HEAT_EXPOSURE);
+  }
+
+  // 물 활동 (spec 4.8, AX-306)
+  if (condition.avoidWater && candidate.waterActivity === true) {
+    reasons.push(REASON.WATER_ACTIVITY);
+  }
+
+  // 식이 필터 — 식당·카페에만 (spec 4.8). 판정 결과는 추정이다
+  for (const reason of dietReasons(candidate.food, condition.diet)) {
+    reasons.push(reason);
   }
 
   // 금식 중 식음 후보 제외 — 금식 시간 자체는 앱이 결정하지 않음
@@ -139,6 +159,29 @@ export function gateCandidate(candidate, condition, ctx = {}) {
   }
 
   return { pass: reasons.length === 0, reasons };
+}
+
+/**
+ * 식이 필터 (spec 4.8, 규칙 21–23).
+ * - 술: 주점 유형(isBar=true)만 제외 → DIET_RESTRICTED
+ * - 매운 음식·날음식: 단서 있음(true) → DIET_RESTRICTED, 판단할 단서 없음(null) → MENU_UNKNOWN.
+ *   카페·전통찻집 유형은 '매운 음식·날음식 아님'으로 본다
+ * - 뜨거운·딱딱한 음식: 제외하지 않는다(주문 카드로 대응 — 엔진이 라벨을 붙인다)
+ * @param {{isFoodPlace?: boolean, isCafe?: boolean|null, isBar?: boolean|null,
+ *          spicy?: boolean|null, raw?: boolean|null} | undefined} food  관광 후보 신호(추정)
+ * @param {{spicy?: boolean, alcohol?: boolean, raw?: boolean} | undefined} diet  합성된 식이 조건
+ * @returns {string[]}
+ */
+function dietReasons(food, diet) {
+  if (!food || food.isFoodPlace !== true || !diet) return [];
+  const reasons = new Set();
+  if (diet.alcohol && food.isBar === true) reasons.add(REASON.DIET_RESTRICTED);
+  for (const key of ['spicy', 'raw']) {
+    if (!diet[key] || food.isCafe === true) continue;
+    if (food[key] === true) reasons.add(REASON.DIET_RESTRICTED);
+    else if (food[key] !== false) reasons.add(REASON.MENU_UNKNOWN);
+  }
+  return [...reasons];
 }
 
 function isValidCoord(c) {
