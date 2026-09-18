@@ -16,6 +16,7 @@ import { deepFreeze } from './stay-fixtures.js';
 import {
   ALLOWED_SNAPSHOT_KEYS,
   FORBIDDEN_MARK,
+  GUARDIAN_STOP_KEYS,
   HOSPITAL_LAT,
   HOSPITAL_LNG,
   collectKeys,
@@ -68,7 +69,7 @@ describe('스냅샷 모양 (spec 5.4)', () => {
     assert.throws(() => build({ lang: 'fr' }), TypeError);
   });
 
-  test('날짜는 체류 날짜(입국일~출국일)만, 날짜 순으로 모두 담는다', () => {
+  test('입국일에 만들면 체류 날짜(입국일~출국일)를 날짜 순으로 모두 담는다', () => {
     const s = build();
     assert.deepEqual(
       s.days.map((d) => d.date),
@@ -78,6 +79,20 @@ describe('스냅샷 모양 (spec 5.4)', () => {
     for (const d of s.days) {
       assert.deepEqual(Object.keys(d).sort(), ['date', 'escortRequired', 'guardianOutings', 'guardianSoloAllowed', 'patientReturn']);
     }
+  });
+
+  test('만든 날(KST)부터 출국일까지만 담는다 — 지난 날은 담지 않는다', () => {
+    const dates = (now) => build({ now }).days.map((d) => d.date);
+    assert.deepEqual(dates('2026-10-04T08:00:00+09:00'), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
+    assert.deepEqual(dates('2026-10-04T23:59:00+09:00'), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
+    // UTC 로는 10-03 이지만 KST 로는 10-04 00:30 이다
+    assert.deepEqual(dates('2026-10-03T15:30:00Z'), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
+    assert.deepEqual(dates('2026-10-08T12:00:00+09:00'), ['2026-10-08']);
+  });
+
+  test('입국 전에 만들면 모든 체류 날짜, 출국일이 지나서 만들면 날짜가 없다', () => {
+    assert.equal(build({ now: '2026-09-25T10:00:00+09:00' }).days.length, 8);
+    assert.deepEqual(build({ now: '2026-10-09T10:00:00+09:00' }).days, []);
   });
 
   test('체류·일정이 없거나 형식이 틀리면 TypeError', () => {
@@ -102,9 +117,7 @@ describe('스냅샷 모양 (spec 5.4)', () => {
     const s = build({ tripPlan });
     const stop = day(s, '2026-10-04').guardianOutings[0].stops[0];
     stop.ko.title = 'changed';
-    stop.legIn.min = 999;
     assert.equal(tripPlan.days['2026-10-04'].guardianOutings[0].stops[0].ko.title, '가상 장소 g1');
-    assert.equal(tripPlan.days['2026-10-04'].guardianOutings[0].stops[0].legIn.min, 12);
   });
 });
 
@@ -176,9 +189,14 @@ describe('규칙 37 — 금지 정보는 구조적으로 들어갈 수 없다', 
     }
   });
 
-  test('보호자 외출 정거장은 식이 관련 라벨(DIET_ESTIMATED·ORDER_CARD)과 모르는 라벨을 버린다', () => {
-    const stop = day(build(), '2026-10-04').guardianOutings[0].stops[0];
-    assert.deepEqual(stop.labels, ['ESTIMATED', 'HOURS_UNCONFIRMED']);
+  test('보호자 외출 정거장은 필요한 필드만 가진다 — 라벨(식이 신호 포함)·보행·실내·식사 표시가 없다', () => {
+    const stops = build().days.flatMap((d) => d.guardianOutings.flatMap((o) => o.stops));
+    assert.ok(stops.length > 0);
+    for (const stop of stops) assert.deepEqual(Object.keys(stop).sort(), GUARDIAN_STOP_KEYS);
+    const json = JSON.stringify(build());
+    for (const code of ['DIET_ESTIMATED', 'ORDER_CARD', 'labels', 'walkBurdenMin', 'isMeal', 'indoor', 'legIn']) {
+      assert.equal(json.includes(code), false, code);
+    }
   });
 
   test('환자 외출의 정거장은 담지 않는다 — 환자 쪽은 복귀 마감과 장소뿐이다', () => {
@@ -306,47 +324,34 @@ describe('보호자 외출 (Outing − deadlineReason)', () => {
         {
           title: '가상 장소 g1',
           address: '가상 관광로 g1',
-          lang: 'ko',
-          category: 'CAFE',
-          isMeal: false,
+          ko: { title: '가상 장소 g1', address: '가상 관광로 g1' },
           lat: 37.501,
           lng: 127.031,
-          ko: { title: '가상 장소 g1', address: '가상 관광로 g1' },
           arriveAt: '13:40',
           leaveAt: '14:40',
-          stayMin: 60,
-          shortened: false,
-          legIn: { min: 12, mode: 'TAXI', estimated: true },
-          walkBurdenMin: 5,
-          indoor: true,
-          labels: ['ESTIMATED', 'HOURS_UNCONFIRMED'],
+          category: 'CAFE',
         },
         {
           title: '가상 장소 g2',
           address: '가상 관광로 g2',
-          lang: 'ko',
-          category: 'RESTAURANT',
-          isMeal: true,
+          ko: { title: '가상 장소 g2', address: '가상 관광로 g2' },
           lat: 37.501,
           lng: 127.031,
-          ko: { title: '가상 장소 g2', address: '가상 관광로 g2' },
           arriveAt: '14:50',
           leaveAt: '15:05',
-          stayMin: 15,
-          shortened: false,
-          legIn: { min: 12, mode: 'TAXI', estimated: true },
-          walkBurdenMin: 5,
-          indoor: null,
-          labels: ['ESTIMATED', 'HOURS_UNCONFIRMED'],
+          category: 'RESTAURANT',
         },
       ],
     });
   });
 
-  test('한국어 원문이 없는 정거장은 ko=null 이다', () => {
+  test('한국어 원문이 없는 정거장에는 ko 가 없다', () => {
     const tripPlan = makeTripPlan();
     tripPlan.days['2026-10-04'].guardianOutings[0].stops[0].ko = null;
-    assert.equal(day(build({ tripPlan }), '2026-10-04').guardianOutings[0].stops[0].ko, null);
+    tripPlan.days['2026-10-04'].guardianOutings[0].stops[1].ko = { title: 42 };
+    const [a, b] = day(build({ tripPlan }), '2026-10-04').guardianOutings[0].stops;
+    assert.equal('ko' in a, false);
+    assert.equal('ko' in b, false);
   });
 
   test('형식이 틀린 값은 옮기지 않는다(문자열 자리에 객체, 숫자 자리에 문자열)', () => {
@@ -354,12 +359,14 @@ describe('보호자 외출 (Outing − deadlineReason)', () => {
     const stop = tripPlan.days['2026-10-04'].guardianOutings[0].stops[0];
     stop.title = { hospital: 'FORBIDDEN_HOSPITAL_NAME' };
     stop.lat = 'FORBIDDEN_LAT';
-    stop.legIn.mode = 'FORBIDDEN_MODE';
+    stop.category = ['FORBIDDEN_CATEGORY'];
+    stop.arriveAt = '9:99';
     const s = build({ tripPlan });
     const out = day(s, '2026-10-04').guardianOutings[0].stops[0];
     assert.equal(out.title, null);
     assert.equal(out.lat, null);
-    assert.equal(out.legIn.mode, null);
+    assert.equal(out.category, null);
+    assert.equal(out.arriveAt, null);
     assert.equal(JSON.stringify(s).includes(FORBIDDEN_MARK), false);
   });
 
@@ -410,6 +417,15 @@ describe('스냅샷 정규화 (암호화 전·복호화 후 허용 목록 재적
     assert.equal(n.days[3].patientReturn[1].placeAddress, null);
     assert.equal(json.includes('"MEDICATION"'), false);
     assert.deepEqual([...collectKeys(n)].filter((k) => !ALLOWED_SNAPSHOT_KEYS.has(k)), []);
+  });
+
+  test('만든 날(KST)보다 이른 날짜는 정규화에서도 버린다', () => {
+    const s = build();
+    s.createdAt = '2026-10-04T08:00:00+09:00';
+    assert.deepEqual(
+      normalizeGuardianSnapshot(s).days.map((d) => d.date),
+      ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'],
+    );
   });
 
   test('동행 필요·단독 외출 값이 불리언이 아니면 엄격한 쪽으로 읽는다', () => {

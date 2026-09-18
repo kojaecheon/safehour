@@ -6,11 +6,13 @@
 // - 키 유도: PBKDF2-HMAC-SHA-256, 무작위 salt 16바이트, 반복 PBKDF2_ITERATIONS 회 → AES-GCM 256비트 키
 // - 인증 암호화: AES-GCM, 무작위 IV 12바이트, 태그 128비트
 // - 암호문(링크의 # 뒤) = base64url( salt(16) | iv(12) | ciphertext+tag ), 패딩 없음
+// - 평문 = 형식 표지 1바이트 + (deflate-raw 로 압축한) 정규 JSON — encoding.js 참고
 //
 // 한계 — 화면에 밝힌다(spec 4.11): 6자리 PIN 은 경우의 수가 100만뿐이라, 암호문을 손에 넣은 사람이
 // 기기 밖에서 전수 대입하면 풀 수 있다. 반복 횟수는 그 비용을 키울 뿐이다. 이 암호화는 **우연한 열람을 막는 수준**이며,
 // 기기 안의 5회 잠금(lockout.js)은 화면에서의 추측만 늦춘다. PIN 은 링크와 다른 경로로 알려야 한다.
 
+import { decodeSnapshotPlaintext, encodeSnapshotPlaintext } from './encoding.js';
 import { GUARDIAN_ERROR, GuardianError } from './errors.js';
 import { normalizeGuardianSnapshot } from './snapshot.js';
 
@@ -30,9 +32,9 @@ export const PBKDF2_ITERATIONS = 600_000;
 export const SALT_BYTES = 16;
 export const IV_BYTES = 12;
 const TAG_BITS = 128;
-const TAG_BYTES = TAG_BITS / 8;
+export const TAG_BYTES = TAG_BITS / 8;
 const KEY_BITS = 256;
-/** 가장 짧은 암호문: salt + iv + 평문 1바이트 이상 + 태그 */
+/** 가장 짧은 암호문: salt + iv + 평문 1바이트 이상 + 태그 (평문이 표지만이면 풀어도 INVALID_SNAPSHOT) */
 const MIN_PAYLOAD_BYTES = SALT_BYTES + IV_BYTES + 1 + TAG_BYTES;
 /** 비정상적으로 긴 입력을 거른다(문자 수). 45박 체류의 스냅샷도 이보다 훨씬 작다 */
 const MAX_FRAGMENT_CHARS = 2_000_000;
@@ -98,7 +100,8 @@ async function deriveKey(c, pin, salt, usage) {
 
 /**
  * 스냅샷을 PIN 으로 암호화해 링크의 # 뒤에 담을 암호문을 만든다.
- * 암호화 전에 허용 목록을 다시 적용한다(normalizeGuardianSnapshot). salt·IV 는 매번 새로 뽑는다.
+ * 암호화 전에 허용 목록을 다시 적용하고(normalizeGuardianSnapshot), 쓸 수 있으면 deflate-raw 로 압축한다.
+ * salt·IV 는 매번 새로 뽑는다.
  *
  * @param {import('./snapshot.js').GuardianSnapshot} snapshot
  * @param {string} pin  정확히 6자리 숫자
@@ -107,7 +110,7 @@ async function deriveKey(c, pin, salt, usage) {
  */
 export async function encryptSnapshot(snapshot, pin) {
   requirePin(pin);
-  const plaintext = new TextEncoder().encode(JSON.stringify(normalizeGuardianSnapshot(snapshot)));
+  const { bytes: plaintext } = await encodeSnapshotPlaintext(snapshot);
   const c = webCrypto();
   const salt = c.getRandomValues(new Uint8Array(SALT_BYTES));
   const iv = c.getRandomValues(new Uint8Array(IV_BYTES));
@@ -130,7 +133,7 @@ export async function encryptSnapshot(snapshot, pin) {
  * @returns {Promise<import('./snapshot.js').GuardianSnapshot>}
  * @throws {GuardianError}
  *   INVALID_PIN(형식) · INVALID_LINK(암호문 형식) · WRONG_PIN(인증 실패: PIN 이 틀림 또는 암호문 변조) ·
- *   INVALID_SNAPSHOT(풀었지만 스냅샷이 아님) · CRYPTO_UNAVAILABLE
+ *   UNSUPPORTED_FORMAT(모르는 평문 표지, 압축 해제 불가) · INVALID_SNAPSHOT(풀었지만 스냅샷이 아님) · CRYPTO_UNAVAILABLE
  */
 export async function decryptSnapshot(fragment, pin) {
   requirePin(pin);
@@ -154,13 +157,7 @@ export async function decryptSnapshot(fragment, pin) {
     throw new GuardianError(GUARDIAN_ERROR.WRONG_PIN, 'PIN 이 맞지 않습니다');
   }
 
-  let parsed;
-  try {
-    parsed = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plaintext));
-  } catch {
-    throw new GuardianError(GUARDIAN_ERROR.INVALID_SNAPSHOT, '보호자 스냅샷 형식이 올바르지 않습니다');
-  }
-  return normalizeGuardianSnapshot(parsed);
+  return normalizeGuardianSnapshot(await decodeSnapshotPlaintext(new Uint8Array(plaintext)));
 }
 
 /** 문자열의 SHA-256 (소문자 16진수) — 잠금 기록 키에 쓴다 */

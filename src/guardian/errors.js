@@ -14,6 +14,8 @@ export const GUARDIAN_ERROR = Object.freeze({
   INVALID_LINK: 'GUARDIAN_INVALID_LINK',
   /** 풀었지만 스냅샷 모양이 아님, 또는 스냅샷이 아닌 값을 암호화하려 함 */
   INVALID_SNAPSHOT: 'GUARDIAN_INVALID_SNAPSHOT',
+  /** 풀었지만 평문 형식 표지를 모르거나, 이 환경에 압축 해제 기능(DecompressionStream 'deflate-raw')이 없음 */
+  UNSUPPORTED_FORMAT: 'GUARDIAN_UNSUPPORTED_FORMAT',
   /** 만료 시각(출국일 23:59 KST)이 지남 — 보여 주지 않는다 */
   EXPIRED: 'GUARDIAN_EXPIRED',
   /** 표준 브라우저 암호 기능(crypto.subtle)을 쓸 수 없음 — 보안 컨텍스트(https·localhost)가 아님 등 */

@@ -2,6 +2,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { deflateRawSync, inflateRawSync } from 'node:zlib';
 
 import {
   GUARDIAN_ERROR,
@@ -9,12 +10,15 @@ import {
   GuardianError,
   PBKDF2_ITERATIONS,
   PIN_LENGTH,
+  PLAINTEXT_FORMAT,
   buildGuardianLink,
   buildGuardianSnapshot,
   decryptSnapshot,
   encryptSnapshot,
   isGuardianFragment,
   isValidPin,
+  measureGuardianLink,
+  normalizeGuardianSnapshot,
   parseGuardianLink,
 } from '../src/guardian/index.js';
 import { FORBIDDEN_MARK, makeGuardianStay, makeTripPlan } from './guardian-fixtures.js';
@@ -32,6 +36,43 @@ function decode(fragment) {
 
 function hasCode(code) {
   return (err) => err instanceof GuardianError && err.code === code;
+}
+
+/** 테스트 쪽에서 문서화된 형식(PBKDF2-SHA256 → AES-GCM 256, salt 16 | iv 12 | ct+tag)을 그대로 구현한 키 유도 */
+async function testKey(pin, salt) {
+  const material = await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', hash: 'SHA-256', salt, iterations: PBKDF2_ITERATIONS },
+    material,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt'],
+  );
+}
+
+/** 모듈을 거치지 않고 평문 바이트를 암호문으로 만든다 */
+async function sealPlaintext(plaintext, pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await testKey(pin, salt), plaintext));
+  return Buffer.concat([salt, iv, ct]).toString('base64url');
+}
+
+/** 모듈을 거치지 않고 암호문을 평문 바이트로 푼다 */
+async function openPlaintext(fragment, pin) {
+  const bytes = decode(fragment);
+  const key = await testKey(pin, bytes.slice(0, 16));
+  return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(16, 28) }, key, bytes.slice(28)));
+}
+
+async function withoutGlobal(name, fn) {
+  const saved = Object.getOwnPropertyDescriptor(globalThis, name);
+  Object.defineProperty(globalThis, name, { value: undefined, writable: true, configurable: true });
+  try {
+    return await fn();
+  } finally {
+    Object.defineProperty(globalThis, name, saved);
+  }
 }
 
 describe('PIN 형식 — 정확히 6자리 숫자', () => {
@@ -67,13 +108,17 @@ describe('암호화·복호화 (규칙 37: 올바른 PIN 으로만 복원)', () 
     }
   });
 
-  test('암호문은 base64url(salt 16 | iv 12 | ciphertext+tag) 이다', async () => {
+  test('암호문은 base64url(salt 16 | iv 12 | ciphertext+tag) 이다 — 모듈 밖 구현으로도 풀린다', async () => {
     const s = snapshot();
     const fragment = await encryptSnapshot(s, PIN);
     assert.match(fragment, /^[A-Za-z0-9_-]+$/);
     const bytes = decode(fragment);
-    const plainLength = new TextEncoder().encode(JSON.stringify(s)).length;
-    assert.equal(bytes.length, 16 + 12 + plainLength + 16);
+    const size = await measureGuardianLink(s);
+    assert.equal(bytes.length, 16 + 12 + size.plaintextBytes + 16);
+    assert.equal(bytes.length, size.payloadBytes);
+    assert.equal(fragment.length, size.fragmentChars);
+    const plaintext = await openPlaintext(fragment, PIN);
+    assert.equal(plaintext.length, size.plaintextBytes);
   });
 
   test('같은 스냅샷·PIN 이어도 매번 다른 salt·iv·암호문이 나온다', async () => {
@@ -134,6 +179,68 @@ describe('암호화·복호화 (규칙 37: 올바른 PIN 으로만 복원)', () 
   test('오류 메시지에 PIN 이 들어가지 않는다', async () => {
     const fragment = await encryptSnapshot(snapshot(), PIN);
     await assert.rejects(decryptSnapshot(fragment, '135790'), (err) => !err.message.includes('135790') && !err.message.includes(fragment));
+  });
+});
+
+describe('평문 형식 — 첫 바이트 표지 + (압축된) 정규 JSON', () => {
+  test('표지 값: 0x00 = 그대로의 JSON, 0x01 = deflate-raw JSON', () => {
+    assert.equal(PLAINTEXT_FORMAT.RAW_JSON, 0x00);
+    assert.equal(PLAINTEXT_FORMAT.DEFLATE_RAW_JSON, 0x01);
+  });
+
+  test('압축을 쓸 수 있으면 평문은 0x01 + deflate-raw(정규 JSON) 이다 — zlib 로도 풀린다', async () => {
+    const s = snapshot();
+    const plaintext = await openPlaintext(await encryptSnapshot(s, PIN), PIN);
+    assert.equal(plaintext[0], 0x01);
+    const json = inflateRawSync(plaintext.subarray(1)).toString('utf8');
+    assert.equal(json, JSON.stringify(normalizeGuardianSnapshot(s)));
+    assert.ok(plaintext.length < Buffer.byteLength(json) / 3, '압축돼야 한다');
+  });
+
+  test('CompressionStream 이 없으면 0x00 + 그대로의 JSON 으로 암호화하고, 풀 때 둘 다 읽는다', async () => {
+    const s = snapshot();
+    const fragment = await withoutGlobal('CompressionStream', () => encryptSnapshot(s, PIN));
+    const plaintext = await openPlaintext(fragment, PIN);
+    assert.equal(plaintext[0], 0x00);
+    assert.equal(Buffer.from(plaintext.subarray(1)).toString('utf8'), JSON.stringify(normalizeGuardianSnapshot(s)));
+    assert.deepEqual(await decryptSnapshot(fragment, PIN), s);
+    const size = await withoutGlobal('CompressionStream', () => measureGuardianLink(s));
+    assert.equal(size.format, 'RAW_JSON');
+    assert.equal(fragment.length, size.fragmentChars);
+  });
+
+  test('다른 구현(zlib)이 만든 0x01 평문도 풀고, 허용 목록을 다시 적용한다', async () => {
+    const s = snapshot();
+    const tampered = { ...s, hospital: { name: 'FORBIDDEN_HOSPITAL_NAME' } };
+    const plaintext = Buffer.concat([Buffer.from([0x01]), deflateRawSync(Buffer.from(JSON.stringify(tampered)))]);
+    const restored = await decryptSnapshot(await sealPlaintext(plaintext, PIN), PIN);
+    assert.deepEqual(restored, s);
+    assert.equal(JSON.stringify(restored).includes(FORBIDDEN_MARK), false);
+  });
+
+  test('모르는 표지는 UNSUPPORTED_FORMAT', async () => {
+    const plaintext = Buffer.concat([Buffer.from([0x02]), Buffer.from(JSON.stringify(snapshot()))]);
+    await assert.rejects(decryptSnapshot(await sealPlaintext(plaintext, PIN), PIN), hasCode(GUARDIAN_ERROR.UNSUPPORTED_FORMAT));
+  });
+
+  test('압축 해제 기능이 없는 환경에서 0x01 평문은 UNSUPPORTED_FORMAT', async () => {
+    const fragment = await encryptSnapshot(snapshot(), PIN);
+    await assert.rejects(
+      withoutGlobal('DecompressionStream', () => decryptSnapshot(fragment, PIN)),
+      hasCode(GUARDIAN_ERROR.UNSUPPORTED_FORMAT),
+    );
+  });
+
+  test('비어 있거나 깨진 평문, 지나치게 커지는 압축은 INVALID_SNAPSHOT', async () => {
+    const cases = [
+      Buffer.from([0x01]),
+      Buffer.from([0x01, 0xff, 0xfe, 0xfd]),
+      Buffer.concat([Buffer.from([0x00]), Buffer.from('{not json')]),
+      Buffer.concat([Buffer.from([0x01]), deflateRawSync(Buffer.alloc(6 * 1024 * 1024, 0x20))]),
+    ];
+    for (const plaintext of cases) {
+      await assert.rejects(decryptSnapshot(await sealPlaintext(plaintext, PIN), PIN), hasCode(GUARDIAN_ERROR.INVALID_SNAPSHOT));
+    }
   });
 });
 

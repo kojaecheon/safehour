@@ -7,8 +7,10 @@
 //
 // - 담는 것: 만든 시각, 만료 시각(출국일 23:59 KST), 언어, 날짜별 {동행 필요, 보호자 단독 외출 가능,
 //   환자 복귀 마감·장소 이름·주소, 보호자 외출}, 긴급 번호(119, 1330)
+// - 날짜는 만든 날(KST)부터 출국일까지 — 지난 날은 보호자에게 쓸모가 없고 링크만 길게 한다
 // - 환자 복귀 장소가 병원이면 이름·주소 대신 일반 라벨 '병원' + 주소 null
-// - 보호자 외출은 Outing 에서 deadlineReason 을 뺀 것. 정거장은 이미지·내부 id 를 뺀다
+// - 보호자 외출은 Outing 에서 deadlineReason 을 뺀 것. 정거장은 보호자에게 필요한 것만 남긴다:
+//   표시 언어 이름·주소, 한국어 원문(있을 때), 목적지 좌표(목적지 전용 지도 링크), 도착·출발 시각, 유형
 //
 // 순수 함수 계층이다. 네트워크·저장소·브라우저 API 를 쓰지 않는다.
 
@@ -26,32 +28,18 @@ export const GUARDIAN_LANGS = Object.freeze(['ko', 'en', 'ja', 'zh']);
 const EXPIRES_AT_CLOCK = '23:59';
 
 const RETURN_PLACES = Object.freeze(['LODGING', 'HOSPITAL']);
-const LEG_MODES = Object.freeze(['WALK', 'TAXI', 'TRANSIT']);
-/**
- * 보호자 사본에 옮기는 정거장 라벨.
- * `DIET_ESTIMATED`·`ORDER_CARD` 는 환자 식이 조건을 드러내므로 옮기지 않는다(규칙 37 '식이 필드 없음').
- */
-const STOP_LABELS = Object.freeze(['ESTIMATED', 'HOURS_UNCONFIRMED', 'NEEDS_TRANSLATION']);
 
 /**
- * @typedef {object} GuardianStop  spec 5.2 Stop 에서 이미지·내부 id(id, candidateId, contentId, sourceIds,
- *   contentTypeIds)와 편집 표시(pinned)를 뺀 것
- * @property {string|null} title
- * @property {string|null} address
- * @property {'ko'|'en'|'ja'|'zh'|null} lang
- * @property {string|null} category
- * @property {boolean} isMeal
- * @property {number|null} lat
+ * @typedef {object} GuardianStop  spec 5.2 Stop 에서 보호자에게 필요한 것만 남긴 것.
+ *   내부 id·이미지·라벨(식이 신호 DIET_ESTIMATED·ORDER_CARD 포함)·이동·보행·실내·식사 표시는 옮기지 않는다
+ * @property {string|null} title    표시 언어 이름
+ * @property {string|null} address  표시 언어 주소
+ * @property {{title: string|null, address: string|null}} [ko]  한국어 원문 — 있을 때만 (이동 카드용)
+ * @property {number|null} lat      목적지 좌표 (목적지 전용 지도 링크용)
  * @property {number|null} lng
- * @property {{title: string|null, address: string|null} | null} ko
  * @property {string|null} arriveAt
  * @property {string|null} leaveAt
- * @property {number|null} stayMin
- * @property {boolean} shortened
- * @property {{min: number|null, mode: 'WALK'|'TAXI'|'TRANSIT'|null, estimated: true} | null} legIn
- * @property {number|null} walkBurdenMin
- * @property {boolean|null} indoor
- * @property {Array<'ESTIMATED'|'HOURS_UNCONFIRMED'|'NEEDS_TRANSLATION'>} labels
+ * @property {string|null} category
  */
 
 /**
@@ -119,35 +107,32 @@ export function toInstantMs(value, name = 'now') {
   return ms;
 }
 
+function kstShift(ms) {
+  return new Date(ms + KST_OFFSET_MIN * 60 * 1000).toISOString();
+}
+
 /** ms → "YYYY-MM-DDTHH:MM:SS+09:00" (초 단위) */
 function toKstIso(ms) {
-  return `${new Date(ms + KST_OFFSET_MIN * 60 * 1000).toISOString().slice(0, 19)}+09:00`;
+  return `${kstShift(ms).slice(0, 19)}+09:00`;
+}
+
+/** ms → KST 날짜 "YYYY-MM-DD" */
+function kstDate(ms) {
+  return kstShift(ms).slice(0, 10);
 }
 
 function copyStop(stop) {
-  const labels = [];
-  for (const label of Array.isArray(stop.labels) ? stop.labels : []) {
-    if (STOP_LABELS.includes(label) && !labels.includes(label)) labels.push(label);
+  const out = { title: str(stop.title), address: str(stop.address) };
+  if (isObject(stop.ko)) {
+    const ko = { title: str(stop.ko.title), address: str(stop.ko.address) };
+    if (ko.title !== null || ko.address !== null) out.ko = ko;
   }
-  return {
-    title: str(stop.title),
-    address: str(stop.address),
-    lang: oneOf(stop.lang, GUARDIAN_LANGS),
-    category: str(stop.category),
-    isMeal: stop.isMeal === true,
-    lat: num(stop.lat),
-    lng: num(stop.lng),
-    ko: isObject(stop.ko) ? { title: str(stop.ko.title), address: str(stop.ko.address) } : null,
-    arriveAt: clock(stop.arriveAt),
-    leaveAt: clock(stop.leaveAt),
-    stayMin: num(stop.stayMin),
-    shortened: stop.shortened === true,
-    // 이동시간은 언제나 추정이다 (spec 5.2 legIn.estimated: true)
-    legIn: isObject(stop.legIn) ? { min: num(stop.legIn.min), mode: oneOf(stop.legIn.mode, LEG_MODES), estimated: true } : null,
-    walkBurdenMin: num(stop.walkBurdenMin),
-    indoor: stop.indoor === true ? true : stop.indoor === false ? false : null,
-    labels,
-  };
+  out.lat = num(stop.lat);
+  out.lng = num(stop.lng);
+  out.arriveAt = clock(stop.arriveAt);
+  out.leaveAt = clock(stop.leaveAt);
+  out.category = str(stop.category);
+  return out;
 }
 
 /** 보호자 외출 — deadlineReason 을 옮기지 않는다. id 는 날짜·순번으로 새로 만든다 */
@@ -231,8 +216,8 @@ function buildDay(stay, date, dayPlan) {
 /**
  * 체류와 전체 일정으로 보호자 스냅샷을 만든다 (spec 4.11, 5.4).
  *
- * - 날짜: 체류 날짜(입국일~출국일) 전부. 일정이 없는 날짜도 담고, 모르는 조건은 엄격한 값으로 둔다.
- *   날짜를 `now` 로 거르지 않는다 — 같은 일정이면 같은 내용이 나와야 일정 지문이 흔들리지 않는다.
+ * - 날짜: 만든 날(`now` 의 KST 날짜)부터 출국일까지의 체류 날짜. 입국 전에 만들면 입국일부터다.
+ *   일정이 없는 날짜도 담고, 모르는 조건은 엄격한 값으로 둔다.
  * - 환자 복귀: 그날 환자 외출마다 {복귀 마감, 장소 이름, 장소 주소}. 숙소면 그날 숙소 이름·도로명주소,
  *   병원이면 '병원' + null.
  * - 보호자 외출: 단독 외출이 가능한 날에만 옮긴다.
@@ -253,11 +238,14 @@ export function buildGuardianSnapshot({ stay, tripPlan, now, lang } = {}) {
   const snapshotLang = lang ?? tripPlan.lang;
   if (!GUARDIAN_LANGS.includes(snapshotLang)) throw new TypeError('buildGuardianSnapshot: 지원하지 않는 언어입니다');
   const createdMs = toInstantMs(now, 'now');
+  const firstDate = kstDate(createdMs);
 
-  const days = stayDates(stay).map((date) => {
-    const dayPlan = Object.hasOwn(tripPlan.days, date) && isObject(tripPlan.days[date]) ? tripPlan.days[date] : undefined;
-    return buildDay(stay, date, dayPlan);
-  });
+  const days = stayDates(stay)
+    .filter((date) => date >= firstDate)
+    .map((date) => {
+      const dayPlan = Object.hasOwn(tripPlan.days, date) && isObject(tripPlan.days[date]) ? tripPlan.days[date] : undefined;
+      return buildDay(stay, date, dayPlan);
+    });
 
   return {
     v: GUARDIAN_SNAPSHOT_VERSION,
@@ -272,7 +260,7 @@ export function buildGuardianSnapshot({ stay, tripPlan, now, lang } = {}) {
 /**
  * 스냅샷 모양의 값에 허용 목록을 다시 적용한다. 암호화 직전과 복호화 직후에 쓴다 —
  * 손으로 만든 스냅샷이나 다른 곳에서 만든 링크에 섞인 필드도 들어오지 못한다.
- * 만든 스냅샷은 정규화해도 그대로다.
+ * 만든 날(createdAt 의 KST 날짜)보다 이른 날짜는 버린다. 만든 스냅샷은 정규화해도 그대로다.
  *
  * @param {unknown} snapshot
  * @returns {GuardianSnapshot}
@@ -282,22 +270,28 @@ export function normalizeGuardianSnapshot(snapshot) {
   const invalid = (field) => new GuardianError(GUARDIAN_ERROR.INVALID_SNAPSHOT, `보호자 스냅샷 형식이 올바르지 않습니다 (${field})`);
   if (!isObject(snapshot)) throw invalid('snapshot');
   if (snapshot.v !== GUARDIAN_SNAPSHOT_VERSION) throw invalid('v');
-  if (typeof snapshot.createdAt !== 'string' || parseInstantMs(snapshot.createdAt) === null) throw invalid('createdAt');
+  const createdMs = typeof snapshot.createdAt === 'string' ? parseInstantMs(snapshot.createdAt) : null;
+  if (createdMs === null) throw invalid('createdAt');
   if (typeof snapshot.expiresAt !== 'string' || parseInstantMs(snapshot.expiresAt) === null) throw invalid('expiresAt');
   if (!GUARDIAN_LANGS.includes(snapshot.lang)) throw invalid('lang');
   if (!Array.isArray(snapshot.days)) throw invalid('days');
 
-  const days = snapshot.days.map((d, index) => {
+  const firstDate = kstDate(createdMs);
+  snapshot.days.forEach((d, index) => {
     if (!isObject(d) || !isDateString(d.date)) throw invalid(`days[${index}].date`);
-    return finishDay({
-      date: d.date,
-      // 불리언이 아니면 엄격한 쪽으로 읽는다
-      escortRequired: d.escortRequired !== false,
-      guardianSoloAllowed: d.guardianSoloAllowed === true,
-      patientReturn: d.patientReturn,
-      guardianOutings: d.guardianOutings,
-    });
   });
+  const days = snapshot.days
+    .filter((d) => d.date >= firstDate)
+    .map((d) =>
+      finishDay({
+        date: d.date,
+        // 불리언이 아니면 엄격한 쪽으로 읽는다
+        escortRequired: d.escortRequired !== false,
+        guardianSoloAllowed: d.guardianSoloAllowed === true,
+        patientReturn: d.patientReturn,
+        guardianOutings: d.guardianOutings,
+      }),
+    );
 
   return {
     v: GUARDIAN_SNAPSHOT_VERSION,

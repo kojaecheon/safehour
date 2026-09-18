@@ -288,28 +288,122 @@ export const ALLOWED_SNAPSHOT_KEYS = Object.freeze(
     'walkTotalMin',
     'travelTotalMin',
     'stops',
-    // Stop (이미지·내부 id 제외)
+    // Stop — 보호자에게 필요한 것만 (ko 는 한국어 원문이 있을 때만)
     'title',
     'address',
-    'category',
-    'isMeal',
+    'ko',
     'lat',
     'lng',
-    'ko',
     'arriveAt',
     'leaveAt',
-    'stayMin',
-    'shortened',
-    'legIn',
-    'walkBurdenMin',
-    'indoor',
-    'labels',
-    // legIn
-    'min',
-    'mode',
-    'estimated',
+    'category',
   ]),
 );
+
+/** 보호자 정거장의 키 전체 (ko 가 있을 때) */
+export const GUARDIAN_STOP_KEYS = Object.freeze(['address', 'arriveAt', 'category', 'ko', 'lat', 'leaveAt', 'lng', 'title']);
+
+// ---------------------------------------------------------------------------
+// 최악 크기 일정 — 링크 길이 측정용
+// ---------------------------------------------------------------------------
+
+const SYLLABLES = [
+  '가', '경', '궁', '남', '대', '동', '마', '명', '문', '민', '박', '백', '북', '사', '산', '서', '성', '송', '수', '시',
+  '신', '안', '양', '연', '영', '원', '월', '은', '의', '인', '장', '전', '정', '제', '종', '주', '중', '진', '창', '천',
+  '청', '초', '충', '태', '평', '포', '하', '한', '해', '현', '호', '홍', '화', '황', '효', '흥', '광', '구', '도', '미',
+];
+const LATIN = ['ga', 'gyeong', 'gung', 'nam', 'dae', 'dong', 'ma', 'myeong', 'mun', 'min', 'bak', 'baek', 'buk', 'sa', 'san', 'seo', 'seong', 'song', 'su', 'si'];
+const CATEGORIES = ['CAFE', 'RESTAURANT', 'SHOPPING', 'PALACE_HISTORY', 'EXHIBITION', 'NATURE', 'KBEAUTY', 'FESTIVAL'];
+
+/** 결정적 의사난수 — 압축이 잘 되지 않는 서로 다른 이름·주소를 만든다 */
+function rng(seed) {
+  let x = seed >>> 0 || 1;
+  return () => {
+    x ^= x << 13;
+    x ^= x >>> 17;
+    x ^= x << 5;
+    return (x >>> 0) / 0x100000000;
+  };
+}
+
+function word(next, parts, min, max) {
+  const n = min + Math.floor(next() * (max - min + 1));
+  let out = '';
+  for (let i = 0; i < n; i += 1) out += parts[Math.floor(next() * parts.length)];
+  return out;
+}
+
+function capital(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/**
+ * 최악 크기 정거장: 표시 언어(en) 이름·주소와 한국어 원문을 모두 가진, 서로 다른 긴 이름·주소, 소수점 10자리 좌표.
+ * 실제 관광공사 원문 길이의 위쪽 끝(한국어 이름 10–14자, 도로명주소 30자 안팎)을 쓴다.
+ */
+function worstStop(date, index, next) {
+  const koTitle = `${word(next, SYLLABLES, 10, 14)} ${word(next, SYLLABLES, 2, 3)}점`;
+  const gu = word(next, SYLLABLES, 2, 2);
+  const road = word(next, SYLLABLES, 2, 4);
+  const no = 1 + Math.floor(next() * 400);
+  const koAddress = `서울특별시 ${gu}구 ${road}로${1 + Math.floor(next() * 40)}길 ${no} (${word(next, SYLLABLES, 2, 3)}동)`;
+  const enTitle = `${capital(word(next, LATIN, 3, 5))} ${capital(word(next, LATIN, 2, 4))} ${capital(word(next, LATIN, 2, 3))} Branch`;
+  const enAddress = `${no}, ${capital(word(next, LATIN, 2, 4))}-ro ${1 + Math.floor(next() * 40)}-gil, ${capital(word(next, LATIN, 2, 3))}-gu, Seoul`;
+  return makeStop(date, 'G', `w${index}`, {
+    title: enTitle,
+    address: enAddress,
+    lang: 'en',
+    category: CATEGORIES[Math.floor(next() * CATEGORIES.length)],
+    lat: Number((37.45 + next() * 0.2).toFixed(10)),
+    lng: Number((126.85 + next() * 0.3).toFixed(10)),
+    ko: { title: koTitle, address: koAddress },
+    arriveAt: `1${Math.floor(next() * 9)}:${String(Math.floor(next() * 60)).padStart(2, '0')}`,
+    leaveAt: `1${Math.floor(next() * 9)}:${String(Math.floor(next() * 60)).padStart(2, '0')}`,
+  });
+}
+
+/**
+ * N박 최악 크기 체류·일정 — '보통' 강도의 한도를 모두 채운다.
+ * - 날마다 환자 외출 3개(숙소·병원 복귀 섞음), 보호자 외출 2개(정거장 3 + 2 = 하루 한도 5곳)
+ * - 모든 정거장이 서로 다른 장소, 숙소 이름은 최대 길이 40자
+ * @param {number} nights
+ */
+export function makeWorstCase(nights) {
+  const arrival = '2026-10-01';
+  const departure = new Date(Date.parse(`${arrival}T00:00:00Z`) + nights * 86400000).toISOString().slice(0, 10);
+  const next = rng(0x5afe + nights);
+  const stay = makeGuardianStay({
+    departure: { date: departure, time: '18:00', airport: 'ICN' },
+    pace: 'NORMAL',
+    lodgings: [
+      {
+        id: 'L1',
+        name: '가'.repeat(40),
+        address: lodgingAddress('서울특별시 가상구 가상대로12길 345 (가상동, 가상레지던스)', 37.5, 127.03),
+        checkIn: arrival,
+        checkOut: departure,
+      },
+    ],
+  });
+  const days = {};
+  let index = 0;
+  for (let t = Date.parse(`${arrival}T00:00:00Z`); t <= Date.parse(`${departure}T00:00:00Z`); t += 86400000) {
+    const date = new Date(t).toISOString().slice(0, 10);
+    const stop = () => worstStop(date, (index += 1), next);
+    days[date] = makeDayPlan(date, {
+      outings: [
+        patientOuting({ departAt: '09:10', returnBy: '11:40', returnPlace: 'LODGING' }),
+        patientOuting({ departAt: '14:00', returnBy: '16:20', returnPlace: 'HOSPITAL' }),
+        patientOuting({ departAt: '18:10', returnBy: '20:50', returnPlace: 'LODGING' }),
+      ],
+      guardianOutings: [
+        guardianOuting(date, { departAt: '11:50', returnBy: '13:50', stops: [stop(), stop(), stop()] }),
+        guardianOuting(date, { departAt: '16:30', returnBy: '18:00', stops: [stop(), stop()] }),
+      ],
+    });
+  }
+  return { stay, tripPlan: makeTripPlan({ lang: 'en', days }), now: `${arrival}T08:00:00+09:00` };
+}
 
 /** 객체 트리의 모든 키 */
 export function collectKeys(value, out = new Set()) {
