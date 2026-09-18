@@ -159,8 +159,9 @@ function compareKeys(a, b) {
  * 넣을 수 있는 후보 중 순위가 가장 높은 것.
  * @param {object} rank  { usedCategories: Set<string> }
  * @param {Map<string,string>} failures  넣지 못한 후보의 마지막 사유(고정 장소 보고용)
+ * 재계획·교체 후보(AX-307)도 같은 순위를 쓴다.
  */
-function selectBest(ctx, plan, index, recs, meal, rank, failures) {
+export function selectBest(ctx, plan, index, recs, meal, rank, failures) {
   let best = null;
   for (const rec of recs) {
     const tried = tryInsert(ctx, plan, index, rec, meal);

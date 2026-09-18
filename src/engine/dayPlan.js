@@ -50,8 +50,8 @@ const LABEL_ORDER = Object.freeze(['ESTIMATED', 'HOURS_UNCONFIRMED', 'NEEDS_TRAN
 const LEG_MODE = Object.freeze({ walk: 'WALK', car: 'TAXI', transit: 'TRANSIT' });
 const FREE_COVERAGE = new Set(['FREE', 'DECLARED_FREE']);
 
-/** 추정기를 감싸 같은 구간은 한 번만 계산한다(값은 올림한 분) */
-function cachedEstimate(estimator) {
+/** 추정기를 감싸 같은 구간은 한 번만 계산한다(값은 올림한 분). 체류 일정 조립(tripPlan.js)도 같은 함수를 쓴다 */
+export function cachedEstimate(estimator) {
   const cache = new Map();
   return (from, to) => {
     const key = `${from.lat},${from.lng}>${to.lat},${to.lng}`;
@@ -79,8 +79,8 @@ function finite(value, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-/** 후보 → 엔진 내부 기록. 판정에 쓰는 값은 언어와 무관하다 */
-function prepareCandidates(candidates, { date, closedContentIds, lodgingPoint, interests, pinned }) {
+/** 후보 → 엔진 내부 기록. 판정에 쓰는 값은 언어와 무관하다. 재계획·교체 후보(AX-307)도 같은 기록을 쓴다 */
+export function prepareCandidates(candidates, { date, closedContentIds, lodgingPoint, interests, pinned }) {
   const byId = new Map();
   for (const candidate of candidates ?? []) {
     const contentId = String(candidate?.stop?.contentId ?? candidate?.id ?? '');
@@ -109,8 +109,8 @@ function prepareCandidates(candidates, { date, closedContentIds, lodgingPoint, i
   });
 }
 
-/** 역할별 후보: 반경 → 게이트 → (다른 날짜 배치 제외, 고정은 예외) */
-function rolePool(recs, { radiusKm, condition, weather, deleted, used }) {
+/** 역할별 후보: 반경 → 게이트 → (다른 날짜 배치 제외, 고정은 예외). 재계획·교체 후보(AX-307)도 이 판정 한곳을 쓴다 */
+export function rolePool(recs, { radiusKm, condition, weather, deleted, used }) {
   const inRadius = [];
   const outOfRadius = new Set();
   for (const rec of recs) {
@@ -127,7 +127,7 @@ function rolePool(recs, { radiusKm, condition, weather, deleted, used }) {
 }
 
 /** 식사 칸의 도착 허용 범위. 식사 제한이 막으면 allowed=false */
-function mealWindow(slot, mealRestriction) {
+export function mealWindow(slot, mealRestriction) {
   const def = DEFAULTS.mealSlots[slot];
   const slotStart = toMinutes(def.start);
   const slotEnd = toMinutes(def.end);
@@ -239,7 +239,7 @@ function toStop(item, { date, role, diet }) {
  */
 
 /** evaluateOuting 결과 → Outing. returnBy·slack 은 그 외출의 안전 마감 기준이다. id 는 호출부가 붙인다 */
-function toOuting(ev, { id = null, role, date, deadlineMin, returnPlace, deadlineReason, recovery, extraBufferMin, diet }) {
+export function toOuting(ev, { id = null, role, date, deadlineMin, returnPlace, deadlineReason, recovery, extraBufferMin, diet }) {
   const sla = checkOutingSla({
     departMin: ev.departMin,
     deadlineMin,
