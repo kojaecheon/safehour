@@ -525,6 +525,11 @@ describe('누락은 조용히 비지 않는다', () => {
 describe('판정은 언어와 무관하다 — i18n 은 표시 계층에만 있다', () => {
   test('판정·일정·서버 모듈이 i18n 을 가져오지 않는다', () => {
     const roots = ['src/engine', 'src/stay', 'src/recovery', 'lib/server', 'app/api'];
+    // 예외 (AX-309 · spec 4.16): AI 일정 소개 모듈은 대체 템플릿(aiIntro 이름공간) 한 파일만 읽는다.
+    // 소개 문장은 표시 문구이고 판정 입력이 아니다. 이 파일도 다른 i18n 모듈(런타임·검수 스위치)은 가져오지 못한다.
+    const ALLOWED_I18N_IMPORTS = {
+      [join('lib', 'server', 'ai-intro.js')]: ['../../src/i18n/messages/aiIntro.js'],
+    };
     const offenders = [];
     const visit = (path) => {
       for (const entry of readdirSync(path)) {
@@ -535,7 +540,9 @@ describe('판정은 언어와 무관하다 — i18n 은 표시 계층에만 있�
         }
         if (!/\.(m?js)$/.test(full)) continue;
         const source = readFileSync(full, 'utf8');
-        if (/from\s+['"][^'"]*i18n[^'"]*['"]/.test(source) || /SAFETY_COPY_REVIEWED/.test(source)) {
+        const allowed = ALLOWED_I18N_IMPORTS[full] ?? [];
+        const i18nImports = [...source.matchAll(/from\s+['"]([^'"]*i18n[^'"]*)['"]/g)].map((m) => m[1]);
+        if (i18nImports.some((spec) => !allowed.includes(spec)) || /SAFETY_COPY_REVIEWED/.test(source)) {
           offenders.push(full);
         }
       }

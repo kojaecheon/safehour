@@ -24,7 +24,8 @@
     "merge": "node scripts/safe-merge.mjs",
     "verify:deploy": "node scripts/verify-deployment.mjs",
     "capture:images": "node scripts/capture-submission-images.mjs",
-    "render:diagrams": "node scripts/render-diagrams.mjs"
+    "render:diagrams": "node scripts/render-diagrams.mjs",
+    "ai:eval": "node scripts/ai-intro-eval.mjs"
   },
   "engines": {
     "node": ">=20.9.0"
