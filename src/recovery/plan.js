@@ -1,329 +1,211 @@
-// 회복 지침 (Recovery Plan) — 데이터 계약과 연결 게이트 (AX-213 · AX-215)
+// 병원 지침 계약 v2 — 형식 검증과 지침 상태 (AX-311 · spec 4.20, 5.3 · ADR-0011)
 //
-// 정의: `docs/PRODUCT_DEFINITION.md` §2·§4·§7
+// 정의: `docs/PRODUCT_DEFINITION.md` §2·§4, `docs/decisions/0011-recovery-plan-v2-freshness.md`
+//
+// ```text
+// RecoveryPlan {
+//   schemaVersion: 2, planId, version (≥1), issuedAt, updatedAt?, expiresAt, revoked: boolean, demo?: boolean,
+//   issuer: { name, role },
+//   hospital: { name, address: { roadAddress, lat, lng }, phone? },
+//   periods: Array<{ startDate, endDate, items: ConditionItems /* SET|NONE 만 */ }>,
+//   appointments?: Array<{ type: "PROCEDURE" | "VISIT", date, start, end? }>,
+//   instructions: Array<{ id, category, text, lang, updatedAt, acknowledged? }>   // 채널 B
+// }
+// ```
 //
 // 두 채널을 **구조로** 분리한다.
-//   - constraints (채널 A): 기계가 읽는 제한조건. 판정 엔진으로 간다. 서버 전송 O
-//   - instructions (채널 B): 병원이 쓴 문장. 표시 전용. **판정에 쓰지 않고 서버로 보내지 않는다**
+//   - periods·appointments (채널 A): 기계가 읽는 값. `HOSPITAL` 조건 기간이 되어 날짜별 합성에 참여한다
+//   - instructions (채널 B): 병원이 쓴 문장. 표시 전용. 판정에 쓰지 않고 번역하지 않는다 (`instructions.js`)
+//
+// - 형식이 하나라도 어긋나면 **지침 전체를 거부한다.** 기간의 날짜가 역순이어도 전체를 거부한다.
+// - v1 은 받지 않는다(규칙 48). 실제 연동 병원이 없고 데모 지침만 있기 때문이다.
+// - 기간이 `expiresAt` 을 넘어도 거부하거나 잘라내지 않는다. 적용 여부는 날짜마다 합성 규칙이 판정한다(spec 4.5).
+// - 환자 호출 필드는 없다. 호출은 데모 사건(`PATIENT_RECALL`)으로만 다룬다(spec 4.20).
+// - 원문 `returnTime` 의 `place: "HOSPITAL"` 은 `hospitalId` 가 없고 **발행 병원**을 뜻한다.
+//   연결 병원 id 로 채우는 일은 변환(`link.js`)이 한다(규칙 57).
 //
 // 이 파일에는 의료 해석이 없다. 병원이 확정한 값을 형식만 검증해 그대로 넘긴다.
 
-import { REASON, STATE } from '../domain/states.js';
+import { CONDITION_SOURCE, validateConditionPeriod } from '../stay/conditions.js';
+import { HOSPITAL_PERIOD_STATUS } from '../stay/coverage.js';
+import { APPOINTMENT_TYPES, NAME_MAX_LENGTH } from '../stay/stay.js';
+import { isClockTime, isDateString, parseInstantMs, toMinutes } from '../stay/time.js';
+import { instructionErrors } from './instructions.js';
 
-export const PLAN_VERSION = 1;
+export {
+  CRITICAL_CATEGORIES,
+  INSTRUCTION_CATEGORIES,
+  acknowledgementKey,
+  stripAcknowledged,
+  unconfirmedCritical,
+  unconfirmedInstructions,
+} from './instructions.js';
 
-/** 채널 B 카드 분류 — 정의 §4.3 */
-export const INSTRUCTION_CATEGORIES = [
-  'activity',
-  'medication',
-  'food',
-  'lifestyle',
-  'escort',
-  'emergency',
-  'visit',
-];
+// 퇴역 예정 v1 단일 외출 경로 — 예전 화면·`/api/today` 의 빌드 호환용 (AX-321 에서 삭제)
+export {
+  effectiveDeadline,
+  gateDecisionPayload,
+  gateRecoveryPlan,
+  invalidateForReturn,
+  nextClockOccurrence,
+  planToCondition,
+  toDecisionPayload,
+  unconfirmedAll,
+  validateDecisionPayload,
+} from './legacyV1.js';
+
+export const PLAN_VERSION = 2;
+
+/** 지침 전체의 상태 — 조건 기간의 병원 상태와 같은 값을 쓴다 */
+export const PLAN_STATUS = HOSPITAL_PERIOD_STATUS;
 
 /**
- * 확인하지 않으면 판정을 STANDBY 로 강등시키는 **중요** 분류.
- * 나머지는 확인하지 않아도 외출을 막지 않는다 — 모든 변경을 막으면
- * "확인" 이 형식적 클릭이 되고, 정작 중요한 변경을 놓친다 (정의 §7 개선 2).
+ * 대한민국 범위(경계 제외). 서버 기준점 검사(`lib/server/engine-io.js` normalizeOrigin)와 같은 범위다 (spec 6장).
  */
-export const CRITICAL_CATEGORIES = ['activity', 'escort', 'visit', 'emergency'];
+const KOREA_BOUNDS = Object.freeze({ latMin: 33, latMax: 39, lngMin: 124, lngMax: 132 });
+
+/**
+ * 원문 병원 복귀를 공통 조건 검증에 넘길 때 쓰는 자리표시자.
+ * 원문에는 hospitalId 가 없고 발행 병원을 뜻하므로, 형식 검증만 통과시키고 결과에는 남기지 않는다.
+ */
+const ISSUING_HOSPITAL = '__issuing_hospital__';
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim() !== '';
+}
 
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
-function isIsoDate(value) {
-  if (typeof value !== 'string') return false;
-  const d = new Date(value);
-  return !Number.isNaN(d.getTime());
+function toMs(now) {
+  return now instanceof Date ? now.getTime() : Number(now);
 }
 
-/** `HH:MM` 24시간 표기 */
-export function isClockTime(value) {
-  return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+function hospitalErrors(hospital, push) {
+  if (!isPlainObject(hospital)) return push('hospital');
+  if (!isNonEmptyString(hospital.name) || hospital.name.length > NAME_MAX_LENGTH) push('hospital.name');
+  const address = hospital.address;
+  if (!isPlainObject(address)) {
+    push('hospital.address');
+  } else {
+    if (!isNonEmptyString(address.roadAddress)) push('hospital.address.roadAddress');
+    const { lat, lng } = address;
+    const inKorea =
+      isFiniteNumber(lat) &&
+      isFiniteNumber(lng) &&
+      lat > KOREA_BOUNDS.latMin &&
+      lat < KOREA_BOUNDS.latMax &&
+      lng > KOREA_BOUNDS.lngMin &&
+      lng < KOREA_BOUNDS.lngMax;
+    if (!inKorea) push('hospital.address.latLng');
+  }
+  if (hospital.phone != null && typeof hospital.phone !== 'string') push('hospital.phone');
 }
 
 /**
- * 형식 검증. **값의 의학적 타당성은 검증하지 않는다** — 그것은 병원의 몫이다.
- * @returns {{valid: boolean, errors: string[]}}
+ * 기간 하나 — 날짜(역순 거부)와 항목(SET·NONE 만)을 조건 기간 공통 검증으로 본다 (spec 4.4 병원 발행 기간).
+ */
+function periodErrors(period, i, plan, push) {
+  const at = `periods[${i}]`;
+  if (!isPlainObject(period)) return push(at);
+
+  let items = period.items;
+  const returnTime = isPlainObject(items) ? items.returnTime : undefined;
+  if (isPlainObject(returnTime)) {
+    // v2 원문에는 hospitalId 가 없다 — 있으면 발행 병원이 아닌 다른 병원을 가리키려는 것이므로 계약 위반이다
+    if (Object.prototype.hasOwnProperty.call(returnTime, 'hospitalId')) push(`${at}.items.returnTime.hospitalId`);
+    else if (returnTime.place === 'HOSPITAL') items = { ...items, returnTime: { ...returnTime, hospitalId: ISSUING_HOSPITAL } };
+  }
+
+  const result = validateConditionPeriod({
+    id: at,
+    source: CONDITION_SOURCE.HOSPITAL,
+    startDate: period.startDate,
+    endDate: period.endDate,
+    items,
+    expiresAt: plan.expiresAt,
+    revoked: plan.revoked,
+  });
+  for (const issue of result.issues) {
+    // 유효기간·철회는 지침 머리에서 따로 본다
+    if (issue.field === 'expiresAt' || issue.field === 'revoked') continue;
+    push(`${at}.${issue.field}`);
+  }
+}
+
+function appointmentErrors(appointments, push) {
+  if (appointments == null) return;
+  if (!Array.isArray(appointments)) return push('appointments');
+  appointments.forEach((a, i) => {
+    const at = `appointments[${i}]`;
+    if (!isPlainObject(a)) return push(at);
+    if (!APPOINTMENT_TYPES.includes(a.type)) push(`${at}.type`);
+    if (!isDateString(a.date)) push(`${at}.date`);
+    const startOk = isClockTime(a.start);
+    if (!startOk) push(`${at}.start`);
+    if (a.end != null) {
+      if (!isClockTime(a.end)) push(`${at}.end`);
+      else if (startOk && toMinutes(a.end) <= toMinutes(a.start)) push(`${at}.end`);
+    }
+  });
+}
+
+/**
+ * v2 형식 검증. **값의 의학적 타당성은 검증하지 않는다** — 그것은 병원의 몫이다.
+ * 목록 밖 필드는 여기서 보지 않는다(게이트웨이 `minimizePlan` 이 버린다).
+ * @param {unknown} plan
+ * @returns {{valid: boolean, errors: string[]}}  errors 는 필드 경로뿐이다(값을 담지 않는다)
  */
 export function validatePlan(plan) {
   const errors = [];
-  const push = (field) => errors.push(field);
+  const push = (field) => {
+    if (!errors.includes(field)) errors.push(field);
+  };
+  if (!isPlainObject(plan)) return { valid: false, errors: ['plan'] };
 
-  if (!plan || typeof plan !== 'object') return { valid: false, errors: ['plan'] };
   if (plan.schemaVersion !== PLAN_VERSION) push('schemaVersion');
-  if (typeof plan.planId !== 'string' || !plan.planId) push('planId');
-  if (!isFiniteNumber(plan.version) || plan.version < 1) push('version');
-  if (!isIsoDate(plan.issuedAt)) push('issuedAt');
-  if (!isIsoDate(plan.expiresAt)) push('expiresAt');
+  if (!isNonEmptyString(plan.planId)) push('planId');
+  if (!Number.isInteger(plan.version) || plan.version < 1) push('version');
+  if (parseInstantMs(plan.issuedAt) === null) push('issuedAt');
+  if (plan.updatedAt != null && parseInstantMs(plan.updatedAt) === null) push('updatedAt');
+  if (parseInstantMs(plan.expiresAt) === null) push('expiresAt');
   if (typeof plan.revoked !== 'boolean') push('revoked');
+  if (plan.demo != null && typeof plan.demo !== 'boolean') push('demo');
 
-  if (!plan.issuer || typeof plan.issuer.name !== 'string' || !plan.issuer.name) push('issuer.name');
-  if (!plan.issuer || typeof plan.issuer.role !== 'string') push('issuer.role');
-
-  const anchor = plan.anchor;
-  if (!anchor || !isFiniteNumber(anchor.lat) || !isFiniteNumber(anchor.lng)) push('anchor');
-  else if (anchor.lat < -90 || anchor.lat > 90 || anchor.lng < -180 || anchor.lng > 180) push('anchor');
-
-  const c = plan.constraints;
-  if (!c || typeof c !== 'object') {
-    push('constraints');
+  if (!isPlainObject(plan.issuer)) {
+    push('issuer');
   } else {
-    for (const flag of [
-      'outingAllowed',
-      'indoorOnly',
-      'avoidUv',
-      'avoidHeat',
-      'noWater',
-      'escortRequired',
-      'splitAllowed',
-      'foodRestricted',
-    ]) {
-      if (typeof c[flag] !== 'boolean') push(`constraints.${flag}`);
-    }
-    for (const num of ['maxWalkMin', 'maxTravelMin']) {
-      if (!isFiniteNumber(c[num]) || c[num] < 0 || c[num] > 240) push(`constraints.${num}`);
-    }
-    if (!isIsoDate(c.returnBy)) push('constraints.returnBy');
-    if (c.nextVisitAt != null && !isIsoDate(c.nextVisitAt)) push('constraints.nextVisitAt');
-    if (c.fastingUntil != null && !isClockTime(c.fastingUntil)) push('constraints.fastingUntil');
-    if (!Array.isArray(c.medicationTimes) || c.medicationTimes.some((t) => !isClockTime(t))) {
-      push('constraints.medicationTimes');
-    }
+    if (!isNonEmptyString(plan.issuer.name)) push('issuer.name');
+    if (typeof plan.issuer.role !== 'string') push('issuer.role');
   }
 
-  if (!Array.isArray(plan.instructions)) {
-    push('instructions');
-  } else {
-    plan.instructions.forEach((item, i) => {
-      if (!item || typeof item.id !== 'string' || !item.id) push(`instructions[${i}].id`);
-      if (!INSTRUCTION_CATEGORIES.includes(item?.category)) push(`instructions[${i}].category`);
-      if (typeof item?.text !== 'string' || !item.text.trim()) push(`instructions[${i}].text`);
-      if (typeof item?.lang !== 'string' || !item.lang) push(`instructions[${i}].lang`);
-      if (!isIsoDate(item?.updatedAt)) push(`instructions[${i}].updatedAt`);
-    });
-  }
+  hospitalErrors(plan.hospital, push);
 
-  return { valid: errors.length === 0, errors };
-}
+  if (!Array.isArray(plan.periods)) push('periods');
+  else plan.periods.forEach((period, i) => periodErrors(period, i, plan, push));
 
-/** 확인하지 않은 중요 안내 */
-export function unconfirmedCritical(plan) {
-  return (plan?.instructions ?? []).filter(
-    (item) => CRITICAL_CATEGORIES.includes(item.category) && item.acknowledged !== true,
-  );
-}
+  appointmentErrors(plan.appointments, push);
 
-/** 확인하지 않은 안내 전체 (중요 여부 무관) */
-export function unconfirmedAll(plan) {
-  return (plan?.instructions ?? []).filter((item) => item.acknowledged !== true);
-}
-
-/**
- * 판정용 축약본 — **서버로 나가는 유일한 형태** (정의 §2).
- *
- * 채널 B(병원 안내문)의 `text` 와 `lang` 을 떼어낸다. 판정에 필요한 것은
- * "확인했는가" 뿐이고, 문장에는 약물·시술 정황이 담긴다.
- * 안내문이 이 함수를 통과하면 "단말을 떠나지 않는다" 가 거짓이 된다.
- */
-export function toDecisionPayload(plan) {
-  if (!plan) return null;
-  return {
-    schemaVersion: plan.schemaVersion,
-    planId: plan.planId,
-    version: plan.version,
-    issuedAt: plan.issuedAt,
-    expiresAt: plan.expiresAt,
-    revoked: plan.revoked,
-    issuer: { role: plan.issuer?.role },
-    anchor: plan.anchor,
-    constraints: plan.constraints,
-    acknowledgements: (plan.instructions ?? []).map((item) => ({
-      id: item.id,
-      category: item.category,
-      acknowledged: item.acknowledged === true,
-    })),
-  };
-}
-
-/** 판정용 축약본의 형식 검증 — 안내문 본문을 요구하지 않는다 */
-export function validateDecisionPayload(payload) {
-  const errors = [];
-  if (!payload || typeof payload !== 'object') return { valid: false, errors: ['payload'] };
-  if (payload.schemaVersion !== PLAN_VERSION) errors.push('schemaVersion');
-  if (typeof payload.planId !== 'string' || !payload.planId) errors.push('planId');
-  if (!isFiniteNumber(payload.version) || payload.version < 1) errors.push('version');
-  if (!isIsoDate(payload.issuedAt)) errors.push('issuedAt');
-  if (!isIsoDate(payload.expiresAt)) errors.push('expiresAt');
-  if (typeof payload.revoked !== 'boolean') errors.push('revoked');
-  if (typeof payload.issuer?.role !== 'string') errors.push('issuer.role');
-
-  const c = payload.constraints;
-  if (!c || typeof c !== 'object') {
-    errors.push('constraints');
-  } else {
-    for (const flag of ['outingAllowed', 'indoorOnly', 'escortRequired', 'splitAllowed']) {
-      if (typeof c[flag] !== 'boolean') errors.push(`constraints.${flag}`);
-    }
-    for (const num of ['maxWalkMin', 'maxTravelMin']) {
-      if (!isFiniteNumber(c[num]) || c[num] < 0 || c[num] > 240) errors.push(`constraints.${num}`);
-    }
-    if (!isIsoDate(c.returnBy)) errors.push('constraints.returnBy');
-  }
-
-  if (!Array.isArray(payload.acknowledgements)) {
-    errors.push('acknowledgements');
-  } else {
-    payload.acknowledgements.forEach((item, i) => {
-      if (typeof item?.id !== 'string' || !item.id) errors.push(`acknowledgements[${i}].id`);
-      if (!INSTRUCTION_CATEGORIES.includes(item?.category)) errors.push(`acknowledgements[${i}].category`);
-    });
-  }
-
-  // 안내문 본문이 섞여 들어오면 계약 위반이다 — 조용히 통과시키지 않는다
-  if (Array.isArray(payload.instructions)) errors.push('instructions:forbidden');
+  for (const field of instructionErrors(plan.instructions)) push(field);
 
   return { valid: errors.length === 0, errors };
 }
 
 /**
- * **연결 게이트** — 기존 안전 게이트 *앞* 단계 (정의 §7).
- *
- * 유효한 병원 계획이 없으면 관광지를 아예 표시하지 않는다.
- * 확인하지 않은 중요 변경은 차단이 아니라 **STANDBY 강등**이다 —
- * 사용자가 읽으면 풀린다.
- *
- * 입력은 판정용 축약본이다. 게이트 구현은 여기 하나뿐이며,
- * 클라이언트가 계획을 들고 있을 때는 `gateRecoveryPlan` 이 변환해서 부른다.
- *
- * @returns {{pass: boolean, state: string, reasons: string[], expired: boolean}}
+ * 지침 전체의 지금 상태 — "유효기간 안이고 철회되지 않음" 이 최신성이다 (spec 4.6). 24시간 한도는 없다.
+ * 날짜별 적용은 이 값이 아니라 `hospitalPeriodStatus`(날짜의 활동 종료 시각 기준)가 정한다.
+ * @param {{revoked?: boolean, expiresAt?: string}} plan
+ * @param {{now?: Date|number}} [opts]
+ * @returns {'ACTIVE'|'EXPIRED'|'REVOKED'}
  */
-export function gateDecisionPayload(payload, { now = new Date() } = {}) {
-  const blocked = (reason, expired = false) => ({
-    pass: false,
-    state: STATE.NO_TOURISM,
-    reasons: [reason],
-    expired,
-  });
-
-  if (!payload) return blocked(REASON.NO_HOSPITAL_PLAN);
-  if (!validateDecisionPayload(payload).valid) return blocked(REASON.NO_HOSPITAL_PLAN);
-  if (payload.revoked) return blocked(REASON.PLAN_REVOKED, true);
-  if (new Date(payload.expiresAt).getTime() <= now.getTime()) {
-    return blocked(REASON.PLAN_EXPIRED, true);
-  }
-
-  const unconfirmed = payload.acknowledgements.filter(
-    (item) => CRITICAL_CATEGORIES.includes(item.category) && item.acknowledged !== true,
-  );
-  if (unconfirmed.length > 0) {
-    // 차단이 아니라 강등 — 읽으면 풀린다
-    return {
-      pass: false,
-      state: STATE.STANDBY,
-      reasons: [REASON.PLAN_UNCONFIRMED_UPDATE],
-      expired: false,
-    };
-  }
-  return { pass: true, state: null, reasons: [], expired: false };
-}
-
-/** 계획 전체를 들고 있을 때 쓰는 편의 함수. 게이트 판단은 위와 같다. */
-export function gateRecoveryPlan(plan, options = {}) {
-  if (!plan || !validatePlan(plan).valid) {
-    return { pass: false, state: STATE.NO_TOURISM, reasons: [REASON.NO_HOSPITAL_PLAN], expired: false };
-  }
-  return gateDecisionPayload(toDecisionPayload(plan), options);
-}
-
-/**
- * 채널 A → 엔진이 아는 병원 조건으로 옮긴다.
- * **매핑만 한다.** 값을 완화하거나 보충하지 않는다.
- */
-export function planToCondition(plan) {
-  const c = plan.constraints;
-  return {
-    version: `${plan.planId}#${plan.version}`,
-    issuedAt: plan.issuedAt,
-    issuedBy: plan.issuer.role,
-    // 금식 종료 시각이 있으면 그때까지는 식음 활동을 막는다
-    fasting: c.foodRestricted || Boolean(c.fastingUntil),
-    outingAllowed: c.outingAllowed,
-    escortRequired: c.escortRequired,
-    avoidUv: c.avoidUv,
-    indoorOnly: c.indoorOnly,
-    splitAllowed: c.splitAllowed,
-    maxWalkMin: c.maxWalkMin,
-    maxTravelMin: c.maxTravelMin,
-  };
-}
-
-/** KST 는 서머타임이 없어 고정 오프셋으로 다뤄도 된다. */
-const KST_OFFSET_MS = 9 * 3600_000;
-
-/**
- * `HH:MM` 을 다음에 오는 그 시각(KST)으로 바꾼다.
- *
- * 병원이 발행한 복약 시각은 **한국 벽시계 시각**이다. 실행 환경의 시간대로 해석하면
- * 두 곳에서 어긋난다 — 서버는 UTC 로 돌고(Vercel), 외국인 이용자의 단말은 현지 시간대다.
- * 어느 쪽이든 마감이 몇 시간씩 밀려 "가장 이른 마감으로 복귀를 보장한다" 는 약속이 깨진다.
- * 그래서 실행 환경과 무관하게 KST 로 고정해 해석한다.
- */
-export function nextClockOccurrence(clock, now = new Date()) {
-  if (!isClockTime(clock)) return null;
-  const [h, m] = clock.split(':').map(Number);
-
-  // now 를 KST 벽시계로 옮겨 "오늘이 KST 로 며칠인지" 를 읽는다.
-  const kstNow = new Date(now.getTime() + KST_OFFSET_MS);
-  const candidate = new Date(
-    Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate(), h, m, 0, 0) -
-      KST_OFFSET_MS,
-  );
-
-  if (candidate.getTime() <= now.getTime()) {
-    candidate.setUTCDate(candidate.getUTCDate() + 1);
-  }
-  return candidate;
-}
-
-/**
- * 복귀 마감은 **가장 이른 마감**이다.
- * 복귀 시각·복약 시각·다음 내원 중 먼저 오는 것이 외출 창을 자른다 (정의 §2).
- * 어느 것이 마감을 정했는지도 함께 돌려준다 — 화면이 이유를 설명해야 하기 때문이다.
- */
-export function effectiveDeadline(plan, now = new Date()) {
-  const c = plan.constraints;
-  const candidates = [{ at: new Date(c.returnBy), source: 'returnBy' }];
-
-  for (const clock of c.medicationTimes ?? []) {
-    const at = nextClockOccurrence(clock, now);
-    if (at) candidates.push({ at, source: 'medication' });
-  }
-  if (c.nextVisitAt) candidates.push({ at: new Date(c.nextVisitAt), source: 'visit' });
-
-  const future = candidates.filter((x) => x.at.getTime() > now.getTime());
-  const pool = future.length > 0 ? future : candidates;
-  return pool.reduce((earliest, x) => (x.at < earliest.at ? x : earliest));
-}
-
-/**
- * 외출 중 지침이 무효가 됐을 때의 판정 결과 (AX-220 · 정의 §7 개선 1).
- *
- * 이미 나가 있는 사람에게 "만료됐습니다" 만 띄우는 것은 위험하다.
- * `PATIENT_RECALL` 과 **같은 모양**으로 추천을 비우고 복귀를 켠다 —
- * 새 판정을 만드는 것이 아니라 안전한 방향으로 무효화만 한다.
- */
-export function invalidateForReturn(decision, reasons) {
-  return {
-    ...decision,
-    state: STATE.NO_TOURISM,
-    reasons: [...new Set(reasons)],
-    course: [],
-    patientCourse: [],
-    companionCourse: [],
-    returnNow: true,
-  };
+export function planStatus(plan, { now = Date.now() } = {}) {
+  if (plan?.revoked === true) return PLAN_STATUS.REVOKED;
+  const expiresMs = parseInstantMs(plan?.expiresAt);
+  if (expiresMs === null || expiresMs <= toMs(now)) return PLAN_STATUS.EXPIRED;
+  return PLAN_STATUS.ACTIVE;
 }

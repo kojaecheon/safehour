@@ -16,12 +16,16 @@ import { useLang } from '@/components/LanguageProvider.js';
 import { readPlan, writePlan } from '@/lib/recovery-store.js';
 import { fmtDateTime } from '@/lib/format.js';
 import { PLAN_KEY } from '@/lib/session.js';
+import { PLAN_LINK_ERROR } from '@/src/recovery/gateway.js';
+import { ERROR_CODE } from '@/src/stay/errorCodes.js';
 
+// /api/plan/link 오류는 `errorCode` 키를 쓴다 (AX-311 · spec 6장). 새 연동 화면은 AX-315 가 만든다.
+const AUTH_REQUIRED = ERROR_CODE.AUTH_REQUIRED;
 const ERROR_KEY = {
-  CODE_REQUIRED: 'link.errRequired',
-  UNKNOWN_CODE: 'link.errUnknown',
-  INVALID_PLAN: 'link.errInvalid',
-  UNAUTHENTICATED: 'link.errLogin',
+  [PLAN_LINK_ERROR.CODE_REQUIRED]: 'link.errRequired',
+  [PLAN_LINK_ERROR.UNKNOWN_CODE]: 'link.errUnknown',
+  [PLAN_LINK_ERROR.INVALID_PLAN]: 'link.errInvalid',
+  [AUTH_REQUIRED]: 'link.errLogin',
 };
 
 const DEMO_CODES = [
@@ -59,8 +63,8 @@ export default function LinkPage() {
       });
       const data = await res.json();
       if (!data.ok) {
-        setErrorKey(ERROR_KEY[data.code] ?? 'link.errInvalid');
-        if (data.code === 'UNAUTHENTICATED') {
+        setErrorKey(ERROR_KEY[data.errorCode] ?? 'link.errInvalid');
+        if (data.errorCode === AUTH_REQUIRED) {
           router.push(`/login?returnTo=${encodeURIComponent('/link')}`);
         }
         return;
