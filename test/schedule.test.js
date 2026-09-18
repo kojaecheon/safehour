@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { openNowFromSchedule, readClosure } from '../src/tour-api/schedule.js';
+import {
+  closureOnDate,
+  openNowFromSchedule,
+  readClosure,
+  readClosureOnDate,
+} from '../src/tour-api/schedule.js';
 
 // KST 기준 요일이 판정의 축이다. 실행 시간대와 무관해야 하므로 절대 시각으로 고정한다.
 const MON = new Date('2026-08-17T01:00:00Z'); // KST 08-17 (월)
@@ -121,5 +126,74 @@ describe('openNow 매핑', () => {
       { eventenddate: '20260731' },
     ].map((s) => openNowFromSchedule(s, MON));
     assert.equal(values.includes(true), false, 'openNow 는 true 를 만들지 않는다');
+  });
+});
+
+/**
+ * AX-305 — 일정 날짜 기준 휴무 (spec 4.8 휴무 게이트, 규칙 26)
+ *
+ * 전체 일정은 입국~출국의 여러 날짜를 한 번에 만든다. 목록은 기준점·반경마다 한 번만
+ * 조회하므로, 같은 운영 원문으로 **임의 날짜**의 닫힘을 판정할 수 있어야 한다.
+ * 원칙은 그대로다 — 닫힘 근거만 읽고, 열려 있다고 단정하지 않는다.
+ */
+
+describe('일정 날짜 기준 휴무 판정', () => {
+  test('정기 휴무 요일이 그 날짜의 요일과 같으면 닫힘', () => {
+    // 2026-08-17 은 월요일, 2026-08-18 은 화요일
+    const r = readClosureOnDate({ restdateculture: '매주 월요일 휴관' }, '2026-08-17');
+    assert.equal(r.closed, true);
+    assert.equal(r.reason, 'WEEKLY_CLOSURE');
+    assert.equal(readClosureOnDate({ restdateculture: '매주 월요일 휴관' }, '2026-08-18').closed, false);
+  });
+
+  test('행사 기간 밖 날짜는 닫힘, 안쪽 날짜(경계 포함)는 닫힘이 아니다', () => {
+    const festival = { eventstartdate: '20260820', eventenddate: '20260825' };
+    assert.equal(readClosureOnDate(festival, '2026-08-19').reason, 'EVENT_NOT_STARTED');
+    assert.equal(readClosureOnDate(festival, '2026-08-26').reason, 'EVENT_ENDED');
+    assert.equal(readClosureOnDate(festival, '2026-08-20').closed, false);
+    assert.equal(readClosureOnDate(festival, '2026-08-25').closed, false);
+  });
+
+  test('YYYYMMDD 형식도 받는다', () => {
+    assert.equal(readClosureOnDate({ restdate: '매주 월요일 휴무' }, '20260817').closed, true);
+  });
+
+  test('실행 시간대와 무관하게 달력 날짜로 요일을 정한다', () => {
+    // KST 로 이미 정해진 일정 날짜다. Date 로 바꿔 UTC 기준 전날이 되면 요일이 어긋난다.
+    const results = ['2026-08-17', '2026-08-23'].map((d) => readClosureOnDate({ restdate: '일요일 휴무' }, d).closed);
+    assert.deepEqual(results, [false, true]);
+  });
+
+  test('존재하지 않는 날짜나 형식이 틀린 값은 오류다 — 조용히 오늘로 바꾸지 않는다', () => {
+    assert.throws(() => readClosureOnDate({ restdate: '매주 월요일 휴무' }, '2026-02-30'), RangeError);
+    assert.throws(() => readClosureOnDate({ restdate: '매주 월요일 휴무' }, 'tomorrow'), RangeError);
+    assert.throws(() => readClosureOnDate({ restdate: '매주 월요일 휴무' }, new Date()), RangeError);
+  });
+
+  test('근거가 없으면 닫힘이 아니고, 열렸다는 뜻도 아니다', () => {
+    assert.equal(readClosureOnDate({}, '2026-08-17').reason, 'SCHEDULE_NOT_PROVIDED');
+    assert.equal(readClosureOnDate({ restdate: '연중무휴' }, '2026-08-17').reason, 'ALWAYS_OPEN');
+    assert.equal(readClosureOnDate({ opentime: '10:00~22:00' }, '2026-08-17').reason, 'NO_CLOSURE_EVIDENCE');
+  });
+
+  test('"오늘" 판정은 그대로다 — 같은 달력 날짜면 같은 결과', () => {
+    const schedule = { restdate: '매주 월요일 휴무' };
+    assert.deepEqual(readClosure(schedule, MON), readClosureOnDate(schedule, '2026-08-17'));
+    assert.deepEqual(readClosure(schedule, TUE), readClosureOnDate(schedule, '2026-08-18'));
+  });
+
+  test('후보에 실린 운영 원문으로 날짜별 닫힘을 판정한다', () => {
+    const candidate = { sourceMetadata: { schedule: { restdatefood: '매주 월요일' } } };
+    // "휴무" 라는 말이 없으면 요일이 보여도 닫힘으로 읽지 않는다 (기존 규칙)
+    assert.equal(closureOnDate(candidate, '2026-08-17').closed, false);
+
+    const closedMonday = { sourceMetadata: { schedule: { restdatefood: '매주 월요일 휴무' } } };
+    assert.equal(closureOnDate(closedMonday, '2026-08-17').closed, true);
+    assert.equal(closureOnDate(closedMonday, '2026-08-18').closed, false);
+  });
+
+  test('운영 원문을 조회하지 않은 후보는 SCHEDULE_NOT_PROVIDED 이다', () => {
+    assert.equal(closureOnDate({ sourceMetadata: { schedule: null } }, '2026-08-17').reason, 'SCHEDULE_NOT_PROVIDED');
+    assert.equal(closureOnDate({}, '2026-08-17').reason, 'SCHEDULE_NOT_PROVIDED');
   });
 });

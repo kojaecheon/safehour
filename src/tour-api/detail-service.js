@@ -1,4 +1,6 @@
 import { callTourApi, extractTourItems } from "./client.js";
+import { fetchKoreanIntro } from "./intro.js";
+import { applyIntro } from "./mapper.js";
 
 const LEGACY_DETAIL_PARAMS = new Set([
   "defaultYN",
@@ -241,4 +243,65 @@ export async function enrichRecommendedCourse(
   );
 
   return [...enriched, ...course.slice(selected.length)];
+}
+
+/** 국문 소개정보를 이미 실은 후보인가 — 다시 부르지 않는다 */
+function hasIntro(candidate) {
+  const metadata = candidate?.sourceMetadata ?? {};
+  return (
+    metadata.schedule !== null &&
+    metadata.schedule !== undefined &&
+    metadata.menu !== null &&
+    metadata.menu !== undefined
+  );
+}
+
+/**
+ * 요청받은 후보에만 국문 소개정보(detailIntro2)를 붙인다 — 식당 메뉴와 운영·휴무 원문 (AX-305).
+ *
+ * spec 4.8: 상세(메뉴 포함) 보강은 일정에 들어갈 후보와 교체 후보에만 한다.
+ * 그래서 후보를 고르는 쪽(엔진·일정 조립)이 대상을 골라 넘긴다. 이 함수는 넘겨받은 것만 부른다.
+ *
+ *   - 대표메뉴(firstmenu)·취급메뉴(treatmenu) 원문은 sourceMetadata.menu 에,
+ *     운영·휴무 원문은 sourceMetadata.schedule 에 싣고, 신호(signals)를 다시 계산한다.
+ *   - 이미 실린 후보는 부르지 않는다(skipped).
+ *   - 실패한 후보는 그대로 돌려준다. 메뉴는 모르는 상태(null)로 남고 id 가 failed 에 남는다.
+ *   - 순서와 개수는 바뀌지 않는다.
+ *
+ * @param {object[]} candidates normalizeTourCandidate 결과 중 보강할 것
+ * @param {{useCache?: boolean}} [options]
+ * @returns {Promise<{candidates: object[], diagnostics: {requested: number, fetched: number, skipped: number, failed: string[]}}>}
+ */
+export async function enrichCandidateIntros(candidates, { useCache = true } = {}) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  const outcomes = await Promise.all(
+    list.map(async (candidate) => {
+      if (hasIntro(candidate)) return { candidate, status: "skipped" };
+
+      const contentId = candidate?.stop?.sourceIds?.ko ?? candidate?.sourceIds?.korean ?? null;
+      const contentTypeId =
+        candidate?.stop?.contentTypeIds?.ko ?? candidate?.sourceMetadata?.contentTypeIds?.korean ?? null;
+      // 국문 원본이 없으면 국문 소개정보를 부를 수 없다. 추측한 ID로 부르지 않는다.
+      if (!contentId || !contentTypeId) return { candidate, status: "failed" };
+
+      try {
+        const intro = await fetchKoreanIntro({ contentId, contentTypeId, useCache });
+        return { candidate: applyIntro(candidate, intro), status: "fetched" };
+      } catch {
+        return { candidate, status: "failed" };
+      }
+    }),
+  );
+
+  return {
+    candidates: outcomes.map((outcome) => outcome.candidate),
+    diagnostics: {
+      requested: list.length,
+      fetched: outcomes.filter((outcome) => outcome.status === "fetched").length,
+      skipped: outcomes.filter((outcome) => outcome.status === "skipped").length,
+      failed: outcomes
+        .filter((outcome) => outcome.status === "failed")
+        .map((outcome) => String(outcome.candidate?.id ?? "")),
+    },
+  };
 }
