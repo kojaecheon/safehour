@@ -10,3 +10,517 @@
  *   - 클래스는 `trip-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
  *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
  */
+
+/* ───────────────────────── 전체 일정·하루 일정 (AX-317) ───────────────────────── */
+.trip-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.trip-page > * {
+  min-width: 0;
+}
+.trip-loading,
+.trip-lead {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.trip-inline-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-thickness: 1px;
+}
+.trip-pair-secondary {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.trip-footer {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.trip-map-note,
+.trip-empty-line {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* 알림 자리 — role=status 는 늘 DOM 에 둔다. 비었을 때는 높이를 차지하지 않는다 */
+.trip-notice-slot:empty {
+  display: none;
+}
+.trip-notice {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.trip-notice p {
+  color: var(--ink);
+}
+/* 실패 알림 — 오류 빨강 대신 대기 색 + 굵은 왼쪽 띠 (판정 상태와 헷갈리지 않게 글자로 밝힌다) */
+.trip-notice.is-error {
+  border-left-color: var(--state-standby-ink);
+  background: var(--state-standby-bg);
+}
+
+/* ── 날짜 목록 (/trip) ── */
+.trip-days {
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+.trip-day-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.trip-day-row.is-past {
+  background: var(--surface-alt);
+}
+.trip-day-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+.trip-day-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.trip-day-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+}
+.trip-state-text {
+  font-weight: var(--weight-bold);
+}
+.trip-state-TOGETHER { color: var(--state-together-ink); }
+.trip-state-SPLIT_NEARBY { color: var(--state-split-ink); }
+.trip-state-STANDBY { color: var(--state-standby-ink); }
+.trip-state-NO_TOURISM { color: var(--state-no-tourism-ink); }
+.trip-day-count {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.trip-day-reasons,
+.trip-delta-reasons,
+.trip-facts-warnings {
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.trip-changed-tag,
+.trip-return-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+}
+.trip-changed-tag {
+  border: 1px solid var(--accent);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+.trip-return-tag {
+  border: 1px solid var(--ink);
+  color: var(--on-dark);
+  background: var(--ink);
+}
+
+/* ── 하루 일정 (/trip/[date]) ── */
+.trip-changed {
+  justify-content: flex-start;
+}
+.trip-changed-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+.trip-return-banner {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.trip-return-banner h2 {
+  margin: 0;
+  color: var(--ink);
+}
+.trip-fix {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px dashed var(--line-input);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+.trip-fix h2 {
+  font-size: var(--text-title-3);
+  margin: 0;
+}
+.trip-tab-lock {
+  display: inline-flex;
+  margin-left: var(--space-1);
+  vertical-align: middle;
+}
+.trip-panel-title {
+  font-size: var(--text-title-3);
+  margin-bottom: var(--space-2);
+}
+.trip-panel-title:focus-visible {
+  outline-offset: 4px;
+}
+.trip-guardian-lock {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--state-split-line);
+  border-radius: var(--radius);
+  background: var(--state-split-bg);
+}
+.trip-guardian-lock p {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.trip-guardian-lock.is-locked {
+  border: 2px solid var(--state-split-ink);
+}
+.trip-guardian-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-heavy);
+}
+.trip-guardian-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* 정거장 카드 안 — 번역 필요·식이 추정·주문 카드와 편집 버튼 */
+.trip-stop-flags,
+.trip-stop-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.trip-stop-actions > .btn {
+  flex: 1 1 96px;
+}
+.trip-order-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* 지도 길찾기 링크 두 개 */
+.trip-maps {
+  display: grid;
+  gap: var(--space-2);
+}
+.trip-map-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.trip-map-row > .btn {
+  flex: 1 1 140px;
+}
+
+.trip-tools {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* 근거 — 적용한 조건·빠진 장소 (접힘) */
+.trip-facts {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0 var(--space-4);
+}
+.trip-facts > summary {
+  padding: var(--space-2) 0;
+  gap: var(--space-2);
+}
+.trip-facts-body {
+  display: grid;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+.trip-facts-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.trip-facts-transport {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+.trip-facts-list {
+  display: grid;
+  gap: var(--space-2);
+}
+.trip-facts-row {
+  display: grid;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.trip-facts-row:last-child {
+  border-bottom: none;
+}
+.trip-facts-row dt {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.trip-facts-row dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+}
+.trip-facts-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.trip-excluded {
+  list-style: none;
+  padding-bottom: var(--space-3);
+}
+
+/* 하루 소개 — 정해진 문장. 판정 영역과 떨어진 인용 모양(AI 소개는 SourceArea ai) */
+.trip-intro {
+  padding: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-left: 4px double var(--line-input);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.trip-intro-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-bold);
+  color: var(--ink-soft);
+}
+.trip-intro-text {
+  margin: var(--space-2) 0;
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.trip-intro-note {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* ── 데모 사건 패널 — 데모임을 숨기지 않는다 ── */
+.trip-demo {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 2px dashed var(--state-standby-ink);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.trip-demo-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.trip-demo-head h2 {
+  margin: 0;
+  font-size: var(--text-title-3);
+}
+.trip-demo-lead {
+  font-size: var(--text-body);
+}
+.trip-demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+}
+.trip-demo-button {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  height: 100%;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.trip-demo-title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+}
+.trip-demo-desc {
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  color: var(--ink-soft);
+  line-height: var(--leading-snug);
+}
+.trip-demo-log {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+}
+.trip-demo-log h3 {
+  font-size: var(--text-body);
+}
+.trip-demo-log ol {
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+
+/* ── 시트 본문 (전후 비교·즉시 복귀·교체·다시 만들기) ── */
+.trip-delta,
+.trip-return,
+.trip-swap {
+  display: grid;
+  gap: var(--space-3);
+}
+.trip-delta p,
+.trip-return p,
+.trip-swap p {
+  font-size: var(--text-body);
+}
+.trip-delta-date {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.trip-delta-body {
+  min-width: 0;
+  color: var(--ink);
+}
+.trip-delta-why {
+  display: block;
+  color: var(--ink-soft);
+}
+.trip-delta-empty {
+  color: var(--ink-soft);
+}
+/* 복귀 지시 본문(주 언어)은 진한 글자 — 병기 줄(.trip-pair-secondary)만 보조 색이다 */
+.trip-return > p:not(.trip-pair-secondary) {
+  color: var(--ink);
+}
+.trip-return-cause {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.trip-return-place {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+.trip-return-place h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.trip-return-name {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.trip-return-address {
+  color: var(--ink);
+}
+.trip-return-emergency {
+  display: grid;
+  gap: var(--space-1);
+}
+.trip-return-note {
+  color: var(--ink);
+}
+.trip-swap-from {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.trip-swap-status:empty {
+  display: none;
+}
+.trip-swap-list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+.trip-swap-preview {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: var(--space-2) 0;
+  font-size: var(--text-body);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.trip-sheet-actions {
+  display: grid;
+  gap: var(--space-2);
+}
+.trip-scope {
+  border: none;
+  margin-top: var(--space-3);
+}
+.trip-scope legend {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+}
+.trip-scope-label {
+  display: block;
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}

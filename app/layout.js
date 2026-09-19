@@ -19,6 +19,8 @@ import LanguageProvider from '@/components/LanguageProvider.js';
 import AppShell from '@/components/ui/AppShell.js';
 // 설치·오프라인·알림 (AX-319): 서비스 워커 등록(운영 빌드만)·세션 유지·앱 안 알림 배너
 import PwaRuntime from '@/components/pwa/PwaRuntime.js';
+// 일정 동기화·즉시 복귀 시트 (AX-317): 어느 화면으로 열어도 변화 감지가 돌고, 즉시 복귀 시트가 자동으로 열린다
+import TripRuntime from '@/components/trip/TripRuntime.js';
 
 export const metadata = {
   title: 'SafeHour — 안심 관광 추천 / Safe outings within hospital instructions',
@@ -48,6 +50,7 @@ export default function RootLayout({ children }) {
         <LanguageProvider>
           <AppShell>{children}</AppShell>
           <PwaRuntime />
+          <TripRuntime />
         </LanguageProvider>
       </body>
     </html>

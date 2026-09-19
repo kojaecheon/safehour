@@ -1,78 +1,117 @@
-// place 이름공간 — 장소 상세(/place/[candidateId]) (AX-303)
+// place 이름공간 — 장소 상세(/place/[candidateId]) (AX-303 → AX-317)
 //
 // 형식과 쓰기 규칙은 ./index.js 머리 주석을 따른다.
 // 운영정보 필드 라벨은 기존 접두사 `schedule.` 을 그대로 쓴다.
 // 관광공사 원문(개요·운영시간 값)은 번역 대상이 아니다 — 여기에는 라벨만 둔다.
+// 퇴역한 결과 화면(/result)으로 돌아가는 문구·판정 없음 안내는 AX-317 에서 지웠다(장소는 확정 일정에서만 찾는다).
 // ja·zh: 검수 전 번역 — 사람 검수 필요
 
 /** 일반 화면 문구 */
 export const messages = {
   'place.header': { ko: '장소 상세', en: 'Place details', ja: '場所の詳細', zh: '地点详情' },
-  'place.backAria': { ko: '결과로 돌아가기', en: 'Back to results', ja: '結果に戻る', zh: '返回结果' },
-  'place.backToResult': { ko: '결과로 돌아가기', en: 'Back to results', ja: '結果に戻る', zh: '返回结果' },
+  'place.back': { ko: '하루 일정으로', en: 'Back to the day plan', ja: '1日の予定へ', zh: '返回当天行程' },
   'place.loading': {
-    ko: '장소 정보를 불러오는 중입니다…',
+    ko: '장소 정보를 불러오는 중이에요…',
     en: 'Loading place information…',
     ja: '場所の情報を読み込んでいます…',
     zh: '正在加载地点信息…',
   },
   'place.loadingDetails': {
-    ko: '관광 원문을 불러오는 중입니다…',
-    en: 'Loading the source text…',
-    ja: '観光情報の原文を読み込んでいます…',
-    zh: '正在加载旅游信息原文…',
+    ko: '관광공사 원문을 불러오는 중이에요…',
+    en: 'Loading the tourism source text…',
+    ja: '観光公社の原文を読み込んでいます…',
+    zh: '正在加载旅游原文…',
   },
-  'place.notShownLabel': { ko: '표시할 수 없음', en: 'Cannot show', ja: '表示できません', zh: '无法显示' },
-  'place.notShownTitle': {
-    ko: '이 장소의 판정 결과가 없습니다',
-    en: 'There is no decision for this place',
-    ja: 'この場所の判定結果がありません',
-    zh: '此地点没有判定结果',
+  'place.notFoundTitle': {
+    ko: '일정에서 이 장소를 찾지 못했어요',
+    en: 'This place is not in your plan',
+    ja: 'この場所は予定に見つかりません',
+    zh: '行程中找不到此地点',
   },
-  'place.notShownBody': {
-    ko: '추천은 병원 조건과 복귀 시간을 기준으로 판정됩니다. 조건 없이 장소만 따로 보여드리지 않습니다.',
-    en: 'Recommendations are decided from your hospital conditions and return time. We do not show places on their own.',
-    ja: 'おすすめは、病院の条件と帰着時刻に基づいて判定します。条件なしで場所だけを個別にお見せすることはありません。',
-    zh: '推荐是根据医院条件和返回时间判定的。我们不会在没有条件的情况下单独展示地点。',
+  'place.notFoundBody': {
+    ko: '일정이 바뀌었을 수 있어요. 전체 일정에서 다시 골라 주세요. 일정에 없는 장소는 보여 주지 않아요.',
+    en: 'Your plan may have changed. Please pick it again from the whole trip. We only show places that are in your plan.',
+    ja: '予定が変わった可能性があります。全体の予定からもう一度選んでください。予定にない場所は表示しません。',
+    zh: '行程可能已变化。请从整个行程中重新选择。我们只显示行程中的地点。',
   },
-  'place.notShownCta': {
-    ko: '조건 입력으로 이동',
-    en: 'Go to conditions',
-    ja: '条件入力へ移動',
-    zh: '前往条件输入',
+  'place.notFoundCta': { ko: '전체 일정 보기', en: 'Open the whole trip', ja: '全体の予定を開く', zh: '打开整个行程' },
+
+  // ── 지도 길찾기 (spec 4.14) ──
+  'place.mapsTitle': { ko: '지도 앱으로 길찾기', en: 'Directions in a map app', ja: '地図アプリで道案内', zh: '在地图应用中导航' },
+  'place.mapsNote': {
+    ko: '목적지(이 장소)의 이름과 좌표만 넘겨요. 출발지와 숙소 위치는 보내지 않아요.',
+    en: 'Only this place’s name and coordinates are sent. Your starting point and where you stay are never sent.',
+    ja: '目的地（この場所）の名前と座標だけを渡します。出発地や宿泊先の位置は送りません。',
+    zh: '只传送目的地（此地点）的名称和坐标，不会发送出发地和住处位置。',
   },
-  'place.blockedCta': {
-    ko: '결과 화면에서 복귀 안내 보기',
-    en: 'See return guidance',
-    ja: '結果画面で帰着案内を見る',
-    zh: '在结果页查看返回指引',
+  'place.mapGoogle': { ko: '구글 지도로 열기', en: 'Open in Google Maps', ja: 'Googleマップで開く', zh: '在 Google 地图中打开' },
+  'place.mapKakao': { ko: '카카오맵으로 열기', en: 'Open in KakaoMap', ja: 'カカオマップで開く', zh: '在 KakaoMap 中打开' },
+  'place.mapsUnavailable': {
+    ko: '좌표가 없어 지도 링크를 만들 수 없어요.',
+    en: 'No coordinates, so no map link can be made.',
+    ja: '座標がないため、地図のリンクを作れません。',
+    zh: '没有坐标，无法生成地图链接。',
   },
-  'place.detailErrLabel': { ko: '상세 정보 없음', en: 'No details', ja: '詳細情報なし', zh: '无详细信息' },
-  'place.errDetail': {
-    ko: '상세 정보를 불러오지 못했습니다.',
-    en: 'Could not load the details.',
-    ja: '詳細情報を読み込めませんでした。',
-    zh: '未能加载详细信息。',
+
+  // ── SafeHour 판정·추정 (원문과 분리) ──
+  'place.planTitle': { ko: '이 장소의 일정', en: 'This place in your plan', ja: 'この場所の予定', zh: '此地点的安排' },
+  'place.estimateNote': {
+    ko: '관광공사 원문이 아니라 SafeHour가 조건 판정을 위해 계산한 값이에요.',
+    en: 'Not from the tourism source — SafeHour calculated these to check your conditions.',
+    ja: '観光公社の原文ではなく、SafeHourが条件の判定のために計算した値です。',
+    zh: '这些不是旅游原文，而是 SafeHour 为判定条件计算的数值。',
   },
-  'place.errDetailNetwork': {
-    ko: '네트워크 오류로 상세 정보를 불러오지 못했습니다.',
-    en: 'A network error stopped the details from loading.',
-    ja: 'ネットワークエラーのため詳細情報を読み込めませんでした。',
-    zh: '由于网络错误，未能加载详细信息。',
+  'place.visit': { ko: '방문', en: 'Visit', ja: '訪問', zh: '到访' },
+  'place.stay': { ko: '머무름', en: 'Stay', ja: '滞在', zh: '停留' },
+  'place.leg': { ko: '오는 길', en: 'Getting there', ja: '行き方', zh: '前往方式' },
+  'place.walk': { ko: '걷기 부담', en: 'Walking load', ja: '歩行の負担', zh: '步行负担' },
+  'place.walkValue': { ko: '약 {n}분', en: 'About {n} min', ja: '約{n}分', zh: '约 {n} 分钟' },
+  'place.indoor': { ko: '실내 여부', en: 'Indoor?', ja: '屋内かどうか', zh: '是否室内' },
+  'place.picked': { ko: '고름', en: 'Choice', ja: '選択', zh: '选择' },
+  'place.hoursNote': {
+    ko: '운영 시간을 확인하지 못했어요. 열려 있다고 단정하지 않으니 방문 전에 확인해 주세요.',
+    en: 'Opening hours could not be confirmed. We do not assume it is open — please check before you go.',
+    ja: '営業時間を確認できませんでした。営業していると断定しないため、訪問前にご確認ください。',
+    zh: '无法确认营业时间。我们不会断定其正在营业，请在前往前确认。',
   },
-  'place.overviewTitle': {
-    ko: '관광정보 원문',
-    en: 'Source text',
-    ja: '観光情報の原文',
-    zh: '旅游信息原文',
+  'place.dietNote': {
+    ko: '메뉴·이름·유형 단서로 식이 조건을 추정했어요. 주문할 때 직원에게 한 번 더 확인해 주세요.',
+    en: 'Diet fit was estimated from menu, name and type clues. Please double-check with staff when you order.',
+    ja: 'メニュー・名前・種類の手がかりから食事条件を推定しました。注文時に店員にもう一度確認してください。',
+    zh: '根据菜单、名称和类型线索估算了饮食条件。点餐时请再向店员确认。',
   },
-  'place.overviewEn': { ko: '영문', en: 'English', ja: '英語', zh: '英文' },
-  'place.overviewKo': {
-    ko: '국문 폴백',
-    en: 'Korean fallback',
-    ja: '韓国語で代替表示',
-    zh: '以韩文代替',
+  'place.orderCardBody': {
+    ko: '뜨거운 음식·딱딱한 음식 제한은 식당을 빼지 않고 한국어 카드로 알려요.',
+    en: 'Limits on hot or hard food do not remove restaurants; show the Korean card instead.',
+    ja: '熱い食べ物・硬い食べ物の制限では飲食店を外さず、韓国語カードで伝えます。',
+    zh: '对热食、硬食的限制不会排除餐厅，而是用韩语卡片告知。',
   },
+  'place.orderCardCta': { ko: '식이 카드 열기', en: 'Open the diet card', ja: '食事カードを開く', zh: '打开饮食卡片' },
+
+  // ── 관광공사 원문 ──
+  'place.koTitle': {
+    ko: '한국어 원문 (택시 기사에게 보여 주세요)',
+    en: 'Korean original (show to a taxi driver)',
+    ja: '韓国語の原文（タクシー運転手に見せてください）',
+    zh: '韩语原文（出示给出租车司机）',
+  },
+  'place.koMissing': {
+    ko: '한국어 주소 확인 필요',
+    en: 'Korean address needs checking',
+    ja: '韓国語の住所の確認が必要',
+    zh: '需要确认韩语地址',
+  },
+  'place.moveCard': {
+    ko: '한국어 이동 카드 보기',
+    en: 'Open the Korean travel card',
+    ja: '韓国語の移動カードを見る',
+    zh: '查看韩语出行卡片',
+  },
+  'place.overviewTitle': { ko: '소개 원문', en: 'Original description', ja: '紹介の原文', zh: '介绍原文' },
+  'place.langKo': { ko: '한국어', en: 'Korean', ja: '韓国語', zh: '韩语' },
+  'place.langEn': { ko: '영어', en: 'English', ja: '英語', zh: '英语' },
+  'place.langJa': { ko: '일본어', en: 'Japanese', ja: '日本語', zh: '日语' },
+  'place.langZh': { ko: '중국어', en: 'Chinese', ja: '中国語', zh: '中文' },
   'place.source': {
     ko: '출처: ⓒ한국관광공사',
     en: 'Source: ⓒKorea Tourism Organization',
@@ -96,31 +135,6 @@ export const messages = {
     en: 'No opening hours were provided. Please verify whether it is open.',
     ja: '営業時間の情報が提供されていません。現在営業しているかどうかは確認が必要です。',
     zh: '未提供营业时间信息。需要确认当前是否营业。',
-  },
-  'place.estimateTitle': {
-    ko: 'SafeHour 추정값',
-    en: 'SafeHour estimates',
-    ja: 'SafeHourの推定値',
-    zh: 'SafeHour 估算值',
-  },
-  'place.estimateNote': {
-    ko: '아래 값은 관광정보 원문이 아니라 SafeHour가 조건 판정을 위해 계산한 값입니다.',
-    en: 'These are not from the tourism source — SafeHour calculated them for the safety check.',
-    ja: '以下の値は観光情報の原文ではなく、SafeHourが条件の判定のために計算した値です。',
-    zh: '以下数值并非旅游信息原文，而是 SafeHour 为判定条件计算的数值。',
-  },
-  'place.estimateTravel': {
-    ko: '기준점에서 편도 {value}',
-    en: '{value} one-way from your point',
-    ja: '基準地点から片道 {value}',
-    zh: '从基准点单程 {value}',
-  },
-  'place.estimateWalkHeuristic': { ko: ' (추정)', en: ' (estimated)', ja: '（推定）', zh: '（估算）' },
-  'place.estimateStay': {
-    ko: '권장 체류 {value}',
-    en: 'Suggested stay {value}',
-    ja: 'おすすめの滞在 {value}',
-    zh: '建议停留 {value}',
   },
   'place.accessTitle': {
     ko: '접근성 정보',
@@ -165,6 +179,24 @@ export const messages = {
     ja: '一部の詳細情報を読み込めませんでした（{count}件）。確認できていない情報は表示しません。',
     zh: '部分详细信息未能加载（{count} 项）。我们不会显示未经确认的信息。',
   },
+  'place.errDetail': {
+    ko: '상세 정보를 불러오지 못했어요. 일정 속 정보는 그대로예요.',
+    en: 'Could not load the details. Your plan details still stand.',
+    ja: '詳細情報を読み込めませんでした。予定の情報はそのままです。',
+    zh: '未能加载详细信息。行程信息保持不变。',
+  },
+  'place.errDetailNetwork': {
+    ko: '네트워크 오류로 상세 정보를 불러오지 못했어요. 일정 속 정보는 그대로예요.',
+    en: 'A network error stopped the details from loading. Your plan details still stand.',
+    ja: 'ネットワークエラーのため詳細情報を読み込めませんでした。予定の情報はそのままです。',
+    zh: '由于网络错误，未能加载详细信息。行程信息保持不变。',
+  },
+  'place.errDetailOffline': {
+    ko: '보기 전용(로그인 만료·오프라인)이라 관광공사 원문을 불러오지 않았어요. 일정 속 정보는 그대로예요.',
+    en: 'View-only (signed out or offline), so the tourism source was not loaded. Your plan details still stand.',
+    ja: '閲覧のみ（ログイン切れ・オフライン）のため、観光公社の原文は読み込みませんでした。予定の情報はそのままです。',
+    zh: '当前仅供查看（登录过期或离线），未加载旅游原文。行程信息保持不变。',
+  },
 
   // 운영정보 필드 라벨 — 값(원문)은 번역하지 않는다
   'schedule.usetime': { ko: '이용시간', en: 'Hours', ja: '利用時間', zh: '开放时间' },
@@ -184,20 +216,8 @@ export const messages = {
   'schedule.endtime': { ko: '종료 시간', en: 'End time', ja: '終了時間', zh: '结束时间' },
 };
 
-/** 안전 문구 — 관광 미추천 상태 안내와 의료 면책 */
+/** 안전 문구 — 의료 면책 */
 export const safety = {
-  'place.blockedTitle': {
-    ko: '지금은 관광을 권하지 않습니다',
-    en: 'Tourism is not recommended right now',
-    ja: '現在は観光をおすすめしていません',
-    zh: '目前不建议观光',
-  },
-  'place.blockedBody': {
-    ko: '현재 판정에서는 이 장소를 포함해 어떤 관광도 추천하지 않습니다. 장소 정보 대신 복귀 안내를 확인해 주세요.',
-    en: 'In the current decision no tourism is recommended, including this place. Please check the return guidance instead.',
-    ja: '現在の判定では、この場所を含め、どの観光もおすすめしていません。場所の情報ではなく、帰着案内をご確認ください。',
-    zh: '根据当前判定，包括此地点在内，我们不推荐任何观光。请查看返回指引，而不是地点信息。',
-  },
   'place.footer': {
     ko: '관광정보 출처: ⓒ한국관광공사. SafeHour는 의료진의 판단을 대체하지 않습니다.',
     en: 'Tourism data: ⓒKorea Tourism Organization. SafeHour does not replace your medical team.',

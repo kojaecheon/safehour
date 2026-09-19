@@ -314,8 +314,9 @@ describe('문구 조회', () => {
   });
 
   test('자리표시자를 치환한다', () => {
-    assert.equal(translate('card.rank', 'ko', { rank: 2 }), '2순위');
-    assert.equal(translate('card.rank', 'en', { rank: 2 }), 'No. 2');
+    // AX-317: 퇴역한 추천 카드 키(card.rank)를 지워 새 일정 화면 키로 바꿨다
+    assert.equal(translate('trip.stopCount', 'ko', { n: 2 }), '장소 2곳');
+    assert.equal(translate('trip.stopCount', 'en', { n: 2 }), '2 places');
   });
 
   test('값이 없는 자리표시자는 표시자를 남긴다', () => {
