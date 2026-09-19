@@ -60,12 +60,13 @@ export const NAMESPACE_NAMES = Object.freeze(Object.keys(NAMESPACES));
  * 기존 화면이 쓰던 키 접두사 → 소속 이름공간.
  * 키를 바꾸면 화면 코드를 모두 고쳐야 하므로, 기존 키는 그대로 두고 소속만 정했다.
  * 소속은 그 화면을 다시 만들거나 퇴역시키는 작업의 이름공간이다. 새 키는 이름공간 이름으로 시작한다.
+ * 키가 하나도 남지 않은 접두사(퇴역한 단일 외출 화면의 plan.·result.·card.)는 AX-321 에서 뺐다.
  */
 export const LEGACY_PREFIXES = Object.freeze({
   common: Object.freeze(['state.']),
   onboarding: Object.freeze(['home.', 'login.']),
   conditions: Object.freeze(['link.', 'guide.']),
-  trip: Object.freeze(['plan.', 'result.', 'event.', 'eventPanel.', 'card.', 'return.', 'delta.']),
+  trip: Object.freeze(['event.', 'eventPanel.', 'return.', 'delta.']),
   place: Object.freeze(['schedule.']),
   settings: Object.freeze(['clear.']),
 });

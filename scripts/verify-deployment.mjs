@@ -1,14 +1,20 @@
 #!/usr/bin/env node
-// 배포본 검증 — 배포 직후·kill switch 발동 후·롤백 후에 실행한다.
+// 배포본 검증 — 배포 직후·kill switch 발동 후·롤백 후에 **사람이 손으로** 실행한다.
 //
 // 사용법: node scripts/verify-deployment.mjs https://<배포주소>
 //
+// 수동 실행 전용이다. CI·npm test·E2E 는 이 스크립트를 부르지 않는다.
+// 데모 로그인이 켜진 배포본에서는 일정 API 를 실제로 부르므로 관광공사 API 호출이 생긴다(요청 날짜 1일 · 2회).
+//
 // 확인 항목 (docs/DEPLOYMENT.md 5장 체크리스트와 대응)
-//   1. 헬스 응답과 인증키 설정 여부
+//   1. 헬스 응답과 인증키 설정 여부, 로그인 가능 여부
 //   2. 보안 헤더 — 특히 geolocation 차단 (D07-BAN002)
-//   3. 안전 게이트 — 외출 미허용 시 미추천, 잘못된 좌표 거부
-//   4. 판정 경로 — 추천 생성과 재판정
+//   3. 로그인 가드와 입력 검증 — 세션 없음 401, 국외 좌표 400 (spec 6장)
+//   4. 일정 API 스모크 — 데모 로그인이 켜져 있을 때만: 데모 체류로 POST /api/itinerary/plan
+//      (외출 불가 조건 → 환자 외출 0개, 추천 중단 스위치가 켜져 있으면 SERVICE_PAUSED)
 //   5. 인증키가 응답 어디에도 노출되지 않음 (D07-POL009)
+//
+// 퇴역한 단일 외출 API(/api/recommend·/api/recalculate)는 부르지 않는다 (AX-308 에서 삭제, AX-321 에서 이 스크립트 갱신).
 
 const baseUrl = process.argv[2]?.replace(/\/$/, '');
 if (!baseUrl) {
@@ -17,7 +23,6 @@ if (!baseUrl) {
 }
 
 const results = [];
-const iso = (offsetMin) => new Date(Date.now() + offsetMin * 60000).toISOString();
 
 function record(name, passed, detail) {
   results.push({ name, passed, detail });
@@ -29,10 +34,10 @@ function warn(name, detail) {
   console.log(`  ! ${name}${detail ? ` — ${detail}` : ''}`);
 }
 
-async function postJson(path, body) {
+async function postJson(path, body, { cookie } = {}) {
   const res = await fetch(`${baseUrl}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
     body: JSON.stringify(body),
   });
   // 서버가 500 을 내면 Next 가 HTML 오류 페이지를 준다. 진단 도구가 여기서
@@ -49,27 +54,60 @@ async function postJson(path, body) {
   }
 }
 
-function condition(overrides = {}) {
+/** 한국 날짜 'YYYY-MM-DD' (오늘 + days) — 서버도 KST 오늘을 기준으로 판정한다 */
+function kstDate(days = 0) {
+  return new Date(Date.now() + 9 * 3600_000 + days * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * 데모 체류(PlanStay 허용 목록 필드만) — 오늘 입국·오늘 수술·시술(경계일)·모레 출국, 숙소·병원은 데모 좌표.
+ * 이름·주소·전화는 보내지 않는다(서버도 버린다). 오늘부터 본인 체크 기간 '외출 불가'를 둔다.
+ */
+function demoStay(overrides = {}) {
+  const today = kstDate(0);
+  const departure = kstDate(2);
   return {
-    version: 'deploy-check',
-    issuedAt: iso(-10),
-    issuedBy: 'medical_staff',
-    outingAllowed: true,
-    avoidUv: true,
-    maxWalkMin: 20,
-    maxTravelMin: 30,
+    arrival: { date: today, time: '06:00', airport: 'ICN' },
+    departure: { date: departure, time: '23:00', airport: 'ICN' },
+    hasCompanion: false,
+    interests: [],
+    pace: 'RELAXED',
+    lodgings: [{ id: 'L1', lat: 37.5609, lng: 126.986, checkIn: today, checkOut: departure }],
+    hospitals: [{ id: 'H1', lat: 37.5163, lng: 127.0203 }],
+    appointments: [{ id: 'A1', hospitalId: 'H1', type: 'PROCEDURE', date: today, start: '07:00' }],
+    periods: [
+      {
+        id: 'P1',
+        source: 'SELF',
+        startDate: today,
+        endDate: departure,
+        items: {
+          outing: 'FORBIDDEN',
+          returnTime: { kind: 'NOT_SET' },
+          walkLimit: { kind: 'NONE' },
+          travelLimit: { kind: 'NONE' },
+          avoidUv: { kind: 'NONE' },
+          avoidHeat: { kind: 'NONE' },
+          avoidWater: { kind: 'NONE' },
+          escortRequired: { kind: 'NONE' },
+          guardianMustStay: { kind: 'NONE' },
+          mealRestriction: { kind: 'NONE' },
+          diet: { spicy: { kind: 'NONE' }, alcohol: { kind: 'NONE' }, hard: { kind: 'NONE' }, hot: { kind: 'NONE' }, raw: { kind: 'NONE' } },
+          medication: { kind: 'NONE' },
+        },
+      },
+    ],
+    consent: { sensitive: { version: 'deploy-check', agreedAt: new Date().toISOString() } },
     ...overrides,
   };
 }
 
-function planBody(overrides = {}) {
-  return {
-    origin: { lat: 37.5105, lng: 127.059, label: '병원' },
-    returnBy: iso(240),
-    condition: condition(),
-    roles: { hasCompanion: true, patientResting: false, companionSeparateAllowed: false },
-    ...overrides,
-  };
+/** 데모 로그인 → 세션 쿠키 한 줄('safehour.session=…'). 실패하면 null */
+async function demoLogin() {
+  const res = await fetch(`${baseUrl}/api/auth/login?provider=demo&returnTo=%2F`, { redirect: 'manual' });
+  const cookies = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : [res.headers.get('set-cookie') ?? ''];
+  const session = cookies.map((c) => c.split(';')[0]).find((c) => c.startsWith('safehour.session='));
+  return session ?? null;
 }
 
 console.log(`\n배포본 검증: ${baseUrl}\n`);
@@ -132,61 +170,58 @@ record('geolocation 차단', permissions.includes('geolocation=()'), permissions
 record('nosniff', pageRes.headers.get('x-content-type-options') === 'nosniff');
 record('frame 차단', pageRes.headers.get('x-frame-options') === 'DENY');
 
-// ── 3. 안전 게이트 ──
-console.log('\n3. 안전 게이트');
-const blocked = await postJson('/api/recommend', {
-  ...planBody(),
-  condition: condition({ outingAllowed: false }),
-});
+// ── 3. 로그인 가드와 입력 검증 ──
+console.log('\n3. 로그인 가드와 입력 검증');
+const unauth = await postJson('/api/itinerary/plan', { lang: 'ko', stay: demoStay(), dates: [kstDate(0)] });
 record(
-  '외출 미허용 → 미추천',
-  blocked.data?.decision?.state === 'NO_TOURISM' && blocked.data.decision.course.length === 0,
-  blocked.parseError ?? blocked.data?.decision?.state,
+  '세션 없음 → 401 SAFEHOUR_AUTH_REQUIRED',
+  unauth.res.status === 401 && unauth.data?.errorCode === 'SAFEHOUR_AUTH_REQUIRED',
+  unauth.parseError ?? `HTTP ${unauth.res.status} ${unauth.data?.errorCode ?? ''}`,
 );
 
-const stale = await postJson('/api/recommend', {
-  ...planBody(),
-  condition: condition({ issuedAt: iso(-25 * 60) }),
-});
-record(
-  '25시간 지난 조건 → 미추천',
-  stale.data?.decision?.state === 'NO_TOURISM',
-  stale.parseError ?? stale.data?.decision?.reasons?.join(','),
-);
-
-const badOrigin = await postJson('/api/recommend', {
-  ...planBody(),
-  origin: { lat: 48.85, lng: 2.35 },
-});
-record('국외 좌표 → 400 거부', badOrigin.res.status === 400, `HTTP ${badOrigin.res.status}`);
-
-// ── 4. 판정 경로 ──
-console.log('\n4. 판정과 재판정');
+// ── 4. 일정 API 스모크 (데모 로그인이 켜진 배포본만) ──
+console.log('\n4. 일정 API 스모크');
 const paused = health.flags?.recommendationKilled === true;
-const plan = await postJson('/api/recommend', planBody());
-if (paused) {
-  record('kill switch 적용됨', plan.data?.servicePaused === true && plan.data.decision.state === 'NO_TOURISM', plan.parseError);
+let planData = null;
+if (!auth.demoLogin) {
+  warn('일정 API 스모크 생략', '데모 로그인(SAFEHOUR_ALLOW_DEMO_LOGIN=1)이 꺼져 있다 — 실제 계정으로 화면에서 확인한다');
 } else {
-  const decision = plan.data?.decision;
-  record(
-    '추천 생성',
-    plan.data?.ok === true,
-    plan.parseError ?? `state=${decision?.state} 후보=${plan.data?.diagnostics?.candidateCount}`,
-  );
-  record('화면 노출 3개 제한', plan.data?.displayLimit === 3);
-
-  if (decision?.course?.length > 0) {
-    const recalc = await postJson('/api/recalculate', {
-      recalcPayload: plan.data.recalcPayload,
-      event: { type: 'PATIENT_RECALL' },
-    });
-    record(
-      '환자 호출 → 즉시 복귀 전환',
-      recalc.data?.recalc?.result?.state === 'NO_TOURISM' && recalc.data.recalc.result.returnNow === true,
-      recalc.parseError,
+  const cookie = await demoLogin();
+  record('데모 로그인 세션 발급', Boolean(cookie));
+  if (cookie) {
+    const badOrigin = await postJson(
+      '/api/itinerary/plan',
+      { lang: 'ko', stay: demoStay({ lodgings: [{ id: 'L1', lat: 48.85, lng: 2.35, checkIn: kstDate(0), checkOut: kstDate(2) }] }), dates: [kstDate(0)] },
+      { cookie },
     );
-  } else {
-    record('재판정 검사', true, '추천 0건이라 생략 (조건상 정상일 수 있음)');
+    record(
+      '국외 좌표 → 400 SAFEHOUR_STAY_INVALID',
+      badOrigin.res.status === 400 && badOrigin.data?.errorCode === 'SAFEHOUR_STAY_INVALID',
+      badOrigin.parseError ?? `HTTP ${badOrigin.res.status} ${badOrigin.data?.errorCode ?? ''}`,
+    );
+
+    const today = kstDate(0);
+    const plan = await postJson('/api/itinerary/plan', { lang: 'ko', stay: demoStay(), dates: [today] }, { cookie });
+    planData = plan.data;
+    const day = plan.data?.days?.[today];
+    if (paused) {
+      record(
+        '추천 중단 스위치 적용됨',
+        plan.data?.servicePaused === true && day?.dayState === 'NO_TOURISM' && (day?.reasons ?? []).includes('SERVICE_PAUSED'),
+        plan.parseError ?? `state=${day?.dayState} reasons=${(day?.reasons ?? []).join(',')}`,
+      );
+    } else {
+      record(
+        '일정 생성 응답',
+        plan.res.status === 200 && plan.data?.ok === true && typeof plan.data.engineVersion === 'string' && Boolean(day),
+        plan.parseError ?? `HTTP ${plan.res.status} engine=${plan.data?.engineVersion} 후보=${plan.data?.diagnostics?.candidateCount}`,
+      );
+      record(
+        '외출 불가 조건 → 환자 외출 0개',
+        Array.isArray(day?.outings) && day.outings.length === 0 && day?.coverage === 'REST_DAY',
+        `coverage=${day?.coverage} state=${day?.dayState} 외출=${day?.outings?.length}`,
+      );
+    }
   }
 }
 
@@ -196,7 +231,7 @@ if (paused) {
 // (weatherKeySource) 를 의도적으로 알리는데, 이름만 보고 실패로 판정하면
 // 진짜 노출과 구분되지 않는다.
 console.log('\n5. 비밀정보 노출');
-const bodies = [JSON.stringify(health), JSON.stringify(plan.data ?? {}), await pageRes.text()];
+const bodies = [JSON.stringify(health), JSON.stringify(planData ?? {}), await pageRes.text()];
 const joined = bodies.join('\n');
 
 // (1) URL 에 serviceKey 가 값과 함께 실려 나간 경우

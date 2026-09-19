@@ -41,26 +41,13 @@ export {
   unconfirmedInstructions,
 } from './instructions.js';
 
-// 퇴역 예정 v1 단일 외출 경로 — 예전 화면·`/api/today` 의 빌드 호환용 (AX-321 에서 삭제)
-export {
-  effectiveDeadline,
-  gateDecisionPayload,
-  gateRecoveryPlan,
-  invalidateForReturn,
-  nextClockOccurrence,
-  planToCondition,
-  toDecisionPayload,
-  unconfirmedAll,
-  validateDecisionPayload,
-} from './legacyV1.js';
-
 export const PLAN_VERSION = 2;
 
 /** 지침 전체의 상태 — 조건 기간의 병원 상태와 같은 값을 쓴다 */
 export const PLAN_STATUS = HOSPITAL_PERIOD_STATUS;
 
 /**
- * 대한민국 범위(경계 제외). 서버 기준점 검사(`lib/server/engine-io.js` normalizeOrigin)와 같은 범위다 (spec 6장).
+ * 대한민국 범위(경계 제외). 일정 API 의 좌표 범위 검사(`lib/server/itinerary-request.js` inKorea)와 같은 범위다 (spec 6장).
  */
 const KOREA_BOUNDS = Object.freeze({ latMin: 33, latMax: 39, lngMin: 124, lngMax: 132 });
 
