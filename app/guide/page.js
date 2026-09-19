@@ -1,21 +1,24 @@
 'use client';
 
-// 병원 회복 안내 — 읽기 전용 (AX-218 · 정의 §4.3)
+// 병원 회복 안내 — 채널 B, 읽기 전용 (AX-218 → AX-315 · spec 4.20, 5.1 LinkedPlan, 규칙 56)
 //
 // 화면 원칙
 //   - 병원 원문(채널 B)을 **그대로** 출력한다. 요약·편집·재배열·번역하지 않는다.
-//   - 원문 언어를 `lang` 으로 표기해 스크린리더가 잘못 읽지 않게 한다.
-//   - "병원에서 제공한 안내" 배지와 발행 시각을 카드마다 붙인다.
-//   - 확인해야 외출 판정의 STANDBY 강등이 풀린다 (정의 §7).
+//     원문 언어를 `lang` 으로 표기하고, 브라우저 자동 번역도 막는다(translate="no").
+//   - 병원 원문은 '병원 발행' 출처 영역 안에만 둔다. 지침 발행·갱신 시각과 안내 작성 시각을 붙인다.
+//   - 데모 지침은 '병원 연동 데모' 배지를 늘 붙인다.
+//   - '확인했습니다'는 LinkedPlan.acknowledged 에 `${id}@${updatedAt}` 키로 남긴다.
+//     내용이 바뀌어 updatedAt 이 달라지면 다시 확인해야 한다(규칙 56).
+//   - 확인하지 않은 중요 안내 수를 보여준다. 오늘 화면의 대기 덧씌우기는 오늘 화면 작업이 한다.
+//   - 안내문은 판정에 쓰지 않는다. 이 화면은 저장소에만 쓴다.
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import LanguageToggle from '@/components/LanguageToggle.js';
-import FooterLinks from '@/components/FooterLinks.js';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
-import { acknowledgeAll, acknowledgeInstruction, readPlan } from '@/lib/recovery-store.js';
+import { Badge, Button, EmptyState, Icon, SourceArea, TopBar, useStoreStatus } from '@/components/ui/index.js';
+import useStay, { useHydrated, useNowMs } from '@/components/conditions/useStay.js';
+import { acknowledgeAllMap, guideEntries, planState } from '@/components/conditions/linkPlan.js';
+import { getStore } from '@/lib/store/index.js';
 import { fmtDateTime } from '@/lib/format.js';
-import { CRITICAL_CATEGORIES, INSTRUCTION_CATEGORIES } from '@/src/recovery/plan.js';
 
 const CATEGORY_KEY = {
   activity: 'guide.catActivity',
@@ -27,100 +30,166 @@ const CATEGORY_KEY = {
   visit: 'guide.catVisit',
 };
 
-export default function GuidePage() {
-  const router = useRouter();
+const STATE_KEY = {
+  ACTIVE: 'link.stateACTIVE',
+  EXPIRED: 'link.stateEXPIRED',
+  REVOKED: 'link.stateREVOKED',
+};
+
+function PlanGuide({ linked, readOnly, nowMs }) {
   const { t, locale } = useLang();
-  const [plan, setPlan] = useState(null);
-  const [loaded, setLoaded] = useState(false);
+  const headingId = useId();
+  const plan = linked.plan ?? {};
+  const entries = guideEntries(plan, linked.acknowledged);
+  const unconfirmed = entries.filter((e) => e.critical && !e.acknowledged).length;
+  const state = planState(plan, nowMs);
+  const focusKey = useRef(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setPlan(readPlan());
-      setLoaded(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
+    if (!focusKey.current) return;
+    document.getElementById(focusKey.current)?.focus();
+    focusKey.current = null;
+  });
 
-  const fmt = (iso) => fmtDateTime(iso, locale);
+  function acknowledge(entry, doneId) {
+    const result = getStore().acknowledgeInstruction(linked.code, entry.instruction);
+    setFailed(!result.ok);
+    // 저장소 변경으로 다시 그려진 뒤 '확인 완료' 문구로 포커스를 옮긴다(버튼이 사라지므로)
+    if (result.ok) focusKey.current = doneId;
+  }
 
-  const instructions = plan?.instructions ?? [];
-  // 병원이 준 순서를 흔들지 않되, 분류가 섞여 오면 정의된 순서로 묶는다
-  const ordered = INSTRUCTION_CATEGORIES.flatMap((category) =>
-    instructions.filter((item) => item.category === category),
+  function acknowledgeAll() {
+    const result = getStore().updateStay((current) => ({
+      ...current,
+      linkedPlans: (current?.linkedPlans ?? []).map((lp) =>
+        lp.code === linked.code ? { ...lp, acknowledged: acknowledgeAllMap(lp.plan) } : lp,
+      ),
+    }));
+    setFailed(!result.ok);
+  }
+
+  return (
+    <section className="conditions-section conditions-guide-plan" aria-labelledby={headingId}>
+      <div className="conditions-section-head">
+        <h2 id={headingId}>{plan.hospital?.name ?? ''}</h2>
+        <span className="conditions-tags">
+          {plan.demo === true && <Badge kind="demo" />}
+          <span className={`conditions-plain-tag conditions-state-${state}`}>{t(STATE_KEY[state])}</span>
+        </span>
+      </div>
+      <div className="conditions-period-meta">
+        <p>{t('link.planIssuer', { issuer: plan.issuer?.name ?? '' })}</p>
+        <p>
+          <time dateTime={plan.issuedAt}>{t('guide.issuedAt', { at: fmtDateTime(plan.issuedAt, locale) })}</time>
+        </p>
+        {plan.updatedAt && plan.updatedAt !== plan.issuedAt && (
+          <p>
+            <time dateTime={plan.updatedAt}>{t('guide.planUpdatedAt', { at: fmtDateTime(plan.updatedAt, locale) })}</time>
+          </p>
+        )}
+      </div>
+
+      <div className={unconfirmed > 0 ? 'conditions-guide-count is-pending' : 'conditions-guide-count'} role="status">
+        <Icon name={unconfirmed > 0 ? 'stateStandby' : 'check'} size={20} strokeWidth={2.2} />
+        <div>
+          <p className="conditions-guide-count-title">
+            {unconfirmed > 0 ? t('guide.unconfirmedCount', { n: unconfirmed }) : t('guide.allConfirmed')}
+          </p>
+          {unconfirmed > 0 && <p>{t('guide.criticalNote')}</p>}
+        </div>
+      </div>
+      {entries.some((e) => !e.acknowledged) && (
+        <div className="conditions-actions">
+          <Button variant="secondary" onClick={acknowledgeAll} disabled={readOnly}>
+            {t('guide.acknowledgeAll')}
+          </Button>
+        </div>
+      )}
+      {failed && (
+        <p className="conditions-field-error" role="alert">
+          {t('conditions.errSave')}
+        </p>
+      )}
+
+      <ul className="conditions-guide-list">
+        {entries.map((entry) => {
+          const { instruction } = entry;
+          const itemHeadingId = `${headingId}-${instruction.id}`;
+          const doneId = `${headingId}-${instruction.id}-done`;
+          return (
+            <li key={entry.key} className="card conditions-guide-item">
+              <div className="conditions-section-head">
+                <h3 id={itemHeadingId}>{t(CATEGORY_KEY[instruction.category] ?? 'guide.issuedBadge')}</h3>
+                {entry.critical && !entry.acknowledged && (
+                  <span className="conditions-critical-tag">
+                    <Icon name="stateStandby" size={14} strokeWidth={2.2} />
+                    <span>{t('guide.critical')}</span>
+                  </span>
+                )}
+              </div>
+              <SourceArea source="hospital" lang={instruction.lang} note={t('guide.originalNote')}>
+                {/* 원문 — 편집·번역하지 않는다 */}
+                <p className="conditions-guide-text" translate="no">
+                  {instruction.text}
+                </p>
+              </SourceArea>
+              <p className="conditions-hint">
+                <time dateTime={instruction.updatedAt}>
+                  {t('guide.updatedAt', { at: fmtDateTime(instruction.updatedAt, locale) })}
+                </time>
+              </p>
+              {entry.acknowledged ? (
+                <p className="conditions-acked" id={doneId} tabIndex={-1}>
+                  <Icon name="check" size={18} strokeWidth={2.6} />
+                  <span>{t('guide.acknowledged')}</span>
+                </p>
+              ) : (
+                <Button
+                  variant="secondary"
+                  size="small"
+                  disabled={readOnly}
+                  aria-describedby={itemHeadingId}
+                  onClick={() => acknowledge(entry, doneId)}
+                >
+                  {t('guide.acknowledge')}
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
-  const hasUnconfirmedCritical = ordered.some(
-    (item) => CRITICAL_CATEGORIES.includes(item.category) && !item.acknowledged,
-  );
+}
+
+export default function GuidePage() {
+  const { t } = useLang();
+  const hydrated = useHydrated();
+  const stay = useStay();
+  const status = useStoreStatus();
+  const nowMs = useNowMs();
+  const linkedPlans = stay?.linkedPlans ?? [];
 
   return (
     <>
-      <header className="top-bar">
-        <button type="button" className="back" aria-label={t('common.back')} onClick={() => router.back()}>
-          ‹
-        </button>
-        <h1 className="brand">{t('guide.header')}</h1>
-        <LanguageToggle />
-      </header>
-
-      <main className="page">
-        <div className="medical-callout" role="note">
-          {t('guide.lead')}
-        </div>
-
-        {loaded && ordered.length === 0 && <p className="source-note">{t('guide.empty')}</p>}
-
-        {hasUnconfirmedCritical && (
-          <div className="state-banner state-STANDBY" role="status">
-            <span className="state-label">{t('guide.critical')}</span>
-            <p>{t('guide.criticalNote')}</p>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ marginTop: 12 }}
-              onClick={() => setPlan(acknowledgeAll(plan))}
-            >
-              {t('guide.acknowledgeAll')}
-            </button>
-          </div>
+      <TopBar title={t('guide.header')} backHref="/conditions" />
+      <main className="page conditions-page">
+        <p className="conditions-lead">{t('guide.lead')}</p>
+        {!hydrated ? (
+          <p className="conditions-hint">{t('conditions.loading')}</p>
+        ) : linkedPlans.length === 0 ? (
+          <EmptyState
+            icon="hospital"
+            title={t('guide.empty')}
+            body={t('guide.emptyBody')}
+            action={<Button href="/link">{t('conditions.linkHospital')}</Button>}
+          />
+        ) : (
+          linkedPlans.map((linked) => (
+            <PlanGuide key={linked.code} linked={linked} readOnly={status.readOnly} nowMs={nowMs} />
+          ))
         )}
-
-        {ordered.map((item) => (
-          <section className="card" key={item.id} aria-labelledby={`guide-${item.id}`}>
-            <h2 id={`guide-${item.id}`}>{t(CATEGORY_KEY[item.category])}</h2>
-
-            <div className="hospital-note">
-              <span className="badge badge-hospital">{t('guide.issuedBadge')}</span>
-              {/* 원문 — 편집하지 않는다. 언어도 원문 언어 그대로 표기한다 */}
-              <p lang={item.lang} style={{ marginTop: 10, whiteSpace: 'pre-line', color: 'var(--ink)' }}>
-                {item.text}
-              </p>
-            </div>
-
-            <p className="hint">{t('guide.updatedAt', { at: fmt(item.updatedAt) })}</p>
-
-            {item.acknowledged ? (
-              <p className="hint" style={{ color: 'var(--state-together-ink)', fontWeight: 600 }}>
-                ✓ {t('guide.acknowledged')}
-              </p>
-            ) : (
-              <button
-                type="button"
-                className="btn btn-secondary btn-small"
-                style={{ marginTop: 10 }}
-                onClick={() => setPlan(acknowledgeInstruction(plan, item.id))}
-              >
-                {t('guide.acknowledge')}
-                {CRITICAL_CATEGORIES.includes(item.category) && (
-                  <span className="badge" style={{ marginLeft: 8 }}>
-                    {t('guide.critical')}
-                  </span>
-                )}
-              </button>
-            )}
-          </section>
-        ))}
-
-        <FooterLinks />
       </main>
     </>
   );

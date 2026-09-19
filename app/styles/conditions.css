@@ -10,3 +10,571 @@
  *   - 클래스는 `conditions-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
  *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
  */
+
+/* ───────────────────────── 화면 공통 ───────────────────────── */
+.conditions-lead {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+  margin-bottom: var(--space-5);
+}
+.conditions-section {
+  margin-bottom: var(--space-8);
+  min-width: 0;
+}
+.conditions-section > h2:focus-visible,
+.conditions-section h2[tabindex='-1']:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.conditions-section-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.conditions-section-head > h2,
+.conditions-section-head > h3 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conditions-section-lead {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  margin-bottom: var(--space-4);
+}
+.conditions-link-title {
+  white-space: pre-line;
+}
+.conditions-hint {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+  margin-top: var(--space-2);
+}
+.conditions-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.conditions-actions.is-inline {
+  display: flex;
+  flex-wrap: wrap;
+}
+.conditions-actions.is-inline > .btn {
+  flex: 1 1 120px;
+}
+.conditions-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.conditions-plain-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  background: var(--surface);
+}
+.conditions-state-EXPIRED,
+.conditions-state-REVOKED {
+  border-style: dashed;
+  background: var(--surface-alt);
+}
+.conditions-notice {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--state-together-ink);
+}
+.conditions-notice:not(:empty) {
+  margin-bottom: var(--space-4);
+}
+.conditions-notice.is-error {
+  color: var(--ink);
+}
+
+/* 안전 문구 병기 — 두 번째 줄도 대비를 낮추지 않는다 */
+.conditions-pair > span {
+  display: block;
+}
+.conditions-pair-primary {
+  color: var(--ink);
+}
+.conditions-pair-secondary {
+  margin-top: var(--space-1);
+  color: var(--ink-soft);
+}
+.conditions-callout {
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--ink-soft);
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  margin-top: var(--space-3);
+}
+
+/* 오류 — 빨강 한 가지에 기대지 않고 아이콘 + 굵은 글자 + 왼쪽 띠 */
+.conditions-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--emergency-strong);
+}
+.conditions-field-error .ui-icon {
+  flex: none;
+  margin-top: 3px;
+}
+.conditions-alert,
+.conditions-error-summary {
+  border: 1px solid var(--emergency);
+  border-left-width: 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.conditions-alert p,
+.conditions-error-summary li {
+  color: var(--ink);
+}
+.conditions-alert-title,
+.conditions-error-summary-title {
+  font-weight: var(--weight-heavy);
+  color: var(--emergency-strong);
+  margin-bottom: var(--space-1);
+}
+.conditions-error-summary ul {
+  padding-left: var(--space-5);
+}
+.conditions-error-summary a {
+  display: inline-block;
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0;
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* ───────────────────────── 동의 ───────────────────────── */
+.conditions-review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border: 1px dashed var(--state-standby-ink);
+  border-radius: var(--radius-xs);
+  background: var(--state-standby-bg);
+  color: var(--state-standby-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+.conditions-consent-lead {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-3);
+}
+.conditions-consent-version {
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+  margin-bottom: var(--space-3);
+}
+.conditions-consent-list {
+  display: grid;
+  gap: var(--space-3);
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+.conditions-consent-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-5);
+  border-radius: var(--radius-sm);
+  background: var(--state-together-bg);
+  color: var(--state-together-ink);
+  font-weight: var(--weight-medium);
+}
+.conditions-consent-status .ui-icon {
+  flex: none;
+  margin-top: 3px;
+}
+.conditions-confirm {
+  margin-top: var(--space-3);
+}
+.conditions-confirm-question {
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+.conditions-withdraw {
+  margin-bottom: var(--space-8);
+}
+
+/* ───────────────────────── 기간 목록 ───────────────────────── */
+.conditions-period-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.conditions-period {
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  background: var(--surface);
+  min-width: 0;
+}
+.conditions-period-SELF {
+  border: 2px dashed var(--source-self);
+}
+.conditions-period-HOSPITAL {
+  border: 1px solid var(--source-hospital);
+  border-left-width: 6px;
+  background: var(--source-hospital-bg);
+}
+.conditions-period-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.conditions-period-head h3 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conditions-period-meta p {
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.conditions-period-meta p + p {
+  margin-top: var(--space-1);
+}
+.conditions-period-meta {
+  margin-bottom: var(--space-3);
+}
+.conditions-counts {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.conditions-dates {
+  margin-top: var(--space-2);
+}
+.conditions-dates > summary {
+  min-height: var(--tap-min);
+}
+.conditions-date-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.conditions-date-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.conditions-date {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.conditions-reasons {
+  flex-basis: 100%;
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.conditions-period-actions {
+  margin-top: var(--space-2);
+}
+
+/* 날짜 분류 — 색 + 아이콘 + 문구. 입력 필요는 오류 색이 아니다 */
+.conditions-coverage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
+  border: 1px solid transparent;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+.conditions-coverage-FREE { background: var(--state-together-bg); color: var(--state-together-ink); border-color: var(--state-together-line); }
+.conditions-coverage-DECLARED_FREE { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); border-style: dashed; }
+.conditions-coverage-RESTRICTED { background: var(--state-standby-bg); color: var(--state-standby-ink); border-color: var(--state-standby-line); }
+.conditions-coverage-REST_DAY { background: var(--state-no-tourism-bg); color: var(--state-no-tourism-ink); border-color: var(--state-no-tourism-line); }
+.conditions-coverage-NEEDS_INPUT { background: var(--surface-alt); color: var(--ink); border-color: var(--line-input); border-style: dashed; }
+
+/* ───────────────────────── 편집기 ───────────────────────── */
+.conditions-form {
+  min-width: 0;
+}
+.conditions-editor-lead {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  margin: var(--space-2) 0 var(--space-3);
+}
+.conditions-toggle {
+  border-bottom: none;
+  margin-bottom: var(--space-3);
+}
+.conditions-toggle > span {
+  min-width: 0;
+}
+.conditions-group-title {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+  margin: var(--space-6) 0 var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.conditions-item {
+  min-width: 0;
+  margin-bottom: var(--space-2);
+}
+.conditions-item:focus {
+  outline: none;
+}
+.conditions-item:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+.conditions-item .ui-answer {
+  margin-bottom: 0;
+}
+/* 예를 고른 뒤 따라오는 입력(분·시각·장소·복약 시각) — 들여 쓰고 왼쪽 선으로 묶는다 */
+.conditions-subfield {
+  margin: var(--space-3) 0 var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--accent-soft);
+}
+.conditions-subfield .ui-answer {
+  margin-bottom: var(--space-3);
+}
+.conditions-auto-hospital {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.conditions-med-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.conditions-med-row {
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+.conditions-med-row .field {
+  margin-bottom: var(--space-2);
+}
+
+/* ───────────────────────── 날짜별 합성 ───────────────────────── */
+.conditions-day-pick {
+  max-width: 320px;
+}
+.conditions-day {
+  border: 1px dotted var(--source-estimate);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  padding: var(--space-4);
+}
+.conditions-day > p + p {
+  margin-top: var(--space-2);
+}
+.conditions-day-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.conditions-effective {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: 0;
+}
+.conditions-effective-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line-strong);
+}
+.conditions-effective-row dt {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.conditions-effective-row dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.conditions-effective-value {
+  color: var(--ink);
+  font-size: var(--text-body);
+  overflow-wrap: anywhere;
+}
+@media (min-width: 560px) {
+  .conditions-effective-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+}
+
+/* ───────────────────────── 병원 연결 ───────────────────────── */
+.conditions-plan-summary {
+  margin-bottom: var(--space-4);
+}
+.conditions-plan-summary > p {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.conditions-plan-summary > p + p {
+  margin-top: var(--space-1);
+}
+.conditions-plan-summary > .conditions-tags {
+  display: flex;
+  margin-bottom: var(--space-2);
+}
+.conditions-choice-list {
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.conditions-choice-list > legend {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+.conditions-choice-list .radio-option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conditions-choice-list .radio-option .sub {
+  font-size: var(--text-body);
+}
+.conditions-done h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--state-together-ink);
+}
+.conditions-done h2:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.conditions-done > p {
+  color: var(--ink);
+  margin-top: var(--space-2);
+}
+.conditions-choose h2:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.conditions-demo .conditions-section-head {
+  margin-bottom: var(--space-2);
+}
+
+/* ───────────────────────── 병원 안내 ───────────────────────── */
+.conditions-guide-count {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--state-together-line);
+  background: var(--state-together-bg);
+  color: var(--state-together-ink);
+}
+.conditions-guide-count.is-pending {
+  border-color: var(--state-standby-line);
+  background: var(--state-standby-bg);
+  color: var(--state-standby-ink);
+}
+.conditions-guide-count .ui-icon {
+  flex: none;
+  margin-top: 3px;
+}
+.conditions-guide-count p {
+  color: inherit;
+}
+.conditions-guide-count-title {
+  font-weight: var(--weight-heavy);
+}
+.conditions-guide-list {
+  list-style: none;
+  padding: 0;
+  margin-top: var(--space-4);
+}
+.conditions-guide-item .ui-source {
+  margin-bottom: var(--space-2);
+}
+.conditions-guide-text {
+  white-space: pre-line;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.conditions-critical-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--state-standby-ink);
+  border-radius: var(--radius-xs);
+  background: var(--state-standby-bg);
+  color: var(--state-standby-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+.conditions-acked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  color: var(--state-together-ink);
+  font-weight: var(--weight-bold);
+}
