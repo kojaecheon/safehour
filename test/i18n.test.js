@@ -53,7 +53,8 @@ const KEY_SHAPE = /'([a-z][a-zA-Z0-9]*\.[a-zA-Z0-9_.]+)'/g;
 const DIRECT_CALL = /\b(?:t|translate)\(\s*'([a-zA-Z0-9_.]+)'/g;
 
 function eachSourceFile(fn) {
-  const roots = ['app', 'components', 'src/i18n'];
+  // lib/notify: 기기 알림 문구 키(notifications.*)는 알림 예약·문구 모듈이 쓴다 (AX-319)
+  const roots = ['app', 'components', 'src/i18n', 'lib/notify'];
   const visit = (path) => {
     for (const entry of readdirSync(path)) {
       const full = join(path, entry);
