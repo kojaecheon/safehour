@@ -10,3 +10,161 @@
  *   - 클래스는 `settings-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
  *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
  */
+
+/* ── 안전 문구 병기 (components/settings/PairText.js · /cards · /emergency · /privacy 도 쓴다) ── */
+.settings-pair-primary,
+.settings-pair-secondary {
+  display: block;
+  font-size: var(--text-body);
+}
+.settings-pair-primary {
+  color: var(--ink);
+}
+/* 병기 줄은 보조 색이지만 투명도를 낮추지 않는다(--ink-soft 7.54:1) */
+.settings-pair-secondary {
+  color: var(--ink-soft);
+  margin-top: var(--space-1);
+}
+
+/* ── /more (AX-318) ── */
+.settings-menu {
+  display: grid;
+  gap: var(--space-2);
+  list-style: none;
+}
+.settings-menu-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: var(--shadow-card);
+}
+.settings-menu-link:hover {
+  background: var(--surface-alt);
+}
+.settings-menu-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.settings-menu-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.settings-menu-label {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.settings-menu-desc {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.settings-menu-chevron {
+  color: var(--ink-soft);
+}
+
+/* ── /settings (AX-318) ── */
+.settings-section > h2 {
+  margin-bottom: var(--space-3);
+}
+.settings-fieldset {
+  border: none;
+  min-width: 0;
+}
+.settings-text {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  margin: var(--space-3) 0;
+}
+.settings-toggle .label {
+  display: grid;
+  gap: var(--space-1);
+}
+.settings-toggle-hint {
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  color: var(--ink-soft);
+}
+.settings-status p {
+  margin-top: var(--space-3);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.settings-disclosure {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--ink-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.settings-effects {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+  margin-top: var(--space-4);
+}
+.settings-effects > li {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--line-strong);
+}
+.settings-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* ── 이 기기에서 내 정보 지우기 (components/ClearSessionButton.js) ── */
+.settings-clear-note {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  margin-top: var(--space-2);
+}
+.settings-clear-question {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.settings-clear-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.settings-clear-actions > .btn {
+  flex: 1 1 120px;
+}
+.settings-clear-result p {
+  margin: var(--space-2) 0;
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.settings-clear.clear-session {
+  padding: 0;
+}
+
+/* 화면 하단 고지 링크 (components/FooterLinks.js) */
+.settings-footer-links {
+  padding: 0 var(--space-1);
+}
+.settings-footer-link {
+  display: inline-flex;
+  align-items: center;
+}

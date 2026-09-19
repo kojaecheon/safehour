@@ -1,68 +1,112 @@
 'use client';
 
-// 내 정보 지우기 (AX-210 · SIGNOFF_CHECKLIST 2.4)
+// 이 기기에서 내 정보 지우기 (AX-210 → AX-318 · spec 4.19 · 규칙 41)
 //
-// 서버는 저장하지 않지만 단말에는 병원 조건이 남는다. 공용 기기나 동반자와
-// 함께 쓰는 폰에서 그것을 지울 수단이 필요하다.
+// 기기 저장소의 deleteAllMyData() 를 부른다 — `safehour.v2.` 아래를 언어만 빼고 모두 지우고
+// (모든 계정 이름공간, 보호자 사본, 알림 예약, AI 문장 캐시, 언어 외 설정, 예전 탭 저장 키), 로그아웃한다.
+// 보기 전용(로그인 만료·오프라인)에서도 동작한다.
 //
 //   - 되돌릴 수 없으므로 한 번 확인한다.
-//   - 삭제 후에는 **전체 새로고침**으로 이동한다 — React 메모리에 남은 조건 사본까지 버린다.
+//   - 로그아웃까지 끝나면(기본) **전체 새로고침**으로 시작 화면에 간다 — React 메모리 사본까지 버리고,
+//     시작 화면이 삭제 안내를 한 번 띄운다(lib/session.js 의 삭제 표시).
+//   - 로그아웃이 서버에 닿지 못했으면(오프라인) 이 자리에 결과를 남긴다: 기기 삭제는 끝났고,
+//     로그아웃은 인터넷에 연결되면 마무리된다(저장소가 온라인이 되면 다시 보낸다). 그동안 로그인으로 보지 않는다.
+//   - stayOnPage(설정 화면)면 로그아웃까지 끝나도 이동하지 않고 결과를 보여준다.
 
 import { useState } from 'react';
+import { deleteAllMyData } from '@/lib/store/index.js';
 import { clearSafeHourSession } from '@/lib/session.js';
 import { useLang } from './LanguageProvider.js';
+import useStoreStatus from './ui/useStoreStatus.js';
 
-export default function ClearSessionButton() {
+/** 시작 화면으로 전체 새로고침 — 삭제 안내를 한 번 띄우도록 표시한다 */
+function goHome() {
+  clearSafeHourSession();
+  window.location.assign('/');
+}
+
+/**
+ * @param {{ stayOnPage?: boolean }} props
+ */
+export default function ClearSessionButton({ stayOnPage = false }) {
   const { t } = useLang();
-  const [confirming, setConfirming] = useState(false);
+  const status = useStoreStatus();
+  /** 'idle' | 'confirm' | 'working' | 'done' */
+  const [phase, setPhase] = useState('idle');
+  const [result, setResult] = useState(null);
 
   async function handleClear() {
-    clearSafeHourSession();
-    // 로그인 쿠키는 httpOnly 라 클라이언트가 지울 수 없다 — 서버에 지워달라고 해야
-    // "내 정보를 지웠다" 가 사실이 된다 (AX-219). 실패해도 단말 삭제는 이미 끝났다.
+    setPhase('working');
+    let outcome;
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      outcome = await deleteAllMyData();
     } catch {
-      // 네트워크가 끊겨도 이동은 진행한다
+      outcome = { ok: false, removed: 0, loggedOut: false };
     }
-    // router.push 는 클라이언트 상태를 유지하므로 쓰지 않는다.
-    window.location.href = '/';
-  }
-
-  if (!confirming) {
-    return (
-      <div className="clear-session">
-        <button type="button" className="link-button" onClick={() => setConfirming(true)}>
-          {t('clear.cta')}
-        </button>
-        <p className="hint">{t('clear.note')}</p>
-      </div>
-    );
+    if (!stayOnPage && outcome.ok && outcome.loggedOut) {
+      // router.push 는 클라이언트 상태를 유지하므로 쓰지 않는다
+      goHome();
+      return;
+    }
+    setResult(outcome);
+    setPhase('done');
   }
 
   return (
-    <div className="clear-session" role="group" aria-label={t('clear.cta')}>
-      <p role="alert" style={{ fontSize: 14 }}>
-        {t('clear.question')}
-      </p>
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button
-          type="button"
-          className="btn btn-secondary btn-small"
-          style={{ flex: 1 }}
-          onClick={() => setConfirming(false)}
-        >
-          {t('clear.cancel')}
-        </button>
-        <button
-          type="button"
-          className="btn btn-secondary btn-small"
-          style={{ flex: 1 }}
-          onClick={handleClear}
-        >
-          {t('clear.confirm')}
-        </button>
+    <div className={stayOnPage ? 'clear-session settings-clear' : 'clear-session'}>
+      {(phase === 'idle' || (phase === 'done' && result && !result.ok)) && (
+        <>
+          <button
+            type="button"
+            className={stayOnPage ? 'btn btn-secondary' : 'link-button'}
+            onClick={() => setPhase('confirm')}
+          >
+            {t('clear.cta')}
+          </button>
+          <p className="settings-clear-note">{t('clear.note')}</p>
+        </>
+      )}
+
+      {(phase === 'confirm' || phase === 'working') && (
+        <div role="group" aria-label={t('clear.cta')}>
+          <p role="alert" className="settings-clear-question">
+            {t('clear.question')}
+          </p>
+          <div className="settings-clear-actions">
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              disabled={phase === 'working'}
+              onClick={() => setPhase('idle')}
+            >
+              {t('clear.cancel')}
+            </button>
+            <button
+              type="button"
+              className="btn btn-secondary btn-small"
+              disabled={phase === 'working'}
+              onClick={handleClear}
+            >
+              {phase === 'working' ? t('clear.working') : t('clear.confirm')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 결과 자리는 늘 DOM 에 둔다 — 바뀌면 스크린리더가 읽는다 */}
+      <div role="status" className="settings-clear-result">
+        {phase === 'done' && result && (
+          <>
+            <p>{result.ok ? t('clear.done', { count: result.removed }) : t('clear.partial')}</p>
+            {result.ok && <p>{status.logoutPending ? t('clear.logoutPending') : t('clear.loggedOut')}</p>}
+          </>
+        )}
       </div>
+      {phase === 'done' && result?.ok && (
+        <button type="button" className="btn btn-secondary btn-small" onClick={goHome}>
+          {t('clear.goHome')}
+        </button>
+      )}
     </div>
   );
 }
