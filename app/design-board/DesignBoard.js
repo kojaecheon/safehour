@@ -1,11 +1,11 @@
 'use client';
 
-// /design-board — 디자인 시안 보드 1차 (AX-304 · spec 7장)
+// /design-board — 디자인 시안 보드 (AX-304 토큰·부품 · AX-321 화면 시안 · spec 7장)
 //
 // - 토큰 견본(색·대비, 글자, 간격·모서리·그림자)과 부품의 상태별 견본을 보여준다.
 // - 고정 데모 데이터(./demoData.js + designBoard 이름공간 문구)만 쓴다. 저장소·세션·서버를 부르지 않는다.
 // - 대비 수치는 globals.css 의 토큰 값을 브라우저에서 읽어 **그 자리에서 계산**한다 — 토큰이 바뀌면 수치도 따라 바뀐다.
-// - '화면 시안' 절은 비워 둔다. AX-321(T19)이 실제 화면 부품 + 고정 데모 데이터로 채운다.
+// - '화면 시안' 절(AX-321)은 ./ScreenPreviews.js 가 주요 화면 8개를 실제 부품 + 고정 데모 데이터(./screenData.js)로 그린다.
 // - 내비에 노출하지 않는다(BottomNav 에 없음).
 
 import { useEffect, useState } from 'react';
@@ -48,6 +48,7 @@ import {
   SPACING,
   TYPE_SCALE,
 } from './demoData.js';
+import ScreenPreviews from './ScreenPreviews.js';
 
 // ── 대비 계산 (WCAG 2.1 상대 휘도) ──
 
@@ -595,11 +596,9 @@ export default function DesignBoard() {
           </div>
         </Section>
 
-        {/* ── 5. 화면 시안 — AX-321(T19)이 채운다. 여기에는 아무것도 넣지 않는다 ── */}
-        <Section id="designBoard-screens" title={t('designBoard.screensTitle')}>
-          <div className="designBoard-pending" data-owner="AX-321">
-            <p>{t('designBoard.screensPending')}</p>
-          </div>
+        {/* ── 5. 화면 시안 (AX-321) — 실제 화면 부품 + 고정 데모 데이터(./screenData.js)로 그린 축소 시안 ── */}
+        <Section id="designBoard-screens" title={t('designBoard.screensTitle')} lead={t('designBoard.screensLead')}>
+          <ScreenPreviews />
         </Section>
       </main>
     </>

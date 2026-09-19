@@ -46,7 +46,7 @@ export const UTMK = Object.freeze({
 
 /**
  * 대한민국 범위 — spec 6장 "좌표는 대한민국 범위만 받는다".
- * 기존 기준점 검사(`lib/server/engine-io.js` normalizeOrigin)와 같은 경계를 쓴다.
+ * 일정 API 의 좌표 범위 검사(`lib/server/itinerary-request.js` inKorea)와 같은 경계를 쓴다.
  */
 export function isInKorea(lat, lng) {
   return Number.isFinite(lat) && Number.isFinite(lng) && lat > 33 && lat < 39 && lng > 124 && lng < 132;

@@ -243,13 +243,81 @@ export const messages = {
     zh: '演示照片 — 并非观光公社的真实照片',
   },
 
-  // ── 화면 시안 (AX-321 이 채운다) ──
+  // ── 화면 시안 (AX-321) ──
   'designBoard.screensTitle': { ko: '화면 시안', en: 'Screen mock-ups', ja: '画面デザイン案', zh: '页面设计稿' },
-  'designBoard.screensPending': {
-    ko: '비어 있는 자리입니다. 오늘·전체 일정·하루 일정·조건 입력·장소 상세·카드·긴급·보호자 열기 축소 시안을 다음 작업이 채웁니다.',
-    en: 'Reserved. A later task fills in mini mock-ups of Today, Trip, Day plan, Conditions, Place, Cards, Emergency and Companion link.',
-    ja: '空欄です。今日・全日程・1日の日程・条件入力・場所詳細・カード・緊急・付き添いリンクの縮小案は後の作業で埋めます。',
-    zh: '此处留空。后续任务会补上今天、全部行程、单日行程、条件填写、地点详情、卡片、紧急和陪同者链接的缩略设计稿。',
+  'designBoard.screensLead': {
+    ko: '실제 화면 부품에 고정 데모 체류(10월 2일 입국 · 3일 수술·시술 · 5일 진료 · 8일 출국)를 넣어 줄여 그린 그림입니다. 오늘은 10월 5일 오전 9시 10분으로 고정했습니다. 그림은 누를 수 없고, 이 기기의 정보를 읽지 않습니다.',
+    en: 'Scaled-down pictures of the real screen components filled with a fixed demo stay (arrive 2 Oct, procedure 3 Oct, check-up 5 Oct, leave 8 Oct). “Now” is fixed at 09:10 on 5 Oct. The pictures cannot be tapped and read nothing from this device.',
+    ja: '実際の画面部品に固定のデモ滞在（10月2日入国・3日手術／施術・5日診察・8日出国）を入れて縮小した図です。今日は10月5日午前9時10分に固定しています。図は押せず、この端末の情報を読みません。',
+    zh: '这些是把固定演示行程（10月2日入境、3日手术或治疗、5日复诊、8日出境）放入真实页面组件后缩小的图。“现在”固定为10月5日上午9:10。图片不能点按，也不会读取本设备上的信息。',
+  },
+  'designBoard.screenToday': { ko: '오늘', en: 'Today', ja: '今日', zh: '今天' },
+  'designBoard.screenTodayNote': {
+    ko: '매일 확인 전 — 상태가 대기로 보이고 길찾기가 막힙니다. 다음 외출의 복귀 마감·이유·예상 귀가가 함께 보입니다.',
+    en: 'Before the daily check — the state shows as standby and directions are blocked. The next outing shows its return deadline, reason and planned return.',
+    ja: '毎日の確認前 — 状態は待機になり、道案内は使えません。次の外出の戻り期限・理由・帰着予定が一緒に表示されます。',
+    zh: '每日确认之前——状态显示为待命，导航不可用。下一次外出会同时显示返回截止时间、原因和预计返回时间。',
+  },
+  'designBoard.screenTrip': { ko: '전체 일정', en: 'Whole trip', ja: '全体の予定', zh: '整个行程' },
+  'designBoard.screenTripNote': {
+    ko: '입국부터 출국까지 날짜마다 상태(색·아이콘·글자), 날짜 분류, 병원 일정, 장소 수, 사유, 변경됨 표시.',
+    en: 'Every date from arrival to departure with its state (colour, icon and text), day type, hospital visit, number of places, reasons and a “changed” tag.',
+    ja: '入国から出国まで日付ごとに状態（色・アイコン・文字）、日の分類、病院の予定、場所の数、理由、変更ありの表示。',
+    zh: '从入境到出境的每一天：状态（颜色、图标、文字）、日期分类、医院日程、地点数量、原因和“已变更”标记。',
+  },
+  'designBoard.screenDay': { ko: '하루 일정', en: 'Day plan', ja: '1日の予定', zh: '单日行程' },
+  'designBoard.screenDayNote': {
+    ko: '조건이 바뀌어 장소 하나가 바뀐 날 — 바뀐 점 보기, 환자/보호자 탭, 노선도 타임라인(이동은 늘 추정), 비운 식사 칸, 적용한 조건과 빠진 장소.',
+    en: 'A day where one place was replaced after the conditions changed — see-what-changed button, patient/companion tabs, route-map timeline (travel always estimated), a cleared meal slot, applied conditions and left-out places.',
+    ja: '条件が変わって場所が1つ入れ替わった日 — 変更点を見る、患者/同行者タブ、路線図タイムライン（移動は常に推定）、空けた食事枠、適用した条件と外れた場所。',
+    zh: '因条件变化替换了一个地点的一天——查看变化按钮、患者/陪同者标签、线路图时间线（交通时间始终为估算）、已清空的用餐时段、已采用的条件和被排除的地点。',
+  },
+  'designBoard.screenConditions': { ko: '조건 입력', en: 'Conditions input', ja: '条件の入力', zh: '条件填写' },
+  'designBoard.screenConditionsNote': {
+    ko: '본인 체크 기간 편집 — 정해진 항목만 예/아니오/모르겠음으로 고릅니다. 자유 서술 칸은 없고, 필수 항목에는 모르겠음이 없습니다.',
+    en: 'Editing a self-check period — only fixed items, answered yes / no / not sure. There is no free-text field, and required items have no “not sure”.',
+    ja: '本人チェック期間の編集 — 決められた項目だけを、はい/いいえ/わからないで選びます。自由記述欄はなく、必須項目に「わからない」はありません。',
+    zh: '编辑本人确认期间——只对固定项目选择是/否/不确定。没有自由填写栏，必填项目没有“不确定”。',
+  },
+  'designBoard.screenPlace': { ko: '장소 상세', en: 'Place details', ja: '場所の詳細', zh: '地点详情' },
+  'designBoard.screenPlaceNote': {
+    ko: 'SafeHour 판정·추정과 관광공사 원문을 다른 출처 영역에 둡니다. 지도 링크는 목적지만 넘기고, 매일 확인 전에는 막힙니다.',
+    en: 'SafeHour decisions and estimates sit in a different source area from the tourism organisation’s original text. Map links carry only the destination and are blocked before the daily check.',
+    ja: 'SafeHourの判定・推定と観光公社の原文を別の出典エリアに置きます。地図リンクは目的地だけを渡し、毎日の確認前は使えません。',
+    zh: 'SafeHour 的判断和估算与观光公社原文放在不同的来源区域。地图链接只传递目的地，每日确认前不可用。',
+  },
+  'designBoard.screenCards': { ko: '한국어 카드', en: 'Korean cards', ja: '韓国語カード', zh: '韩语卡片' },
+  'designBoard.screenCardsNote': {
+    ko: '식당 직원·택시 기사에게 보여 주는 고정 문구 카드 — 식이, 이동, 복귀, 병원 순서입니다.',
+    en: 'Fixed-wording cards to show restaurant staff or taxi drivers — diet, going somewhere, returning, hospital.',
+    ja: '飲食店の店員やタクシー運転手に見せる固定文のカード — 食事、移動、戻り、病院の順です。',
+    zh: '给餐厅员工或出租车司机看的固定文字卡片——依次为饮食、出行、返回、医院。',
+  },
+  'designBoard.screenEmergency': { ko: '긴급 연락', en: 'Emergency', ja: '緊急連絡', zh: '紧急联系' },
+  'designBoard.screenEmergencyNote': {
+    ko: '119·1330(해외 형식 함께)과 등록한 병원 전화. 로그인 만료·오프라인에서도 열립니다. 데모 병원 번호는 걸리지 않는 자리표시자입니다.',
+    en: '119 and 1330 (with the overseas format) plus the registered hospital’s phone. Opens even when signed out or offline. The demo hospital number is a placeholder that cannot connect.',
+    ja: '119・1330（海外からの形式も）と登録した病院の電話。ログイン切れ・オフラインでも開きます。デモ病院の番号はつながらない仮の番号です。',
+    zh: '119、1330（附境外拨打格式）和已登记医院的电话。登录过期或离线时也能打开。演示医院号码是无法接通的占位号码。',
+  },
+  'designBoard.screenGuardian': { ko: '보호자 열기', en: 'Companion link', ja: '付き添いリンク', zh: '陪同者链接' },
+  'designBoard.screenGuardianNote': {
+    ko: '새 링크의 PIN 입력과 이미 가져온 사본 — 만든 시각 기준이고 자동으로 바뀌지 않습니다. 병원 이름·주소와 조건 세부는 담지 않습니다.',
+    en: 'PIN entry for a new link above a copy already imported — as of the time it was made, never updated automatically. It holds no hospital name or address and no condition details.',
+    ja: '新しいリンクのPIN入力と取り込み済みの写し — 作成時点のもので自動では更新されません。病院名・住所や条件の詳細は含みません。',
+    zh: '新链接的 PIN 输入和已导入的副本——以创建时间为准，不会自动更新。不包含医院名称、地址和条件细节。',
+  },
+  'designBoard.demoCraft': { ko: '데모 공예 박물관', en: 'Demo Craft Museum', ja: 'デモ工芸博物館', zh: '演示工艺博物馆' },
+  'designBoard.demoTeaHouse': { ko: '데모 찻집', en: 'Demo Tea House', ja: 'デモ茶房', zh: '演示茶馆' },
+  'designBoard.demoTofu': { ko: '데모 두부 요리점', en: 'Demo Tofu Kitchen', ja: 'デモ豆腐料理店', zh: '演示豆腐料理店' },
+  'designBoard.demoSauna': { ko: '데모 찜질방', en: 'Demo Jjimjilbang', ja: 'デモチムジルバン', zh: '演示汗蒸房' },
+  'designBoard.demoWaterpark': { ko: '데모 워터파크', en: 'Demo Water Park', ja: 'デモウォーターパーク', zh: '演示水上乐园' },
+  'designBoard.demoPub': { ko: '데모 주점', en: 'Demo Pub', ja: 'デモ居酒屋', zh: '演示酒馆' },
+  'designBoard.demoAddress': {
+    ko: '데모 주소 · 서울 중구 명동 인근',
+    en: 'Demo address · near Myeong-dong, Jung-gu, Seoul',
+    ja: 'デモ住所 · ソウル中区明洞付近',
+    zh: '演示地址 · 首尔中区明洞附近',
   },
 };
 

@@ -12,8 +12,8 @@
 // | PATIENT_RECALL | 없음                                   | 오늘 남은 일정 비움, returnNow, PATIENT_RECALLED |
 // | RISK_SIGNAL    | 없음                                   | 오늘 남은 환자·보호자 외출 비움, NO_TOURISM       |
 //
-// 누적 방식은 기존 /api/recalculate 계약(lib/server/engine-io.js toCumulativeEvent)과 같다:
-// 사건마다 범위로 자르고, 누적값도 사건마다 상한으로 자른다. 순서가 같으면 결과가 같다.
+// 누적 방식: 사건마다 범위로 자르고, 누적값도 사건마다 상한으로 자른다. 순서가 같으면 결과가 같다
+// (퇴역한 단일 외출 재계산 API 의 누적 규칙을 그대로 옮긴 것이다 — 그 API 는 AX-308 에서 지웠다).
 
 import { fromMinutes, isClockTime, toMinutes } from '../stay/time.js';
 

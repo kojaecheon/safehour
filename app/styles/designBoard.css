@@ -1,6 +1,6 @@
 /* 기능별 스타일 — designBoard (/design-board)
  *
- * AX-304 가 1차(토큰·부품 견본)를 채웠다. '화면 시안' 절은 AX-321(T19)이 이 파일에 이어서 쓴다.
+ * AX-304 가 1차(토큰·부품 견본)를 채웠고, '화면 시안' 절은 AX-321 이 이어서 썼다(맨 아래).
  * 등록은 app/layout.js 한곳에서 이미 끝났다 — 새로 import 하지 않는다.
  *
  * 규칙
@@ -305,15 +305,94 @@
   border-radius: var(--radius-sm);
 }
 
-/* ── 화면 시안 자리 (AX-321 이 채운다) ── */
-.designBoard-pending {
-  padding: var(--space-8) var(--space-5);
-  border: 2px dashed var(--line-input);
-  border-radius: var(--radius-lg);
-  background: var(--surface-alt);
-  text-align: center;
+/* ── 화면 시안 (AX-321) ──
+ * 화면 틀은 360×760(기준 폭 360px)으로 그리고 transform 으로 줄인다. 넘치는 아래쪽은 틀이 자른다.
+ * 줄인 폭: 좁은 화면 0.78(281px — 320px 화면의 본문 폭 288px 안), 700px 이상 0.7(252px, 1120px 보드에 4열).
+ * 틀 안은 inert(ScreenPreviews.js)라 누르거나 포커스할 수 없다. 긴급 버튼·하단 내비는 틀 아래에 붙인다. */
+.designBoard-screens {
+  --designBoard-phone-w: 360px;
+  --designBoard-phone-h: 760px;
+  --designBoard-scale: 0.78;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--designBoard-phone-w) * var(--designBoard-scale)), 1fr));
+  gap: var(--space-8) var(--space-6);
+  justify-items: center;
+  align-items: start;
 }
-.designBoard-pending p {
-  max-width: 60ch;
-  margin: 0 auto;
+@media (min-width: 700px) {
+  .designBoard-screens {
+    --designBoard-scale: 0.7;
+  }
+}
+.designBoard-screen {
+  display: grid;
+  gap: var(--space-3);
+  width: calc(var(--designBoard-phone-w) * var(--designBoard-scale));
+  min-width: 0;
+}
+.designBoard-phone {
+  width: 100%;
+  height: calc(var(--designBoard-phone-h) * var(--designBoard-scale));
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-card);
+}
+.designBoard-phone-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--designBoard-phone-w);
+  height: var(--designBoard-phone-h);
+  overflow: hidden;
+  background: var(--bg);
+  transform: scale(var(--designBoard-scale));
+  transform-origin: 0 0;
+}
+.designBoard-phone-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+/* main.page 와 같은 여백(아래는 긴급 버튼·내비 자리만큼) — 시안 안에는 main 랜드마크를 두지 않는다 */
+.designBoard-phone-page {
+  padding: var(--space-5) var(--gutter) calc(var(--nav-height) + var(--space-12));
+}
+.designBoard-phone-dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.designBoard-phone-sos {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 var(--gutter);
+}
+.designBoard-phone .ui-bottom-nav.is-preview {
+  border-width: 1px 0 0;
+  border-radius: 0;
+}
+.designBoard-screen-caption {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.designBoard-screen-name {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+}
+.designBoard-screen-caption code {
+  justify-self: start;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.designBoard-screen-note {
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  color: var(--ink-soft);
 }

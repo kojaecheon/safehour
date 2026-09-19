@@ -22,10 +22,11 @@ import PwaRuntime from '@/components/pwa/PwaRuntime.js';
 // 일정 동기화·즉시 복귀 시트 (AX-317): 어느 화면으로 열어도 변화 감지가 돌고, 즉시 복귀 시트가 자동으로 열린다
 import TripRuntime from '@/components/trip/TripRuntime.js';
 
+// 제목·설명은 안전을 약속하지 않는다 — 조건 통과와 안전은 다르다 (spec 9.1 '안전합니다' 표현 금지 · AX-321)
 export const metadata = {
-  title: 'SafeHour — 안심 관광 추천 / Safe outings within hospital instructions',
+  title: 'SafeHour — 체류 일정 동반 / Day plans for your medical stay in Korea',
   description:
-    '수술·시술 후 외국인 환자와 보호자에게 병원 조건과 복귀시간 안에서 안전한 관광 활동을 추천합니다. SafeHour는 의료 판단을 하지 않습니다. — SafeHour suggests tourism only within the precautions and return time set by your hospital. It makes no medical judgements.',
+    '수술·시술을 받으러 한국에 온 외국인 환자와 동반 보호자에게 입국부터 출국까지 날짜별 관광 일정을 만들어 드립니다. 일정은 병원이 정했거나 본인이 확인한 조건 안에서만 만들며, SafeHour는 의료 판단을 하지 않습니다. — SafeHour builds day-by-day sightseeing plans for international patients and their companions, from arrival to departure, only within the conditions set by the hospital or checked by the patient. It makes no medical judgements.',
   // 앱 설치 (AX-319): 매니페스트는 app/manifest.js 가 자동으로 링크한다. 아이콘은 public/icons/*
   icons: { icon: '/icons/icon.svg', apple: '/icons/apple-touch-icon.png' },
   appleWebApp: { capable: true, title: 'SafeHour', statusBarStyle: 'default' },
