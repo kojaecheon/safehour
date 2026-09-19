@@ -9,4 +9,739 @@
  *   - 부품 모양(components/ui, app/styles/ui.css)은 여기서 덮어쓰지 않는다. 화면 배치만 더한다.
  *   - 클래스는 `onboarding-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
  *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
+ *
+ * AX-314 배치
+ *   - 시작(/): 일러스트 히어로 → 언어 선택 → 고지 3종(두 언어 병기) → 시작하기 → 면책(두 언어)
+ *   - 로그인(/login): 자물쇠 표식 + 제목 → 공급자 버튼 묶음 → 본인 확인 아님 안내
+ *   - 체류 설정(/onboarding): 단계 표시 → 단계 제목 → 오류 요약 → 카드형 입력 → 이전/다음
+ *   - 오류는 문장 + 왼쪽 굵은 띠 + 굵은 글자로 보인다(색만으로 알리지 않는다). 글자 색은 --support-ink(7.64:1).
  */
+
+/* ───────────────────────── 공통 ───────────────────────── */
+
+.onboarding-hint,
+.onboarding-note,
+.onboarding-count {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+}
+.onboarding-hint {
+  margin-top: var(--space-2);
+}
+.onboarding-note {
+  margin: var(--space-4) 0;
+}
+.onboarding-count {
+  margin-top: var(--space-1);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.onboarding-stack {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
+}
+.onboarding-section {
+  margin-top: var(--space-8);
+}
+.onboarding-section > h2 {
+  margin-bottom: var(--space-1);
+}
+
+/* 안전 문구 병기 — 주 언어 한 줄 + 병기 언어 한 줄. 병기 줄도 16px·대비 유지(투명도 감산 금지) */
+.onboarding-safety {
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--ink-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.onboarding-safety p {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--ink);
+}
+.onboarding-safety .onboarding-secondary {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--line-strong);
+  color: var(--ink-soft);
+}
+
+/* ───────────────────────── 시작 화면 ───────────────────────── */
+
+.onboarding-hero {
+  padding-top: var(--space-2);
+}
+.onboarding-hero-art {
+  aspect-ratio: 16 / 9;
+  margin-bottom: var(--space-5);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--art-sky);
+}
+.onboarding-art {
+  width: 100%;
+  height: 100%;
+}
+.onboarding-hero-title {
+  font-size: var(--text-display);
+  line-height: var(--leading-tight);
+}
+.onboarding-hero-title > span {
+  display: block;
+}
+.onboarding-hero-title > span + span {
+  color: var(--accent-strong);
+}
+.onboarding-hero-lead {
+  margin-top: var(--space-3);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+
+/* 언어 선택 — 2열 격자. 선택: 포인트 테두리 + 옅은 바탕 + 체크 아이콘 + 굵기 (색 단독 금지) */
+.onboarding-lang-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.onboarding-lang-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  text-align: left;
+  cursor: pointer;
+}
+.onboarding-lang-option:hover {
+  background: var(--surface-alt);
+}
+.onboarding-lang-option[aria-pressed='true'] {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: var(--weight-heavy);
+}
+.onboarding-lang-check {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+/* 고지 3종 */
+.onboarding-notices {
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.onboarding-notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.onboarding-notice-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.onboarding-notice-title {
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+.onboarding-notice-text p {
+  margin-top: var(--space-1);
+  font-size: var(--text-body);
+}
+.onboarding-notice-secondary {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px dashed var(--line-strong);
+}
+.onboarding-notice-secondary strong {
+  font-weight: var(--weight-bold);
+}
+
+.onboarding-cta {
+  margin-top: var(--space-6);
+}
+.onboarding-footer-note {
+  margin-top: var(--space-5);
+}
+
+/* ───────────────────────── 로그인 ───────────────────────── */
+
+.onboarding-login-hero {
+  padding: var(--space-4) 0 var(--space-5);
+}
+.onboarding-login-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.onboarding-login-title {
+  font-size: var(--text-title-1);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-heavy);
+  white-space: pre-line;
+  margin-bottom: 0;
+}
+.onboarding-login-methods {
+  margin-bottom: var(--space-5);
+}
+.onboarding-login-signed {
+  display: grid;
+  gap: var(--space-3);
+}
+.onboarding-login-signed-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--state-together-ink);
+}
+
+/* ───────────────────────── 체류 설정 ───────────────────────── */
+
+.onboarding-page {
+  padding-top: var(--space-4);
+}
+
+/* 단계 표시 — 숫자 원 5개. 모양으로도 구분한다: 체크(지남) · 채운 원(지금) · 실선(가 봄) · 파선(아직) */
+.onboarding-steps {
+  margin-bottom: var(--space-4);
+}
+.onboarding-steps-count {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink-soft);
+  margin-bottom: var(--space-2);
+}
+.onboarding-steps ol {
+  list-style: none;
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+.onboarding-steps-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* 첫 칸은 앞 연결선이 없으므로 제 폭만 차지한다 — 칸 사이 간격이 고르게 된다 */
+.onboarding-steps-item:first-child {
+  flex: none;
+}
+/* 칸 사이 연결선 */
+.onboarding-steps-item + .onboarding-steps-item::before {
+  content: '';
+  flex: 1;
+  height: 2px;
+  margin-right: var(--space-1);
+  background: var(--line-strong);
+}
+.onboarding-steps-item > button,
+.onboarding-steps-item > span {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: none;
+  font-family: inherit;
+  cursor: default;
+}
+.onboarding-steps-item > button {
+  cursor: pointer;
+}
+.onboarding-steps-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--line-input);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+.onboarding-steps-item.is-upcoming .onboarding-steps-mark {
+  border-style: dashed;
+  color: var(--ink-soft);
+}
+.onboarding-steps-item.is-done .onboarding-steps-mark {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+.onboarding-steps-item.is-current .onboarding-steps-mark {
+  width: 40px;
+  height: 40px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: var(--weight-heavy);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.onboarding-steps-item > button:hover .onboarding-steps-mark {
+  background: var(--surface-alt);
+}
+
+.onboarding-step-title {
+  font-size: var(--text-title-1);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  font-weight: var(--weight-heavy);
+  margin-bottom: var(--space-2);
+  /* 초점이 올 때 고정 상단 바에 가리지 않게 */
+  scroll-margin-top: 88px;
+}
+.onboarding-step-title:focus {
+  outline: none;
+}
+.onboarding-step-title:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.onboarding-lead {
+  margin-bottom: var(--space-5);
+  font-size: var(--text-body);
+}
+.onboarding-subhead {
+  margin: var(--space-6) 0 var(--space-2);
+  font-size: var(--text-title-2);
+}
+
+/* 카드 — 숙소 구간·병원·일정·입국/출국 묶음 */
+.onboarding-card {
+  min-width: 0;
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  scroll-margin-top: 88px;
+}
+fieldset.onboarding-card {
+  padding-top: var(--space-2);
+}
+.onboarding-card.is-locked {
+  background: var(--surface-alt);
+}
+.onboarding-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.onboarding-card-head h3,
+.onboarding-card-head h4 {
+  font-size: var(--text-title-3);
+  line-height: var(--leading-snug);
+  margin: 0;
+}
+.onboarding-card-head .btn-quiet {
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+.onboarding-group-title {
+  padding: 0 var(--space-1);
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.onboarding-list {
+  scroll-margin-top: 88px;
+}
+.onboarding-list:focus {
+  outline: none;
+}
+.onboarding-list:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
+}
+
+/* 날짜 + 시각 두 칸 — 좁으면 한 줄씩 */
+.onboarding-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0 var(--space-3);
+}
+.onboarding-field {
+  min-width: 0;
+}
+.onboarding-field input,
+.onboarding-field select {
+  min-width: 0;
+}
+
+/* 라디오 묶음 */
+.onboarding-choice {
+  min-width: 0;
+  border: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+}
+.onboarding-choice > legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.onboarding-choice > .onboarding-hint {
+  margin: 0 0 var(--space-2);
+}
+.onboarding-option-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.onboarding-option-label {
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+.radio-option.selected .onboarding-option-label {
+  font-weight: var(--weight-heavy);
+}
+.onboarding-option-sub {
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  color: var(--ink-soft);
+}
+
+/* 오류 — 문장 + 왼쪽 굵은 띠 + 굵은 글자. 입력 칸은 테두리가 두꺼워진다(색만으로 알리지 않는다) */
+.onboarding-field-error {
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--support-ink);
+}
+.onboarding-field-error p {
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  font-weight: var(--weight-bold);
+  color: var(--support-ink);
+}
+.onboarding-field-error p + p {
+  margin-top: var(--space-1);
+}
+.onboarding-form input[aria-invalid='true'],
+.onboarding-form select[aria-invalid='true'] {
+  border-color: var(--support-ink);
+  box-shadow: inset 0 0 0 1px var(--support-ink);
+}
+
+/* 오류 요약 */
+.onboarding-summary {
+  margin-bottom: var(--space-5);
+  padding: var(--space-4);
+  border: 2px solid var(--support-ink);
+  border-radius: var(--radius);
+  background: var(--support-soft);
+  scroll-margin-top: 88px;
+}
+.onboarding-summary-title {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+}
+.onboarding-summary ul {
+  list-style: none;
+  display: grid;
+  gap: var(--space-1);
+}
+.onboarding-summary a {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: var(--tap-min);
+  padding: var(--space-1) 0;
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.onboarding-summary a strong {
+  color: var(--support-ink);
+}
+
+/* 주소 검색 */
+.onboarding-address {
+  min-width: 0;
+}
+.onboarding-search-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  align-items: stretch;
+}
+.onboarding-search-row input {
+  flex: 1;
+  min-width: 0;
+}
+.onboarding-search-row .btn {
+  flex: none;
+}
+.onboarding-search-status {
+  min-height: var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.onboarding-search-status:empty {
+  margin-top: 0;
+}
+.onboarding-search-status.is-error {
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--support-ink);
+  font-weight: var(--weight-bold);
+  color: var(--support-ink);
+}
+.onboarding-results {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.onboarding-result {
+  display: grid;
+  gap: 2px;
+  justify-items: start;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3);
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.onboarding-result:hover {
+  background: var(--surface-alt);
+  border-color: var(--accent);
+}
+.onboarding-result-main {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+}
+.onboarding-result-sub {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.onboarding-result .ui-badge {
+  margin-top: var(--space-1);
+}
+.onboarding-picked {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.onboarding-picked-caption {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+}
+.onboarding-picked-main {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.onboarding-picked-sub {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.onboarding-picked .btn {
+  margin-top: var(--space-2);
+}
+
+/* 예상 종료 — '추정' 배지 + 굵은 시각 */
+.onboarding-estimate {
+  margin-top: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dotted var(--ink-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.onboarding-estimate p {
+  font-size: var(--text-body);
+}
+.onboarding-estimate-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+.onboarding-estimate-head strong {
+  font-variant-numeric: tabular-nums;
+}
+.onboarding-locked-line {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+
+.onboarding-tally {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+}
+
+/* 관심사 칩 — 선택: 포인트 테두리 + 옅은 바탕 + 체크 아이콘 + 굵기 (색 단독 금지) */
+.onboarding-chips {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.onboarding-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding: 0 var(--space-4) 0 var(--space-3);
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+.onboarding-chip input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.onboarding-chip:hover {
+  background: var(--surface-alt);
+}
+.onboarding-chip:focus-within {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.onboarding-chip.is-checked {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: var(--weight-heavy);
+}
+.onboarding-chip-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+}
+
+/* 이전 / 다음 · 저장 */
+.onboarding-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+}
+.onboarding-actions > .btn:only-child {
+  grid-column: 1 / -1;
+}
+.onboarding-readonly {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.onboarding-save-error {
+  margin-top: var(--space-3);
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--support-ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--support-ink);
+}
+.onboarding-saved {
+  padding: var(--space-8) 0;
+  text-align: center;
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+
+/* 넓은 화면 — 셸 폭(480px) 안이라 배치는 같다. 시작 화면 격자만 4열로 펼친다 */
+@media (min-width: 420px) {
+  .onboarding-lang-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .onboarding-lang-option {
+    justify-content: center;
+    padding: 0 var(--space-2);
+  }
+}
