@@ -10,3 +10,131 @@
  *   - 클래스는 `emergency-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
  *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
  */
+
+/* ── /emergency (AX-318) ── */
+.emergency-lead {
+  padding: var(--space-4);
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--emergency);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.emergency-lead .settings-pair-primary {
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+
+.emergency-lines {
+  display: grid;
+  gap: var(--space-4);
+  list-style: none;
+  margin-bottom: var(--space-6);
+}
+
+/* 전화 걸기 — 큰 터치 대상(64px 이상), 전화 아이콘 + 번호 + 설명 */
+.emergency-call {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--line-input);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  box-shadow: var(--shadow-card);
+}
+.emergency-call:hover {
+  background: var(--surface-alt);
+}
+/* 119 — 긴급 빨강(긴급 연락 전용 토큰). 흰 글자 5.88:1 */
+.emergency-call.is-urgent {
+  border-color: var(--emergency);
+  background: var(--emergency);
+  color: var(--emergency-ink);
+}
+.emergency-call.is-urgent:hover {
+  background: var(--emergency-strong);
+}
+.emergency-call.is-urgent:focus-visible {
+  outline-color: var(--ink);
+}
+.emergency-call.is-secondary {
+  min-height: var(--tap-min);
+  box-shadow: none;
+}
+.emergency-call-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+.emergency-call.is-urgent .emergency-call-icon {
+  background: var(--emergency-strong);
+  color: var(--emergency-ink);
+}
+.emergency-call-text {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.emergency-call-text strong {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  color: inherit;
+}
+.emergency-call-text span {
+  font-size: var(--text-body);
+  color: inherit;
+}
+
+.emergency-intl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.emergency-intl-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.emergency-section h2 {
+  margin-bottom: var(--space-3);
+}
+.emergency-hospitals {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+}
+.emergency-hospital {
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.emergency-hospital-name {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+}
+.emergency-no-phone,
+.emergency-empty {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
