@@ -1,75 +1,100 @@
 'use client';
 
-// SCR008 — 즉시 복귀 안내
-// 경로 API 승인 전이므로 지도 연결 대신 기준점 좌표 복사 + 병원 연락 안내를 제공한다 (D04-F012 BLOCKED).
+// 즉시 복귀 시트 (AX-317 · spec 4.9 즉시 복귀 · 규칙 13 · 기존 AX-220·AX-011)
 //
-// 복귀 지시는 안전 문구다. 한국어 화면에서도 영문을 병기해 언어를 바꾸지 못한
-// 사용자가 지시를 놓치지 않게 한다 (AX-209). 병기 언어는 safetyPair() 가 정한다 (AX-303):
-// 선택 언어+한국어, ko 면 한국어+영어, ja·zh 는 검수 스위치가 켜지기 전까지 영어+한국어.
+// 환자 호출(데모 사건)·외출 중 지침 철회·만료로 오늘 남은 일정이 비워지면(returnNow) **자동으로** 열린다.
+// 이 동작은 끌 수 없다. 앱 전체에 한 번 다는 components/trip/TripRuntime.js 가 연다.
+//   - 복귀 지시는 안전 문구다 — 주 언어 + 병기 언어 두 줄(safetyPair). ja·zh 는 검수 전까지 영어+한국어.
+//   - 돌아갈 곳은 그날 숙소의 이름·주소 **글자만** 보인다. 좌표·지도 링크를 넣지 않는다(spec 4.14 · 규칙 39).
+//     택시 기사에게 보여 줄 한국어 복귀 카드(/cards)로 잇는다.
+//   - 긴급 연락: 119 전화 걸기와 /emergency.
+//   - 닫기(X)는 없다. '확인했어요' · Escape · 뒤로 가기가 모두 시트만 닫는다(useModalSheet — 페이지를 떠나지 않는다).
+//     닫아도 저장 일정의 returnNow 는 그대로다. 오늘 화면이 '복귀 안내 다시 보기'를 계속 보인다.
 
-import { useState } from 'react';
-import { fmtTime } from '@/lib/format.js';
-import { useModalSheet } from '@/lib/useModalSheet.js';
+import Link from 'next/link';
 import { useLang } from './LanguageProvider.js';
-import { translate } from '@/src/i18n/index.js';
+import { Icon, Sheet } from './ui/index.js';
+import { lodgingOf } from './trip/viewModel.js';
 
-export default function ReturnSheet({ origin, returnBy, latestDepartureAt, onClose }) {
-  const { lang, safety, t, locale } = useLang();
-  const [copyState, setCopyState] = useState('idle'); // idle | ok | fail
-  // 즉시 복귀는 안전 지시다. 뒤로가기로 페이지를 떠나 지시를 잃지 않도록
-  // 모든 닫기가 같은 경로(requestClose)를 거친다 (ADR-0001 보완 조건 3)
-  const { sheetRef, requestClose } = useModalSheet(onClose);
-
-  // return.title·body·note 는 안전 문구 키라 t() 가 safety.primary 언어로 준다
-  const otherLang = safety.secondary;
-  const primaryLang = safety.primary === lang ? undefined : safety.primary;
-
-  async function copyCoords() {
-    try {
-      await navigator.clipboard.writeText(`${origin.lat}, ${origin.lng}`);
-      setCopyState('ok');
-    } catch {
-      setCopyState('fail');
-    }
-  }
+/**
+ * @param {object} props
+ * @param {object|null} props.day        오늘 저장 일정(DayPlan)
+ * @param {object|null} props.stay
+ * @param {string|null} [props.cause]    PATIENT_RECALLED | PLAN_REVOKED | PLAN_EXPIRED
+ * @param {() => void} props.onClose
+ */
+export default function ReturnSheet({ day, stay, cause = null, onClose }) {
+  const { t, pair, safety, lang, reasonText } = useLang();
+  const title = pair('return.title');
+  const body = pair('return.body');
+  const note = pair('return.note');
+  const lodging = lodgingOf(day, stay);
+  const reasonLang = safety.primary === lang ? undefined : safety.primary;
 
   return (
-    <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby="return-sheet-h">
-      <div className="sheet" ref={sheetRef} tabIndex={-1}>
-        <h2 id="return-sheet-h" lang={primaryLang}>
-          {t('return.title')}
-        </h2>
-        <p lang={otherLang} style={{ color: 'var(--ink-soft)', fontSize: 14 }}>
-          {translate('return.title', otherLang)} — {translate('return.body', otherLang)}
+    <Sheet
+      title={title.primary.text}
+      titleLang={title.primary.lang === lang ? undefined : title.primary.lang}
+      onClose={onClose}
+      showClose={false}
+      footer={({ requestClose }) => (
+        <button type="button" className="btn btn-return" onClick={requestClose}>
+          {t('return.confirm')}
+        </button>
+      )}
+    >
+      <div className="trip-return">
+        <p className="trip-pair-secondary" lang={title.secondary.lang}>
+          {title.secondary.text}
         </p>
-        <p lang={primaryLang} style={{ marginTop: 6, marginBottom: 14 }}>
-          {t('return.body')}
+        {cause && (
+          <p className="trip-return-cause" lang={reasonLang}>
+            {reasonText(cause)}
+          </p>
+        )}
+        <p lang={body.primary.lang}>{body.primary.text}</p>
+        <p className="trip-pair-secondary" lang={body.secondary.lang}>
+          {body.secondary.text}
         </p>
 
-        <div className="card" style={{ marginBottom: 10 }}>
-          <h3>{origin.label}</h3>
-          <p style={{ fontSize: 14 }}>{t('return.coords', { lat: origin.lat, lng: origin.lng })}</p>
-          <div className="meta" style={{ marginTop: 8 }}>
-            {returnBy && <span>{t('return.deadline', { time: fmtTime(returnBy, locale) })}</span>}
-          </div>
+        <section className="trip-return-place" aria-labelledby="trip-return-place-h">
+          <h3 id="trip-return-place-h">
+            <Icon name="bed" size={18} /> {t('return.placeTitle')}
+          </h3>
+          {lodging ? (
+            <>
+              <p className="trip-return-name">{lodging.name}</p>
+              {lodging.address && (
+                <p className="trip-return-address" lang="ko">
+                  {lodging.address}
+                </p>
+              )}
+            </>
+          ) : (
+            <p>{t('return.noLodging')}</p>
+          )}
+          <Link className="trip-inline-link" href="/cards#cards-return">
+            {t('return.cardLink')}
+          </Link>
+        </section>
+
+        <div className="trip-return-emergency">
+          <a className="btn btn-secondary" href="tel:119">
+            <Icon name="phone" size={20} />
+            <span>{t('return.call119')}</span>
+          </a>
+          <Link className="trip-inline-link" href="/emergency">
+            {t('return.emergencyLink')}
+          </Link>
         </div>
 
-        <button type="button" className="btn btn-secondary" onClick={copyCoords}>
-          {t('return.copyCta')}
-        </button>
-        <p role="status" style={{ fontSize: 14, marginTop: 6, minHeight: 20 }}>
-          {copyState === 'ok' && t('return.copyOk')}
-          {copyState === 'fail' && t('return.copyFail')}
+        <p className="trip-return-note" lang={note.primary.lang}>
+          {note.primary.text}
         </p>
-
-        <p className="source-note" lang={primaryLang} style={{ marginTop: 8 }}>
-          {t('return.note')}
+        <p className="trip-pair-secondary" lang={note.secondary.lang}>
+          {note.secondary.text}
         </p>
-
-        <button type="button" className="btn" style={{ marginTop: 4 }} onClick={requestClose}>
-          {t('common.confirm')}
-        </button>
       </div>
-    </div>
+    </Sheet>
   );
 }

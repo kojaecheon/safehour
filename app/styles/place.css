@@ -10,3 +10,98 @@
  *   - 클래스는 `place-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
  *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
  */
+
+/* ───────────────────────── 장소 상세 (AX-317) ───────────────────────── */
+.place-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.place-page > * {
+  min-width: 0;
+}
+.place-loading,
+.place-note {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.place-block {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.place-block h2 {
+  font-size: var(--text-title-3);
+  margin: 0;
+}
+.place-block p {
+  font-size: var(--text-body);
+}
+
+/* SafeHour 판정·추정 값 — 이름과 값을 두 줄로 */
+.place-facts {
+  display: grid;
+  gap: var(--space-2);
+}
+.place-facts > div {
+  display: grid;
+  gap: 2px;
+}
+.place-facts dt {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.place-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 관광공사 원문 */
+.place-ko-name {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.place-overview {
+  white-space: pre-line;
+  color: var(--ink);
+}
+.place-schedule {
+  display: grid;
+  gap: var(--space-2);
+}
+.place-schedule > div {
+  display: grid;
+  gap: 2px;
+}
+.place-schedule dt {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.place-schedule dd {
+  color: var(--ink);
+  white-space: pre-line;
+}
+.place-photos {
+  display: grid;
+  gap: var(--space-3);
+}
+.place-photos figure {
+  margin: 0;
+}
+.place-photos img {
+  width: 100%;
+  border-radius: var(--radius-sm);
+}
+.place-photos figcaption {
+  margin-top: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
