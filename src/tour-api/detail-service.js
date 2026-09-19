@@ -150,19 +150,73 @@ async function fetchLocaleDetails({
   };
 }
 
+/** 상세 서비스 → 표시 언어 코드 */
+const SERVICE_LANG = Object.freeze({
+  korean: "ko",
+  english: "en",
+  japanese: "ja",
+  chineseSimplified: "zh",
+});
+
+const SERVICE_SOURCE = Object.freeze({
+  korean: "TourAPI:KorService2",
+  english: "TourAPI:EngService2",
+  japanese: "TourAPI:JpnService2",
+  chineseSimplified: "TourAPI:ChsService2",
+});
+
+/** 선택 언어 → 추가로 부르는 상세 서비스 (ko 는 국문만) — candidate-service.js 의 목록 조회와 같은 규칙 */
+const DETAIL_LANG_SERVICE = Object.freeze({
+  ko: null,
+  en: "english",
+  ja: "japanese",
+  zh: "chineseSimplified",
+});
+
+/**
+ * 표시 우선순위. lang 이 없으면 기존 동작(영문 → 국문)이다.
+ * 선택 언어(ja·zh) → 영문 → 국문 (spec 4.8 출처와 언어: 선택 언어가 없거나 실패하면 영문, 영문도 없으면 국문)
+ */
+function preferenceOrder(lang) {
+  switch (lang) {
+    case "ko":
+      return ["korean"];
+    case "ja":
+      return ["japanese", "english", "korean"];
+    case "zh":
+      return ["chineseSimplified", "english", "korean"];
+    default:
+      return ["english", "korean"];
+  }
+}
+
 /**
  * 상세 API 원문은 손대지 않고, 화면용 필드는 별도로 생성한다.
+ *
+ * 필드마다 우선순위(preferenceOrder)의 첫 원문을 쓴다. 개요는 비어 있지 않은 첫 원문이고
+ * `overviewLanguage` 에 그 언어를 적는다(개요가 없으면 "ko").
+ * @param {{korean?: object, english?: object, japanese?: object, chineseSimplified?: object, lang?: "ko"|"en"|"ja"|"zh"}} locales
  */
-export function normalizeCandidateDetails({ korean, english }) {
-  const preferredCommon = english?.common ?? korean?.common ?? null;
-  const preferredIntro = english?.intro ?? korean?.intro ?? null;
-  const preferredImages =
-    english?.images?.length > 0 ? english.images : korean?.images ?? [];
+export function normalizeCandidateDetails({ korean = null, english = null, japanese = null, chineseSimplified = null, lang } = {}) {
+  const locales = { korean, english, japanese, chineseSimplified };
+  const chain = preferenceOrder(lang)
+    .map((name) => [name, locales[name]])
+    .filter(([, locale]) => locale);
+  const first = (pick) => chain.map(([name, locale]) => [name, pick(locale)]).find(([, value]) => value);
+
+  const preferredCommon = first((l) => l.common)?.[1] ?? null;
+  const preferredIntro = first((l) => l.intro)?.[1] ?? null;
+  const preferredImages = first((l) => (l.images?.length > 0 ? l.images : null))?.[1] ?? [];
+  const overviewSource = first((l) => compactText(l.common?.overview));
   const schedule = nonEmptyFields(preferredIntro, SCHEDULE_FIELDS);
+  const fetched = Object.keys(SERVICE_LANG).filter((name) => locales[name]);
+
+  const original = (locale) =>
+    locale ? { common: locale.common, intro: locale.intro, images: locale.images } : null;
 
   return {
-    overview: compactText(preferredCommon?.overview) || null,
-    overviewLanguage: english?.common?.overview ? "en" : "ko",
+    overview: overviewSource?.[1] || null,
+    overviewLanguage: overviewSource ? SERVICE_LANG[overviewSource[0]] : "ko",
     address:
       [preferredCommon?.addr1, preferredCommon?.addr2]
         .map(compactText)
@@ -177,54 +231,64 @@ export function normalizeCandidateDetails({ korean, english }) {
         ? "UNVERIFIED_SCHEDULE_TEXT"
         : "SCHEDULE_NOT_PROVIDED",
     images: normalizeImages(preferredImages),
-    sources: [korean && "TourAPI:KorService2", english && "TourAPI:EngService2"].filter(
-      Boolean,
-    ),
-    errors: [...(korean?.errors ?? []), ...(english?.errors ?? [])],
+    sources: fetched.map((name) => SERVICE_SOURCE[name]),
+    errors: fetched.flatMap((name) => locales[name].errors ?? []),
     original: {
-      korean: korean
-        ? {
-            common: korean.common,
-            intro: korean.intro,
-            images: korean.images,
-          }
-        : null,
-      english: english
-        ? {
-            common: english.common,
-            intro: english.intro,
-            images: english.images,
-          }
-        : null,
+      korean: original(korean),
+      english: original(english),
+      japanese: original(japanese),
+      chineseSimplified: original(chineseSimplified),
     },
   };
 }
 
-export async function fetchCandidateDetails(candidate, { useCache = true } = {}) {
-  const koreanId = candidate.sourceIds?.korean;
-  const englishId = candidate.sourceIds?.english;
-  const contentTypes = candidate.sourceMetadata?.contentTypeIds ?? {};
+/** 선택 언어 상세를 쓸 수 있는가 — 기본 정보(detailCommon2) 항목이 있어야 한다. 없거나 실패면 영문으로 대체 */
+function usableLocale(locale) {
+  return Boolean(locale?.common);
+}
 
-  const [korean, english] = await Promise.all([
-    koreanId && contentTypes.korean
-      ? fetchLocaleDetails({
-          serviceName: "korean",
-          contentId: koreanId,
-          contentTypeId: contentTypes.korean,
-          useCache,
-        })
-      : null,
-    englishId && contentTypes.english
-      ? fetchLocaleDetails({
-          serviceName: "english",
-          contentId: englishId,
-          contentTypeId: contentTypes.english,
-          useCache,
-        })
-      : null,
+/**
+ * 장소 상세 (국문 + 선택 언어 서비스).
+ *
+ * candidate: `{ sourceIds: { korean, english, japanese?, chineseSimplified? },
+ *               sourceMetadata: { contentTypeIds: { korean, english, japanese?, chineseSimplified? } } }`
+ * 식별자와 유형 코드가 모두 있는 서비스만 부른다(추측한 ID 로 부르지 않는다).
+ *
+ * - lang 없음: 기존 동작 — 국문·영문을 함께 부르고 영문을 우선한다
+ * - ko: 국문만. en: 국문·영문
+ * - ja·zh: 국문·선택 언어. 선택 언어 식별자가 없거나 기본 정보를 못 받으면(실패·키 미신청·항목 없음) 영문을 더 부른다.
+ *   영문도 없으면 국문을 보여주고 overviewLanguage 로 알린다(spec 4.8)
+ * @param {object} candidate
+ * @param {{useCache?: boolean, lang?: "ko"|"en"|"ja"|"zh"}} [options]
+ */
+export async function fetchCandidateDetails(candidate, { useCache = true, lang } = {}) {
+  const ids = candidate?.sourceIds ?? {};
+  const contentTypes = candidate?.sourceMetadata?.contentTypeIds ?? {};
+  const fetchLocale = (serviceName) => {
+    const contentId = ids[serviceName];
+    const contentTypeId = contentTypes[serviceName];
+    return contentId && contentTypeId
+      ? fetchLocaleDetails({ serviceName, contentId, contentTypeId, useCache })
+      : Promise.resolve(null);
+  };
+
+  if (lang === undefined || lang === null) {
+    const [korean, english] = await Promise.all([fetchLocale("korean"), fetchLocale("english")]);
+    return normalizeCandidateDetails({ korean, english });
+  }
+
+  // 지원하지 않는 값은 en 으로 본다(spec 4.17 '그 외→en'). ko 는 null — 국문만 부른다
+  const selected = Object.prototype.hasOwnProperty.call(DETAIL_LANG_SERVICE, lang) ? DETAIL_LANG_SERVICE[lang] : "english";
+  const [korean, primary] = await Promise.all([
+    fetchLocale("korean"),
+    selected ? fetchLocale(selected) : Promise.resolve(null),
   ]);
-
-  return normalizeCandidateDetails({ korean, english });
+  const locales = { korean };
+  if (selected) locales[selected] = primary;
+  if (selected && selected !== "english" && !usableLocale(primary)) {
+    locales.english = await fetchLocale("english");
+  }
+  return normalizeCandidateDetails({ ...locales, lang: SERVICE_LANG[selected ?? "korean"] });
 }
 
 /**
