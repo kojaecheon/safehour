@@ -17,11 +17,16 @@ import './styles/privacy.css';
 import './styles/designBoard.css';
 import LanguageProvider from '@/components/LanguageProvider.js';
 import AppShell from '@/components/ui/AppShell.js';
+// 설치·오프라인·알림 (AX-319): 서비스 워커 등록(운영 빌드만)·세션 유지·앱 안 알림 배너
+import PwaRuntime from '@/components/pwa/PwaRuntime.js';
 
 export const metadata = {
   title: 'SafeHour — 안심 관광 추천 / Safe outings within hospital instructions',
   description:
     '수술·시술 후 외국인 환자와 보호자에게 병원 조건과 복귀시간 안에서 안전한 관광 활동을 추천합니다. SafeHour는 의료 판단을 하지 않습니다. — SafeHour suggests tourism only within the precautions and return time set by your hospital. It makes no medical judgements.',
+  // 앱 설치 (AX-319): 매니페스트는 app/manifest.js 가 자동으로 링크한다. 아이콘은 public/icons/*
+  icons: { icon: '/icons/icon.svg', apple: '/icons/apple-touch-icon.png' },
+  appleWebApp: { capable: true, title: 'SafeHour', statusBarStyle: 'default' },
 };
 
 export const viewport = {
@@ -42,6 +47,7 @@ export default function RootLayout({ children }) {
       <body>
         <LanguageProvider>
           <AppShell>{children}</AppShell>
+          <PwaRuntime />
         </LanguageProvider>
       </body>
     </html>
