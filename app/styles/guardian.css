@@ -10,3 +10,314 @@
  *   - 클래스는 `guardian-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
  *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
  */
+
+/* ───────────────────────── 공통 ───────────────────────── */
+.guardian-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.guardian-page > .card,
+.guardian-page .guardian-form > .card {
+  margin-bottom: 0;
+}
+.guardian-lead {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.guardian-meta {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.guardian-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* 안내 덩이 — 아이콘 + 문장. 색만으로 뜻을 나누지 않는다(문장이 뜻을 말한다) */
+.guardian-note {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--ink-soft);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.guardian-note-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  color: var(--ink);
+  padding-top: 2px;
+}
+.guardian-note-text {
+  min-width: 0;
+}
+.guardian-note-text p {
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.guardian-note-secondary {
+  margin-top: var(--space-1);
+  font-weight: var(--weight-medium);
+}
+.guardian-note-strong {
+  border-left-color: var(--ink);
+}
+
+/* 입력 오류 — 문장 + 왼쪽 띠 + 굵기 (색만으로 알리지 않는다) */
+.guardian-error {
+  margin-top: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 4px solid var(--support-ink);
+  color: var(--support-ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+}
+.guardian-error.is-empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+/* 주의 안내 — 긴 링크, 저장 실패, 연결 없음 */
+.guardian-warning {
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--state-standby-line);
+  border-left: 4px solid var(--state-standby-ink);
+  border-radius: var(--radius-sm);
+  background: var(--state-standby-bg);
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.guardian-block {
+  margin-top: 0;
+}
+.guardian-pin {
+  font-size: var(--text-title-3);
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+  max-width: 240px;
+}
+
+/* ───────────────────────── /guardian ───────────────────────── */
+.guardian-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.guardian-list-title {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-body);
+}
+.guardian-list {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-5);
+  color: var(--ink);
+}
+.guardian-list li {
+  font-size: var(--text-body);
+}
+.guardian-list-in { list-style: disc; }
+.guardian-list-out { list-style: circle; }
+.guardian-consent {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  border-bottom: none;
+}
+.guardian-consent .label {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.guardian-resend {
+  padding: var(--space-4);
+  border: 1px solid var(--accent);
+  border-left: 6px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+}
+.guardian-resend h2 {
+  margin-bottom: var(--space-2);
+}
+.guardian-resend .guardian-note {
+  background: var(--surface);
+}
+.guardian-resend .guardian-meta {
+  margin: var(--space-3) 0;
+}
+.guardian-sent {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.guardian-link-field {
+  font-family: var(--font-mono);
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+.guardian-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+.guardian-feedback {
+  min-height: 1lh;
+  margin-top: var(--space-3);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+.guardian-pin-reminder {
+  margin-top: var(--space-3);
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+.guardian-result h2:focus,
+.guardian-asof h2:focus {
+  outline: none;
+}
+.guardian-result h2:focus-visible,
+.guardian-asof h2:focus-visible {
+  outline: 3px solid var(--accent);
+}
+
+/* ───────────────────────── /g ───────────────────────── */
+.guardian-login p {
+  margin-bottom: var(--space-4);
+}
+.guardian-pin-card .btn {
+  margin-top: var(--space-3);
+}
+.guardian-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.guardian-copy > .card {
+  margin-bottom: 0;
+}
+.guardian-asof {
+  padding: var(--space-4);
+  border-radius: var(--radius);
+  background: var(--state-split-bg);
+  border: 1px solid var(--state-split-line);
+}
+.guardian-asof h2 {
+  margin-bottom: var(--space-1);
+}
+/* '○월 ○일 ○시 기준' — 사본이라는 사실이 가장 먼저 읽히게 크게 */
+.guardian-asof-time {
+  color: var(--state-split-ink);
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+}
+.guardian-asof .guardian-note {
+  background: var(--surface);
+}
+.guardian-asof .guardian-meta {
+  margin-top: var(--space-2);
+  color: var(--ink);
+}
+.guardian-emergency h3 {
+  margin-bottom: var(--space-2);
+}
+.guardian-calls {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.guardian-call {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-3) var(--space-4);
+  border: 2px solid var(--emergency);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+}
+.guardian-call .ui-icon {
+  color: var(--emergency);
+}
+.guardian-call:hover {
+  background: var(--surface-alt);
+}
+.guardian-day-title {
+  font-size: var(--text-title-2);
+  margin-bottom: var(--space-2);
+}
+.guardian-escort {
+  margin: 0 0 var(--space-3);
+  border-color: var(--support);
+  border-left-color: var(--support-ink);
+  background: var(--support-soft);
+}
+.guardian-subtitle {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+}
+.guardian-returns {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.guardian-return {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-alt);
+}
+.guardian-return-time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent-strong);
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+}
+.guardian-return-place {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+}
+.guardian-return-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding-top: 3px;
+  color: var(--ink-soft);
+}
+.guardian-return-address {
+  display: block;
+  color: var(--ink-soft);
+  font-size: var(--text-body);
+}
+.guardian-others h2 {
+  font-size: var(--text-title-3);
+}
+.guardian-other-list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
