@@ -4,15 +4,16 @@
 //   - 후보는 숙소 기준점·반경 10km·언어 조합마다 한 번만 조회한다
 //   - 상세(메뉴·운영) 보강은 일정에 들어간 후보와 식사 칸을 채울 수 있는 식당(메뉴 모름)에만 한다
 //   - 기상은 오늘~모레, 숙소 좌표로 조회한다. 실패하면 '확인 불가'이고 판정에 반영하지 않는다
-//   - 공항 이동은 서버가 고정 공항 좌표와 기존 택시 추정기로 계산한다
+//   - 공항 이동은 서버가 고정 공항 좌표와 공항 이동 전용 추정(직선×1.3, 60km/h, +15분)으로 계산한다. 도심 구간은 기존 추정기
 //   - 현재 위치류 필드·PlanStay 밖 필드는 엔진·후보 조회·응답 어디에도 가지 않는다
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AIRPORT_POINTS, airportTravelMinutes } from '../lib/server/airports.js';
+import { AIRPORT_POINTS, AIRPORT_TRANSFER, airportTravelMinutes, createAirportTransferEstimator } from '../lib/server/airports.js';
 import { CANDIDATE_RADIUS_M, createItineraryHandlers } from '../lib/server/itinerary-service.js';
-import { createFallbackEstimator } from '../src/adapters/travelTime.js';
+import { createFallbackEstimator, createTransitEstimator } from '../src/adapters/travelTime.js';
+import { haversineKm } from '../src/engine/slaCalculator.js';
 import { SilentReplanError, planTrip } from '../src/engine/tripPlan.js';
 import { alternativesFor as realAlternatives } from '../src/engine/alternatives.js';
 import { museum, place } from './day-plan-fixtures.js';
@@ -258,27 +259,62 @@ describe('기상 단기예보 — 오늘~모레 (spec 4.9 변화 원천 4, 6장)
   });
 });
 
-describe('공항 이동 — 고정 공항 좌표와 택시 추정기 (spec 4.1)', () => {
+describe('공항 이동 — 고정 공항 좌표와 공항 이동 전용 추정 (spec 4.1)', () => {
+  const pad = (n) => String(n).padStart(2, '0');
+  const clockOf = (min) => `${pad(Math.floor(min / 60))}:${pad(min % 60)}`;
+  /** 직선거리 × 1.3 ÷ 60km/h + 15분, 올림 */
+  const transfer = (from, to) => Math.ceil(((haversineKm(from, to) * 1.3) / 60) * 60 + 15);
+
   test('공항 좌표는 AIP 기준점이다', () => {
     assert.deepEqual(AIRPORT_POINTS.ICN, { lat: 37.4625, lng: 126.439167 });
     assert.deepEqual(AIRPORT_POINTS.GMP, { lat: 37.556944, lng: 126.7975 });
   });
 
-  test('입국일 시작 = 도착 + 입국 수속 90분 + 인천공항→숙소 추정', async () => {
-    const estimate = createFallbackEstimator().estimate(AIRPORT_POINTS.ICN, HOME).min;
-    const expectedStart = 6 * 60 + 90 + Math.ceil(estimate);
-    const { handlers } = setup({ now: at('2026-09-30', '10:00') });
-    const data = await body(await plan(handlers, { lang: 'en', stay: planStay(), dates: ['2026-10-01'] }));
-    const window = data.days['2026-10-01'].window;
-    const pad = (n) => String(n).padStart(2, '0');
-    assert.equal(window.start, `${pad(Math.floor(expectedStart / 60))}:${pad(expectedStart % 60)}`);
+  test('공항 이동 추정 기본값은 직선×1.3, 60km/h, 승차·터미널 15분이다(조정 가능)', () => {
+    assert.deepEqual(AIRPORT_TRANSFER, { detourFactor: 1.3, speedKmh: 60, terminalMin: 15 });
+    assert.ok(Object.isFrozen(AIRPORT_TRANSFER));
   });
 
-  test('김포 출국은 김포 좌표로 계산한다', () => {
+  test('공항 이동 추정은 올림한 분이고, 도심 택시 추정기(×1.4, 18km/h)보다 현실에 가깝게 짧다', () => {
+    const estimator = createAirportTransferEstimator();
+    const gangnam = { lat: 37.4979, lng: 127.0276 };
+    const icn = estimator.estimate(AIRPORT_POINTS.ICN, gangnam);
+    const gmp = estimator.estimate(gangnam, AIRPORT_POINTS.GMP);
+    assert.equal(icn.min, transfer(AIRPORT_POINTS.ICN, gangnam));
+    assert.equal(gmp.min, transfer(gangnam, AIRPORT_POINTS.GMP));
+    assert.ok(icn.min >= 60 && icn.min <= 120, `인천↔강남 ${icn.min}분`);
+    assert.ok(gmp.min >= 30 && gmp.min < icn.min, `김포↔강남 ${gmp.min}분`);
+    assert.ok(icn.min < createFallbackEstimator().estimate(AIRPORT_POINTS.ICN, gangnam).min);
+  });
+
+  test('입국일 시작 = 도착 + 입국 수속 90분 + 인천공항→숙소 공항 이동 추정', async () => {
+    // 08:00 도착 — 활동 시작(09:00)보다 늦게 끝나도록 해 공항 구간이 창 시작에 드러나게 한다
+    const stay = planStay({ arrival: { date: '2026-10-01', time: '08:00', airport: 'ICN' } });
+    const expectedStart = 8 * 60 + 90 + transfer(AIRPORT_POINTS.ICN, HOME);
+    const { handlers } = setup({ now: at('2026-09-30', '10:00') });
+    const data = await body(await plan(handlers, { lang: 'en', stay, dates: ['2026-10-01'] }));
+    assert.equal(data.days['2026-10-01'].window.start, clockOf(expectedStart));
+  });
+
+  test('출국일 마감 = 출발 − 공항 도착 여유 3시간 − 숙소→김포 공항 이동 추정 − 여유 30분', async () => {
     const stay = planStay({ departure: { date: '2026-10-10', time: '23:00', airport: 'GMP' } });
     const t = airportTravelMinutes(stay);
-    assert.equal(t.lodgingToAirportMin, Math.ceil(createFallbackEstimator().estimate(HOME, AIRPORT_POINTS.GMP).min));
+    assert.equal(t.lodgingToAirportMin, transfer(HOME, AIRPORT_POINTS.GMP));
+    assert.equal(t.airportToLodgingMin, transfer(AIRPORT_POINTS.ICN, HOME));
     assert.ok(t.lodgingToAirportMin < t.airportToLodgingMin, '김포가 인천보다 가깝다');
+
+    const { handlers } = setup({ now: at('2026-09-30', '10:00') });
+    const data = await body(await plan(handlers, { lang: 'en', stay, dates: ['2026-10-10'] }));
+    const cutoff = 23 * 60 - 180 - t.lodgingToAirportMin - 30;
+    assert.equal(data.days['2026-10-10'].window.end, clockOf(Math.min(cutoff, 21 * 60)));
+  });
+
+  test('도심 구간(숙소↔장소)은 기존 추정기 그대로다 — 공항 추정은 공항 구간에만 쓴다', async () => {
+    const { handlers } = setup();
+    const data = await body(await plan(handlers, { lang: 'en', stay: planStay(), dates: ['2026-10-02'] }));
+    const first = data.days['2026-10-02'].outings[0].stops[0];
+    const fallback = createTransitEstimator().estimate(HOME, { lat: first.lat, lng: first.lng }).min;
+    assert.equal(first.legIn.min, fallback);
   });
 });
 

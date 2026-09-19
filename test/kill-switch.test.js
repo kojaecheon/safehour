@@ -208,3 +208,48 @@ describe('헬스 엔드포인트 (RG007)', () => {
     assert.deepEqual(Object.keys(runtimeFlagsSnapshot()), ['recommendationKilled']);
   });
 });
+
+describe('헬스 엔드포인트 — 기상 키 상태는 일정 API 와 같은 규칙으로 읽는다 (AX-308)', () => {
+  const ORIGINAL_KMA = process.env.KMA_API_KEY;
+  const ORIGINAL_TOUR = process.env.TOUR_API_KEY;
+  afterEach(() => {
+    if (ORIGINAL_KMA === undefined) delete process.env.KMA_API_KEY;
+    else process.env.KMA_API_KEY = ORIGINAL_KMA;
+    if (ORIGINAL_TOUR === undefined) delete process.env.TOUR_API_KEY;
+    else process.env.TOUR_API_KEY = ORIGINAL_TOUR;
+  });
+
+  async function weatherConfig({ kma, tour }) {
+    if (kma === undefined) delete process.env.KMA_API_KEY;
+    else process.env.KMA_API_KEY = kma;
+    if (tour === undefined) delete process.env.TOUR_API_KEY;
+    else process.env.TOUR_API_KEY = tour;
+    const data = await (await healthGet()).json();
+    assert.deepEqual(Object.keys(data.config).sort(), ['tourApiKeyConfigured', 'weatherApiKeyConfigured', 'weatherKeySource']);
+    return data.config;
+  }
+
+  test('KMA_API_KEY 가 공백뿐이거나 off 면 기상은 설정되지 않은 것이다(조회를 끈다)', async () => {
+    for (const kma of [' ', 'off', 'OFF']) {
+      const config = await weatherConfig({ kma, tour: 'tour-key' });
+      assert.equal(config.weatherApiKeyConfigured, false, `KMA_API_KEY=${JSON.stringify(kma)}`);
+      assert.equal(config.weatherKeySource, 'KMA_API_KEY');
+      assert.equal(config.tourApiKeyConfigured, true);
+    }
+  });
+
+  test('KMA_API_KEY 가 없거나 빈 값이면 TOUR_API_KEY 로 설정된다', async () => {
+    for (const kma of [undefined, '']) {
+      const config = await weatherConfig({ kma, tour: 'tour-key' });
+      assert.equal(config.weatherApiKeyConfigured, true);
+      assert.equal(config.weatherKeySource, 'TOUR_API_KEY');
+    }
+    assert.equal((await weatherConfig({ kma: undefined, tour: undefined })).weatherApiKeyConfigured, false);
+  });
+
+  test('KMA_API_KEY 에 값이 있으면 그 키로 설정된다', async () => {
+    const config = await weatherConfig({ kma: 'kma-key', tour: undefined });
+    assert.equal(config.weatherApiKeyConfigured, true);
+    assert.equal(config.weatherKeySource, 'KMA_API_KEY');
+  });
+});
