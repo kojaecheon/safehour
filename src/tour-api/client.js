@@ -323,7 +323,10 @@ export async function callTourApi({
   };
 
   if (useCache) {
-    fs.writeFileSync(cacheFile, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+    // 파일명은 요청 해시라 좌표를 되돌릴 수 없다. 본문에도 기준점 좌표를 남기지 않는다
+    // (서버는 체류 정보를 저장하지 않는다 — spec §4.19).
+    const stored = { ...result, parameters: redactParameters(parameters) };
+    fs.writeFileSync(cacheFile, `${JSON.stringify(stored, null, 2)}\n`, "utf8");
   }
 
   return result;
