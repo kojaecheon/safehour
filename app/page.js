@@ -1,16 +1,56 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import LanguageToggle from '@/components/LanguageToggle.js';
 import FooterLinks from '@/components/FooterLinks.js';
 import { useLang } from '@/components/LanguageProvider.js';
+import { SafetyNote } from '@/components/onboarding/Fields.js';
+import StartArt from '@/components/onboarding/StartArt.js';
+import { Button, Icon, TopBar } from '@/components/ui/index.js';
 import { takeClearedFlag } from '@/lib/session.js';
+import { LANGS, LANG_NAMES } from '@/src/i18n/index.js';
 
-// SCR001 — 시작 화면
-// CTA 주변에서 핵심 한계 3가지가 읽지 않아도 인지되도록 배치한다 (D03).
+// SCR001 — 시작 화면 (AX-314 · spec 3.1 `/`: 언어 선택, 고지 3종, 로그인 유도)
+//
+// - 머리글에 '안심'·'안전' 같은 보증 표현을 쓰지 않는다(spec 9.1 — 조건 통과와 안전은 다르다).
+// - 고지 3종과 의료 면책은 안전 문구다. 선택 언어 + 한국어(ko 면 영어)로 두 줄씩 보인다(spec 4.17 · pair()).
+// - 언어는 상단 지구본 버튼 말고도 여기서 바로 고를 수 있다 — 첫 화면에서 가장 먼저 필요한 동작이다.
+// - 시작하기 → 로그인 → 체류 설정(spec 3.2 기본 흐름).
+
+const NOTICES = [
+  { icon: 'hospital', title: 'home.p1Title', body: 'home.p1Body' },
+  { icon: 'map', title: 'home.p2Title', body: 'home.p2Body' },
+  { icon: 'bed', title: 'home.p3Title', body: 'home.p3Body' },
+];
+
+const FOOTER_NOTICE = 'home.footer';
+const START_HREF = '/login?returnTo=%2Fonboarding';
+
+function Notice({ icon, titleKey, bodyKey }) {
+  const { pair } = useLang();
+  const title = pair(titleKey);
+  const body = pair(bodyKey);
+  return (
+    <li className="onboarding-notice">
+      <span className="onboarding-notice-icon" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <div className="onboarding-notice-text">
+        <div lang={title.primary.lang}>
+          <h3 className="onboarding-notice-title">{title.primary.text}</h3>
+          <p>{body.primary.text}</p>
+        </div>
+        <div className="onboarding-notice-secondary" lang={title.secondary.lang}>
+          <p>
+            <strong>{title.secondary.text}</strong> {body.secondary.text}
+          </p>
+        </div>
+      </div>
+    </li>
+  );
+}
+
 export default function HomePage() {
-  const { t } = useLang();
+  const { t, lang, setLang } = useLang();
   const [cleared, setCleared] = useState(false);
 
   // "내 정보 지우기" 는 전체 새로고침으로 이 화면에 도착한다 (AX-210).
@@ -22,51 +62,66 @@ export default function HomePage() {
 
   return (
     <>
-      <header className="top-bar">
-        <span className="brand">SafeHour</span>
-        <LanguageToggle />
-      </header>
-      <main className="page">
+      <TopBar title="SafeHour" as="p" />
+      <main className="page onboarding-start">
         {cleared && (
           <div className="state-banner state-TOGETHER" role="status">
             <p>{t('home.clearedNotice')}</p>
           </div>
         )}
 
-        <section className="card" style={{ paddingTop: 24, paddingBottom: 24 }}>
-          <h1>
-            {t('home.titleLine1')}
-            <br />
-            {t('home.titleLine2')}
+        <section className="onboarding-hero" aria-labelledby="home-title">
+          <div className="onboarding-hero-art">
+            <StartArt />
+          </div>
+          <h1 id="home-title" className="onboarding-hero-title">
+            <span>{t('home.titleLine1')}</span> <span>{t('home.titleLine2')}</span>
           </h1>
-          <p style={{ marginTop: 10 }}>{t('home.lead')}</p>
+          <p className="onboarding-hero-lead">{t('home.lead')}</p>
         </section>
 
-        <section className="card" aria-label={t('home.principlesAria')}>
-          <h2>{t('home.principlesTitle')}</h2>
-          {/* listStyle none 은 Safari/VoiceOver 에서 리스트 시맨틱을 제거하므로 role 로 복원 */}
-          <ul role="list" style={{ listStyle: 'none', display: 'grid', gap: 10, marginTop: 4 }}>
-            {[
-              ['home.p1Title', 'home.p1Body'],
-              ['home.p2Title', 'home.p2Body'],
-              ['home.p3Title', 'home.p3Body'],
-            ].map(([titleKey, bodyKey]) => (
-              <li key={titleKey}>
-                <strong>{t(titleKey)}</strong>
-                <br />
-                <span style={{ color: 'var(--ink-soft)', fontSize: 15 }}>{t(bodyKey)}</span>
-              </li>
+        <section className="onboarding-section" aria-labelledby="home-lang">
+          <h2 id="home-lang">{t('onboarding.langTitle')}</h2>
+          <p className="onboarding-hint" id="home-lang-hint">
+            {t('onboarding.langHint')}
+          </p>
+          <ul className="onboarding-lang-grid" role="list">
+            {LANGS.map((code) => {
+              const selected = lang === code;
+              return (
+                <li key={code}>
+                  <button
+                    type="button"
+                    lang={code}
+                    className="onboarding-lang-option"
+                    aria-pressed={selected}
+                    onClick={() => setLang(code)}
+                  >
+                    <span className="onboarding-lang-check" aria-hidden="true">
+                      {selected ? <Icon name="check" size={18} strokeWidth={2.8} /> : <Icon name="globe" size={18} />}
+                    </span>
+                    {LANG_NAMES[code]}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        <section className="onboarding-section" aria-labelledby="home-principles">
+          <h2 id="home-principles">{t('home.principlesTitle')}</h2>
+          <ul className="onboarding-notices" role="list" aria-label={t('home.principlesAria')}>
+            {NOTICES.map((notice) => (
+              <Notice key={notice.title} icon={notice.icon} titleKey={notice.title} bodyKey={notice.body} />
             ))}
           </ul>
         </section>
 
-        <Link href="/today" className="btn" style={{ marginTop: 4 }}>
-          {t('home.cta')}
-        </Link>
+        <div className="onboarding-cta">
+          <Button href={START_HREF}>{t('home.cta')}</Button>
+        </div>
 
-        <p className="source-note" style={{ marginTop: 16 }}>
-          {t('home.footer')}
-        </p>
+        <SafetyNote noticeKey={FOOTER_NOTICE} className="onboarding-safety onboarding-footer-note" />
 
         <FooterLinks />
       </main>
