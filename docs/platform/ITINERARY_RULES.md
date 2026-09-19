@@ -1,6 +1,6 @@
 # 일정 규칙과 조정 가능한 기본값
 
-- 기준일: 2026-09-18
+- 기준일: 2026-09-18 (코드 위치·단서 표·병원 일정 전 외출 규칙 갱신: 2026-09-20, AX-321)
 - 작업 ID: AX-301
 - 연결: `PRODUCT_DEFINITION_V3.md`, `IA_AND_FLOWS.md`, ADR-0005(조건 기간·합성),
   ADR-0006(일정 엔진), ADR-0011(병원 지침 v2·최신성)
@@ -14,8 +14,8 @@
 - '조정 가능'이라고 적은 값은 11장의 기본값이며, 설정 한곳에서 바꿀 수 있어야 한다.
 - **'의료진 검토' 표시가 붙은 값은 사람 검토 전 임시값이다.** 의료진이 확인하기 전까지 이 값으로 동작하며,
   확인 없이 더 느슨하게 바꾸지 않는다.
-- 조정 가능한 **숫자 기본값은 코드의 한 파일**에, **단서 목록**(열·물·매운 음식·날음식·주점·카페, 관심사 매핑)은
-  **관광 후보 모듈의 상수 한곳**에 둔다. 두 곳의 파일 경로는 구현 시 확정하며, 이 문서의 11장 표와 값이 같아야 한다.
+- 조정 가능한 **숫자 기본값은 코드의 한 파일**(`src/stay/defaults.js`)에, **단서 목록**(열·물·매운 음식·날음식·주점·카페,
+  관심사 매핑)은 **관광 후보 모듈의 상수 한곳**(`src/tour-api/cues.js`)에 둔다. 이 문서의 11장 표와 값이 같아야 한다.
 
 ---
 
@@ -69,12 +69,18 @@
 ### 3.3 병원 일정 블록
 
 - **블록** = [시작 − 숙소→병원 이동 − 도착 여유 10분, 종료 + 병원→숙소 이동]. 이 구간에는 외출을 만들지 않는다.
-- **다음 고정 블록이 병원 일정인 외출은 항상 그 병원에서 끝난다.**
-  - 복귀 장소는 그 병원이고, 마감은 일정 시작 시각이다.
+- **병원 일정 직전의 마지막 외출만 그 병원에서 끝난다** (2026-09-19 운영자 결정, 규칙 13-2).
+  - 그 외출의 복귀 장소는 그 병원이고, 마감(`returnBy`)은 일정 시작 시각, 마감 이유는 `APPOINTMENT`다.
+    병원에 일찍 닿아 기다리지 않도록 마감에 맞춰 거꾸로 짠다.
   - 도착 여유 10분은 복귀 계산식에서 한 번만 더한다.
   - 이 경우 블록은 **일정 시작 시각**부터 시작한다. 숙소→병원 이동은 외출의 마지막 구간이 대신하므로 블록에 넣지 않는다.
   - 직전 외출이 없으면 블록은 위 식대로 '시작 − 이동 − 10분'부터다.
   - 45분 최소 창은 이렇게 정한 블록 시작까지로 계산한다.
+- **같은 구간의 앞선 외출은 숙소로 돌아온다.** 이전 규칙대로면 오후 진료 전 점심 외출 뒤 병원에서 2시간 넘게 기다려야 했다.
+  - 앞선 외출의 안전 마감은 '일정 시작 − 숙소→병원 이동 − 도착 여유 10분'이고 마감 이유는 `APPOINTMENT`다.
+    마지막 외출의 계획상 출발 전까지 숙소에 돌아오도록 짜며, 병원 일정 블록과 겹치지 않는다.
+  - 화면은 모든 외출에 **예상 귀가 시각**(`plannedReturnAt`)을 복귀 마감과 함께 보여준다(7.2절).
+  - 구현: `src/engine/dayPlan.js`(병원에서 끝나는 창 — `planHospitalWindow`).
 
 ### 3.4 수술 후 경계일
 
@@ -238,6 +244,9 @@
 
 - '숙소에서 복용' 복약 시각이 마감을 만들면 사유 `MEDICATION_WINDOW`를 함께 기록한다.
   '숙소 밖 복용' 시각은 마감을 만들지 않는다.
+- 외출마다 **안전 마감**(`returnBy`)과 별도로 **예상 귀가**(`plannedReturnAt`, "HH:MM")를 기록한다.
+  예상 귀가 = 마지막 정거장 출발 + 복귀 구간 이동 추정이며 버퍼를 넣지 않는다. 모든 외출에서 `plannedReturnAt` ≤ `returnBy`다.
+  한 구간에 외출이 여럿이면 앞 외출도 그 구간의 실제 마감(`returnBy`)을 그대로 갖고, 계획상 귀가는 `plannedReturnAt`이다.
 
 ### 7.3 복귀 계산식
 
@@ -412,9 +421,11 @@
 
 ## 11. 조정 가능한 기본값
 
-- 숫자 기본값: 코드의 **한 파일**에 모은다. 파일 경로는 구현 시 확정한다.
-- 단서 목록(열·물·매운 음식·날음식·주점·카페, 관심사 매핑): **관광 후보 모듈의 상수 한곳**에 둔다. 위치는 구현 시 확정한다.
-- 위 두 곳의 값과 아래 표는 같아야 한다.
+- 숫자 기본값: `src/stay/defaults.js`의 `DEFAULTS`(숫자)와 `UNKNOWN_DEFAULTS`('모르겠음' 기본값) 한 파일에 모았다.
+  다른 모듈은 읽기만 한다. 코드 키는 11.1절 표에 있다.
+- 단서 목록(열·물·매운 음식·날음식·주점·카페, 관심사 매핑): `src/tour-api/cues.js` 한곳에 모았다. 표는 11.2절이다.
+- 공항 이동 추정 상수만 서버 모듈 `lib/server/airports.js`에 따로 있다(11.3절).
+- 위 파일들의 값과 이 장의 표는 같아야 한다.
 - **'의료진 검토'가 '예'인 값은 사람 검토 전 임시값이다.** 의료진 확인 없이 더 느슨하게 바꾸지 않는다.
 
 | 항목 | 기본값 | 쓰이는 곳 | 의료진 검토 | 상태 |
@@ -437,5 +448,90 @@
 | 출국 후 삭제 | 7일 | 1장 | — | — |
 | PIN 잠금 | 5회 / 1시간 | ADR-0009 | — | — |
 | AI 제한시간 / 길이 | 3초 / 200자 | ADR-0008 | — | — |
-| 열·물·매운 음식·날음식·주점 단서 목록, 관심사 매핑 | 구현 시 정의 | 8.3–8.5절 | 식이 목록은 예 | 식이 목록은 **사람 검토 전 임시값** |
+| 열·물·매운 음식·날음식·주점 단서 목록, 관심사 매핑 | 11.2절 표 | 8.3–8.5절 | 식이 목록은 예 | 식이 목록은 **사람 검토 전 임시값** |
 | 관광공사 호출 경고 / 차단 | 800 / 1,000(환경변수) | 8.2절 | — | — |
+
+### 11.1 숫자 기본값의 코드 위치 (`src/stay/defaults.js`)
+
+위 표의 값이 코드의 어느 키인지 적는다. 값을 바꿀 때는 이 파일만 고친다.
+
+| 항목 | 코드 키 | 값 |
+| --- | --- | --- |
+| 모르겠음: 보행 한도 / 이동 한도 | `DEFAULTS.unknown.walkLimitMin` / `.travelLimitMin` (`UNKNOWN_DEFAULTS`가 그대로 씀) | 15 / 20 |
+| 모르겠음: 자외선·열·물·동행·곁 지키기·식사 제한·식이 5항목 | `UNKNOWN_DEFAULTS.avoidUv` · `avoidHeat` · `avoidWater` · `escortRequired` · `guardianMustStay` · `mealRestriction` · `diet` | 모두 '예'(가장 엄격), 식사 제한 `ALL_DAY` |
+| 모르겠음: 복약 | `UNKNOWN_DEFAULTS.medication` | 마감 없음 + `MEDICATION_TIMES_MISSING` 경고 |
+| 회복기 가산 / 도착 여유 / 호출·대기 / 교통 변동 | `DEFAULTS.buffers.recoveryExtraMin` / `.arrivalMarginMin` / `.hailingMin` / `.trafficVariancePct` | 10 / 10 / 5 / 0.25 |
+| 최소 외출 창 / 최소 체류 | `DEFAULTS.minOutingWindowMin` / `.minStopStayMin` | 45 / 15 |
+| 활동 시간 | `DEFAULTS.activityHours` | 09:00–21:00 |
+| 식사 칸 | `DEFAULTS.mealSlots.LUNCH` / `.DINNER` | 11:30–13:30 / 17:30–19:30 |
+| 정거장 수 | `DEFAULTS.stopsPerPace.RELAXED` / `.NORMAL` | 외출 2·하루 3 / 외출 3·하루 5 |
+| 검색 반경(m) | `DEFAULTS.searchRadiusM.restricted` / `.free` / `.guardian` | 3000 / 10000 / 3000 |
+| 대중교통 추정 | `DEFAULTS.transitEstimate` | 직선 × 1.3 ÷ 20km/h + 10분 |
+| 병원 일정 예상 길이(분) | `DEFAULTS.appointmentDurationMin.PROCEDURE` / `.VISIT` | 240 / 90 |
+| 복약 후 다음 외출 | `DEFAULTS.medicationGapMin` | 15 |
+| 입국 수속 / 공항 도착 여유 / 출국 여유(분) | `DEFAULTS.airport.arrivalProcessingMin` / `.departureArrivalLeadMin` / `.departureSlackMin` | 90 / 180 / 30 |
+| 알림 시점(분 전) | `DEFAULTS.notifications` | 복귀 60·30, 숙소 복약 10(숙소 밖 복약 0), 병원 출발 15 |
+| 체류 최대 길이 / 출국 후 삭제 | `DEFAULTS.stay.maxNights` / `.deleteAfterDepartureDays` | 45박 / 7일 |
+| PIN 잠금 | `DEFAULTS.guardianPin` | 5회 / 60분 |
+| AI 제한시간 / 길이 | `DEFAULTS.ai.timeoutMs` / `.maxChars` | 3000ms / 200자 |
+| 관광공사 호출 경고 / 차단 | `DEFAULTS.tourApi` (실제 적용은 `src/tour-api/config.js`의 환경변수 `TOUR_API_WARNING_AT` / `TOUR_API_DAILY_LIMIT`, 비우면 같은 기본값) | 800 / 1,000 |
+
+### 11.2 단서 목록 (`src/tour-api/cues.js`)
+
+- 이름 단서는 **국문 제목과 국문 메뉴 원문**에만 적용한다. 표시 언어 제목을 쓰면 언어마다 판정이 달라지기 때문이다(규칙 27).
+- 찾는 방식은 세 가지다: `substrings`(부분 문자열), `tokens`(구분자로 나눈 낱말이 정확히 같을 때만 — '회'처럼 짧은 말),
+  `words`(라틴 문자 낱말 경계, 대소문자 무시).
+- 찾기 전에 **비슷하지만 단서가 아닌 말**(`CUE_FALSE_FRIENDS`)을 지운다: 스파게티, 스파클링, 스파이, 스파크, 스파오, 스파르타.
+- 분류 코드(`lclsSystm1~3`)는 관광공사 신분류체계다. 구분류(`cat1~3`)는 공식 명세에 '미사용(삭제 예정)'이라 쓰지 않는다.
+  코드 이름은 2026-09-18 관광공사 콘텐츠랩 분류체계 화면에서 확인했다 — 운영 전 사람 확인 대상이다(`HUMAN_ACTIONS.md` 11번).
+- **식이 목록(매운 음식·날음식·주점)은 사람 검토 전 임시값이다.** 단서를 빼면 제외되던 식당이 일정에 들어가므로 검토 없이 줄이지 않는다.
+
+| 목록(상수) | 쓰는 곳 | 분류 코드 | 이름 단서 | 상태 |
+| --- | --- | --- | --- | --- |
+| 열 노출 (`HEAT_CUES`) | `avoidHeat`=예 → `HEAT_EXPOSURE` | `lclsSystm3`: EX050100 온천/사우나/스파, EX050200 찜질방, EX050500 뷰티스파 | 사우나, 찜질, 스파, 온천, 한증, 불가마, 반신욕, 족욕 · 영문 sauna, spa, jjimjilbang, hot spring | — |
+| 물 (`WATER_CUES`) | `avoidWater`=예 → `WATER_ACTIVITY` | `lclsSystm2`: LS02 수상레저스포츠 · `lclsSystm3`: VE020200 워터파크, EX050100, EX050200, EX050500 | 수영장, 워터파크, 온천, 수상레저, 물놀이, 해수욕장, 스파, 목욕탕, 래프팅, 카약, 카누, 요트, 서핑, 스쿠버, 다이빙, 스노클링, 제트스키, 수상스키 · 영문 swimming (pool), water park, waterpark, hot spring, spa, rafting, kayak, canoe, yacht, surfing, scuba, snorkeling, jet ski | — |
+| 주점 (`BAR_CUES`) | `diet.alcohol`=예 → `DIET_RESTRICTED` | `lclsSystm2`: FD04 주점 — 분류가 있으면 분류만 믿는다 | (분류 없는 음식점만) 주점, 술집, 포차, 호프, 이자카야, 선술집, 와인바, 칵테일, 펍, 맥주, 막걸리, 전통주 · 영문 pub, bar, izakaya, brewery, beer | **사람 검토 전 임시값** |
+| 카페·전통찻집 (`CAFE_CUES`) | 매운·날음식 '아님' 근거, 식사 칸 제외, 관심사 `CAFE` | `lclsSystm2`: FD05 카페/찻집 — **분류로만** 정한다 | 없음(이름 '카페'로 정하면 식이 필터가 느슨해진다) | — |
+| 매운 음식 (`SPICY_CUES`) | `diet.spicy`=예 → `DIET_RESTRICTED`, 판단 단서 없으면 `MENU_UNKNOWN` | — | 매운, 매콤, 얼큰, 마라, 떡볶이, 불닭, 짬뽕, 닭갈비, 낙지볶음, 쭈꾸미, 주꾸미, 아구찜, 아귀찜, 해물찜, 육개장, 부대찌개, 김치, 닭볶음탕, 닭도리탕, 제육, 오징어볶음, 쫄면, 비빔냉면, 매운탕, 감자탕, 훠궈, 사천, 쓰촨, 고추 · 영문 spicy, mala, tteokbokki, buldak, jjamppong, kimchi, sichuan, szechuan, chili, chilli, hotpot, hot pot | **사람 검토 전 임시값** |
+| 날음식 (`RAW_CUES`) | `diet.raw`=예 → `DIET_RESTRICTED`, 판단 단서 없으면 `MENU_UNKNOWN` | — | 육회, 물회, 횟집, 생선회, 모듬회, 모둠회, 활어, 광어회, 우럭회, 참치회, 연어회, 회덮밥, 회정식, 회센터, 회무침, 사시미, 스시, 초밥, 오마카세, 카이센, 게장, 생굴, 산낙지, 탕탕이, 세비체, 포케, 타르타르, 카르파초 · 낱말 '회' · 영문 sashimi, sushi, raw, omakase, tartare, ceviche, poke, carpaccio, yukhoe | **사람 검토 전 임시값** |
+
+- 매운 음식·날음식 판단(`src/tour-api/signals.js`): 국문 제목·메뉴 원문에 단서가 있으면 제외(`DIET_RESTRICTED`)다.
+  카페·찻집 분류(FD05)이거나, 메뉴 원문이 있는데 단서가 없으면 '해당 음식 아님'(추정)이다. 둘 다 아니면 판단할 근거가 없어
+  `MENU_UNKNOWN`으로 제외한다(8.4절).
+- 주점·카페 유형은 음식 중분류(`FD` 아래 FD01–FD05)가 있으면 분류만 믿고, 분류가 없는 음식점에만 주점 이름 단서를 쓴다.
+
+**관심사 매핑 (`INTEREST_TAG_RULES`, 태그 순서 `INTEREST_TAGS`)** — 유형(국문 체계)·분류 코드·국문 이름 단서 중 하나라도 맞으면 붙인다.
+
+| 태그 | 유형 코드 | 분류 코드 | 이름 단서 |
+| --- | --- | --- | --- |
+| `SHOPPING` | 38 쇼핑 | `lclsSystm1` SH | — |
+| `KBEAUTY` | — | `lclsSystm3` EX050500 | 화장품, 코스메틱, 뷰티, 올리브영 · cosmetic(s), beauty |
+| `PALACE_HISTORY` | — | `lclsSystm1` HS | 경복궁, 창덕궁, 창경궁, 덕수궁, 경희궁, 종묘, 고궁, 궁궐, 왕릉 · palace |
+| `CAFE` | — | 카페 신호(FD05)일 때 | — |
+| `EXHIBITION` | — | `lclsSystm2` VE07 · `lclsSystm3` EV030100, EV030200 | 박물관, 미술관, 갤러리, 전시, 기념관, 과학관 · museum, gallery, exhibition |
+| `FOOD` | 39 음식점 | 음식점이면서 카페·주점이 아닐 때 | — |
+| `NATURE` | — | `lclsSystm1` NA · `lclsSystm2` VE03 | 수목원, 정원, 공원, 숲, 계곡, 폭포, 호수 · park, garden, forest |
+| `FESTIVAL` | 15 축제공연행사 | `lclsSystm1` EV | — |
+
+- 의료 시설 단서(`MEDICAL_CUES`: `lclsSystm3` EX050800 기타의료관광, 의원·병원·클리닉·피부과·성형·치과·한의원, clinic·hospital)는
+  `KBEAUTY` 태그를 막는다 — 병원을 관광 관심사로 올리면 병원 알선이 된다(spec 9.1). 후보 제외는 엔진이 따로 한다.
+- 유형 코드는 국문 체계다. 영문·일문·중문 서비스의 유형 코드(75·76·78·79·80·82·85)는 `src/tour-api/content-types.js`가
+  국문 코드로 바꾼 뒤 판정한다(77 교통은 대응이 없어 그대로 둔다).
+
+### 11.3 공항 이동 추정 (`lib/server/airports.js` `AIRPORT_TRANSFER`)
+
+입국일 시작·출국일 마감(1장)에 쓰는 공항↔숙소 이동 추정이다. **세 값 모두 사람 검토 전 임시값이다** — 실제 공항버스·택시 소요와 비교해 사람이 확인한다(`HUMAN_ACTIONS.md` 12번).
+
+```
+분 = 올림(공항–숙소 직선거리 km × 1.3 ÷ 60km/h × 60 + 15분)
+```
+
+| 값 | 기본값 | 상태 |
+| --- | --- | --- |
+| 도로 우회 계수 `detourFactor` | 직선거리 × 1.3 | **사람 검토 전 임시값** |
+| 평균 속도 `speedKmh` | 60km/h | **사람 검토 전 임시값** |
+| 승차 대기·터미널 이동 `terminalMin` | +15분 | **사람 검토 전 임시값** |
+
+- 공항 기준점은 인천(`ICN`)·김포(`GMP`) 좌표 한 점씩이다. 입국 수속 90분·공항 도착 여유 3시간·출국 여유 30분은
+  `src/stay/defaults.js`의 별도 값이며 이 식에 더하지 않는다.
+- 그날 숙소가 없으면 등록된 숙소 중 가장 먼 곳으로 계산한다(창을 넓히는 쪽으로 틀리지 않게).
