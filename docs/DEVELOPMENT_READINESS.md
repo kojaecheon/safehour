@@ -11,7 +11,7 @@
 | 항목 | 증거 | 상태 |
 | --- | --- | --- |
 | 설치 | `npm ci` (잠금 파일 그대로, 의존성 변경 없음) | 준비 |
-| 단위·통합 테스트 | `npm test` | **1,679/1,679 통과** (383 suites) — 퇴역한 v1 지침 호환 계층 테스트(`test/recovery-legacy.test.js`)는 계층과 함께 삭제 |
+| 단위·통합 테스트 | `npm test` | **1,680/1,680 통과** (383 suites) — 퇴역한 v1 지침 호환 계층 테스트(`test/recovery-legacy.test.js`)는 계층과 함께 삭제 |
 | 정적 검사 | `npm run lint` | 통과 |
 | 프로덕션 빌드 | `npm run build` | 통과 (API 경로 11개, 퇴역한 `/plan`·`/result`는 `/today`로 보내는 경로만 남음) |
 | E2E | `npm run e2e` | **62/62 통과** (13 파일, 360px, 외부 호출 0건) — spec 12.3 시나리오 11개로 다시 썼다(AX-322) |

@@ -26,7 +26,7 @@
 | `SAFEHOUR_BAD_REQUEST` | 400 | 요청 본문이 계약에 맞지 않는다 |
 | `SAFEHOUR_STAY_INVALID` | 400 | 체류 자체가 규칙을 어긴다 — 날짜 역순, 45박 초과, 수술·시술 일정 없음, 숙소 날짜 겹침, 대한민국 밖 좌표, 체류 필드 형식 오류 |
 | `SAFEHOUR_ADDRESS_UNAVAILABLE` | 503 | 주소 검색 키가 없다 |
-| `SAFEHOUR_EXTERNAL_API` | 502 | 관광공사 국문 목록 조회가 실패했다(키 없음·호출 한도 포함). 일정을 만들지 않는다 |
+| `SAFEHOUR_EXTERNAL_API` | 502 | 외부 데이터 제공자 호출이 실패했다(키 없음·호출 한도 포함). 일정 경로에서는 일정을 만들지 않고 기존 일정도 바꾸지 않는다 |
 | `SAFEHOUR_PLACE_INVALID` | 400 | 장소 상세 요청의 장소 식별자·유형 조합이 올바르지 않다 |
 | `SAFEHOUR_RECALCULATION_FAILED` | 500 | 판정을 시작했으나 끝내지 못했다 |
 | `SAFEHOUR_PLAN_CODE_REQUIRED` | 400 | 연결 코드가 없다 |
@@ -119,7 +119,8 @@ PlanStay {
 정거장 하나를 바꿀 후보를 준다.
 
 - 입력: `{ lang, stay, date, outingId, stopId, day, usedContentIds?, edits?, events? }`
-  (`day.date`가 `date`와 다르면 400이다)
+- 오류: 401, 체류 규칙 위반은 `SAFEHOUR_STAY_INVALID`, 본문 형식 오류는 `SAFEHOUR_BAD_REQUEST`
+  (`day.date`가 `date`와 다른 경우 포함), 관광공사 조회 실패는 502, 판정 실패는 500
 - 출력: `{ ok: true, alternatives: Array<{ stop, outingPreview }> }` — **최대 5개**
 - 돌려주는 후보는 모두 게이트와 외출 재검증(복귀 계산·보행 누적·이동 한도)을 통과한 것뿐이다.
   통과하지 못한 후보를 "넣어보고 실패하면 되돌리기"용으로 주지 않는다.
@@ -129,6 +130,7 @@ PlanStay {
 - 입력: `{ lang, stops: Array<{ title, category, arriveAt }>, interests, pace }`
 - 출력: `{ ok: true, text, source: "AI" | "TEMPLATE" }`
 - **이 본문 밖의 정보는 받지 않는다.** 조건·병원·숙소·날짜 필드를 넣어도 버려지고 외부로 나가지 않는다.
+- 오류: 401, 본문 형식 오류는 400 `SAFEHOUR_BAD_REQUEST`(어느 필드인지 함께 준다).
 - 스위치나 키가 없으면 `source`는 항상 `TEMPLATE`이다.
 
 ## `POST /api/address/search`
@@ -136,16 +138,18 @@ PlanStay {
 - 입력: `{ keyword (2–60자), lang }`
 - 출력: `{ ok: true, results: Address[] }` — **최대 10개**. 각 결과는 도로명주소·지번주소·건물명과
   위경도를 담고 출처가 `JUSO` 또는 `DEMO`다.
-- 키가 없으면 503 `SAFEHOUR_ADDRESS_UNAVAILABLE`. 데모 로그인 모드에서는 고정 데모 주소를
-  '데모 주소'로 돌려준다.
+- 오류: 401, 검색어 형식 오류는 400, 키가 없으면 503 `SAFEHOUR_ADDRESS_UNAVAILABLE`,
+  제공자 호출 실패는 502. 데모 로그인 모드에서는 키가 없어도 고정 데모 주소를 '데모 주소'로 돌려준다.
 - 제공자가 주는 좌표는 UTM-K(GRS80)이고 **서버가 위경도로 변환해서** 돌려준다. 클라이언트는 변환된
   값만 본다.
 
 ## `POST /api/place`
 
 장소 상세를 준다. 입력은 정거장과 같은 모양(`{ lang, contentId, sourceIds, contentTypeIds }`)이다.
-언어별 원본 장소 id를 함께 받아 선택 언어 서비스를 부른다. 식별자와 유형 조합이 맞지 않으면
-400 `SAFEHOUR_PLACE_INVALID`다.
+언어별 원본 장소 id를 함께 받아 선택 언어 서비스를 부른다.
+
+- 오류: 401, 식별자와 유형 코드가 짝으로 오지 않으면 400 `SAFEHOUR_PLACE_INVALID`,
+  관광공사 조회 실패는 502.
 
 ## `POST /api/plan/link`
 

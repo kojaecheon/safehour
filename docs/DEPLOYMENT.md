@@ -208,7 +208,9 @@ Vercel 은 이전 배포를 보존하므로 롤백에 재빌드가 필요 없다
 
 ## 5. 배포 전 체크리스트
 
-- [ ] CI `quality` 통과 (lint · 단위 322 · build · audit · E2E 93)
+- [ ] CI `quality` 통과 (lint · build · E2E). 대중형 플랫폼 브랜치 기준 단위 1,680건 · E2E 62건이다.
+      **audit 단계는 현재 의존성 권고 3건으로 실패한다** — 잠금 파일을 2026-11-05 이후에나 올릴 수 있어
+      그때까지는 이 단계만 예외로 두고 나머지로 판단한다
 - [ ] `/api/health` 에서 `tourApiKeyConfigured: true`
 - [ ] `/api/auth/session` 에서 `auth.ready: true`, 쓰려는 공급자가 `configured: true`
 - [ ] 핵심 흐름 수동 1회: 로그인 → 체류 설정 → 동의·본인 체크 → 전체 일정 → 오늘 → 휴무 사건 → 즉시 복귀

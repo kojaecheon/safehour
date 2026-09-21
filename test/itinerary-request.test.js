@@ -8,6 +8,7 @@
 //   - 기기가 보낸 일정(previous·day)은 DayPlan 필드만 남긴다
 
 import { test, describe } from 'node:test';
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 
 import {
@@ -19,6 +20,7 @@ import {
   normalizePlanRequest,
   normalizePlanStay,
 } from '../lib/server/itinerary-request.js';
+import { LABEL_ORDER, WARNING_ORDER } from '../src/engine/displayOrder.js';
 import { planTrip } from '../src/engine/tripPlan.js';
 import { AIRPORT_TRAVEL, at, byLodging, tripPool, tripStay } from './trip-fixtures.js';
 import { planStay } from './itinerary-fixtures.js';
@@ -304,6 +306,21 @@ describe('기기가 보낸 일정(DayPlan) 정리', () => {
   test('엔진이 만든 일정은 그대로 통과한다', () => {
     assert.deepEqual(normalizeDayPlan(structuredClone(withOutings), 'day'), withOutings);
     for (const day of Object.values(trip.days)) assert.deepEqual(normalizeDayPlan(structuredClone(day), 'day'), day);
+  });
+
+  test('경고·표시 라벨 허용 목록은 엔진 정본에서 온다 — 사본을 두면 재계획에서 값이 사라진다', async () => {
+    // 이 모듈은 기기가 보낸 일정에서 허용 목록 밖 경고·라벨을 걸러 낸다.
+    // 목록을 여기 리터럴로 다시 적으면, 엔진 정본에만 값을 더했을 때 첫 재계획에서 조용히 사라진다.
+    const source = await readFile(new URL('../lib/server/itinerary-request.js', import.meta.url), 'utf8');
+    assert.match(source, /new Set\(WARNING_ORDER\)/);
+    assert.match(source, /new Set\(LABEL_ORDER\)/);
+
+    const day = structuredClone(withOutings);
+    day.warnings = [...WARNING_ORDER];
+    day.outings[0].stops[0].labels = [...LABEL_ORDER];
+    const kept = normalizeDayPlan(day, 'day');
+    assert.deepEqual(kept.warnings, [...WARNING_ORDER], '정본의 경고가 하나도 버려지지 않는다');
+    assert.deepEqual(kept.outings[0].stops[0].labels, [...LABEL_ORDER], '정본의 라벨이 하나도 버려지지 않는다');
   });
 
   test('DayPlan 밖 필드·현재 위치류 필드는 모든 깊이에서 버린다', () => {
