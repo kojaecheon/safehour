@@ -7,7 +7,9 @@ import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
 import { REASON, STATE } from '../src/domain/states.js';
-import { ITINERARY_ENGINE_VERSION, kstClock, planTrip, regenerate } from '../src/engine/tripPlan.js';
+import { LABEL_ORDER, WARNING_ORDER } from '../src/engine/displayOrder.js';
+import { ITINERARY_ENGINE_VERSION, kstClock, planTrip, regenerate, relabelDay } from '../src/engine/tripPlan.js';
+import { WARNING } from '../src/stay/compose.js';
 import { classifyDate, stayDates } from '../src/stay/index.js';
 import {
   AIRPORT_TRAVEL,
@@ -222,6 +224,36 @@ describe('규칙 30 — 지난 날짜·고정·삭제', () => {
     // 나머지 정거장은 제자리에 남는다
     const rest = contentIdsOf(first.days['2026-10-07']).filter((id) => id !== victim);
     for (const id of rest) assert.ok(contentIdsOf(result.days['2026-10-07']).includes(id), `${id} 는 남는다`);
+  });
+});
+
+// 표시 순서 목록은 dayPlan 이 만들고 tripPlan 이 **거르개**로 쓴다(relabelStop·assembleDay).
+// 목록이 두 벌이면 한쪽에만 더한 표시가 재계획·언어 다시 쓰기에서 소리 없이 사라진다.
+describe('표시 순서 목록은 한곳에서 온다 (dayPlan · tripPlan)', () => {
+  test('목록에 있는 표시는 언어 다시 쓰기를 왕복해도 남는다', () => {
+    const s = tripStay({}, { pace: 'NORMAL' });
+    const en = trip(s, { lang: 'en' });
+    const date = '2026-10-05';
+    const day = en.days[date];
+    assert.ok(day.outings[0]?.stops[0], '정거장이 있는 날짜여야 한다');
+    // NEEDS_TRANSLATION 은 새 언어 후보를 보고 다시 붙이는 표시라 왕복 대상이 아니다
+    const seeded = LABEL_ORDER.filter((l) => l !== 'NEEDS_TRANSLATION');
+    const [outing, ...restOutings] = day.outings;
+    const [stop, ...restStops] = outing.stops;
+    const withLabels = {
+      ...day,
+      outings: [{ ...outing, stops: [{ ...stop, labels: [...seeded] }, ...restStops] }, ...restOutings],
+    };
+    const after = relabelDay(withLabels, tripPool('ja'));
+    assert.deepEqual(
+      after.outings[0].stops[0].labels.filter((l) => l !== 'NEEDS_TRANSLATION'),
+      seeded,
+      '거르개가 목록과 다르면 새로 더한 표시가 사라진다',
+    );
+  });
+
+  test('경고 순서 목록은 조건 합성의 WARNING 과 같은 값이다', () => {
+    assert.deepEqual([...WARNING_ORDER].sort(), Object.values(WARNING).sort());
   });
 });
 

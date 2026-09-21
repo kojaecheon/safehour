@@ -29,6 +29,7 @@ import { DEFAULTS } from '../stay/defaults.js';
 import { appointmentsOnDate, lodgingForDate, pointOf } from '../stay/stay.js';
 import { fromMinutes, toMinutes } from '../stay/time.js';
 import { appointmentEvents, freeIntervals, patientEvents, patientWindows } from './dayTimeline.js';
+import { LABEL_ORDER, WARNING_ORDER } from './displayOrder.js';
 import { buildForwardOuting, buildMealOuting } from './outingBuilder.js';
 import { gateCandidate } from './safetyGate.js';
 import { checkOutingSla } from './slaCalculator.js';
@@ -45,8 +46,6 @@ import {
 const MEAL_SLOTS = Object.freeze(['LUNCH', 'DINNER']);
 const MIN_WINDOW = DEFAULTS.minOutingWindowMin;
 const MIN_STAY = DEFAULTS.minStopStayMin;
-const WARNING_ORDER = Object.freeze(['MEDICATION_TIMES_MISSING', 'DEFAULTS_APPLIED', 'TRAVEL_TIMES_ESTIMATED']);
-const LABEL_ORDER = Object.freeze(['ESTIMATED', 'HOURS_UNCONFIRMED', 'NEEDS_TRANSLATION', 'DIET_ESTIMATED', 'ORDER_CARD']);
 const LEG_MODE = Object.freeze({ walk: 'WALK', car: 'TAXI', transit: 'TRANSIT' });
 const FREE_COVERAGE = new Set(['FREE', 'DECLARED_FREE']);
 

@@ -35,6 +35,7 @@ import {
 } from './dayContext.js';
 import { planDay, planStayDay } from './dayPlan.js';
 import { newRepairLog, repairDay } from './dayRepair.js';
+import { LABEL_ORDER, WARNING_ORDER } from './displayOrder.js';
 import { checkOutingSla } from './slaCalculator.js';
 import { foldDemoEvents, shiftAppointmentsOnDate } from './tripEvents.js';
 
@@ -43,8 +44,6 @@ export { SilentReplanError };
 /** 일정 규칙 버전 — 게이트 순서·버퍼·순위·재계획 규칙이 바뀌면 올린다 */
 export const ITINERARY_ENGINE_VERSION = '2.0.0';
 
-const WARNING_ORDER = Object.freeze(['MEDICATION_TIMES_MISSING', 'DEFAULTS_APPLIED', 'TRAVEL_TIMES_ESTIMATED']);
-const LABEL_ORDER = Object.freeze(['ESTIMATED', 'HOURS_UNCONFIRMED', 'NEEDS_TRANSLATION', 'DIET_ESTIMATED', 'ORDER_CARD']);
 const IMMEDIATE_RETURN_CAUSES = Object.freeze([REASON.PATIENT_RECALLED, REASON.PLAN_REVOKED, REASON.PLAN_EXPIRED]);
 /** 풀리면 남은 시간을 다시 짜는 원인 — 날짜 사유에 남아 있다가 사라지면 풀린 것이다 */
 const LIFTABLE_CAUSES = Object.freeze([
