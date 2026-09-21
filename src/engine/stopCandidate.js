@@ -47,8 +47,13 @@ function canonicalTypeOf(candidate) {
 
 /**
  * 의료 시설(병원·의원·클리닉 등)인가. 관광 후보 모듈의 단서 목록(MEDICAL_CUES) 한곳을 쓴다.
- * 판정 입력은 분류체계 코드와 **국문 제목**이다(언어 무관). 국문 원문이 없을 때만 표시 제목을 본다.
+ * 판정 입력은 분류체계 코드와 **국문 제목**이다(언어 무관).
  * 단서가 있으면 제외 쪽으로 본다 — 병원을 정거장으로 두면 병원 알선이 된다(spec 9.1).
+ *
+ * 국문 원문(`stop.ko`)이 있으면 그 제목만 본다 — 제목이 비어 있어도 표시 제목으로 내려가지 않는다.
+ * 표시 제목은 선택 언어를 따라 달라지므로, 표시 제목을 보면 같은 후보가 언어마다 다르게 판정된다
+ * (MEDICAL_CUES 는 국문 단서와 라틴 문자 단어뿐이라 일문·중문 제목은 애초에 맞지 않는다 — 규칙 27 위반).
+ * 국문 원문이 아예 없는 후보는 언어와 무관한 신호(위의 분류체계 코드)로만 판정한다.
  */
 export function isMedicalFacility(candidate) {
   const classification = candidate?.sourceMetadata?.classification ?? {};
@@ -56,8 +61,9 @@ export function isMedicalFacility(candidate) {
     const code = classification[level];
     if (code && (MEDICAL_CUES[level] ?? []).includes(code)) return true;
   }
-  const title = candidate?.stop?.ko?.title || candidate?.title || '';
-  return matchCues(title, MEDICAL_CUES).length > 0;
+  const koreanTitle = candidate?.stop?.ko?.title;
+  if (typeof koreanTitle !== 'string') return false;
+  return matchCues(koreanTitle, MEDICAL_CUES).length > 0;
 }
 
 /** 식당(음식점 유형이고 카페·찻집이 아님이 확인됨) — 식사 칸에만 들어간다 */

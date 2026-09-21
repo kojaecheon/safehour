@@ -12,6 +12,7 @@ import {
   AIRPORT_TRAVEL,
   SET,
   allStops,
+  blankKoreanTitle,
   cafe,
   mins,
   museum,
@@ -269,6 +270,30 @@ describe('의료 시설은 정거장이 되지 않는다 (불변조건)', () => 
       edits: { pinned: ['601'], deleted: [], clearedMeals: [] },
     });
     assert.ok(!allStops(day).some((x) => x.contentId === '601'));
+  });
+
+  // 규칙 27 — 의료 시설 판정도 언어와 무관해야 한다.
+  // 국문 제목이 비어 있으면 표시 제목이 선택 언어를 따라 달라진다(ko·en 은 영문, ja·zh 는 각 언어).
+  // 판정이 표시 제목으로 새면 같은 후보가 ko·en 에서는 빠지고 ja·zh 에서는 일정에 들어간다.
+  test('국문 제목이 비어 있어도 판정은 언어와 무관하다 (규칙 27)', () => {
+    const foreignOnly = (lang) =>
+      blankKoreanTitle('603', {
+        type: '14',
+        north: 0.5,
+        lang,
+        en: 'Test Clinic',
+        ja: 'テスト美容クリニック',
+        zh: '测试整形医院',
+      });
+    const shape = (d) => ({
+      dayState: d.dayState,
+      stops: allStops(d).map((x) => x.contentId),
+      excluded: d.excluded.map((e) => [e.candidateId, e.reasons]),
+    });
+    const results = ['ko', 'en', 'ja', 'zh'].map((lang) =>
+      shape(plan(restrictedStay(), '2026-10-05', { candidates: [foreignOnly(lang), ...basics()] })),
+    );
+    for (const r of results.slice(1)) assert.deepEqual(r, results[0]);
   });
 });
 
