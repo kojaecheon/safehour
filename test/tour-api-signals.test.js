@@ -21,6 +21,7 @@ import {
   WATER_CUES,
 } from '../src/tour-api/cues.js';
 import { deriveSignals } from '../src/tour-api/signals.js';
+import { INTERESTS } from '../src/stay/stay.js';
 import { normalizeTourCandidate, applyIntro } from '../src/tour-api/mapper.js';
 import { canonicalContentType } from '../src/tour-api/content-types.js';
 
@@ -46,6 +47,12 @@ describe('단서 목록은 관광 후보 모듈의 상수 한곳에 있다 (spec
       'NATURE',
       'FESTIVAL',
     ]);
+  });
+
+  // 두 목록은 서로를 모르고 각자 같은 여덟 개를 적고 있다. 갈라져도 오류가 나지 않는다 —
+  // 체류에서 받아들여지지만 후보에는 아무것도 맞지 않는 태그, 또는 그 반대가 생길 뿐이다.
+  test('관심사 태그 집합은 체류 도메인의 INTERESTS 와 같다 (spec 4.8)', () => {
+    assert.deepEqual([...INTEREST_TAGS], [...INTERESTS], '순서까지 같아야 한다 — 태그는 이 순서로 붙는다');
   });
 });
 
