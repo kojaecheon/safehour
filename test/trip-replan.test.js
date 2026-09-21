@@ -5,10 +5,12 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
+import { createFallbackEstimator } from '../src/adapters/travelTime.js';
 import { REASON, STATE } from '../src/domain/states.js';
 import { SilentReplanError, computeDayDelta } from '../src/engine/dayDelta.js';
 import { foldDemoEvents } from '../src/engine/tripEvents.js';
 import { applyImmediateReturn, planTrip } from '../src/engine/tripPlan.js';
+import { CLINIC_POINT } from './day-plan-fixtures.js';
 import { hospitalPeriod } from './stay-fixtures.js';
 import {
   AIRPORT_TRAVEL,
@@ -17,6 +19,7 @@ import {
   contentIdsOf,
   mins,
   park,
+  period,
   plus,
   requiredMin,
   stay,
@@ -375,6 +378,69 @@ describe('규칙 13 — 외출 중 지침 철회·만료는 즉시 복귀', () =
     const back = cutOuting.travelTotalMin - first.legIn.min;
     assert.equal(mins(cutOuting.plannedReturnAt), mins(first.leaveAt) + back);
     assert.equal(mins(cutOuting.returnBy) - mins(cutOuting.departAt) - requiredMin(cutOuting, { recovery: true }), cutOuting.slackMin);
+  });
+});
+
+// 병원이 둘인 것은 정상이다 — 사용자가 넣은 병원에 연동 지침(데모)이 더한 병원이 붙는다.
+// 즉시 복귀는 숫자가 가장 중요한 순간이므로, 복귀 병원을 '첫 번째 병원'으로 추측해서는 안 된다.
+describe('규칙 13-1 — 즉시 복귀 재계산은 합성된 복귀 시각의 병원으로 한다', () => {
+  /** 숙소 남동쪽 — H1(북쪽 2.2km)과 반대편이라 복귀 이동 추정이 확실히 다르다 */
+  const SECOND_POINT = Object.freeze({ lat: 37.478, lng: 127.056 });
+  const hospital = (id, point) => ({
+    id,
+    name: `테스트 병원 ${id}`,
+    address: { roadAddress: `테스트로 ${id}`, lat: point.lat, lng: point.lng, source: 'DEMO' },
+  });
+  const twoHospitals = () =>
+    stay({
+      pace: 'NORMAL',
+      hospitals: [hospital('H1', CLINIC_POINT), hospital('H2', SECOND_POINT)],
+      periods: [
+        period(
+          { returnTime: { kind: 'SET', time: '16:30', place: 'HOSPITAL', hospitalId: 'H2' } },
+          { startDate: '2026-10-04', endDate: '2026-10-10' },
+        ),
+      ],
+    });
+  const backMin = (stop, point) =>
+    Math.ceil(createFallbackEstimator().estimate({ lat: Number(stop.lat), lng: Number(stop.lng) }, point).min);
+
+  const s = twoHospitals();
+  const base = plan(s);
+  const day = base.days[TODAY];
+  const outing = day.outings.find((o) => o.returnPlace === 'HOSPITAL' && o.deadlineReason === 'RETURN_TIME');
+  assert.ok(outing, '병원으로 복귀하는 RETURN_TIME 외출이 있어야 한다');
+  assert.ok(outing.stops.length >= 2, '비울 정거장이 남아야 한다');
+  assert.equal(day.effective.returnTime.value.hospitalId, 'H2');
+  const [first] = outing.stops;
+  const now = at(TODAY, plus(first.arriveAt, 1));
+  const cutOf = (target) => applyImmediateReturn(day, { now, cause: 'PLAN_REVOKED', stay: target }).outings.find((o) => o.id === outing.id);
+
+  test('두 번째 병원으로 복귀하는 외출은 그 병원 좌표로 다시 계산한다', () => {
+    const toSecond = backMin(first, SECOND_POINT);
+    const toFirst = backMin(first, CLINIC_POINT);
+    assert.notEqual(toSecond, toFirst, 'fixture 의 두 병원은 복귀 추정이 달라야 한다');
+    const cut = cutOf(s);
+    assert.deepEqual(
+      cut.stops.map((x) => x.id),
+      [first.id],
+    );
+    assert.equal(mins(cut.plannedReturnAt), mins(first.leaveAt) + toSecond);
+    assert.equal(cut.travelTotalMin, first.legIn.min + toSecond);
+  });
+
+  test('복귀 병원을 찾을 수 없으면 추측하지 않고 외출 단위 값을 그대로 둔다', () => {
+    const without = { ...s, hospitals: [hospital('H1', CLINIC_POINT)] };
+    const cut = cutOf(without);
+    assert.deepEqual(
+      cut.stops.map((x) => x.id),
+      [first.id],
+      '정거장은 그대로 비운다',
+    );
+    assert.equal(cut.plannedReturnAt, outing.plannedReturnAt);
+    assert.equal(cut.travelTotalMin, outing.travelTotalMin);
+    assert.equal(cut.slackMin, outing.slackMin);
+    assert.equal(cut.latestDepartureAt, outing.latestDepartureAt);
   });
 });
 

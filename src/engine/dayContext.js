@@ -533,14 +533,18 @@ export function locateGuardian(context, outing, { lower, departed, patientBusy, 
   };
 }
 
-/** 저장된 외출의 복귀 좌표 — 숙소, 또는 마감과 시작이 같은 병원 일정·병원 복귀 시각의 병원 */
+/**
+ * 저장된 외출의 복귀 좌표 — 숙소, 또는 마감과 시작이 같은 병원 일정·병원 복귀 시각의 병원 (규칙 13-1).
+ * 병원은 `hospitalId` 로만 찾는다 — 찾지 못했다고 첫 번째 병원으로 추측하지 않는다.
+ * 병원이 둘 이상인 것은 정상이다(사용자 병원 + 연동 지침이 더한 병원). 추측하면 다른 병원 좌표로 복귀를 계산하게 된다.
+ */
 export function returnPointOf(context, outing) {
   if (outing.returnPlace !== 'HOSPITAL') return context.lodgingPoint;
   const at = toMinutes(outing.returnBy);
   const appt = context.apptEvents.find((e) => e.deadlineMin === at);
   if (appt) return appt.point;
-  const rt = context.limits?.returnTime;
-  const hospital = (context.hospitals ?? []).find((h) => h?.id === rt?.hospitalId) ?? (context.hospitals ?? [])[0];
+  const hospitalId = context.limits?.returnTime?.hospitalId;
+  const hospital = hospitalId ? (context.hospitals ?? []).find((h) => h?.id === hospitalId) : null;
   return hospital ? pointOf(hospital) : context.lodgingPoint;
 }
 
