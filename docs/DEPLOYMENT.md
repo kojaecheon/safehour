@@ -170,8 +170,9 @@ npm run merge -- <PR번호> --wait   # 실행 중이면 완료까지 대기(최�
 
 ### 발동 시 동작
 
-- `/api/recommend`, `/api/recalculate` 가 **판정도 외부 호출도 하지 않고** 즉시
-  `NO_TOURISM` 으로 응답한다.
+- 일정 판정 경로(`/api/itinerary/plan`, `/api/itinerary/alternatives`)가 **판정도 외부 호출도 하지 않고**
+  모든 날짜를 정거장 0건 `NO_TOURISM` 으로 응답한다.
+  (단일 외출 API `/api/recommend`·`/api/recalculate`·`/api/today` 는 ADR-0006 으로 퇴역했다.)
 - 사용자 화면에는 오류가 아니라 정상 미추천 결과로 보인다 —
   "점검을 위해 추천을 일시 중단했습니다. 병원 안내를 먼저 따르세요."
 - 이벤트(휴무·기상·환자 호출)를 보내도 미추천이 유지된다.
@@ -210,7 +211,8 @@ Vercel 은 이전 배포를 보존하므로 롤백에 재빌드가 필요 없다
 - [ ] CI `quality` 통과 (lint · 단위 322 · build · audit · E2E 93)
 - [ ] `/api/health` 에서 `tourApiKeyConfigured: true`
 - [ ] `/api/auth/session` 에서 `auth.ready: true`, 쓰려는 공급자가 `configured: true`
-- [ ] 핵심 흐름 수동 1회: 로그인 → 병원 지침 연결 → 안내 확인 → 외출 판정 → 휴무 이벤트 → 즉시 복귀
+- [ ] 핵심 흐름 수동 1회: 로그인 → 체류 설정 → 동의·본인 체크 → 전체 일정 → 오늘 → 휴무 사건 → 즉시 복귀
+      (병원 연동 흐름도 볼 때는 지침 연결 → 안내 확인을 사이에 넣는다)
 - [ ] 현재 GPS 요청 0건 (브라우저 개발자도구 → Application → Permissions)
 - [ ] 360px 에서 가로 스크롤 없음
 - [ ] kill switch 발동·해제 리허설 1회 (실제 사고 때 처음 해보면 늦다)
@@ -256,7 +258,8 @@ Vercel 은 이전 배포를 보존하므로 롤백에 재빌드가 필요 없다
 확인한 것:
 
 - `/api/health` → `recommendationKilled: true`
-- `/api/recommend` → `servicePaused: true`, `NO_TOURISM`, 코스 0건, 사유 `SERVICE_PAUSED`
+- 일정 판정 경로 → `servicePaused: true`, 모든 날짜 `NO_TOURISM`, 정거장 0건, 사유 `SERVICE_PAUSED`
+  (확인 당시에는 퇴역 전 `/api/recommend` 로 확인했다)
 - 사용자 화면 → 오류가 아니라 정상 미추천 배너
   ("지금은 관광을 권하지 않습니다 / 점검을 위해 추천을 일시 중단했습니다")
 - 해제 후 `npm run verify:deploy` 13/13 통과로 정상 복구 확인
