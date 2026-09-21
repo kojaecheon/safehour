@@ -514,6 +514,58 @@ describe('출력 검사 → 템플릿 대체 (규칙 36)', () => {
     assert.equal(findBanned('간체 번체 醫院 표기', 'zh'), BANNED.MEDICAL);
   });
 
+  // 이 제품의 대상 진료과 — 성형외과·피부과와 흔한 시술 이름.
+  // '수술'·'시술'·'手術'·'surgery' 만으로는 걸리지 않아 그대로 AI 문장으로 나갔다 (spec 4.16 의료 언급 금지).
+  const SPECIALTY_SAMPLES = {
+    ko: [
+      ['성형', '오늘은 성형 일정 뒤에 경복궁을 천천히 둘러봐요.'],
+      ['피부과', '피부과 근처 카페에서 쉬었다 경복궁으로 가요.'],
+      ['보톡스', '보톡스 뒤에는 경복궁을 가볍게 걸어요.'],
+      ['필러', '필러 일정 뒤에 북촌한옥마을을 둘러봐요.'],
+      ['레이저', '레이저 뒤에는 실내 위주로 경복궁을 봐요.'],
+    ],
+    en: [
+      ['cosmetic', 'A calm day at Gyeongbokgung Palace after your cosmetic appointment.'],
+      ['plastic surgery', 'Gyeongbokgung Palace is gentle after plastic surgery.'],
+      ['dermatology', 'Gyeongbokgung Palace comes after your dermatology visit.'],
+      ['botox', 'Gyeongbokgung Palace after botox sessions.'],
+      ['filler', 'Filler sessions aside, enjoy Gyeongbokgung Palace today.'],
+      ['laser', 'A gentle laser day around Gyeongbokgung Palace.'],
+    ],
+    ja: [
+      ['整形', '今日は整形の後に景福宮を巡ります。'],
+      ['美容', '美容の予定の後で景福宮へ向かいます。'],
+      ['皮膚科', '皮膚科のそばのカフェから景福宮へ。'],
+      ['ボトックス', 'ボトックスの後は景福宮をゆっくり巡ります。'],
+      ['フィラー', 'フィラーの後で北村韓屋村を歩きます。'],
+      ['レーザー', 'レーザーの後は景福宮へ向かいます。'],
+    ],
+    zh: [
+      ['整形', '今天是整形之后的轻松行程，去景福宫。'],
+      ['美容', '美容之后去景福宫走走。'],
+      ['皮肤科', '皮肤科附近的咖啡馆，然后去景福宫。'],
+      ['肉毒', '肉毒之后去景福宫看看。'],
+      ['玻尿酸', '玻尿酸之后去北村韩屋村。'],
+      ['激光', '激光之后去景福宫走走。'],
+    ],
+  };
+
+  for (const [lang, samples] of Object.entries(SPECIALTY_SAMPLES)) {
+    for (const [word, sample] of samples) {
+      test(`${lang}: 성형외과·피부과 표현 '${word}' → TEMPLATE`, async () => {
+        assert.deepEqual(
+          checkIntroOutput(sample, { lang, titles: TITLES[lang] }),
+          { ok: false, rule: INTRO_CHECK.BANNED, category: BANNED.MEDICAL },
+          sample,
+        );
+        const result = await run(lang, sample);
+        assert.equal(result.source, 'TEMPLATE', sample);
+        assert.equal(result.reason, FALLBACK_REASON.CHECK_FAILED);
+        assert.equal(result.text, templateIntro(inputFor(lang)));
+      });
+    }
+  }
+
   test('금지 단어가 장소 이름 안에만 있으면 막지 않는다 (템플릿에도 같은 이름이 들어간다)', () => {
     const titles = ['안심 카페 거리', 'Safe Harbor Park'];
     assert.equal(checkIntroOutput('오늘은 안심 카페 거리에 들러 차를 마셔요.', { lang: 'ko', titles }).ok, true);
