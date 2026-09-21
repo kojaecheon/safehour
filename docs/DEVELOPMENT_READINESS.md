@@ -11,11 +11,11 @@
 | 항목 | 증거 | 상태 |
 | --- | --- | --- |
 | 설치 | `npm ci` (잠금 파일 그대로, 의존성 변경 없음) | 준비 |
-| 단위·통합 테스트 | `npm test` | **1,638/1,638 통과** (378 suites) — 퇴역한 v1 지침 호환 계층 테스트(`test/recovery-legacy.test.js`)는 계층과 함께 삭제 |
+| 단위·통합 테스트 | `npm test` | **1,679/1,679 통과** (383 suites) — 퇴역한 v1 지침 호환 계층 테스트(`test/recovery-legacy.test.js`)는 계층과 함께 삭제 |
 | 정적 검사 | `npm run lint` | 통과 |
 | 프로덕션 빌드 | `npm run build` | 통과 (API 경로 11개, 퇴역한 `/plan`·`/result`는 `/today`로 보내는 경로만 남음) |
-| E2E | `npm run e2e` | **다시 쓰는 중** — 예전 단일 외출 흐름 E2E는 새 흐름과 맞지 않는다. AX-322(T18)가 spec 12.3 시나리오 11개로 다시 쓰고 수치를 채운다 |
-| 운영 의존성 감사 | `npm run audit` | AX-322(T18)가 네트워크가 되면 실행해 기록한다 |
+| E2E | `npm run e2e` | **62/62 통과** (13 파일, 360px, 외부 호출 0건) — spec 12.3 시나리오 11개로 다시 썼다(AX-322) |
+| 운영 의존성 감사 | `npm run audit` | **실패 — 권고 3건**(next 2건: GHSA-p293-qw3h-jr36 critical, GHSA-2xp9-vwfh-vxw4 critical / sharp 1건: GHSA-rgj7-g3m4-5g8c high). `package.json`의 의존성과 `package-lock.json`은 기준 커밋과 동일하므로 이 브랜치가 만든 문제가 아니다. 해결하려면 의존성 상승이 필요하고, 그것은 2026-11-05 이후 결정 사항이다 |
 | 시안 보드 | `/design-board` — 토큰·부품 견본 + 주요 화면 8개 축소 시안, axe WCAG 2.1 A/AA 위반 0(360·1280px, ko·en·ja·zh), 가로 스크롤 없음(320–1280px) | 준비 |
 | 배포 | 없음 — 작업 브랜치 로컬 커밋만(원격 push·PR·병합 금지) | **2026-11-05 이후 결정** |
 | 사람이 해야 할 일 | 도로명주소·Gemini 키, 일·중 관광 서비스 신청, 의료진·법무·번역 검수 등 17건 | `docs/platform/HUMAN_ACTIONS.md` |
