@@ -338,12 +338,6 @@ export const messages = {
     ja: '1日の紹介・定型文',
     zh: '当天简介 · 固定文句',
   },
-  'trip.introTemplateNote': {
-    ko: '정해진 문장으로 만든 소개예요. 판정과 사유에는 쓰지 않아요.',
-    en: 'Made from fixed wording. It is not used for any decision.',
-    ja: '定型文で作った紹介です。判定や理由には使いません。',
-    zh: '使用固定文句生成的介绍，不用于任何判定。',
-  },
 
   // ── 데모 사건 패널 ──
   'trip.demoEvents': { ko: '오늘 들어온 데모 사건', en: 'Demo events today', ja: '今日のデモ事象', zh: '今天的演示事件' },

@@ -6,7 +6,8 @@
 //     (viewModel.introRequestFor). 조건·병원·숙소·날짜·계정은 보내지 않는다.
 //   - 같은 요청이면 기기에 저장한 문장을 다시 쓴다(getStore().readAiIntro / writeAiIntro). 하루 내용이 바뀌면
 //     요청이 달라지므로 한 번 더 받는다. 보기 전용(로그인 만료·오프라인)이면 부르지 않고 저장한 문장만 보인다.
-//   - source 가 AI 면 'AI 소개' 출처 영역에 'AI가 쓴 소개'라고 밝힌다. 템플릿이면 '정해진 문장'이라고 밝힌다.
+//   - source 가 AI 면 'AI 소개' 출처 영역에 'AI가 쓴 소개'라고 밝히고, 틀릴 수 있다는 것도 함께 알린다.
+//     템플릿이면 머리글의 '정해진 문장'만으로 출처가 드러난다 — 같은 말을 한 줄 더 쓰지 않는다.
 //     어느 쪽이든 판정·사유 영역과 시각적으로 떨어진 별도 영역이다. 이 문장은 판정에 쓰지 않는다.
 //   - 실패하면 아무것도 보이지 않는다(판정과 무관한 보강이다).
 
@@ -84,7 +85,6 @@ export default function IntroArea({ day, stay, readOnly }) {
         <span>{t('trip.introTemplateLabel')}</span>
       </p>
       <p className="trip-intro-text">{intro.text}</p>
-      <p className="trip-intro-note">{t('trip.introTemplateNote')}</p>
     </section>
   );
 }

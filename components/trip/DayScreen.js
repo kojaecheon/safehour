@@ -355,8 +355,6 @@ export default function DayScreen() {
           </section>
         )}
 
-        <IntroArea day={day} stay={stay} readOnly={trip.readOnly} />
-
         <div className="tabs" role="tablist" aria-label={t('trip.tabsLabel')}>
           {[
             ['P', t('trip.tabPatient')],
@@ -428,6 +426,11 @@ export default function DayScreen() {
             ) : null}
           </section>
         ))}
+
+        {/* 하루 소개는 타임라인 **뒤에** 둔다. 앞에 두면 일정이 첫 화면 밖으로 밀리는데,
+            소개는 아래 타임라인을 한 줄로 요약한 것이라 먼저 읽을 이유가 없다.
+            판정·사유 영역과 떨어진 별도 영역이라는 점은 그대로다(spec 4.16). */}
+        <IntroArea day={day} stay={stay} readOnly={trip.readOnly} />
 
         <section className="trip-tools" aria-labelledby={`${tabsId}-tools`}>
           <h2 id={`${tabsId}-tools`} className="visually-hidden">
