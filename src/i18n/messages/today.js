@@ -104,6 +104,13 @@ export const messages = {
     ja: 'そのほか{n}項目は制限なし',
     zh: '其他 {n} 项：无限制',
   },
+  // 제한 항목은 접어 둔다 — 펼치기 문구. 확인 화면이 조건 감사표가 되지 않게 한다(spec 4.6 '요약')
+  'today.checkMoreItems': {
+    ko: '제한 항목 {n}개 보기',
+    en: 'Show {n} restrictions',
+    ja: '制限項目 {n} 件を表示',
+    zh: '查看 {n} 项限制',
+  },
   'today.checkDone': {
     ko: '오늘 확인을 마쳤어요. 자정까지 유지돼요.',
     en: 'Today’s check is done. It lasts until midnight.',

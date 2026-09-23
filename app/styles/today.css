@@ -77,6 +77,45 @@
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
+/* 제한 항목 펼치기 — 확인 카드가 조건 감사표가 되지 않게 접어 둔다.
+   펼치기 자체가 터치 대상이라 44px 을 지킨다. 색만으로 구분하지 않게 문구 + 화살표를 함께 쓴다. */
+.today-check-more {
+  margin-top: var(--space-2);
+}
+.today-check-more > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--accent-strong);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  cursor: pointer;
+  list-style: none;
+}
+.today-check-more > summary::-webkit-details-marker {
+  display: none;
+}
+.today-check-more > summary::after {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+.today-check-more[open] > summary::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+.today-check-more > summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .today-check-row {
   display: grid;
   gap: var(--space-1);
