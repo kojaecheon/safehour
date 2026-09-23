@@ -85,8 +85,12 @@ export const TYPE_SCALE = [
   { token: '--text-korean-card', weight: '--weight-heavy', korean: true },
 ];
 
-export const SPACING = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-5', '--space-6', '--space-8', '--space-10', '--space-12'];
-export const RADII = ['--radius-xs', '--radius-sm', '--radius', '--radius-lg', '--radius-pill'];
+export const SPACING = [
+  '--space-0-5', '--space-1', '--space-1-5', '--space-2', '--space-3', '--space-4', '--space-5',
+  '--space-6', '--space-8', '--space-10', '--space-12', '--space-14',
+];
+/** SEED 모서리 단계 — 기존 다섯 개(--radius-xs … --radius-pill)는 ②층에서 옮긴 뒤 지운다 */
+export const RADII = ['--radius-6', '--radius-8', '--radius-10', '--radius-12', '--radius-16', '--radius-20', '--radius-24', '--radius-full'];
 export const SHADOWS = ['--shadow-card', '--shadow-float', '--shadow-sheet'];
 
 /** 날짜 칩 견본 — 고정 날짜 */

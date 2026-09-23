@@ -1,6 +1,6 @@
 # 디자인 시스템 — 밝은 여행앱
 
-- 기준일: 2026-09-20
+- 기준일: 2026-09-24 (SEED ①층 토큰 반영)
 - 작업 ID: AX-321 (디자인 시스템과 앱 셸 구현은 AX-304)
 - 연결: spec 7장, `IA_AND_FLOWS.md`, `ITINERARY_RULES.md`, ADR-0007(언어), ADR-0009(보기 전용), ADR-0010(긴급·지도)
 - 정본 코드: 토큰 `app/globals.css`(`:root`), 부품 모양 `app/styles/ui.css`, 부품 `components/ui/`(모음 `components/ui/index.js`),
@@ -38,9 +38,11 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 | 무리 | 토큰 | 값 | 쓰임 |
 | --- | --- | --- | --- |
-| 바탕 | `--bg` · `--surface` · `--surface-alt` | `#ffffff` · `#ffffff` · `#f3f5f9` | 페이지 · 카드 면 · 묶음·눌린 면 |
-| 글자 | `--ink` · `--ink-soft` | `#121826` · `#4b5565` | 본문 · 보조 글자 |
-| 경계 | `--line` · `--line-strong` · `--line-input` | `#e3e7ee` · `#c9d0dc` · `#7b8497` | 장식 구분선 · 장식 카드 테두리 · **입력·선택지 경계(정보 전달)** |
+| 바탕 | `--bg` · `--surface` · `--surface-alt` | `#ffffff` · `#ffffff` · `#f3f4f5` | 페이지 · 카드 면 · 채운 보조 버튼·선택 칸(SEED bg.neutral-weak) |
+| 층 (SEED) | `--layer-basement` · `--layer-default` · `--layer-floating` | `#f3f4f5` · `#ffffff` · `#ffffff` | 구역이 여럿인 화면의 바탕 · 흰 블록 · 시트·대화상자 |
+| 눌림·선택 (SEED) | `--pressed` · `--pressed-weak` · `--pressed-transparent` · `--selected` | `#f7f8f9` · `#eeeff1` · `rgba(0,0,0,.027)` · `#2a3038` | 흰 면 눌림 · 회색 채움 눌림 · 바탕 없는 요소 눌림 · '선택됨' 채움 |
+| 글자 | `--ink` · `--ink-soft` · `--ink-subtle` | `#1a1c20` · `#555d6d` · `#868b94` | 본문 · 보조 글자 · **아이콘·화살표·비활성 전용(글자 금지)** |
+| 경계 | `--line` · `--line-section` · `--line-strong` · `--line-input` · `--line-contrast` | `rgba(0,0,0,.047)` · `rgba(0,0,0,.063)` · `#dcdee3` · `#868b94` · `#1a1c20` | 반복 구분선 · 구역 경계 · 카드 테두리 · **입력·선택지 경계(정보 전달)** · 초점·고른 칸 |
 | 포인트 | `--accent` · `--accent-strong` · `--accent-soft` · `--accent-ink` | `#0a5cff` · `#0046d1` · `#eaf1ff` · `#ffffff` | 주 버튼·선택·타임라인 선 · 누름·링크 글자 · 선택 칸 바탕 · 포인트 면 위 글자 |
 | 짙은 면 위 글자 | `--on-dark` | `#ffffff` | `--ink`·보기 전용 배지 위 |
 | 보조색 | `--support` · `--support-soft` · `--support-ink` | `#ff7aa2` · `#ffe9f0` · `#a3134a` | 장식 전용(글자 금지) · 분홍 바탕 · 분홍 계열 글자 |
@@ -53,25 +55,27 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | 배지 | `--badge-demo-stripe-a` · `-b` · `--badge-readonly-bg` | `#fff3cc` · `#ffe7a3` · `#334055` | 데모 띠 무늬 · 보기 전용 짙은 면 |
 | 일러스트 | `--art-sky` · `--art-blossom` · `--art-latte` · `--art-sage` · `--art-lilac` · `--art-sand` · `--art-line` | 장식 전용 | 사진이 없을 때 유형별 일러스트(`CategoryArt`) |
 
-**대비** (WCAG 2.1 상대 휘도, 2026-09-20 위 값으로 계산 — `/design-board`가 브라우저에서 같은 값을 다시 계산해 보여준다)
+**대비** (WCAG 2.1 상대 휘도, 2026-09-24 위 값으로 계산 — `/design-board`가 브라우저에서 같은 값을 다시 계산해 보여준다)
 
 | 글자 / 바탕 | 대비 | 기준 |
 | --- | --- | --- |
-| `--ink` / `--bg` | 17.73:1 | 본문 4.5 |
-| `--ink-soft` / `--bg` · `--surface-alt` · `--accent-soft` | 7.54 · 6.90 · 6.65:1 | 본문 4.5 |
-| `--ink` / `--surface-alt` | 16.24:1 | 본문 4.5 |
-| `--line-input` / `--bg` · `--surface-alt` (UI 경계) | 3.76 · 3.44:1 | UI 3.0 |
+| `--ink` / `--bg` · `--layer-basement`(=`--surface-alt`) | 17.06 · 15.49:1 | 본문 4.5 |
+| `--ink-soft` / `--bg` · `--layer-basement` · `--accent-soft` | 6.62 · 6.01 · 5.84:1 | 본문 4.5 |
+| `--line-input` / `--bg` · `--layer-basement` (UI 경계) | 3.42 · 3.11:1 | UI 3.0 |
+| `--ink-subtle` / `--bg` (아이콘·화살표) | 3.42:1 | UI 3.0 — 글자에는 쓰지 않는다 |
+| `--on-dark` / `--selected` | 13.31:1 | 본문 4.5 |
+| `--accent` / `--layer-basement` | 4.78:1 | 본문 4.5 |
 | `--accent-ink` / `--accent` (주 버튼) | 5.27:1 | 본문 4.5 |
 | `--accent` / `--bg` · `--accent-strong` / `--bg` | 5.27 · 7.51:1 | 본문 4.5 |
 | `--accent-strong` / `--accent-soft` | 6.62:1 | 본문 4.5 |
 | `--support-ink` / `--support-soft` · `--bg` | 6.61 · 7.64:1 | 본문 4.5 |
 | 상태 글자 / 상태 바탕 — 동행 · 근거리 · 대기 · 미추천 | 6.04 · 7.42 · 6.84 · 9.25:1 | 본문 4.5 |
-| `--ink` / 상태 바탕 — 동행 · 근거리 · 대기 · 미추천 | 15.84 · 15.34 · 16.21 · 15.66:1 | 본문 4.5 |
+| `--ink` / 상태 바탕 — 동행 · 근거리 · 대기 · 미추천 | 15.24 · 14.76 · 15.59 · 15.07:1 | 본문 4.5 |
 | 상태 글자 / `--bg` — 동행 · 근거리 · 대기 · 미추천 | 6.76 · 8.58 · 7.48 · 10.47:1 | 본문 4.5 |
 | `--emergency-ink` / `--emergency` | 5.88:1 | 본문 4.5 |
-| `--on-dark` / `--ink` · `--badge-readonly-bg` | 17.73 · 10.47:1 | 본문 4.5 |
+| `--on-dark` / `--ink` · `--badge-readonly-bg` | 17.06 · 10.47:1 | 본문 4.5 |
 | `--source-hospital` / `--source-hospital-bg` · `--bg` | 5.41 · 5.89:1 | 본문 4.5 |
-| `--ink` / `--badge-demo-stripe-a` · `-b` | 16.00 · 14.53:1 | 본문 4.5 |
+| `--ink` / `--badge-demo-stripe-a` · `-b` | 15.39 · 13.98:1 | 본문 4.5 |
 
 - `--support`(`#ff7aa2`)는 흰 바탕 대비가 낮아 **글자에 쓰지 않는다**(장식 전용). 분홍 계열 글자는 `--support-ink`다.
 - `--line`·`--line-strong`은 장식선이다. 정보를 전하는 경계(입력칸·선택지)는 `--line-input`을 쓴다.
@@ -80,15 +84,16 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 | 토큰 | 값 | 쓰임 |
 | --- | --- | --- |
-| `--text-display` | 30px | 큰 제목 |
+| `--text-display` | 26px / 35px | 큰 제목 (SEED screenTitle) |
 | `--text-title-1` · `-2` · `-3` | 24 · 20 · 18px | h1 · h2 · h3(상단 바 제목은 18px) |
 | `--text-body` | 16px | 본문 — **최소 크기** |
-| `--text-button` | 17px | 버튼 |
+| `--text-button` | 16px / 22px | 버튼 (SEED 14px — 하한으로 올림). 큰 CTA 는 18px / 24px |
 | `--text-caption` | 14px | 배지·보조 캡션 전용(본문 금지) |
 | `--text-korean-card` | 30px | 한국어 안내 카드 본문(멀리서도 읽힌다) |
-| `--leading-tight` · `-snug` · `-body` | 1.25 · 1.4 · 1.6 | 줄 간격 |
-| `--weight-regular` · `-medium` · `-bold` · `-heavy` | 400 · 500 · 700 · 800 | 굵기 |
-| `--tracking-tight` | -0.02em | 제목 자간 |
+| `--leading-tight` · `-snug` · `-body` | 1.33 · 1.375 · 1.5 | 줄 간격 비율 (SEED 짝 24/32 · 16/22 · 16/24) |
+| `--lh-display` … `--lh-caption` | 35 · 32 · 27 · 24 · 22 · 24(긴 글) · 19px | 높이가 정확해야 하는 부품의 줄 높이 |
+| `--weight-regular` · `-medium` · `-bold` · `-heavy` | 400 · 500 · 700 · 700 | 굵기 (SEED 는 400·500·700 뿐) |
+| `--tracking-tight` | normal | 자간 없음 (SEED) |
 
 - **글꼴은 기기에 있는 시스템 글꼴 목록만** 쓴다(`--font-ko`·`--font-en`·`--font-ja`·`--font-zh`·`--font-mono`). 빌드·실행 중 글꼴을 내려받지 않는다.
 - 한·일·중 한자 자형이 섞이지 않게 `:lang()`마다 글꼴 목록을 따로 둔다. 문서 언어(`<html lang>`)는 언어 선택에 따라 바뀐다.
@@ -99,12 +104,13 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 | 무리 | 토큰과 값 |
 | --- | --- |
-| 간격(4px 단위) | `--space-1` 4 · `-2` 8 · `-3` 12 · `-4` 16 · `-5` 20 · `-6` 24 · `-8` 32 · `-10` 40 · `-12` 48px |
-| 모서리 | `--radius-xs` 8(배지) · `--radius-sm` 12(입력·칩·작은 버튼) · `--radius` 16(카드·배너) · `--radius-lg` 24(사진 카드·시트) · `--radius-pill` 999(알약·긴급 버튼) |
-| 그림자 | `--shadow-card`(카드) · `--shadow-float`(떠 있는 버튼) · `--shadow-sheet`(아래에서 올라오는 시트) |
+| 간격(4px 단위) | `--space-0-5` 2 · `-1` 4 · `-1-5` 6 · `-2` 8 · `-3` 12 · `-4` 16 · `-5` 20 · `-6` 24 · `-8` 32 · `-10` 40 · `-12` 48 · `-14` 56px |
+| 의미 간격 (SEED) | `--gap-component` 12 · `--gap-text` 6 · `--gap-nav-to-title` 20 · `--gap-screen-bottom` 56 · `--gap-section` 8px |
+| 모서리 (SEED) | `--radius-6` 배지 · `-8` 작은 버튼·아이콘 버튼 · `-10` 안내 상자 · `-12` 큰 버튼·입력 · `-16` 누르는 카드 · `-20` 대화상자 · `-24` 시트 · `-full` 칩·스위치. 기존 `--radius-xs`·`-sm`·`--radius`·`-lg`·`-pill` 은 ②층에서 옮긴 뒤 지운다 |
+| 그림자 | `--shadow-card` SEED s1(①층 한정, ③층에서 없앰) · `--shadow-float` SEED s3(떠 있는 메뉴) · `--shadow-sheet` 없음(하단 바는 1px 윗선) |
 | 배치 | `--shell-max` 480px(앱 셸 최대 폭) · `--gutter` 16px(좌우 여백) · `--tap-min` 44px · `--nav-height` 64px · `--nav-offset`(하단 내비가 있을 때 고정 요소가 올라서는 높이, 앱 셸이 켠다) |
-| 움직임 | `--ease-out` · `--duration-fast` 120ms · `--duration` 200ms. 움직임은 `prefers-reduced-motion: no-preference`일 때만 켠다 |
-| 포커스 | 모든 요소 `:focus-visible` 3px `--accent` 윤곽선. 포인트 면(주 버튼·복귀 버튼·긴급 버튼) 위에서는 `--ink` 윤곽선 |
+| 움직임 | `--ease-color`(색 전환) · `--ease-press`(눌림 축소) · `--duration-fast` 150ms · `--duration` 200ms. 움직임은 `prefers-reduced-motion: no-preference`일 때만 켠다 |
+| 포커스 | 모든 요소 `:focus-visible` `--focus-width`(2px) `--accent` 윤곽선. SEED 의 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지. 포인트 면 위에서는 `--ink` 윤곽선 |
 
 **호환 별칭**: 예전 화면이 쓰던 `--brand`·`--brand-hover`·`--brand-ink`·`--font-display`·`--font-body`는 새 토큰을 가리키는 별칭으로 남겼다. 새 코드는 쓰지 않는다.
 

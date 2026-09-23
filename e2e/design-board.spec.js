@@ -35,6 +35,14 @@ test.describe('시나리오 11 — /design-board', () => {
     for (const screen of ['오늘', '전체 일정', '조건', '장소 상세', '한국어 안내 카드', '긴급 연락', '보호자 안내']) {
       await expect(page.getByRole('heading', { name: screen, level: 1 }).first()).toBeVisible();
     }
+    // 대비 판정 — 보드가 브라우저에서 토큰 값을 읽어 계산한다. 미달 판정이 하나도 없어야 한다(설계서 4.7)
+    const verdicts = page.locator('[data-verdict]');
+    await expect(verdicts.first()).toBeVisible();
+    await expect(page.locator('[data-verdict="measuring"]')).toHaveCount(0);
+    await expect(page.locator('[data-verdict="fail"]')).toHaveCount(0);
+    expect(await page.locator('[data-verdict="pass"]').count()).toBeGreaterThanOrEqual(30);
+    // SEED 층 짝이 보드에 그려진다
+    await expect(page.getByRole('heading', { name: '층·선택·아이콘 (SEED)', level: 3 })).toBeVisible();
     await expectNoHorizontalScroll(page, '/design-board');
     await evidenceShot(page, '22-design-board');
 

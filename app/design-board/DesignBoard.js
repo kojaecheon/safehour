@@ -164,9 +164,12 @@ function Swatch({ pair, values }) {
         <code>{bgVal || '…'}</code>
       </p>
       {pair.decorative ? (
-        <p className="designBoard-verdict">{t('designBoard.decorative')}</p>
+        <p className="designBoard-verdict" data-verdict="decorative">{t('designBoard.decorative')}</p>
       ) : (
-        <p className={passed ? 'designBoard-verdict is-pass' : 'designBoard-verdict'}>
+        <p
+          className={passed ? 'designBoard-verdict is-pass' : 'designBoard-verdict'}
+          data-verdict={ratio === null ? 'measuring' : passed ? 'pass' : 'fail'}
+        >
           {ratio === null ? (
             t('designBoard.measuring')
           ) : (
