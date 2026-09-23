@@ -82,14 +82,15 @@
 .ui-emergency:hover {
   background: var(--emergency-strong);
 }
-.app-shell[data-nav='off'] .ui-emergency {
+.app-shell[data-nav='off'] .ui-emergency:not(.is-docked) {
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
 }
-/* 고정 복귀 버튼이 있는 화면에서는 그 위로 비켜 선다 — 두 안전 버튼이 겹치지 않게 */
-.app-shell:has(.sticky-return) .ui-emergency {
+/* 고정 복귀 버튼이 있는 화면에서는 그 위로 비켜 선다 — 두 안전 버튼이 겹치지 않게.
+   바 **안에** 들어간 긴급(is-docked)은 비켜설 필요가 없다 — 자리를 건드리면 바 밖으로 밀려 나간다. */
+.app-shell:has(.sticky-return) .ui-emergency:not(.is-docked) {
   bottom: calc(var(--nav-offset) + 88px);
 }
-.app-shell[data-nav='off']:has(.sticky-return) .ui-emergency {
+.app-shell[data-nav='off']:has(.sticky-return) .ui-emergency:not(.is-docked) {
   bottom: calc(88px + env(safe-area-inset-bottom));
 }
 .ui-emergency-dot {
@@ -117,7 +118,8 @@
 }
 .ui-bottom-nav ul {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* 5칸 — 오늘·일정·조건·더보기·긴급. 320px 에서 칸당 64px 이라 문구가 짧아야 한다(common.navEmergency) */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   list-style: none;
   height: var(--nav-height);
 }
@@ -135,6 +137,25 @@
   line-height: 1.2;
   color: var(--ink-soft);
   text-align: center;
+}
+/* 긴급 칸 — 다른 칸과 성격이 다르다. 긴급 전용 색 + 채운 알약 + 문구 세 겹으로 구분한다.
+   판정 상태 색(동행·대기·미추천)과 섞이지 않는다(spec 7장 · DESIGN_SYSTEM 2.1). */
+.ui-bottom-nav a.is-emergency {
+  color: var(--emergency);
+}
+.ui-bottom-nav a.is-emergency .ui-nav-pill {
+  background: var(--emergency);
+  color: var(--emergency-ink);
+}
+.ui-bottom-nav a.is-emergency[aria-current='page'] {
+  color: var(--emergency-strong);
+  font-weight: var(--weight-heavy);
+}
+.ui-bottom-nav a.is-emergency[aria-current='page'] .ui-nav-pill {
+  background: var(--emergency-strong);
+}
+.ui-bottom-nav a.is-emergency[aria-current='page']::before {
+  background: var(--emergency-strong);
 }
 .ui-nav-pill {
   display: inline-grid;
@@ -168,12 +189,15 @@
 }
 
 /* 시안 보드용 미리보기 — 고정하지 않고 제자리에 그린다 */
+/* 고정을 풀고 흐름 안에 놓는 변형 — 시안 보드 견본(is-preview)과
+   시작 화면 하단 바 안(is-docked)에서 쓴다. 떠 있으면 본문을 덮기 때문이다.
+   위의 `.app-shell:has(.sticky-return) .ui-emergency`(클래스 3개)보다 세야 하므로
+   `.app-shell` 을 앞에 붙여 자리 지정을 확실히 끈다 — 안 그러면 바 위로 88px 밀려 올라간다. */
 .ui-bottom-nav.is-preview,
-.ui-emergency.is-preview {
+.ui-emergency.is-preview,
+.app-shell .ui-emergency.is-docked {
   position: relative;
-  left: auto;
-  right: auto;
-  bottom: auto;
+  inset: auto;
   transform: none;
 }
 .ui-bottom-nav.is-preview {

@@ -6,6 +6,7 @@ import { useLang } from '@/components/LanguageProvider.js';
 import { SafetyNote } from '@/components/onboarding/Fields.js';
 import StartArt from '@/components/onboarding/StartArt.js';
 import { Button, Icon, TopBar } from '@/components/ui/index.js';
+import EmergencyButton from '@/components/ui/EmergencyButton.js';
 import { takeClearedFlag } from '@/lib/session.js';
 import { LANGS, LANG_NAMES } from '@/src/i18n/index.js';
 
@@ -110,10 +111,14 @@ export default function HomePage() {
           </ul>
         </section>
 
-        {/* 하단 고정 — 긴급 버튼이 이 위로 비켜선다(app/styles/ui.css `:has(.sticky-return)`).
-            고정하지 않으면 전체 너비 CTA 위에 긴급 버튼이 겹쳐 앉아, 오른쪽을 누르면 긴급 전화가 걸린다. */}
+        {/* 하단 고정 바 — 긴급과 시작하기를 한 줄에 둔다.
+            떠 있는 긴급 버튼은 어디에 두든 본문을 덮었다(시작하기 131x31px, 언어 칸 '中文' 41%).
+            바 안에 넣으면 덮는 것이 없고 둘 다 늘 닿는다. 셸은 이 경로에서 떠 있는 버튼을 그리지 않는다. */}
         <div className="onboarding-cta sticky-return">
-          <Button href={START_HREF}>{t('home.cta')}</Button>
+          <div className="onboarding-cta-row">
+            <EmergencyButton docked />
+            <Button href={START_HREF}>{t('home.cta')}</Button>
+          </div>
         </div>
 
         <section className="onboarding-section" aria-labelledby="home-principles">

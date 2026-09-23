@@ -192,6 +192,23 @@
 .onboarding-cta {
   margin-top: var(--space-6);
 }
+/* 시작 화면 하단 바는 불투명하다 — 기본 그라데이션은 위쪽이 비쳐서 뒤의 언어 선택 칸이
+   긴급 버튼과 겹쳐 보인다. 하단 내비와 같은 처리(면 + 윗선)를 쓴다. */
+.onboarding-cta.sticky-return {
+  background: var(--bg);
+  border-top: 1px solid var(--line-strong);
+}
+
+/* 하단 바 한 줄 — 긴급(고정 폭) + 시작하기(남는 폭). 320px 에서도 둘 다 44px 이상이다 */
+.onboarding-cta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.onboarding-cta-row .btn {
+  flex: 1;
+  min-width: 0;
+}
 .onboarding-footer-note {
   margin-top: var(--space-5);
 }

@@ -31,6 +31,10 @@ export const messages = {
   'common.navTrip': { ko: '일정', en: 'Trip', ja: '日程', zh: '行程' },
   'common.navConditions': { ko: '조건', en: 'Conditions', ja: '条件', zh: '出行条件' },
   'common.navMore': { ko: '더보기', en: 'More', ja: 'その他', zh: '更多' },
+  // 내비 칸은 5개라 좁다 — 320px 에서 칸당 64px 이다. 긴급 칸만 짧은 문구를 쓴다.
+  // 영어 'Emergency'(74px)는 칸을 넘어 화면 밖으로 잘린다 — 국제적으로 통하는 'SOS' 로 줄였다.
+  // 화면 제목과 로그인 전 떠 있는 버튼은 그대로 common.emergency('Emergency')를 쓴다.
+  'common.navEmergency': { ko: '긴급', en: 'SOS', ja: '緊急', zh: '紧急' },
   'common.emergency': { ko: '긴급 연락', en: 'Emergency', ja: '緊急連絡', zh: '紧急联系' },
   'common.readOnlyTitle': {
     ko: '보기 전용 — 로그인이 필요합니다',
