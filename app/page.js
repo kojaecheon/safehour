@@ -110,7 +110,9 @@ export default function HomePage() {
           </ul>
         </section>
 
-        <div className="onboarding-cta">
+        {/* 하단 고정 — 긴급 버튼이 이 위로 비켜선다(app/styles/ui.css `:has(.sticky-return)`).
+            고정하지 않으면 전체 너비 CTA 위에 긴급 버튼이 겹쳐 앉아, 오른쪽을 누르면 긴급 전화가 걸린다. */}
+        <div className="onboarding-cta sticky-return">
           <Button href={START_HREF}>{t('home.cta')}</Button>
         </div>
 
