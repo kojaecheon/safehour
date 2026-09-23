@@ -228,6 +228,10 @@ svg.ui-icon {
 .app-shell[data-nav='on'] {
   --nav-offset: calc(var(--nav-height) + env(safe-area-inset-bottom));
 }
+/* 하단 긴급 바도 내비와 같은 자리를 차지한다 — 고정 요소와 본문 여백이 같은 값을 쓰게 한다 */
+.app-shell[data-emergency-bar='on'] {
+  --nav-offset: calc(64px + env(safe-area-inset-bottom));
+}
 
 main.page {
   flex: 1;

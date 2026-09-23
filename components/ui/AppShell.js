@@ -3,7 +3,8 @@
 // 앱 셸 (AX-304 · spec 3.1 · 4.18)
 //
 //   [보기 전용 배너 자리]   ← 저장소 상태로 자동 표시 (ReadOnlyBanner)
-//   [긴급 연락 버튼]        ← 내비가 **없는** 화면에서만 떠 있는 버튼으로 (EmergencyButton, DOM 에서는 본문 앞)
+//   [긴급 연락 버튼]        ← 늘 하단에 붙어 있다. 내비가 있으면 다섯째 칸, 없으면 하단 긴급 바.
+//                            떠 있게 두면 본문의 누를 수 있는 요소를 덮는다(입력 칸·'다음'·언어 칸).
 //   [화면 본문]             ← 각 화면이 자기 상단 바(.top-bar / TopBar)와 main.page 를 그린다
 //   [하단 내비 5개]         ← 로그인 전 흐름(/, /login, /onboarding, /g)에서는 숨긴다. 긴급이 다섯째 칸이다
 //
@@ -29,7 +30,7 @@ export const NAV_HIDDEN_PATHS = Object.freeze(['/', '/login', '/onboarding', '/g
  */
 export const STATUS_HIDDEN_PATHS = Object.freeze(['/', '/login', '/design-board']);
 
-/** 떠 있는 긴급 버튼을 셸이 그리지 않는 경로 — 그 화면이 자기 하단 바 안에 직접 그린다 */
+/** 긴급을 셸이 그리지 않는 경로 — 그 화면이 자기 하단 바 안에 직접 그린다 */
 export const EMERGENCY_IN_PAGE_PATHS = Object.freeze(['/']);
 
 function matches(pathname, list) {
@@ -41,6 +42,7 @@ export default function AppShell({ children }) {
   const showNav = !matches(pathname, NAV_HIDDEN_PATHS);
   const showStatus = !matches(pathname, STATUS_HIDDEN_PATHS);
   const emergencyInPage = matches(pathname, EMERGENCY_IN_PAGE_PATHS);
+  const showEmergencyBar = !showNav && !emergencyInPage;
   const refreshed = useRef(false);
 
   useEffect(() => {
@@ -51,13 +53,17 @@ export default function AppShell({ children }) {
   }, [showStatus]);
 
   return (
-    <div className="app-shell" data-nav={showNav ? 'on' : 'off'}>
+    <div className="app-shell" data-nav={showNav ? 'on' : 'off'} data-emergency-bar={showEmergencyBar ? 'on' : 'off'}>
       {showStatus && <ReadOnlyBanner />}
-      {/* 긴급은 어느 화면에서든 닿아야 한다(spec 4.15). 내비가 있으면 다섯째 칸이 그 역할을 하고,
-          내비가 없는 로그인 전 흐름에서만 떠 있는 버튼을 그린다 — 떠 있는 버튼은 본문을 덮는다. */}
-      {!showNav && !emergencyInPage && <EmergencyButton current={pathname === '/emergency'} />}
       {children}
       {showNav && <BottomNav pathname={pathname} />}
+      {/* 긴급은 어느 화면에서든 닿아야 한다(spec 4.15).
+          내비가 있으면 다섯째 칸이, 없으면 이 바가 그 역할을 한다. 떠 있게 두지 않는다. */}
+      {showEmergencyBar && (
+        <div className="ui-emergency-bar">
+          <EmergencyButton current={pathname === '/emergency'} docked />
+        </div>
+      )}
     </div>
   );
 }

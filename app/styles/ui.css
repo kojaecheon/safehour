@@ -103,6 +103,24 @@
 }
 
 /* 하단 내비 4개 — 오늘 · 일정 · 조건 · 더보기 */
+/* 하단 긴급 바 — 내비가 없는 화면(로그인 전 흐름·보호자 열기)에서 긴급을 바닥에 붙인다.
+   내비와 같은 자리·같은 처리(면 + 윗선)라 화면을 오갈 때 긴급의 위치가 흔들리지 않는다. */
+.ui-emergency-bar {
+  position: fixed;
+  z-index: 30;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: var(--shell-max);
+  padding: var(--space-2) var(--gutter) calc(var(--space-2) + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sheet);
+}
+
 .ui-bottom-nav {
   position: fixed;
   z-index: 30;
