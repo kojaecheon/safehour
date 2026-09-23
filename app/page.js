@@ -15,6 +15,8 @@ import { LANGS, LANG_NAMES } from '@/src/i18n/index.js';
 // - 고지 3종과 의료 면책은 안전 문구다. 선택 언어 + 한국어(ko 면 영어)로 두 줄씩 보인다(spec 4.17 · pair()).
 // - 언어는 상단 지구본 버튼 말고도 여기서 바로 고를 수 있다 — 첫 화면에서 가장 먼저 필요한 동작이다.
 // - 시작하기 → 로그인 → 체류 설정(spec 3.2 기본 흐름).
+// - **시작하기는 고지 3종보다 위에 둔다.** 고지가 먼저 오면 처음 온 사람이 들어가는 문을 보기까지
+//   두 화면을 넘겨야 한다(고지만 906px). 고지는 지우지 않고 자리만 아래로 옮겼다 — 같은 화면에 그대로 있다.
 
 const NOTICES = [
   { icon: 'hospital', title: 'home.p1Title', body: 'home.p1Body' },
@@ -108,6 +110,10 @@ export default function HomePage() {
           </ul>
         </section>
 
+        <div className="onboarding-cta">
+          <Button href={START_HREF}>{t('home.cta')}</Button>
+        </div>
+
         <section className="onboarding-section" aria-labelledby="home-principles">
           <h2 id="home-principles">{t('home.principlesTitle')}</h2>
           <ul className="onboarding-notices" role="list" aria-label={t('home.principlesAria')}>
@@ -116,10 +122,6 @@ export default function HomePage() {
             ))}
           </ul>
         </section>
-
-        <div className="onboarding-cta">
-          <Button href={START_HREF}>{t('home.cta')}</Button>
-        </div>
 
         <SafetyNote noticeKey={FOOTER_NOTICE} className="onboarding-safety onboarding-footer-note" />
 
