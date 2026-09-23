@@ -30,16 +30,31 @@
   /* ── 바탕 ── */
   --bg: #ffffff;            /* 페이지 바탕 — 흰색 */
   --surface: #ffffff;       /* 카드 면 */
-  --surface-alt: #f3f5f9;   /* 묶음·눌린 면. --ink 16.24:1, --ink-soft 6.90:1 */
+  --surface-alt: #f3f4f5;   /* SEED bg.neutral-weak — 채운 보조 버튼·선택 칸 바탕. --ink 15.49:1, --ink-soft 6.01:1 */
+
+  /* ── 층 (SEED) — 구역이 여럿인 화면은 회색 바탕 위에 흰 블록을 쌓는다(바탕은 ③층에서 화면별로 켠다) ── */
+  --layer-basement: #f3f4f5;          /* SEED bg.layer-basement — 화면 바탕 */
+  --layer-default: #ffffff;           /* SEED bg.layer-default — 흰 블록·목록·상단 바 */
+  --layer-floating: #ffffff;          /* SEED bg.layer-floating — 시트·대화상자 */
+  --pressed: #f7f8f9;                 /* SEED bg.layer-default-pressed — 흰 면 위 눌림 */
+  --pressed-weak: #eeeff1;            /* SEED bg.neutral-weak-pressed — 회색 채움 눌림 */
+  --pressed-transparent: rgba(0, 0, 0, 0.027); /* SEED bg.transparent-pressed — 바탕 없는 요소의 눌림 */
+  --selected: #2a3038;                /* SEED bg.neutral-inverted — '선택됨' 채움. 흰 글자 13.31:1 */
+  --selected-pressed: #555d6d;        /* SEED bg.neutral-inverted-pressed */
+  --overlay: rgba(0, 0, 0, 0.455);    /* SEED bg.overlay — 시트·대화상자 뒤 */
 
   /* ── 글자 ── */
-  --ink: #121826;           /* 본문. 흰 바탕 17.73:1 */
-  --ink-soft: #4b5565;      /* 보조 글자. 흰 바탕 7.54:1, --surface-alt 6.90:1, --accent-soft 6.65:1 */
+  --ink: #1a1c20;           /* SEED fg.neutral — 본문. 흰 바탕 17.06:1, 회색 바탕 15.49:1 */
+  --ink-soft: #555d6d;      /* SEED fg.neutral-muted — 보조 글자. 흰 바탕 6.62:1, 회색 바탕 6.01:1, --accent-soft 5.84:1 */
+  --ink-subtle: #868b94;    /* SEED fg.neutral-subtle — **아이콘·화살표·비활성 글자 전용**. 흰 바탕 3.42:1 — 글자 기준 미달이라 읽어야 하는 글자에 쓰지 않는다 */
 
   /* ── 경계 ── */
-  --line: #e3e7ee;          /* 장식용 구분선 (정보 전달 없음) */
-  --line-strong: #c9d0dc;   /* 장식용 카드 테두리 (정보 전달 없음) */
-  --line-input: #7b8497;    /* 입력 필드·선택지 경계 — 흰 바탕 3.76:1, --surface-alt 3.44:1 (WCAG 1.4.11 ≥3:1) */
+  --line: rgba(0, 0, 0, 0.047);          /* SEED stroke.neutral-subtle — 반복 항목 구분선 (장식) */
+  --line-section: rgba(0, 0, 0, 0.063);  /* SEED stroke.neutral-muted — 구역 경계, 화면당 1–2개 (장식) */
+  --line-strong: #dcdee3;                /* SEED stroke.neutral-weak — 카드·테두리 버튼 (장식) */
+  --line-input: #868b94;                 /* 입력 필드·선택지 경계 — 흰 바탕 3.42:1, 회색 바탕 3.11:1 (WCAG 1.4.11 ≥3:1).
+                                            SEED 는 #dcdee3(1.3:1)이라 하한에 맞춰 gray-700 으로 올렸다 (설계서 4.7) */
+  --line-contrast: #1a1c20;              /* SEED stroke.neutral-contrast — 입력 초점·고른 칸 테두리 */
 
   /* ── 포인트 1색: 한강 코발트 ──
      흰 글자가 올라가는 주 버튼·선택 상태·하루 타임라인 선에 쓴다. */
@@ -52,7 +67,7 @@
   /* ── 보조색: 벚꽃 분홍 ──
      장식(일러스트·강조 띠)에만 쓴다. 글자에는 --support-ink 만 쓴다. */
   --support: #ff7aa2;       /* 장식 전용 — 글자 색 금지 */
-  --support-soft: #ffe9f0;  /* --support-ink 6.56:1, --ink 15.34:1 */
+  --support-soft: #ffe9f0;  /* --support-ink 6.56:1, --ink 14.76:1 */
   --support-ink: #a3134a;   /* 흰 바탕 7.64:1 */
 
   /* ── 긴급 ── 긴급 연락 버튼 전용. 판정 상태에는 쓰지 않는다 */
@@ -85,8 +100,8 @@
   --source-ai-bg: var(--support-soft);
 
   /* ── 배지 ── */
-  --badge-demo-stripe-a: #fff3cc;  /* 데모 띠 무늬 — --ink 16.00:1 */
-  --badge-demo-stripe-b: #ffe7a3;  /*                --ink 14.53:1 */
+  --badge-demo-stripe-a: #fff3cc;  /* 데모 띠 무늬 — --ink 15.39:1 */
+  --badge-demo-stripe-b: #ffe7a3;  /*                --ink 13.98:1 */
   --badge-readonly-bg: #334055;    /* 흰 글자 10.47:1 */
 
   /* ── 일러스트 바탕 (장식 전용, 글자 없음) ── */
@@ -110,22 +125,31 @@
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
   /* ── 글자 크기 — 본문 최소 16px. 14px 는 배지·보조 캡션 전용(본문 금지) ── */
-  --text-display: 30px;
-  --text-title-1: 24px;
-  --text-title-2: 20px;
-  --text-title-3: 18px;
-  --text-body: 16px;
-  --text-button: 17px;
-  --text-caption: 14px;
-  --text-korean-card: 30px; /* 한국어 안내 카드 본문 — 멀리서도 읽힌다 */
-  --leading-tight: 1.25;
-  --leading-snug: 1.4;
-  --leading-body: 1.6;
+  --text-display: 26px;     /* SEED t10 · screenTitle */
+  --text-title-1: 24px;     /* SEED t9 */
+  --text-title-2: 20px;     /* SEED t7 */
+  --text-title-3: 18px;     /* SEED t6 — 상단 바 제목 */
+  --text-body: 16px;        /* SEED t5 — 본문 최소 */
+  --text-button: 16px;      /* SEED medium 버튼은 14px — 하한 16px 로 올림 (설계서 4.7). 큰 CTA 는 부품이 18px 을 쓴다 */
+  --text-caption: 14px;     /* SEED t4 */
+  --text-korean-card: 30px; /* 한국어 안내 카드 본문 — 멀리서도 읽힌다 (SEED 예외) */
+  /* 줄 높이 비율 — 어떤 크기에도 쓰이므로 비율로 둔다. SEED 짝(24/32 · 16/22 · 16/24)에 맞췄다 */
+  --leading-tight: 1.33;
+  --leading-snug: 1.375;
+  --leading-body: 1.5;
+  /* 줄 높이 px 짝 — 버튼·입력·목록 행처럼 높이가 정확해야 하는 부품용 */
+  --lh-display: 35px;
+  --lh-title-1: 32px;
+  --lh-title-2: 27px;
+  --lh-title-3: 24px;
+  --lh-body: 22px;
+  --lh-article: 24px;
+  --lh-caption: 19px;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-bold: 700;
-  --weight-heavy: 800;
-  --tracking-tight: -0.02em;
+  --weight-heavy: 700;      /* SEED 굵기는 400·500·700 뿐 — 800 을 쓰던 자리는 700 이 된다 */
+  --tracking-tight: normal; /* SEED 에는 자간 토큰이 없다 */
 
   /* ── 간격 (4px 단위) ── */
   --space-1: 4px;
@@ -137,6 +161,15 @@
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
+  --space-0-5: 2px;
+  --space-1-5: 6px;
+  --space-14: 56px;
+  /* 의미 간격 (SEED spacing-y) */
+  --gap-component: var(--space-3);        /* 부품 사이 기본 12px */
+  --gap-text: var(--space-1-5);           /* 글자 덩어리 사이 6px */
+  --gap-nav-to-title: var(--space-5);     /* 상단 바 → 첫 제목 20px */
+  --gap-screen-bottom: var(--space-14);   /* 화면 끝 56px */
+  --gap-section: var(--space-2);          /* 회색 바탕 위 흰 블록 사이 8px */
 
   /* ── 모서리 ── */
   --radius-xs: 8px;     /* 배지 */
@@ -144,11 +177,22 @@
   --radius: 16px;       /* 카드·배너 */
   --radius-lg: 24px;    /* 사진 카드·시트 */
   --radius-pill: 999px; /* 알약 버튼·긴급 버튼 */
+  /* SEED 모서리 단계 — ②층에서 부품마다 이 토큰으로 옮기고, 다 옮기면 위의 다섯 개를 지운다 */
+  --radius-6: 6px;       /* r1_5 — 배지 */
+  --radius-8: 8px;       /* r2 — 작은 버튼(44px)·상단 바 아이콘 버튼·그림 틀 */
+  --radius-10: 10px;     /* r2_5 — 안내 상자·목록 행 눌림 */
+  --radius-12: 12px;     /* r3 — 큰 버튼·입력칸·Select Box·날짜 칩 */
+  --radius-16: 16px;     /* r4 — 누르는 카드·뼈대 */
+  --radius-20: 20px;     /* r5 — 대화상자 */
+  --radius-24: 24px;     /* r6 — 시트 위 모서리 */
+  --radius-full: 9999px; /* full — 칩·스위치·Segmented Control */
 
   /* ── 그림자 ── */
-  --shadow-card: 0 1px 2px rgba(18, 24, 38, 0.05), 0 6px 20px -8px rgba(18, 24, 38, 0.14);
-  --shadow-float: 0 2px 6px rgba(18, 24, 38, 0.08), 0 12px 32px -8px rgba(18, 24, 38, 0.28);
-  --shadow-sheet: 0 -8px 32px -8px rgba(18, 24, 38, 0.25);
+  /* SEED 는 그림자 대신 바탕 층으로 구분한다. 카드 그림자는 ①층에서는 가장 약한 s1 로만 줄이고,
+     화면이 회색 바탕 + 흰 블록으로 바뀌는 ③층에서 화면마다 없앤다 (설계서 4.5) */
+  --shadow-card: 0 1px 4px 0 rgba(0, 0, 0, 0.078);   /* SEED s1 — ①층 한정 */
+  --shadow-float: 0 4px 16px 0 rgba(0, 0, 0, 0.122); /* SEED s3 — 떠 있는 메뉴 */
+  --shadow-sheet: none;                               /* 하단 내비·하단 바는 1px 윗선으로 구분한다 */
 
   /* ── 배치 ── */
   --shell-max: 480px;
@@ -160,8 +204,11 @@
 
   /* ── 움직임 ── */
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --duration-fast: 120ms;
+  --ease-color: cubic-bezier(0.35, 0, 0.35, 1);   /* SEED 색 전환 */
+  --ease-press: cubic-bezier(0, 0, 0.15, 1);      /* SEED 눌림 축소 */
+  --duration-fast: 150ms;                         /* SEED 색 전환·눌림 */
   --duration: 200ms;
+  --focus-width: 2px;                             /* SEED 초점 링 두께 — 색은 코발트 유지(설계서 4.7) */
 
   /* ── 호환 별칭 — 기존 화면이 쓰는 이름. 새 코드는 위의 이름을 쓴다 ── */
   --brand: var(--accent);
@@ -405,7 +452,7 @@ input[readonly] {
 
 /* 키보드 포커스 — UA 기본에 맡기지 않고 3:1 이상 링을 명시한다 */
 :focus-visible {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
 /* 포인트 색 면 위에서는 링을 글자색으로 바꿔 면과 구분한다 */

@@ -45,6 +45,7 @@ export const messages = {
     ja: '判定4状態 — 色＋文言＋アイコン',
     zh: '四种判定状态 — 颜色＋文字＋图标',
   },
+  'designBoard.groupLayer': { ko: '층·선택·아이콘 (SEED)', en: 'Layers, selection and icons (SEED)', ja: 'レイヤー・選択・アイコン（SEED）', zh: '层级、选中与图标（SEED）' },
   'designBoard.groupEmergency': { ko: '긴급·즉시 복귀', en: 'Emergency and return now', ja: '緊急・すぐ戻る', zh: '紧急与立即返回' },
   'designBoard.groupSource': { ko: '출처 영역·배지', en: 'Source areas and badges', ja: '出典エリア・バッジ', zh: '来源区域与徽章' },
   'designBoard.pass': { ko: 'AA 통과', en: 'Passes AA', ja: 'AA適合', zh: '符合 AA' },

@@ -18,6 +18,18 @@ export const CONTRAST_GROUPS = [
     ],
   },
   {
+    key: 'designBoard.groupLayer',
+    pairs: [
+      { fg: '--ink', bg: '--layer-basement' },
+      { fg: '--ink-soft', bg: '--layer-basement' },
+      { fg: '--accent', bg: '--layer-basement' },
+      { fg: '--line-input', bg: '--layer-basement', ui: true },
+      { fg: '--on-dark', bg: '--selected' },
+      { fg: '--ink-subtle', bg: '--bg', ui: true },
+      { fg: '--line-contrast', bg: '--bg', ui: true },
+    ],
+  },
+  {
     key: 'designBoard.groupAccent',
     pairs: [
       { fg: '--accent-ink', bg: '--accent' },
