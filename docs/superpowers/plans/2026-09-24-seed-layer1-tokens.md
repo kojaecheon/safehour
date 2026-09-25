@@ -915,3 +915,14 @@ MSG
 
 - **②층 부품 계획**은 이 계획의 Task 3 승인 뒤에 쓴다. 설계서 5장을 따르고, 부품마다 시안 보드 위에서 계산된 스타일(높이·모서리·색·선택 상태)을 재는 화면 테스트를 먼저 쓴다. 기존 모서리 토큰 다섯 개를 지우는 일이 이 계획에 들어간다.
 - **③층 화면 계획**은 ②층 승인 뒤에 쓴다. 설계서 6.2 순서로 한 화면씩, 화면마다 회색 바탕·흰 블록 적용과 카드 그림자 제거가 들어간다.
+- **②층으로 넘기는 것** (①층 최종 검토에서 나온 것):
+  1. 하드코딩 3px 초점 링 12곳을 `--focus-width`로 옮긴다 — globals.css(.radio-option/.toggle-row :focus-within), conditions.css 4곳, guardian.css 1곳, ui.css 2곳, today.css 1곳, onboarding.css 3곳. `.radio-option.selected`가 같은 우선순위로 뒤에 있어 초점 box-shadow를 덮는다 — box-shadow 대신 outline+offset으로 바꿔 선택 표시와 초점 표시를 구분한다.
+  2. 채운 면(선택된 DateChip 등) 위 초점 링은 `--ink`로 — 설계서 4.6.
+  3. 시트 뒤 가림막 `rgba(18,24,38,.48)`(globals.css)을 `--overlay`로.
+  4. 부품을 새 모서리 토큰으로 옮긴 뒤 옛 다섯 개를 지우고, 토큰 테스트의 존재 검사를 `!TOKENS.has(old)`로 뒤집는다.
+  5. 큰 버튼 글자 18/24 토큰을 만든다(`--text-button` 주석이 가리키는 값) — 기능 CSS가 새 글자 크기를 직접 쓰지 않게.
+  6. h2의 `letter-spacing: -0.01em`(globals.css, ui.css)을 없앤다 — SEED는 자간이 없다.
+  7. `#868b94`(`--line-input`·`--ink-subtle`)는 `--pressed-weak` 2.98, `--support-soft`·split 바탕 2.96으로 3:1 미달 — 이 조합을 쓰기 전에 `CONTRAST_GROUPS`에 `--line-input|--pressed-weak`, `--ink-subtle|--surface-alt`, `--ink-subtle|--layer-basement`, `--line-input|--accent-soft`를 더한다.
+  8. 시안 보드 `parseColor`가 투명도를 버린다 — 반투명 짝을 더하기 전에 null을 돌려주거나 바탕에 섞어 계산하게 고친다.
+  9. 화면 테스트의 `pass ≥ 30`을 `CONTRAST_GROUPS`에서 센 정확한 수로 바꾼다.
+  10. `--selected`(#2a3038)와 `--ink`(#1a1c20)는 1.28:1로 가깝다 — 선택된 칩이 '즉시 복귀' 버튼(`.btn-return`)처럼 보이지 않는지 ②층 시안 보드에서 확인한다.

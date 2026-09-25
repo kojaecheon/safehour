@@ -20,7 +20,7 @@
 .settings-pair-primary {
   color: var(--ink);
 }
-/* 병기 줄은 보조 색이지만 투명도를 낮추지 않는다(--ink-soft 7.54:1) */
+/* 병기 줄은 보조 색이지만 투명도를 낮추지 않는다(--ink-soft 6.62:1) */
 .settings-pair-secondary {
   color: var(--ink-soft);
   margin-top: var(--space-1);

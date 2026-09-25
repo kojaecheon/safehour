@@ -40,7 +40,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | --- | --- | --- | --- |
 | 바탕 | `--bg` · `--surface` · `--surface-alt` | `#ffffff` · `#ffffff` · `#f3f4f5` | 페이지 · 카드 면 · 채운 보조 버튼·선택 칸(SEED bg.neutral-weak) |
 | 층 (SEED) | `--layer-basement` · `--layer-default` · `--layer-floating` | `#f3f4f5` · `#ffffff` · `#ffffff` | 구역이 여럿인 화면의 바탕 · 흰 블록 · 시트·대화상자 |
-| 눌림·선택 (SEED) | `--pressed` · `--pressed-weak` · `--pressed-transparent` · `--selected` | `#f7f8f9` · `#eeeff1` · `rgba(0,0,0,.027)` · `#2a3038` | 흰 면 눌림 · 회색 채움 눌림 · 바탕 없는 요소 눌림 · '선택됨' 채움 |
+| 눌림·선택 (SEED) | `--pressed` · `--pressed-weak` · `--pressed-transparent` · `--selected` · `--selected-pressed` · `--overlay` | `#f7f8f9` · `#eeeff1` · `rgba(0,0,0,.027)` · `#2a3038` · `#555d6d` · `rgba(0,0,0,.455)` | 흰 면 눌림 · 회색 채움 눌림 · 바탕 없는 요소 눌림 · '선택됨' 채움 · '선택됨' 눌림 · 시트·대화상자 뒤 |
 | 글자 | `--ink` · `--ink-soft` · `--ink-subtle` | `#1a1c20` · `#555d6d` · `#868b94` | 본문 · 보조 글자 · **아이콘·화살표·비활성 전용(글자 금지)** |
 | 경계 | `--line` · `--line-section` · `--line-strong` · `--line-input` · `--line-contrast` | `rgba(0,0,0,.047)` · `rgba(0,0,0,.063)` · `#dcdee3` · `#868b94` · `#1a1c20` | 반복 구분선 · 구역 경계 · 카드 테두리 · **입력·선택지 경계(정보 전달)** · 초점·고른 칸 |
 | 포인트 | `--accent` · `--accent-strong` · `--accent-soft` · `--accent-ink` | `#0a5cff` · `#0046d1` · `#eaf1ff` · `#ffffff` | 주 버튼·선택·타임라인 선 · 누름·링크 글자 · 선택 칸 바탕 · 포인트 면 위 글자 |
@@ -109,8 +109,8 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | 모서리 (SEED) | `--radius-6` 배지 · `-8` 작은 버튼·아이콘 버튼 · `-10` 안내 상자 · `-12` 큰 버튼·입력 · `-16` 누르는 카드 · `-20` 대화상자 · `-24` 시트 · `-full` 칩·스위치. 기존 `--radius-xs`·`-sm`·`--radius`·`-lg`·`-pill` 은 ②층에서 옮긴 뒤 지운다 |
 | 그림자 | `--shadow-card` SEED s1(①층 한정, ③층에서 없앰) · `--shadow-float` SEED s3(떠 있는 메뉴) · `--shadow-sheet` 없음(하단 바는 1px 윗선) |
 | 배치 | `--shell-max` 480px(앱 셸 최대 폭) · `--gutter` 16px(좌우 여백) · `--tap-min` 44px · `--nav-height` 64px · `--nav-offset`(하단 내비가 있을 때 고정 요소가 올라서는 높이, 앱 셸이 켠다) |
-| 움직임 | `--ease-color`(색 전환) · `--ease-press`(눌림 축소) · `--duration-fast` 150ms · `--duration` 200ms. 움직임은 `prefers-reduced-motion: no-preference`일 때만 켠다 |
-| 포커스 | 모든 요소 `:focus-visible` `--focus-width`(2px) `--accent` 윤곽선. SEED 의 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지. 포인트 면 위에서는 `--ink` 윤곽선 |
+| 움직임 | `--ease-out`(현재 전환·시트 애니메이션이 쓰는 기본값) · `--ease-color`(색 전환) · `--ease-press`(눌림 축소) · `--duration-fast` 150ms · `--duration` 200ms. 움직임은 `prefers-reduced-motion: no-preference`일 때만 켠다 |
+| 포커스 | 전역 `:focus-visible`은 `--focus-width`(2px) `--accent` 윤곽선. 답 선택 칸·장소 카드·온보딩 칩·조건 항목·라디오·토글 카드 등 일부 부품은 아직 3px 윤곽선을 하드코딩했다 — ②층에서 `--focus-width`로 옮긴다. SEED 의 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지. 포인트 면 위에서는 `--ink` 윤곽선 |
 
 **호환 별칭**: 예전 화면이 쓰던 `--brand`·`--brand-hover`·`--brand-ink`·`--font-display`·`--font-body`는 새 토큰을 가리키는 별칭으로 남겼다. 새 코드는 쓰지 않는다.
 
