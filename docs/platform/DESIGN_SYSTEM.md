@@ -1,6 +1,6 @@
 # 디자인 시스템 — 밝은 여행앱
 
-- 기준일: 2026-09-24 (SEED ①층 토큰 반영)
+- 기준일: 2026-09-26 (SEED ②층 부품 반영)
 - 작업 ID: AX-321 (디자인 시스템과 앱 셸 구현은 AX-304)
 - 연결: spec 7장, `IA_AND_FLOWS.md`, `ITINERARY_RULES.md`, ADR-0007(언어), ADR-0009(보기 전용), ADR-0010(긴급·지도)
 - 정본 코드: 토큰 `app/globals.css`(`:root`), 부품 모양 `app/styles/ui.css`, 부품 `components/ui/`(모음 `components/ui/index.js`),
@@ -65,6 +65,14 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | `--ink-subtle` / `--bg` (아이콘·화살표) | 3.42:1 | UI 3.0 — 글자에는 쓰지 않는다 |
 | `--on-dark` / `--selected` | 13.31:1 | 본문 4.5 |
 | `--accent` / `--layer-basement` | 4.78:1 | 본문 4.5 |
+| `--ink` / `--pressed` · `--pressed-weak` (눌린 면 위 글자) | 16.05 · 14.83:1 | 본문 4.5 |
+| `--ink-soft` / `--pressed` | 6.22:1 | 본문 4.5 |
+| `--line-input` / `--pressed` (눌린 칩 테두리) | 3.22:1 | UI 3.0 |
+| `--line-contrast` / `--surface-alt` (고른 칩 테두리) | 15.49:1 | UI 3.0 |
+| `--ink-subtle` / `--surface-alt` (비활성 버튼 글자 — WCAG 예외지만 읽히도록 3:1) | 3.11:1 | UI 3.0 |
+| `--selected` / `--bg` (고른 면·켠 스위치) | 13.31:1 | UI 3.0 |
+| `--on-dark` / `--ink-subtle` (끈 스위치의 알맹이) | 3.42:1 | UI 3.0 |
+| `--emergency` / `--bg` (긴급 칸 글자·입력 오류 도움말) | 5.88:1 | 본문 4.5 |
 | `--accent-ink` / `--accent` (주 버튼) | 5.27:1 | 본문 4.5 |
 | `--accent` / `--bg` · `--accent-strong` / `--bg` | 5.27 · 7.51:1 | 본문 4.5 |
 | `--accent-strong` / `--accent-soft` | 6.62:1 | 본문 4.5 |
@@ -87,7 +95,9 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | `--text-display` | 26px / 35px | 큰 제목 (SEED screenTitle) |
 | `--text-title-1` · `-2` · `-3` | 24 · 20 · 18px | h1 · h2 · h3(상단 바 제목은 18px) |
 | `--text-body` | 16px | 본문 — **최소 크기** |
-| `--text-button` | 16px / 22px | 버튼 (SEED 14px — 하한으로 올림). 큰 CTA 는 18px / 24px |
+| `--text-button` | 16px / 22px | 작은 버튼(44px) (SEED 14px — 하한으로 올림) |
+| `--text-button-large` | 18px / 24px | 큰 CTA(52px 버튼)·긴급 버튼 |
+| `--text-title-sheet` | 22px / 30px | 시트 제목 (SEED t8) |
 | `--text-caption` | 14px | 배지·보조 캡션 전용(본문 금지) |
 | `--text-korean-card` | 30px | 한국어 안내 카드 본문(멀리서도 읽힌다) |
 | `--leading-tight` · `-snug` · `-body` | 1.33 · 1.375 · 1.5 | 줄 간격 비율 (SEED 짝 24/32 · 16/22 · 16/24) |
@@ -106,11 +116,11 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | --- | --- |
 | 간격(4px 단위) | `--space-0-5` 2 · `-1` 4 · `-1-5` 6 · `-2` 8 · `-3` 12 · `-4` 16 · `-5` 20 · `-6` 24 · `-8` 32 · `-10` 40 · `-12` 48 · `-14` 56px |
 | 의미 간격 (SEED) | `--gap-component` 12 · `--gap-text` 6 · `--gap-nav-to-title` 20 · `--gap-screen-bottom` 56 · `--gap-section` 8px |
-| 모서리 (SEED) | `--radius-6` 배지 · `-8` 작은 버튼·아이콘 버튼 · `-10` 안내 상자 · `-12` 큰 버튼·입력 · `-16` 누르는 카드 · `-20` 대화상자 · `-24` 시트 · `-full` 칩·스위치. 기존 `--radius-xs`·`-sm`·`--radius`·`-lg`·`-pill` 은 ②층에서 옮긴 뒤 지운다 |
-| 그림자 | `--shadow-card` SEED s1(①층 한정, ③층에서 없앰) · `--shadow-float` SEED s3(떠 있는 메뉴) · `--shadow-sheet` 없음(하단 바는 1px 윗선) |
+| 모서리 (SEED) | `--radius-6` 배지 · `-8` 작은 버튼·아이콘 버튼 · `-10` 안내 상자·목록 행 눌림 · `-12` 큰 버튼·입력·선택 상자·날짜 칩 · `-16` 누르는 카드 · `-20` 대화상자 · `-24` 시트 · `-full` 칩·스위치·전환. 옛 `--radius-xs`·`-sm`·`--radius`·`-lg`·`-pill`은 ②층에서 옮기고 지웠다 |
+| 그림자 | `--shadow-card` SEED s1 — 회색 바탕(`main.page.is-basement`) 안에서는 `none` · `--shadow-float` SEED s3(떠 있는 메뉴) · `--shadow-sheet` 없음(하단 바는 1px 윗선) |
 | 배치 | `--shell-max` 480px(앱 셸 최대 폭) · `--gutter` 16px(좌우 여백) · `--tap-min` 44px · `--nav-height` 64px · `--nav-offset`(하단 내비가 있을 때 고정 요소가 올라서는 높이, 앱 셸이 켠다) |
-| 움직임 | `--ease-out`(현재 전환·시트 애니메이션이 쓰는 기본값) · `--ease-color`(색 전환) · `--ease-press`(눌림 축소) · `--duration-fast` 150ms · `--duration` 200ms. 움직임은 `prefers-reduced-motion: no-preference`일 때만 켠다 |
-| 포커스 | 전역 `:focus-visible`은 `--focus-width`(2px) `--accent` 윤곽선. 답 선택 칸·장소 카드·온보딩 칩·조건 항목·라디오·토글 카드 등 일부 부품은 아직 3px 윤곽선을 하드코딩했다 — ②층에서 `--focus-width`로 옮긴다. SEED 의 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지. 포인트 면 위에서는 `--ink` 윤곽선 |
+| 움직임 | `--ease-out`(시트 애니메이션 등 기존 전환) · `--ease-color`(색 전환) · `--ease-press`(눌림 축소) · `--duration-fast` 150ms · `--duration` 200ms · `--press-scale-wide` 0.976 · `--press-scale-tight` 0.955(눌리면 2px 만큼 줄어든다 — 넓은 큰 버튼·목록 행 / 44px 칸). 눌림은 면 색만 바꾸고(`--pressed*`), 호버는 `(hover: hover) and (pointer: fine)`에서만 눌림과 같은 색. 축소는 `prefers-reduced-motion: no-preference`일 때만 |
+| 포커스 | 모든 요소 `:focus-visible`은 `--focus-width`(2px) 코발트 윤곽선, 바깥 2px 띄움(상단 바 버튼·목록 행은 안쪽 −2px). 카드형 라디오·토글·답 칩은 안쪽 입력이 키보드 초점을 받을 때만(`:has(input:focus-visible)`) 칸 전체에 링. 글자 입력칸은 윤곽선 대신 2px `--line-contrast` 테두리. 짙은 면(주·critical·즉시 복귀 버튼, 긴급, 고른 날짜 칩) 위 링은 `--ink`. SEED 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지 |
 
 **호환 별칭**: 예전 화면이 쓰던 `--brand`·`--brand-hover`·`--brand-ink`·`--font-display`·`--font-body`는 새 토큰을 가리키는 별칭으로 남겼다. 새 코드는 쓰지 않는다.
 
@@ -121,22 +131,25 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 | 부품 | 주요 props | 지키는 것 |
 | --- | --- | --- |
-| `Button` | `variant`(`primary`·`secondary`·`quiet`), `size`(`normal`·`small`), `block`, `href`, `icon`, `disabled`, `type` | 높이 44px 이상. `href`면 링크, 비활성 링크는 링크를 만들지 않고 `aria-disabled` 버튼. 비활성은 투명도가 아니라 색 교체 |
-| `Badge` | `kind`(5장), `label?` | 아이콘 + 테두리 모양 + 문구. `label`로 문구만 바꿀 수 있고 뜻이 다른 배지를 만들지 않는다 |
-| `StateBanner` | `state`, `reasons`, `live?` | 상태 라벨 + 아이콘 + 안전 문구 두 언어 병기 + 사유 목록. `live`면 갱신을 `aria-live="polite"`로 알린다 |
-| `DateChip` | `date`, `state?`, `isToday?`, `selected?`, `hasAppointment?`, `href?`·`onClick?` | 60×92px. 요일·날짜·상태 아이콘·병원 표시. 스크린리더에는 전체 날짜·오늘·상태·병원 일정을 한 문장으로 읽힌다 |
+| `Button` | `variant`(`primary`·`secondary`·`quiet`·`critical`), `size`(`normal`·`small`), `block`, `href`, `icon`, `disabled`, `loading`, `type` | SEED Action Button. 큰 CTA 52px·모서리 12·18/24, 작은 44px·모서리 8·16/22. 보조 = 회색 채움, 조용한 = 바탕 없는 글자, critical = 긴급 빨강(되돌릴 수 없는 확인). 채운 강조 버튼은 화면당 하나. `loading`은 눌린 색 + 회전 표시(`aria-busy`). `href`면 링크, 비활성 링크는 `aria-disabled` 버튼. 비활성은 투명도가 아니라 회색 면 + `--ink-subtle` 글자 |
+| `Badge` | `kind`(5장), `label?` | 14/19·모서리 6·높이 28 안팎. 아이콘 + 면·테두리 모양 + 문구. `label`로 문구만 바꿀 수 있고 뜻이 다른 배지를 만들지 않는다 |
+| `StateBanner` | `state`, `reasons`, `live?` | SEED Callout 모양(모서리 10·안쪽 14·아이콘 20·라벨 16, 1px 상태 선). 상태 라벨 + 아이콘 + 안전 문구 두 언어 병기 + 사유 목록. `live`면 갱신을 `aria-live="polite"`로 알린다 |
+| `DateChip` | `date`, `state?`, `isToday?`, `selected?`, `hasAppointment?`, `href?`·`onClick?` | 60×92px·모서리 12. 고른 날 `--selected` 채움 + 흰 글자, '오늘'은 코발트 2px 테두리 + '오늘' 글자, 나머지 회색 면. 요일·날짜·상태 아이콘·병원 표시. 스크린리더에는 전체 날짜·오늘·상태·병원 일정을 한 문장으로 읽힌다 |
 | `DayTimeline` | `entries`, `label`, `person`(`patient`·`guardian`) | 지하철 노선도. 항목 `kind`: `depart`·`stop`·`meal`·`return`·`appointment`·`medication`·`rest`. 종류 이름은 늘 글자로 보이고, 이동 시간(`leg`)에는 늘 '추정' 배지 |
-| `PlaceCard` | `title`, `titleLang?`, `category`, `imageUrl?`, `time?`, `meta?`, `badges?`, `credit?`, `href?`, `variant`(`feature`·`compact`), `headingLevel` | 사진은 URL 참조만(내려받기·서버 가공 금지, `next/image` 안 씀). 사진이 없거나 실패하면 `CategoryArt`. 사진 위 글자는 흰 알약 위 |
+| `PlaceCard` | `title`, `titleLang?`, `category`, `imageUrl?`, `time?`, `meta?`, `badges?`, `credit?`, `href?`, `variant`(`feature`·`compact`), `headingLevel` | 사진은 URL 참조만(내려받기·서버 가공 금지, `next/image` 안 씀). 사진이 없거나 실패하면 `CategoryArt`. 사진 위 글자는 흰 알약 위. 모서리 16·그림자 없음·1px `--line-strong` 테두리 |
 | `CategoryArt` | `category` | 유형별 인라인 SVG 일러스트(장식, `aria-hidden`) |
 | `MealSlot` | `slot`(`LUNCH`·`DINNER`), `status`(`FILLED`·`NONE_AVAILABLE`·`CLEARED`·`NOT_APPLICABLE`), `time?`, `reasons?` | '추천 장소 없음'은 정상 결과 — 점선 칸 + 중립 회색 + 사유 문구 |
-| `AnswerInput` | `legend`, `value`(`YES`·`NO`·`UNKNOWN`·`null`), `onChange`, `disallowUnknown?`, `hint?`, `disabled?`, `showMeaning?` | 예/아니오/모르겠음. `fieldset`+`legend`+표준 라디오. 고른 뒤 '아니오'(제한 없음)와 '모르겠음'(가장 엄격한 기본값)의 뜻을 한 줄로 보인다. 필수 항목은 '모르겠음' 없음 |
+| `AnswerInput` | `legend`, `value`(`YES`·`NO`·`UNKNOWN`·`null`), `onChange`, `disallowUnknown?`, `hint?`, `disabled?`, `showMeaning?` | 예/아니오/모르겠음 — 44px 알약 칩(테두리 `--line-input` 3:1). 고르면 진한 테두리 + 회색 면 + 체크 + 굵게. `fieldset`+`legend`+표준 라디오. 고른 뒤 '아니오'(제한 없음)와 '모르겠음'(가장 엄격한 기본값)의 뜻을 한 줄로 보인다. 필수 항목은 '모르겠음' 없음 |
 | `PeriodEditor` | `title`, `source`(`SELF`·`HOSPITAL`), `startDate`·`endDate`, `onStartChange`·`onEndChange`, `minDate`·`maxDate`, `disabled?`, `headExtra?`, `actions?` | 틀만. 본인 체크는 파선, 병원 발행은 실선 띠. 병원 기간 날짜는 고칠 수 없다. 자유 서술 칸이 없다 |
-| `Sheet` | `title`, `onClose`, `showClose?`, `children`, `footer` | 전후 비교·복귀 시트의 틀. 열리면 포커스 이동·배경 잠금·Tab 가두기, 닫히면 이전 포커스로. Escape·닫기·확인·뒤로 가기 모두 `requestClose` 한 경로로 닫힌다(`lib/useModalSheet.js`). `showClose=false`는 즉시 복귀처럼 확인을 꼭 받는 안전 지시용 |
+| `Sheet` | `title`, `onClose`, `showClose?`, `children`, `footer` | SEED Bottom Sheet — 위 모서리 24, 제목 22/30, 뒤 `--overlay`, 손잡이는 닫을 수 있는 시트에만. 열리면 포커스 이동·배경 잠금·Tab 가두기, 닫히면 이전 포커스로. Escape·닫기·확인·뒤로 가기 모두 `requestClose` 한 경로로 닫힌다(`lib/useModalSheet.js`). `showClose=false`는 즉시 복귀처럼 확인을 꼭 받는 안전 지시용(손잡이·닫기 없음) |
 | `SourceArea` · `SourceTag` | `source`(6장), `title?`, `note?`, `lang?` | 출처 영역 / 항목 옆 작은 출처 표시 |
 | `KoreanCard` | `title`, `korean`(줄 배열), `explanation?`, `explanationLang?` | 큰 한국어 본문(`lang="ko"`) + 사용자 언어 설명. 고정 문구만(AI 금지). 네트워크를 쓰지 않는다 |
 | `EmptyState` | `icon`, `title`, `body?`, `action?`, `headingLevel?` | 무엇이 없는지 + 다음에 할 일. 오류 색·경고 아이콘 없음 |
-| `TopBar` | `title`, `titleLang?`, `backHref?`·`onBack?`, `backLabel?`, `as?`, `actions?` | 제목(기본 h1, 좁으면 말줄임) + 뒤로 가기(44px) + 언어 선택(8장) |
-| `Icon` | `name`, `size?`, `strokeWidth?` | 인라인 SVG 선 아이콘(`ICON_NAMES`). 상태 아이콘은 `STATE_ICON` |
+| `AlertDialog` | `title`, `titleLang?`, `description?`, `cancelLabel`, `confirmLabel`, `critical?`, `busy?`, `onConfirm({ requestClose })`, `onClose` | SEED Alert Dialog — 272px·모서리 20, 버튼 둘(취소·확인), 되돌릴 수 없으면 `critical`. 바깥을 눌러도 닫히지 않는다. `role="alertdialog"`, 포커스 가두기·복원·뒤로 가기는 `lib/useModalSheet.js` |
+| `ListItem` · `ListGroup` · `ListHeader` | `title`, `titleLang?`, `description?`, `leading?`, `trailing?`(`'chevron'`·노드), `href?`·`onClick?` / `label?` / `as?`, `id?` | SEED List Item — 위아래 12·좌우 16, 제목 16/22·설명 14/19 `--ink-soft`(한 줄 46·두 줄 66px). 누르면 좌우 6px 안으로 들어온 모서리 10 면. 반복 행 사이 1px 선 16px 들여씀. 행 안에서 따로 누를 것은 3개까지 |
+| 클래스 `.ui-switch` · `.ui-block` · `main.page.is-basement` · `.hint.is-error` | — | 스위치(바로 적용되는 켬/끔, `role="switch"`, `.toggle-row` 라벨 안 — 끔 트랙 `--ink-subtle`), 흰 블록(화면 폭·8px 틈), 회색 바탕 층(그 안에서 카드 그림자 끔), 입력 오류 도움말(긴급 빨강, 입력은 `aria-invalid`) |
+| `TopBar` | `title`, `titleLang?`, `backHref?`·`onBack?`, `backLabel?`, `as?`, `actions?` | SEED Top Navigation — 높이 56·선 없음, 제목(기본 h1) 18/24 굵게·좁으면 말줄임, 뒤로 가기 44×44·모서리 8, 언어 선택(8장) |
+| `Icon` | `name`, `size?`, `strokeWidth?` | 인라인 SVG 선 아이콘(`ICON_NAMES`). 이름이 `Fill`로 끝나면 채운 모양(하단 내비 현재 칸). 상태 아이콘은 `STATE_ICON` |
 | `BottomNav` · `EmergencyButton` · `ReadOnlyBanner` · `AppShell` | 7장 | 앱 셸 |
 | `useStoreStatus` · `shouldShowReadOnly` | — | 기기 저장소의 보기 전용 신호. 쓰기 동작은 `readOnly`면 막는다 |
 
@@ -164,11 +177,13 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 | `kind` | 문구(ko / en) | 모양 | 붙이는 곳 |
 | --- | --- | --- | --- |
-| `estimate` | 추정 / Estimate | 점선 테두리, 회색 면, 물결(≈) 아이콘 | SafeHour가 추정한 값 — 이동·체류·보행 시간, 식이 판단, 예상 귀가 |
-| `defaulted` | 기본값 적용 / Default applied | 분홍 면·분홍 테두리, 방패 아이콘 | '모르겠음'에 가장 엄격한 기본값을 넣은 항목 |
-| `hoursUnconfirmed` | 운영 확인 필요 / Check opening hours | 파선 테두리, 흰 면, 물음표 시계 | 운영 여부를 단정할 수 없는 장소(열려 있다고 쓰지 않는다) |
+| `estimate` | 추정 / Estimate | 테두리 없는 회색 면, 물결(≈) 아이콘 | SafeHour가 추정한 값 — 이동·체류·보행 시간, 식이 판단, 예상 귀가 |
+| `defaulted` | 기본값 적용 / Default applied | 분홍 면(테두리 없음), 방패 아이콘 | '모르겠음'에 가장 엄격한 기본값을 넣은 항목 |
+| `hoursUnconfirmed` | 운영 확인 필요 / Check opening hours | 점선 테두리(`--line-input`), 흰 면, 물음표 시계 | 운영 여부를 단정할 수 없는 장소(열려 있다고 쓰지 않는다) |
 | `demo` | 병원 연동 데모 / Hospital link demo | 노랑 띠 무늬, 대기색 테두리, 플라스크 아이콘 | 데모 병원 지침 — 데모를 실제 연동처럼 보이지 않게 늘 붙인다 |
 | `readOnly` | 보기 전용 / View only | 짙은 면 + 흰 글자, 자물쇠 | 로그인 만료·오프라인 |
+
+맨 `.badge`(배지 5종이 아닌 곳)는 옅은 1px `--line-strong` 테두리를 지킨다 — 5종은 종류마다 테두리를 스스로 정한다.
 
 조건 화면의 '동의 문구 법무 검토 전'은 배지 5종과 뜻이 달라 조건 화면 전용 모양(`LegalReviewBadge`)을 쓴다.
 
@@ -198,9 +213,9 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 - **하단 내비** — 오늘(`/today`) · 일정(`/trip`) · 조건(`/conditions`) · 더보기(`/more`).
   하위 화면도 해당 탭을 현재로 본다(`/trip/…`·`/place/…` → 일정, `/link`·`/guide` → 조건, `/cards`·`/guardian`·`/settings`·`/privacy` → 더보기).
-  현재 탭은 `aria-current="page"` + 포인트 색 + 굵기 + 알약 바탕 + 윗줄. `/design-board`는 내비에 없다.
+  현재 탭은 `aria-current="page"` + 채운 아이콘 + `--ink` 글자 + 굵기(SEED Bottom Navigation — 알약 바탕·윗줄 없음). 긴급 칸은 긴급 빨강 아이콘 + 글자. `/design-board`는 내비에 없다.
 - **긴급 연락 버튼** — 모든 화면에 고정한다. 로그인 전·로그인 만료·오프라인·추천 중단 중에도 보인다. `/emergency`로 가는 링크이며
-  긴급 빨강 + 전화 아이콘 + '긴급 연락', 높이 48px. 판정 상태 색과 겹치지 않는다. 하단 내비·고정 복귀 버튼이 있으면 그 위로 비켜 선다.
+  긴급 빨강 채움 + 전화 아이콘 + '긴급 연락', 큰 CTA 모양(52px·모서리 12). 판정 상태 색과 겹치지 않는다. 하단 내비·고정 복귀 버튼이 있으면 그 위로 비켜 선다.
 - **보기 전용 배너** — 저장소가 보기 전용(로그인 안 함·만료·오프라인)이면 맨 위에 '보기 전용 — 로그인이 필요합니다'와 이유를 보인다.
   자리(`role="status"`)는 늘 DOM에 있어 쓰는 중에 오프라인이 되면 읽어 준다. 오프라인이면 누를 수 없는 로그인 링크를 두지 않는다.
   세션 확인 전 첫 그림에서는 그리지 않는다(깜빡임 방지, 오프라인은 바로 보인다). `/`·`/login`·`/design-board`에는 두지 않는다.
@@ -209,11 +224,11 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 ## 8. 언어 선택 (`LanguageToggle`)
 
-- 모든 상단 바 오른쪽에 늘 붙는다. 지구본 + 현재 언어 이름만 보이는 작은 버튼이고, 누르면 4개 언어 목록이 펼쳐진다
+- 모든 상단 바 오른쪽에 늘 붙는다. 지구본 + 현재 언어 이름을 적은 글자 버튼(테두리 없음·16px·높이 44)이고, 누르면 4개 언어 목록이 펼쳐진다
   (360px에서 제목 자리를 빼앗지 않으려고).
 - 언어 이름은 늘 자기 언어로 적는다: 한국어 / English / 日本語 / 中文 — 번역하면 못 찾는다.
 - 펼침 버튼의 접근 가능한 이름은 영어 + 현재 언어('Language — 한국어 선택됨' 꼴)다. 목록은 드러내기(disclosure) 방식:
-  `aria-expanded`, Escape·바깥 누르기로 닫히고 펼침 버튼으로 포커스가 돌아온다. 언어 버튼은 44px 이상, 선택된 언어는 체크 아이콘 + 굵기 + `aria-pressed`.
+  `aria-expanded`, Escape·바깥 누르기로 닫히고 펼침 버튼으로 포커스가 돌아온다. 언어 버튼은 44px 이상, 선택된 언어는 체크 아이콘 + 굵기 + 회색 면 + `aria-pressed`.
 - 첫 언어는 기기에 저장한 선택 → 브라우저 언어(`ja-JP`→`ja`, `zh-CN`·`zh-TW`→`zh`, 그 밖→`en`, `ko-KR`→`ko`) 순이다.
   고른 언어는 기기 설정(`prefs`)에 저장되고 `<html lang>`이 바뀐다.
 

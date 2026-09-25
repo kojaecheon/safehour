@@ -52,6 +52,7 @@
 - 홈의 매일 확인: 외출·복귀만 펼치고 나머지 제한 항목은 접는다(명세 4.6 '요약')
 - 하루 화면: 타임라인을 하루 소개보다 먼저 보인다
 - SEED 적용 ①층(토큰): 회색·글자·간격·모서리·그림자·초점 링을 SEED 값으로 교체 — 설계서 `docs/superpowers/specs/2026-09-24-seed-design-adoption-design.md`
+- SEED 적용 ②층(부품): 버튼·입력·선택·배지·안내·시트·상단 바·하단 내비를 SEED 모양으로, 목록 행·흰 블록·스위치·확인 대화상자 부품 추가 — 계획서 `docs/superpowers/plans/2026-09-26-seed-layer2-components.md`
 
 **검증 장치**
 
