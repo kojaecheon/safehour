@@ -112,7 +112,7 @@
   transform: rotate(-135deg) translate(-2px, -2px);
 }
 .today-check-more > summary:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
 

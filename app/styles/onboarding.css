@@ -355,7 +355,7 @@
   outline: none;
 }
 .onboarding-step-title:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
 .onboarding-lead {
@@ -415,7 +415,7 @@ fieldset.onboarding-card {
   outline: none;
 }
 .onboarding-list:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 4px;
 }
 
@@ -699,7 +699,7 @@ fieldset.onboarding-card {
   background: var(--surface-alt);
 }
 .onboarding-chip:focus-within {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
 .onboarding-chip.is-checked {

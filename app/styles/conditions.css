@@ -24,7 +24,7 @@
 }
 .conditions-section > h2:focus-visible,
 .conditions-section h2[tabindex='-1']:focus {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
 .conditions-section-head {
@@ -364,7 +364,7 @@
   outline: none;
 }
 .conditions-item:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 4px;
 }
 .conditions-item .ui-answer {
@@ -503,7 +503,7 @@
   color: var(--state-together-ink);
 }
 .conditions-done h2:focus {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
 .conditions-done > p {
@@ -511,7 +511,7 @@
   margin-top: var(--space-2);
 }
 .conditions-choose h2:focus {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
 .conditions-demo .conditions-section-head {

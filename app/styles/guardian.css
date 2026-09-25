@@ -189,7 +189,7 @@
 }
 .guardian-result h2:focus-visible,
 .guardian-asof h2:focus-visible {
-  outline: 3px solid var(--accent);
+  outline: var(--focus-width) solid var(--accent);
 }
 
 /* ───────────────────────── /g ───────────────────────── */

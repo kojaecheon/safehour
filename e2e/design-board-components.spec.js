@@ -102,4 +102,90 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
       'font-size': '18px',
     });
   });
+
+  test('입력·선택 — 입력칸·답 칩·선택 상자·스위치·전환·날짜 칩 (설계서 5.2·5.3)', async ({ page }) => {
+    await pointerAway(page);
+
+    // 입력칸: 52px · 모서리 12 · 좌우 16 · 3:1 테두리. 초점은 2px 진한 테두리, 윤곽선 없음. 오류는 빨강
+    const input = page.locator('#designBoard-input');
+    expect(
+      await styles(input, ['min-height', 'border-top-left-radius', 'border-top-color', 'font-size', 'padding-left']),
+    ).toEqual({
+      'min-height': '52px',
+      'border-top-left-radius': '12px',
+      'border-top-color': 'rgb(134, 139, 148)',
+      'font-size': '16px',
+      'padding-left': '16px',
+    });
+    await input.focus();
+    await expect
+      .poll(() => styles(input, ['border-top-color', 'box-shadow', 'outline-style']))
+      .toEqual({
+        'border-top-color': 'rgb(26, 28, 32)',
+        'box-shadow': 'rgb(26, 28, 32) 0px 0px 0px 1px inset',
+        'outline-style': 'none',
+      });
+    const invalid = page.locator('#designBoard-input-error');
+    expect((await styles(invalid, ['border-top-color']))['border-top-color']).toBe('rgb(200, 16, 46)');
+
+    // 답 칩: 44px 알약 · 16px · 3:1 테두리. 고르면 진한 테두리 + 회색 면 + 굵게 + 체크
+    const yes = page.locator('#designBoard-c-answer .ui-answer').first().locator('.ui-answer-option').first();
+    expect(await styles(yes, ['min-height', 'border-top-left-radius', 'font-size', 'border-top-color'])).toEqual({
+      'min-height': '44px',
+      'border-top-left-radius': '9999px',
+      'font-size': '16px',
+      'border-top-color': 'rgb(134, 139, 148)',
+    });
+    await yes.click();
+    await expect(yes).toHaveClass(/is-selected/);
+    await pointerAway(page);
+    await expect
+      .poll(() => styles(yes, ['background-color', 'border-top-color', 'font-weight']))
+      .toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-top-color': 'rgb(26, 28, 32)', 'font-weight': '700' });
+    await expect(yes.locator('.ui-answer-mark')).toBeVisible();
+
+    // 선택 상자: 모서리 12. 고른 칸은 2px 진한 테두리, 나머지는 3:1 테두리
+    const boxes = page.locator('#designBoard-c-select .radio-option');
+    await expect(boxes.nth(0)).toHaveClass(/selected/);
+    expect(await styles(boxes.nth(0), ['border-top-left-radius', 'border-top-color', 'box-shadow'])).toEqual({
+      'border-top-left-radius': '12px',
+      'border-top-color': 'rgb(26, 28, 32)',
+      'box-shadow': 'rgb(26, 28, 32) 0px 0px 0px 1px inset',
+    });
+    expect((await styles(boxes.nth(1), ['border-top-color']))['border-top-color']).toBe('rgb(134, 139, 148)');
+
+    // 스위치: 52×32, 끔은 --ink-subtle, 켬은 --selected
+    const sw = page.getByRole('switch', { name: '알림 켜기 (견본)' });
+    expect(await styles(sw, ['width', 'height', 'background-color'])).toEqual({
+      width: '52px',
+      height: '32px',
+      'background-color': 'rgb(134, 139, 148)',
+    });
+    await sw.check();
+    await pointerAway(page);
+    await expect.poll(() => styles(sw, ['background-color']).then((s) => s['background-color'])).toBe('rgb(42, 48, 56)');
+
+    // 전환(Segmented): 회색 알약 통, 고른 칸은 흰 면 + 진한 글자, 안 고른 칸은 보조 글자
+    const seg = page.locator('.tabs').first();
+    expect(await styles(seg, ['border-top-left-radius', 'background-color'])).toEqual({
+      'border-top-left-radius': '9999px',
+      'background-color': 'rgb(243, 244, 245)',
+    });
+    expect(
+      await styles(seg.locator('[aria-selected="true"]'), ['min-height', 'background-color', 'color', 'font-weight']),
+    ).toEqual({ 'min-height': '44px', 'background-color': 'rgb(255, 255, 255)', color: 'rgb(26, 28, 32)', 'font-weight': '700' });
+    expect((await styles(seg.locator('[aria-selected="false"]'), ['color'])).color).toBe('rgb(85, 93, 109)');
+
+    // 날짜 칩: 고른 날 진한 회색 채움 + 흰 글자, '오늘' 코발트 테두리, 나머지 회색 면
+    const chips = page.locator('#designBoard-c-datechip .ui-date-chip');
+    expect(
+      await styles(page.locator('#designBoard-c-datechip .ui-date-chip.is-selected'), [
+        'background-color',
+        'color',
+        'border-top-left-radius',
+      ]),
+    ).toEqual({ 'background-color': 'rgb(42, 48, 56)', color: 'rgb(255, 255, 255)', 'border-top-left-radius': '12px' });
+    expect((await styles(chips.nth(0), ['border-top-color']))['border-top-color']).toBe('rgb(10, 92, 255)');
+    expect((await styles(chips.nth(2), ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+  });
 });

@@ -203,6 +203,8 @@ export default function DesignBoard() {
   const [start, setStart] = useState('2026-10-01');
   const [end, setEnd] = useState('2026-10-07');
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [box, setBox] = useState('A');
+  const [switchOn, setSwitchOn] = useState(false);
 
   const lodging = t('designBoard.demoLodging');
   const palaceCard = (
@@ -501,6 +503,67 @@ export default function DesignBoard() {
                 disallowUnknown
                 disabled
               />
+            </Sub>
+
+            <Sub id="designBoard-c-input" title={t('designBoard.cInput')}>
+              <div className="field">
+                <label htmlFor="designBoard-input">{t('designBoard.inputLabel')}</label>
+                <input
+                  id="designBoard-input"
+                  type="text"
+                  placeholder={t('designBoard.inputPlaceholder')}
+                  aria-describedby="designBoard-input-hint"
+                />
+                <p className="hint" id="designBoard-input-hint">
+                  {t('designBoard.inputHint')}
+                </p>
+              </div>
+              <div className="field">
+                <label htmlFor="designBoard-input-error">{t('designBoard.inputErrorLabel')}</label>
+                <input
+                  id="designBoard-input-error"
+                  type="text"
+                  defaultValue="25:70"
+                  aria-invalid="true"
+                  aria-describedby="designBoard-input-error-msg"
+                />
+                <p className="hint is-error" id="designBoard-input-error-msg">
+                  {t('designBoard.inputError')}
+                </p>
+              </div>
+            </Sub>
+
+            <Sub id="designBoard-c-select" title={t('designBoard.cSelect')}>
+              <div className="radio-group" role="radiogroup" aria-label={t('designBoard.selectLegend')}>
+                {[
+                  ['A', 'designBoard.selectA', 'designBoard.selectASub'],
+                  ['B', 'designBoard.selectB', 'designBoard.selectBSub'],
+                ].map(([option, titleKey, subKey]) => (
+                  <label key={option} className={box === option ? 'radio-option selected' : 'radio-option'}>
+                    <input
+                      type="radio"
+                      name="designBoard-select"
+                      value={option}
+                      checked={box === option}
+                      onChange={() => setBox(option)}
+                    />
+                    <span>
+                      <strong>{t(titleKey)}</strong>
+                      <span className="sub">{t(subKey)}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <label className="toggle-row">
+                <span className="label">{t('designBoard.switchLabel')}</span>
+                <input
+                  type="checkbox"
+                  role="switch"
+                  className="ui-switch"
+                  checked={switchOn}
+                  onChange={(event) => setSwitchOn(event.target.checked)}
+                />
+              </label>
             </Sub>
 
             <Sub id="designBoard-c-period" title={t('designBoard.cPeriod')} wide>
