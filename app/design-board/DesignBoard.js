@@ -413,6 +413,12 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
+            <Sub id="designBoard-c-callout" title={t('designBoard.cCallout')}>
+              <div className="medical-callout" role="note">
+                {t('designBoard.calloutBody')}
+              </div>
+            </Sub>
+
             <Sub id="designBoard-c-datechip" title={t('designBoard.cDateChip')}>
               <ul className="ui-date-strip" role="list">
                 {DEMO_DAYS.map((day) => (

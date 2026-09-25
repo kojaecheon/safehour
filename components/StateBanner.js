@@ -32,7 +32,7 @@ export default function StateBanner({ state, reasons = [], live = false }) {
     <section className={`state-banner state-${state}`} aria-live={live ? 'polite' : undefined}>
       <span className="state-label" lang={primaryLang}>
         <span className="state-icon">
-          <Icon name={STATE_ICON[state]} size={18} strokeWidth={2.2} />
+          <Icon name={STATE_ICON[state]} size={20} strokeWidth={2.2} />
         </span>
         {t(`state.${state}`)}
       </span>

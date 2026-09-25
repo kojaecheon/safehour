@@ -13,11 +13,12 @@
 /* ───────────────────────── 앱 셸 ───────────────────────── */
 
 /* 보기 전용 배너 자리 — 비어 있어도 DOM 에 남겨 상태 변화를 읽어 준다(role=status) */
+/* 보기 전용 배너 (SEED Page Banner) — 화면 폭 맨 위, 화면당 하나, 위아래 10 · 좌우 16, 16px(안전 문구) */
 .ui-readonly {
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
-  padding: var(--space-3) var(--gutter);
+  padding: 10px var(--gutter);
   background: var(--surface-alt);
   border-bottom: 1px solid var(--line-strong);
 }
@@ -38,8 +39,8 @@
 .ui-readonly-title {
   display: block;
   color: var(--ink);
-  font-weight: var(--weight-heavy);
-  line-height: var(--leading-snug);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-body);
 }
 .ui-readonly-body {
   margin-top: var(--space-1);
@@ -228,20 +229,18 @@
 }
 
 /* ───────────────────────── 배지 5종 ───────────────────────── */
-/* 모양이 서로 다르다: 점선(추정) · 방패 아이콘 분홍(기본값) · 파선(운영 확인) · 띠 무늬(데모) · 짙은 면(보기 전용) */
+/* 모양이 서로 다르다: 회색 면(추정) · 분홍 면(기본값) · 점선 테두리 흰 면(운영 확인) · 띠 무늬(데모) · 짙은 면 굵게(보기 전용).
+   아이콘도 다섯 가지가 다르다(Badge.js) — 색만으로 구분하지 않는다 */
 .ui-badge-estimate {
-  border-style: dotted;
-  border-color: var(--ink-soft);
   background: var(--surface-alt);
   color: var(--ink-soft);
 }
 .ui-badge-defaulted {
-  border-color: var(--support-ink);
   background: var(--support-soft);
   color: var(--support-ink);
 }
 .ui-badge-hoursUnconfirmed {
-  border-style: dashed;
+  border-style: dotted;
   border-color: var(--line-input);
   background: var(--surface);
   color: var(--ink-soft);
@@ -256,15 +255,15 @@
   );
 }
 .ui-badge-readOnly {
-  border-color: var(--badge-readonly-bg);
   background: var(--badge-readonly-bg);
   color: var(--on-dark);
+  font-weight: var(--weight-bold);
 }
 
 /* ───────────────────────── 출처 영역 ───────────────────────── */
 /* 다섯 출처는 머리글 문구 + 아이콘 + 테두리 모양으로 나뉜다. 한 영역에 두 출처를 섞지 않는다. */
 .ui-source {
-  border-radius: var(--radius-16);
+  border-radius: var(--radius-10);
   padding: var(--space-3) 14px 14px;
   margin-bottom: var(--space-3);
   background: var(--surface);
@@ -328,11 +327,11 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-8);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-6);
   font-size: var(--text-caption);
-  font-weight: var(--weight-bold);
-  line-height: 1.3;
+  font-weight: var(--weight-medium);
+  line-height: var(--lh-caption);
   white-space: nowrap;
   background: var(--surface);
 }
@@ -1031,16 +1030,15 @@
   margin-top: var(--space-5);
 }
 
-/* ───────────────────────── 빈 상태 ───────────────────────── */
+/* ───────────────────────── 빈 상태 (SEED Result Section) ─────────────────────────
+ * 바탕 없이 가운데 — 그림 → 제목 → 설명 → 버튼. 오류가 아니므로 빨강·경고를 쓰지 않고, 코발트도 쓰지 않는다 */
 .ui-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: var(--space-2);
+  gap: var(--space-1-5);
   padding: var(--space-8) var(--space-4);
-  border-radius: var(--radius-24);
-  background: var(--surface-alt);
 }
 .ui-empty-art {
   display: inline-grid;
@@ -1049,11 +1047,12 @@
   height: 64px;
   margin-bottom: var(--space-2);
   border-radius: var(--radius-full);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  background: var(--surface-alt);
+  color: var(--ink-soft);
 }
 .ui-empty-title {
   font-size: var(--text-title-3);
+  line-height: var(--lh-title-3);
   color: var(--ink);
   margin: 0;
 }

@@ -104,6 +104,13 @@ export const messages = {
     ja: '休む日（観光のおすすめなし）はエラーではありません。赤や警告の三角ではなく、青灰色と月のアイコンを使います。',
     zh: '休息日（不推荐观光）不是错误——使用蓝灰色和月亮图标，而不是红色或警告三角。',
   },
+  'designBoard.cCallout': { ko: '안내 상자', en: 'Callout', ja: '案内ボックス', zh: '提示框' },
+  'designBoard.calloutBody': {
+    ko: 'SafeHour는 의료진의 판단을 대신하지 않습니다. 몸 상태에 이상이 느껴지면 바로 병원에 연락하세요.',
+    en: 'SafeHour does not replace your medical team. If you feel unwell, contact your hospital right away.',
+    ja: 'SafeHourは医療者の判断に代わるものではありません。体調に異変を感じたら、すぐに病院へ連絡してください。',
+    zh: 'SafeHour 不能替代医护人员的判断。如感到身体不适，请立即联系医院。',
+  },
   'designBoard.cDateChip': { ko: '날짜 칩', en: 'Date chips', ja: '日付チップ', zh: '日期标签' },
   'designBoard.cTimeline': { ko: '하루 타임라인 — 지하철 노선도', en: 'Day timeline — metro line map', ja: '1日のタイムライン — 地下鉄路線図', zh: '一日时间线 — 地铁线路图' },
   'designBoard.timelineNote': {

@@ -188,4 +188,70 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
     expect((await styles(chips.nth(0), ['border-top-color']))['border-top-color']).toBe('rgb(10, 92, 255)');
     expect((await styles(chips.nth(2), ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
   });
+
+  test('배지·안내 — 배지 모양, 상태 배너, 안내 상자, 출처 영역, 빈 상태 (설계서 5.4·5.6)', async ({ page }) => {
+    await pointerAway(page);
+
+    // 배지 5종: 14/19 · 모서리 6 · 좌우 8 · 높이 28px 안팎
+    const area = page.locator('#designBoard-c-badge');
+    const badges = area.locator('.ui-badge');
+    await expect(badges).toHaveCount(5);
+    for (const badge of await badges.all()) {
+      expect(await styles(badge, ['font-size', 'line-height', 'border-top-left-radius', 'padding-left'])).toEqual({
+        'font-size': '14px',
+        'line-height': '19px',
+        'border-top-left-radius': '6px',
+        'padding-left': '8px',
+      });
+      const { height } = await badge.boundingBox();
+      expect(height).toBeGreaterThanOrEqual(26);
+      expect(height).toBeLessThanOrEqual(30);
+    }
+    expect(await styles(area.locator('.ui-badge-estimate'), ['background-color', 'border-top-color'])).toEqual({
+      'background-color': 'rgb(243, 244, 245)',
+      'border-top-color': 'rgba(0, 0, 0, 0)',
+    });
+    expect(await styles(area.locator('.ui-badge-hoursUnconfirmed'), ['border-top-style', 'border-top-color'])).toEqual({
+      'border-top-style': 'dotted',
+      'border-top-color': 'rgb(134, 139, 148)',
+    });
+    expect(await styles(area.locator('.ui-badge-readOnly'), ['background-color', 'font-weight'])).toEqual({
+      'background-color': 'rgb(51, 64, 85)',
+      'font-weight': '700',
+    });
+    expect(await styles(area.locator('.ui-source-tag').first(), ['border-top-left-radius', 'font-size'])).toEqual({
+      'border-top-left-radius': '6px',
+      'font-size': '14px',
+    });
+
+    // 상태 배너 (Callout): 모서리 10 · 안쪽 14 · 라벨 16px · 아이콘 20px
+    const banner = page.locator('#designBoard-c-state .state-banner').first();
+    expect(await styles(banner, ['border-top-left-radius', 'padding-top'])).toEqual({
+      'border-top-left-radius': '10px',
+      'padding-top': '14px',
+    });
+    expect((await styles(banner.locator('.state-label'), ['font-size']))['font-size']).toBe('16px');
+    expect((await banner.locator('.state-icon svg').boundingBox()).width).toBe(20);
+
+    // 안내 상자: 왼쪽 띠 없는 회색 면 · 모서리 10 · 16px
+    const callout = page.locator('#designBoard-c-callout .medical-callout');
+    expect(
+      await styles(callout, ['border-top-left-radius', 'border-left-width', 'background-color', 'font-size']),
+    ).toEqual({
+      'border-top-left-radius': '10px',
+      'border-left-width': '0px',
+      'background-color': 'rgb(243, 244, 245)',
+      'font-size': '16px',
+    });
+
+    // 출처 영역: 모서리 10, 병원 발행은 왼쪽 띠를 지킨다
+    expect(
+      await styles(page.locator('#designBoard-c-source .ui-source-hospital'), ['border-top-left-radius', 'border-left-width']),
+    ).toEqual({ 'border-top-left-radius': '10px', 'border-left-width': '6px' });
+
+    // 빈 상태 (Result Section): 바탕 없이 가운데
+    expect(
+      (await styles(page.locator('#designBoard-c-empty .ui-empty'), ['background-color']))['background-color'],
+    ).toBe('rgba(0, 0, 0, 0)');
+  });
 });
