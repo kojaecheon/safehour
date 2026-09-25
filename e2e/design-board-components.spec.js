@@ -310,4 +310,49 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
       ]),
     ).toEqual({ 'border-top-left-radius': '16px', 'box-shadow': 'none', 'border-top-color': 'rgb(220, 222, 227)' });
   });
+
+  test('시트·대화상자 — 시트 모양, 대화상자는 바깥을 눌러도 닫히지 않는다 (설계서 5.6)', async ({ page }) => {
+    await pointerAway(page);
+
+    // 시트: 뒤 --overlay, 위 모서리 24, 그림자 없음, 제목 22/30 굵게, 닫기는 44px 누르는 곳
+    await page.locator('#designBoard-c-sheet').getByRole('button', { name: '시트 열기' }).click();
+    const backdrop = page.locator('.sheet-backdrop');
+    await expect(backdrop).toBeVisible();
+    expect((await styles(backdrop, ['background-color']))['background-color']).toBe('rgba(0, 0, 0, 0.455)');
+    const sheet = page.locator('.sheet');
+    expect(await styles(sheet, ['border-top-left-radius', 'box-shadow'])).toEqual({
+      'border-top-left-radius': '24px',
+      'box-shadow': 'none',
+    });
+    expect(await styles(sheet.locator('.ui-sheet-head h2'), ['font-size', 'line-height', 'font-weight'])).toEqual({
+      'font-size': '22px',
+      'line-height': '30px',
+      'font-weight': '700',
+    });
+    await expect(sheet.locator('.ui-sheet-grabber')).toBeVisible();
+    const close = sheet.getByRole('button', { name: '닫기' });
+    const closeBox = await close.boundingBox();
+    expect(closeBox.width).toBeGreaterThanOrEqual(44);
+    expect(closeBox.height).toBeGreaterThanOrEqual(44);
+    await close.click();
+    await expect(backdrop).toHaveCount(0);
+
+    // 대화상자: 272px · 모서리 20, 되돌릴 수 없는 확인은 긴급 빨강, 바깥을 눌러도 닫히지 않고 Escape 로 닫힌다
+    await page.locator('#designBoard-c-dialog').getByRole('button', { name: '대화상자 열기' }).click();
+    const dialog = page.getByRole('alertdialog', { name: '이 기기의 기록을 지울까요?' });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toBeFocused();
+    await pointerAway(page); // 대화상자가 방금 누른 자리 위에 뜰 수 있다 — 버튼 호버 색이 섞이지 않게
+    expect(await styles(dialog, ['border-top-left-radius', 'max-width'])).toEqual({
+      'border-top-left-radius': '20px',
+      'max-width': '272px',
+    });
+    expect(
+      (await styles(dialog.getByRole('button', { name: '지우기' }), ['background-color']))['background-color'],
+    ).toBe('rgb(200, 16, 46)');
+    await page.mouse.click(5, 5);
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  });
 });

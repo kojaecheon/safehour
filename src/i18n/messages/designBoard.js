@@ -189,6 +189,11 @@ export const messages = {
     ja: '戻る操作、Esc、閉じる・OKボタンのどれで閉じても、履歴に余計な項目は残りません。',
     zh: '无论用返回、Esc、关闭按钮还是确认按钮关闭，都不会在浏览记录中留下多余项目。',
   },
+  'designBoard.cDialog': { ko: '확인 대화상자', en: 'Confirm dialog', ja: '確認ダイアログ', zh: '确认对话框' },
+  'designBoard.dialogOpen': { ko: '대화상자 열기', en: 'Open dialog', ja: 'ダイアログを開く', zh: '打开对话框' },
+  'designBoard.dialogTitle': { ko: '이 기기의 기록을 지울까요?', en: 'Delete the records on this device?', ja: 'この端末の記録を消しますか？', zh: '要删除此设备上的记录吗？' },
+  'designBoard.dialogBody': { ko: '지운 기록은 되돌릴 수 없어요.', en: "Deleted records can't be restored.", ja: '消した記録は元に戻せません。', zh: '删除的记录无法恢复。' },
+  'designBoard.dialogConfirm': { ko: '지우기', en: 'Delete', ja: '消す', zh: '删除' },
   'designBoard.cEmpty': { ko: '빈 상태', en: 'Empty state', ja: '空の状態', zh: '空状态' },
   'designBoard.emptyTitle': { ko: '아직 일정이 없어요', en: 'No plan yet', ja: 'まだ日程がありません', zh: '还没有行程' },
   'designBoard.emptyBody': {

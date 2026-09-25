@@ -44,14 +44,15 @@ export default function Sheet({ title, titleLang, onClose, showClose = true, chi
   return (
     <div className="sheet-backdrop" role="dialog" aria-modal="true" aria-labelledby={headingId}>
       <div className="sheet ui-sheet" ref={sheetRef} tabIndex={-1}>
-        <div className="ui-sheet-grabber" aria-hidden="true" />
+        {/* 손잡이는 닫을 수 있는 시트에만 — 확인을 꼭 받는 시트(showClose=false)가 끌어 내려 닫힐 것처럼 보이지 않게 */}
+        {showClose && <div className="ui-sheet-grabber" aria-hidden="true" />}
         <div className="ui-sheet-head">
           <h2 id={headingId} lang={titleLang}>
             {title}
           </h2>
           {showClose && (
             <button type="button" className="ui-sheet-close" aria-label={t('common.close')} onClick={requestClose}>
-              <Icon name="close" size={20} />
+              <Icon name="close" size={16} />
             </button>
           )}
         </div>

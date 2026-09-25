@@ -992,11 +992,13 @@
   flex: 1 1 140px;
 }
 
-/* ───────────────────────── 시트 ───────────────────────── */
+/* ───────────────────────── 시트 머리 (SEED Bottom Sheet) ─────────────────────────
+ * 손잡이 36×4 는 닫을 수 있는 시트에만(Sheet.js). 즉시 복귀처럼 확인을 꼭 받는 시트에는 손잡이·닫기가 없다.
+ * 제목 22/30 굵게, 머리 아래 선 없음. 닫기는 28px 원이 보이고 누르는 곳은 44px */
 .ui-sheet-grabber {
-  width: 40px;
+  width: 36px;
   height: 4px;
-  margin: calc(var(--space-3) * -1) auto var(--space-3);
+  margin: 0 auto var(--space-3);
   border-radius: var(--radius-full);
   background: var(--line-strong);
 }
@@ -1004,17 +1006,19 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  padding-bottom: var(--space-3);
-  margin-bottom: var(--space-4);
-  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-3);
 }
 .ui-sheet-head h2 {
   flex: 1;
   min-width: 0;
   margin: 0;
-  padding-top: 6px;
+  padding-top: var(--space-2);
+  font-size: var(--text-title-sheet);
+  line-height: var(--lh-title-sheet);
+  font-weight: var(--weight-bold);
 }
 .ui-sheet-close {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: var(--tap-min);
@@ -1022,10 +1026,29 @@
   flex: none;
   margin: 0 calc(var(--space-2) * -1) 0 0;
   border: none;
-  border-radius: var(--radius-full);
-  background: var(--surface-alt);
+  background: none;
   color: var(--ink);
   cursor: pointer;
+}
+.ui-sheet-close::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.ui-sheet-close:active::before {
+  background: var(--pressed-weak);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-sheet-close:hover::before { background: var(--pressed-weak); }
+}
+.ui-sheet-close > .ui-icon {
+  position: relative;
 }
 .ui-sheet-foot {
   display: grid;
@@ -1234,4 +1257,45 @@ main.page.is-basement {
 /* 화살표는 아이콘이라 --ink-subtle(흰 바탕 3.42:1) — 글자에는 쓰지 않는다 */
 .ui-list-item-trailing > .ui-icon {
   color: var(--ink-subtle);
+}
+
+/* ───────────────────────── 확인 대화상자 (SEED Alert Dialog) ─────────────────────────
+ * 가운데 272px · 모서리 20 · 제목 20/27 굵게 · 설명 16/22 보조 글자 · 버튼 둘 반반. 시트(50)보다 위(60) */
+.ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+  background: var(--overlay);
+}
+.ui-dialog {
+  width: 100%;
+  max-width: 272px;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-radius: var(--radius-20);
+  background: var(--layer-floating);
+}
+.ui-dialog-title {
+  margin: 0;
+  font-size: var(--text-title-2);
+  line-height: var(--lh-title-2);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.ui-dialog-desc {
+  margin-top: var(--space-1-5);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--ink-soft);
+}
+.ui-dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+.ui-dialog-actions > .btn {
+  width: 100%;
 }

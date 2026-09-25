@@ -899,11 +899,11 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
   padding-bottom: var(--space-3);
 }
 
-/* ── 모달 시트 ── */
+/* ── 모달 시트 (SEED Bottom Sheet) ── 최대 480 · 위 모서리 24 · 뒤 --overlay · 최대 높이 90% · 그림자 없음 */
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(18, 24, 38, 0.48);
+  background: var(--overlay);
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -912,12 +912,11 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 .sheet {
   width: 100%;
   max-width: var(--shell-max);
-  background: var(--surface);
+  background: var(--layer-floating);
   border-radius: var(--radius-24) var(--radius-24) 0 0;
-  padding: var(--space-6) var(--gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
-  max-height: 88dvh;
+  padding: var(--space-3) var(--gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
+  max-height: 90dvh;
   overflow-y: auto;
-  box-shadow: var(--shadow-sheet);
 }
 .sheet > h2:first-child {
   padding-bottom: var(--space-3);

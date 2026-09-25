@@ -4,6 +4,7 @@
 // 부품을 고쳐야 하면 디자인 시스템 소유(AX-304)에 보고하고, 화면 배치는 자기 기능 스타일 파일에서 한다.
 // 전체 견본은 /design-board 에서 본다.
 
+export { default as AlertDialog } from './AlertDialog.js';
 export { default as AnswerInput } from './AnswerInput.js';
 export { default as AppShell, NAV_HIDDEN_PATHS, STATUS_HIDDEN_PATHS } from './AppShell.js';
 export { default as Badge, BADGE_KINDS } from './Badge.js';

@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import StateBanner from '@/components/StateBanner.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import {
+  AlertDialog,
   AnswerInput,
   ART_CATEGORIES,
   Badge,
@@ -208,6 +209,7 @@ export default function DesignBoard() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [box, setBox] = useState('A');
   const [switchOn, setSwitchOn] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const lodging = t('designBoard.demoLodging');
   const palaceCard = (
@@ -655,6 +657,23 @@ export default function DesignBoard() {
                 >
                   <p>{t('designBoard.sheetBody')}</p>
                 </Sheet>
+              )}
+            </Sub>
+
+            <Sub id="designBoard-c-dialog" title={t('designBoard.cDialog')}>
+              <Button variant="secondary" onClick={() => setDialogOpen(true)}>
+                {t('designBoard.dialogOpen')}
+              </Button>
+              {dialogOpen && (
+                <AlertDialog
+                  title={t('designBoard.dialogTitle')}
+                  description={t('designBoard.dialogBody')}
+                  cancelLabel={t('designBoard.demoCancel')}
+                  confirmLabel={t('designBoard.dialogConfirm')}
+                  critical
+                  onConfirm={({ requestClose }) => requestClose()}
+                  onClose={() => setDialogOpen(false)}
+                />
               )}
             </Sub>
 
