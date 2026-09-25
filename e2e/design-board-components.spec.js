@@ -355,4 +355,41 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
   });
+
+  test('상단 바·하단 내비 — 56px 선 없는 바, 글자 언어 버튼, 채운 아이콘 현재 칸 (설계서 5.7·5.8·5.9)', async ({ page }) => {
+    await pointerAway(page);
+
+    // 상단 바: 높이 56 · 아래 선 없음 · 제목 18/24 굵게 · 언어 선택은 테두리 없는 16px 글자 버튼
+    const bar = page.locator('header.top-bar').first();
+    expect(Math.round((await bar.boundingBox()).height)).toBe(56);
+    expect(await styles(bar, ['border-bottom-width', 'background-color'])).toEqual({
+      'border-bottom-width': '0px',
+      'background-color': 'rgb(255, 255, 255)',
+    });
+    expect(await styles(bar.locator('.brand'), ['font-size', 'line-height', 'font-weight'])).toEqual({
+      'font-size': '18px',
+      'line-height': '24px',
+      'font-weight': '700',
+    });
+    expect(await styles(bar.locator('.lang-trigger'), ['border-top-width', 'font-size', 'min-height'])).toEqual({
+      'border-top-width': '0px',
+      'font-size': '16px',
+      'min-height': '44px',
+    });
+
+    // 하단 내비: 현재 칸은 채운 아이콘 + 진한 글자 700, 다른 칸은 선 아이콘 + 보조 글자 500
+    const nav = page.locator('#designBoard-c-shell .ui-bottom-nav');
+    const current = nav.getByRole('link', { name: '일정' });
+    await expect(current).toHaveAttribute('aria-current', 'page');
+    expect(await styles(current, ['color', 'font-weight'])).toEqual({ color: 'rgb(26, 28, 32)', 'font-weight': '700' });
+    const other = nav.getByRole('link', { name: '오늘' });
+    expect(await styles(other, ['color', 'font-weight'])).toEqual({ color: 'rgb(85, 93, 109)', 'font-weight': '500' });
+    expect(await current.locator('svg [fill="currentColor"]').count()).toBeGreaterThan(0);
+    expect(await other.locator('svg [fill="currentColor"]').count()).toBe(0);
+
+    // 긴급 칸: 빨간 알약 없이 긴급 빨강 아이콘 + 글자
+    const emergency = nav.getByRole('link', { name: '긴급 연락' });
+    expect((await styles(emergency, ['color'])).color).toBe('rgb(200, 16, 46)');
+    await expect(emergency.locator('.ui-nav-pill')).toHaveCount(0);
+  });
 });

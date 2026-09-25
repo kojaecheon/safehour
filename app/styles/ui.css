@@ -127,9 +127,8 @@
   transform: translateX(-50%);
   width: 100%;
   max-width: var(--shell-max);
-  background: var(--surface);
+  background: var(--layer-default);
   border-top: 1px solid var(--line-strong);
-  box-shadow: var(--shadow-sheet);
   padding-bottom: env(safe-area-inset-bottom);
 }
 .ui-bottom-nav ul {
@@ -139,69 +138,42 @@
   list-style: none;
   height: var(--nav-height);
 }
+/* 칸 (SEED Bottom Navigation) — 선 아이콘 24px + 보조 글자 500.
+   현재 칸은 채운 아이콘 + 진한 글자 700 — 모양·굵기·색이 함께 바뀐다(색 단독 금지). aria-current 로 스크린리더에도 알린다 */
 .ui-bottom-nav a {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: var(--space-0-5);
   height: 100%;
   min-height: var(--tap-min);
   font-size: var(--text-caption);
   font-weight: var(--weight-medium);
-  line-height: 1.2;
+  line-height: var(--lh-caption);
   color: var(--ink-soft);
   text-align: center;
+  transition: transform var(--duration-fast) var(--ease-press);
 }
-/* 긴급 칸 — 다른 칸과 성격이 다르다. 긴급 전용 색 + 채운 알약 + 문구 세 겹으로 구분한다.
-   판정 상태 색(동행·대기·미추천)과 섞이지 않는다(spec 7장 · DESIGN_SYSTEM 2.1). */
+@media (prefers-reduced-motion: no-preference) {
+  .ui-bottom-nav a:active { transform: scale(var(--press-scale-tight)); }
+}
+.ui-bottom-nav a[aria-current='page'] {
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+/* 긴급 칸 — 긴급 빨강 아이콘 + 글자로 다른 칸과 가른다(흰 바탕 5.88:1). 판정 상태 색과 섞이지 않는다 */
 .ui-bottom-nav a.is-emergency {
   color: var(--emergency);
 }
-.ui-bottom-nav a.is-emergency .ui-nav-pill {
-  background: var(--emergency);
-  color: var(--emergency-ink);
-}
 .ui-bottom-nav a.is-emergency[aria-current='page'] {
   color: var(--emergency-strong);
-  font-weight: var(--weight-heavy);
 }
-.ui-bottom-nav a.is-emergency[aria-current='page'] .ui-nav-pill {
-  background: var(--emergency-strong);
-}
-.ui-bottom-nav a.is-emergency[aria-current='page']::before {
-  background: var(--emergency-strong);
-}
-.ui-nav-pill {
+.ui-nav-icon {
   display: inline-grid;
   place-items: center;
-  width: 52px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  transition: background-color var(--duration-fast) var(--ease-out);
-}
-/* 현재 화면: 포인트 색 + 굵기 + 알약 바탕 + 윗줄 (색 단독 금지). aria-current 로 스크린리더에도 알린다 */
-.ui-bottom-nav a[aria-current='page'] {
-  color: var(--accent-strong);
-  font-weight: var(--weight-heavy);
-}
-.ui-bottom-nav a[aria-current='page'] .ui-nav-pill {
-  background: var(--accent-soft);
-}
-.ui-bottom-nav a[aria-current='page']::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: 36px;
-  height: 3px;
-  transform: translateX(-50%);
-  border-radius: 0 0 3px 3px;
-  background: var(--accent);
-}
-.ui-bottom-nav a:hover .ui-nav-pill {
-  background: var(--surface-alt);
+  width: 24px;
+  height: 24px;
 }
 
 /* 시안 보드용 미리보기 — 고정하지 않고 제자리에 그린다 */

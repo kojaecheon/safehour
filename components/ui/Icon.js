@@ -4,6 +4,7 @@
 // - 아이콘은 **보조 신호**다. 상태·배지·출처는 늘 문구와 함께 쓴다(색·모양만으로 구분하지 않는다).
 // - 장식이므로 aria-hidden 이다. 뜻은 옆의 문구가 전한다.
 // - 선 색은 currentColor — 글자 색을 따라가므로 대비는 글자 대비와 같다.
+// - 이름이 Fill 로 끝나면 채운 모양이다(하단 내비 현재 칸 — SEED 는 현재 칸을 채운 아이콘으로 보인다).
 
 const PATHS = {
   // 셸
@@ -20,6 +21,12 @@ const PATHS = {
   close: <path d="M6 6l12 12M18 6 6 18" />,
   phone: (
     <path d="M6.6 3.5h2.6l1.6 4.2-2.1 1.4a11.5 11.5 0 0 0 6.2 6.2l1.4-2.1 4.2 1.6v2.6a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2Z" />
+  ),
+  phoneFill: (
+    <path
+      fill="currentColor"
+      d="M6.6 3.5h2.6l1.6 4.2-2.1 1.4a11.5 11.5 0 0 0 6.2 6.2l1.4-2.1 4.2 1.6v2.6a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2Z"
+    />
   ),
   lock: (
     <>
@@ -56,6 +63,35 @@ const PATHS = {
       <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8" />
       <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8" />
       <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8" />
+    </>
+  ),
+  navTodayFill: (
+    <>
+      <circle cx="12" cy="12" r="4.5" fill="currentColor" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" />
+    </>
+  ),
+  navTripFill: (
+    <>
+      <path d="M8 3v3.5M16 3v3.5" />
+      <path stroke="none" fill="currentColor" d="M6 4.5h12a3 3 0 0 1 3 3v2H3v-2a3 3 0 0 1 3-3Z" />
+      <path stroke="none" fill="currentColor" d="M3 11h18v7a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3Z" />
+    </>
+  ),
+  navConditionsFill: (
+    <>
+      <path d="M4 6.5h9M17 6.5h3M4 12h3M11 12h9M4 17.5h11M19 17.5h1" />
+      <circle cx="15" cy="6.5" r="2.5" fill="currentColor" />
+      <circle cx="9" cy="12" r="2.5" fill="currentColor" />
+      <circle cx="17" cy="17.5" r="2.5" fill="currentColor" />
+    </>
+  ),
+  navMoreFill: (
+    <>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.8" fill="currentColor" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8" fill="currentColor" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8" fill="currentColor" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8" fill="currentColor" />
     </>
   ),
   // 상태 — 모양이 서로 달라 색을 못 보는 사람도 구분할 수 있다

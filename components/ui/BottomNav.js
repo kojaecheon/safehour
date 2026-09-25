@@ -5,7 +5,7 @@
 // 긴급은 내비 칸이다 — 떠 있는 버튼은 본문 위에 얹혀 누를 수 있는 요소를 덮었다(중국어 선택 칸 41% 등).
 // 내비가 없는 로그인 전 흐름에서는 앱 셸이 떠 있는 버튼을 대신 그린다.
 //
-// - 현재 화면은 aria-current="page" + 포인트 색 + 굵기 + 알약 바탕 + 윗줄로 표시한다(색 단독 금지).
+// - 현재 화면은 aria-current="page" + 채운 아이콘 + 진한 글자 + 굵기로 표시한다(색 단독 금지 · SEED Bottom Navigation).
 // - 하위 화면도 해당 탭을 현재로 본다(예: /trip/2026-10-03 · /place/… → 일정, /link → 조건).
 // - /design-board 는 내비에 넣지 않는다(spec 7장).
 
@@ -56,8 +56,9 @@ export default function BottomNav({ pathname, preview = false }) {
               aria-label={item.emergency ? t('common.emergency') : undefined}
               aria-current={active === item.href ? 'page' : undefined}
             >
-              <span className="ui-nav-pill">
-                <Icon name={item.icon} size={22} />
+              {/* 현재 칸은 채운 아이콘 — 선 아이콘과 모양이 달라 색 없이도 구분된다 */}
+              <span className="ui-nav-icon">
+                <Icon name={active === item.href ? `${item.icon}Fill` : item.icon} size={24} />
               </span>
               <span>{t(item.key)}</span>
             </Link>
