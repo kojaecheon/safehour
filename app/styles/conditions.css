@@ -78,7 +78,7 @@
   min-height: 28px;
   padding: 2px var(--space-2);
   border: 1px solid var(--line-input);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-8);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
   color: var(--ink);
@@ -116,7 +116,7 @@
   border: 1px solid var(--line-strong);
   border-left: 4px solid var(--ink-soft);
   background: var(--surface-alt);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   padding: var(--space-3) var(--space-4);
   font-size: var(--text-body);
   line-height: var(--leading-body);
@@ -141,7 +141,7 @@
 .conditions-error-summary {
   border: 1px solid var(--emergency);
   border-left-width: 6px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-4);
@@ -176,7 +176,7 @@
   min-height: 28px;
   padding: 2px var(--space-2);
   border: 1px dashed var(--state-standby-ink);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-8);
   background: var(--state-standby-bg);
   color: var(--state-standby-ink);
   font-size: var(--text-caption);
@@ -205,7 +205,7 @@
   gap: var(--space-2);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--state-together-bg);
   color: var(--state-together-ink);
   font-weight: var(--weight-medium);
@@ -233,7 +233,7 @@
   gap: var(--space-3);
 }
 .conditions-period {
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   padding: var(--space-4);
   background: var(--surface);
   min-width: 0;
@@ -321,7 +321,7 @@
   gap: 6px;
   min-height: 28px;
   padding: 2px var(--space-2);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-8);
   border: 1px solid transparent;
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
@@ -398,7 +398,7 @@
 .conditions-med-row {
   padding: var(--space-3);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
 }
 .conditions-med-row .field {
   margin-bottom: var(--space-2);
@@ -410,7 +410,7 @@
 }
 .conditions-day {
   border: 1px dotted var(--source-estimate);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface-alt);
   padding: var(--space-4);
 }
@@ -524,7 +524,7 @@
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   border: 1px solid var(--state-together-line);
   background: var(--state-together-bg);
   color: var(--state-together-ink);
@@ -564,7 +564,7 @@
   min-height: 28px;
   padding: 2px var(--space-2);
   border: 1px solid var(--state-standby-ink);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-8);
   background: var(--state-standby-bg);
   color: var(--state-standby-ink);
   font-size: var(--text-caption);

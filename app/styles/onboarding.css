@@ -55,7 +55,7 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line-strong);
   border-left: 4px solid var(--ink-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface-alt);
 }
 .onboarding-safety p {
@@ -78,7 +78,7 @@
 .onboarding-hero-art {
   aspect-ratio: 16 / 9;
   margin-bottom: var(--space-5);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-24);
   overflow: hidden;
   background: var(--art-sky);
 }
@@ -118,7 +118,7 @@
   min-height: 48px;
   padding: 0 var(--space-3);
   border: 1px solid var(--line-input);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
@@ -158,7 +158,7 @@
   gap: var(--space-3);
   padding: var(--space-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface);
   box-shadow: var(--shadow-card);
 }
@@ -167,7 +167,7 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -224,7 +224,7 @@
   width: 56px;
   height: 56px;
   margin-bottom: var(--space-4);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -299,7 +299,7 @@
   height: var(--tap-min);
   padding: 0;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: none;
   font-family: inherit;
   cursor: default;
@@ -312,7 +312,7 @@
   place-items: center;
   width: 34px;
   height: 34px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   border: 2px solid var(--line-input);
   background: var(--surface);
   color: var(--ink);
@@ -373,7 +373,7 @@
   margin: 0 0 var(--space-4);
   padding: var(--space-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface);
   box-shadow: var(--shadow-card);
   scroll-margin-top: 88px;
@@ -495,7 +495,7 @@ fieldset.onboarding-card {
   margin-bottom: var(--space-5);
   padding: var(--space-4);
   border: 2px solid var(--support-ink);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--support-soft);
   scroll-margin-top: 88px;
 }
@@ -572,7 +572,7 @@ fieldset.onboarding-card {
   min-height: var(--tap-min);
   padding: var(--space-3);
   border: 1px solid var(--line-input);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
@@ -601,7 +601,7 @@ fieldset.onboarding-card {
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--accent);
   border-left-width: 4px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--accent-soft);
 }
 .onboarding-picked-caption {
@@ -631,7 +631,7 @@ fieldset.onboarding-card {
   margin-top: var(--space-2);
   padding: var(--space-3);
   border: 1px dotted var(--ink-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface-alt);
 }
 .onboarding-estimate p {
@@ -657,7 +657,7 @@ fieldset.onboarding-card {
   align-items: center;
   min-height: var(--tap-min);
   padding: 0 var(--space-4);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent-strong);
   font-size: var(--text-body);
@@ -679,7 +679,7 @@ fieldset.onboarding-card {
   min-height: var(--tap-min);
   padding: 0 var(--space-4) 0 var(--space-3);
   border: 1px solid var(--line-input);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--ink);
   font-size: var(--text-body);

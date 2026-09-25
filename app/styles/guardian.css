@@ -44,7 +44,7 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line-strong);
   border-left: 4px solid var(--ink-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface-alt);
 }
 .guardian-note-icon {
@@ -89,7 +89,7 @@
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--state-standby-line);
   border-left: 4px solid var(--state-standby-ink);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--state-standby-bg);
   color: var(--ink);
   font-size: var(--text-body);
@@ -143,7 +143,7 @@
   padding: var(--space-4);
   border: 1px solid var(--accent);
   border-left: 6px solid var(--accent);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--accent-soft);
 }
 .guardian-resend h2 {
@@ -157,7 +157,7 @@
 }
 .guardian-sent {
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface-alt);
 }
 .guardian-link-field {
@@ -209,7 +209,7 @@
 }
 .guardian-asof {
   padding: var(--space-4);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--state-split-bg);
   border: 1px solid var(--state-split-line);
 }
@@ -245,7 +245,7 @@
   min-height: 52px;
   padding: var(--space-3) var(--space-4);
   border: 2px solid var(--emergency);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--ink);
   font-size: var(--text-body);
@@ -283,7 +283,7 @@
   display: grid;
   gap: var(--space-1);
   padding: var(--space-3);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface-alt);
 }
 .guardian-return-time {

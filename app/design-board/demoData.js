@@ -30,6 +30,23 @@ export const CONTRAST_GROUPS = [
     ],
   },
   {
+    // ②층 부품이 쓰는 조합 — 눌린 면·고른 칩·비활성 글자·스위치·긴급 글자
+    key: 'designBoard.groupParts',
+    pairs: [
+      { fg: '--ink', bg: '--pressed' },
+      { fg: '--ink', bg: '--pressed-weak' },
+      { fg: '--ink-soft', bg: '--pressed' },
+      { fg: '--line-input', bg: '--pressed', ui: true },
+      { fg: '--line-contrast', bg: '--surface-alt', ui: true },
+      // 비활성 버튼 글자 — WCAG 는 비활성을 대비 기준에서 빼지만, 무엇이 적혔는지는 읽혀야 해서 3:1 을 지킨다(설계서 5.1)
+      { fg: '--ink-subtle', bg: '--surface-alt', ui: true },
+      { fg: '--selected', bg: '--bg', ui: true },
+      // 스위치 — 끔 트랙 위 흰 알맹이
+      { fg: '--on-dark', bg: '--ink-subtle', ui: true },
+      { fg: '--emergency', bg: '--bg' },
+    ],
+  },
+  {
     key: 'designBoard.groupAccent',
     pairs: [
       { fg: '--accent-ink', bg: '--accent' },
@@ -89,7 +106,7 @@ export const SPACING = [
   '--space-0-5', '--space-1', '--space-1-5', '--space-2', '--space-3', '--space-4', '--space-5',
   '--space-6', '--space-8', '--space-10', '--space-12', '--space-14',
 ];
-/** SEED 모서리 단계 — 기존 다섯 개(--radius-xs … --radius-pill)는 ②층에서 옮긴 뒤 지운다 */
+/** SEED 모서리 단계 */
 export const RADII = ['--radius-6', '--radius-8', '--radius-10', '--radius-12', '--radius-16', '--radius-20', '--radius-24', '--radius-full'];
 export const SHADOWS = ['--shadow-card', '--shadow-float', '--shadow-sheet'];
 

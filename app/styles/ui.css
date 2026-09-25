@@ -27,7 +27,7 @@
   width: 32px;
   height: 32px;
   flex: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--badge-readonly-bg);
   color: var(--on-dark);
 }
@@ -48,7 +48,7 @@
 }
 .ui-readonly.is-preview {
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
 }
 .ui-readonly-login {
   display: inline-flex;
@@ -71,7 +71,7 @@
   gap: var(--space-2);
   min-height: 48px;
   padding: 0 var(--space-5) 0 var(--space-4);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--emergency);
   color: var(--emergency-ink);
   font-size: var(--text-body);
@@ -98,7 +98,7 @@
   place-items: center;
   width: 28px;
   height: 28px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--emergency-strong);
 }
 
@@ -180,7 +180,7 @@
   place-items: center;
   width: 52px;
   height: 28px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   transition: background-color var(--duration-fast) var(--ease-out);
 }
 /* 현재 화면: 포인트 색 + 굵기 + 알약 바탕 + 윗줄 (색 단독 금지). aria-current 로 스크린리더에도 알린다 */
@@ -221,7 +221,7 @@
 .ui-bottom-nav.is-preview {
   z-index: auto;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   overflow: hidden;
   box-shadow: none;
   padding-bottom: 0;
@@ -267,7 +267,7 @@
 /* ───────────────────────── 출처 영역 ───────────────────────── */
 /* 다섯 출처는 머리글 문구 + 아이콘 + 테두리 모양으로 나뉜다. 한 영역에 두 출처를 섞지 않는다. */
 .ui-source {
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   padding: var(--space-3) 14px 14px;
   margin-bottom: var(--space-3);
   background: var(--surface);
@@ -332,7 +332,7 @@
   align-items: center;
   gap: var(--space-1);
   padding: 2px var(--space-2);
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-8);
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
   line-height: 1.3;
@@ -369,7 +369,7 @@
   min-height: 92px;
   padding: var(--space-2) 6px;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface);
   color: var(--ink);
   font-family: inherit;
@@ -402,7 +402,7 @@
   place-items: center;
   width: 24px;
   height: 24px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--surface);
   border: 1px solid currentColor;
 }
@@ -415,7 +415,7 @@
   place-items: center;
   width: 24px;
   height: 24px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--source-hospital);
   border: 1px solid currentColor;
@@ -507,7 +507,7 @@
   height: 32px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--surface);
   border: 4px solid var(--tl-line);
   color: var(--ink);
@@ -522,13 +522,13 @@
 .ui-tl-meal .ui-tl-marker { border-width: 4px; }
 /* 종착역(복귀 마감): 노선 색 사각 면 + 깃발 */
 .ui-tl-return .ui-tl-marker {
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-8);
   background: var(--tl-line);
   color: var(--accent-ink);
 }
 /* 노선 밖 고정 블록: 먹색 사각(병원) · 흰 원(복약·휴식) */
 .ui-tl-appointment .ui-tl-marker {
-  border-radius: var(--radius-xs);
+  border-radius: var(--radius-8);
   border-color: var(--ink);
   background: var(--ink);
   color: var(--on-dark);
@@ -594,7 +594,7 @@
   align-items: center;
   gap: var(--space-1);
   padding: 2px 10px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--tl-line);
   color: var(--accent-ink);
   font-size: var(--text-caption);
@@ -605,7 +605,7 @@
   position: relative;
   background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-24);
   overflow: hidden;
   box-shadow: var(--shadow-card);
 }
@@ -627,7 +627,7 @@
   align-items: center;
   gap: var(--space-1);
   padding: 3px 10px;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--ink);
   font-size: var(--text-caption);
@@ -703,7 +703,7 @@
 .ui-place.is-compact {
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
 }
 .ui-place.is-compact .ui-place-media {
   aspect-ratio: auto;
@@ -741,7 +741,7 @@
 /* ───────────────────────── 식사 칸 ───────────────────────── */
 .ui-meal {
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   padding: var(--space-3) 14px;
   background: var(--surface);
 }
@@ -809,7 +809,7 @@
   min-height: 48px;
   padding: var(--space-2) 10px;
   border: 1px solid var(--line-input);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface);
   color: var(--ink);
   font-weight: var(--weight-medium);
@@ -871,7 +871,7 @@
 
 /* ───────────────────────── 조건 기간 편집기 틀 ───────────────────────── */
 .ui-period {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-24);
   padding: var(--space-4);
   margin-bottom: var(--space-4);
   background: var(--surface);
@@ -927,7 +927,7 @@
   width: 40px;
   height: 4px;
   margin: calc(var(--space-3) * -1) auto var(--space-3);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--line-strong);
 }
 .ui-sheet-head {
@@ -952,7 +952,7 @@
   flex: none;
   margin: 0 calc(var(--space-2) * -1) 0 0;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--surface-alt);
   color: var(--ink);
   cursor: pointer;
@@ -971,7 +971,7 @@
   text-align: center;
   gap: var(--space-2);
   padding: var(--space-8) var(--space-4);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-24);
   background: var(--surface-alt);
 }
 .ui-empty-art {
@@ -980,7 +980,7 @@
   width: 64px;
   height: 64px;
   margin-bottom: var(--space-2);
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -997,7 +997,7 @@
 
 /* ───────────────────────── 한국어 안내 카드 ───────────────────────── */
 .ui-kcard {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-24);
   background: var(--surface);
   border: 1px solid var(--line-strong);
   box-shadow: var(--shadow-card);
@@ -1029,7 +1029,6 @@
   font-size: var(--text-korean-card);
   font-weight: var(--weight-heavy);
   line-height: 1.35;
-  letter-spacing: -0.01em;
   word-break: keep-all;
 }
 .ui-kcard-korean p {

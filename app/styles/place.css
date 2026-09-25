@@ -30,7 +30,7 @@
   gap: var(--space-2);
   padding: var(--space-4);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface);
 }
 .place-block h2 {
@@ -98,7 +98,7 @@
 }
 .place-photos img {
   width: 100%;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
 }
 .place-photos figcaption {
   margin-top: var(--space-1);

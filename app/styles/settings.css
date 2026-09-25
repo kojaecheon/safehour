@@ -39,7 +39,7 @@
   min-height: 64px;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface);
   color: var(--ink);
   text-decoration: none;
@@ -54,7 +54,7 @@
   width: 40px;
   height: 40px;
   flex: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-full);
   background: var(--accent-soft);
   color: var(--accent-strong);
 }
@@ -108,7 +108,7 @@
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
   border-left: 4px solid var(--ink-soft);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
   background: var(--surface-alt);
 }
 .settings-effects {

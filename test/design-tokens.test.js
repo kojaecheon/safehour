@@ -6,7 +6,7 @@
 
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { CONTRAST_GROUPS } from '../app/design-board/demoData.js';
 
 const css = await readFile(new URL('../app/globals.css', import.meta.url), 'utf8');
@@ -186,7 +186,7 @@ describe('간격·모서리·그림자·움직임 (설계서 4.3–4.6)', () => 
     assert.equal(value('--tap-min'), '44px');
   });
 
-  test('모서리 — SEED 단계 토큰을 더했고 기존 토큰은 ②층까지 남아 있다', () => {
+  test('모서리 — SEED 단계 토큰만 있고 옛 토큰은 지웠다', () => {
     const seed = {
       '--radius-6': '6px',
       '--radius-8': '8px',
@@ -199,7 +199,7 @@ describe('간격·모서리·그림자·움직임 (설계서 4.3–4.6)', () => 
     };
     for (const [name, v] of Object.entries(seed)) assert.equal(value(name), v, name);
     for (const old of ['--radius-xs', '--radius-sm', '--radius', '--radius-lg', '--radius-pill']) {
-      assert.ok(TOKENS.has(old), `${old} 는 ②층에서 옮긴 뒤 지운다`);
+      assert.ok(!TOKENS.has(old), `${old} 가 :root 에 남아 있다`);
     }
   });
 
@@ -250,6 +250,43 @@ describe('대비 — 시안 보드와 같은 짝 (WCAG 2.1 AA)', () => {
       '--line-contrast|--bg',
     ]) {
       assert.ok(all.includes(needed), `대비 목록에 ${needed} 가 없다`);
+    }
+  });
+});
+
+/** app/·components/ 아래에서 pattern 에 맞는 파일 URL 목록 */
+async function listFiles(dirs, pattern) {
+  const root = new URL('../', import.meta.url);
+  const out = [];
+  for (const dir of dirs) {
+    const entries = await readdir(new URL(`${dir}/`, root), { recursive: true });
+    for (const rel of entries) if (pattern.test(rel)) out.push(new URL(`${dir}/${rel}`, root));
+  }
+  return out;
+}
+
+describe('②층 준비 — 옛 모서리 토큰 정리와 부품용 토큰', () => {
+  test('앱 코드가 옛 모서리 토큰을 부르지 않는다', async () => {
+    const offenders = [];
+    for (const file of await listFiles(['app', 'components'], /\.(css|js)$/)) {
+      const text = await readFile(file, 'utf8');
+      if (/var\(--radius(-xs|-sm|-lg|-pill)?\)/.test(text)) offenders.push(file.pathname);
+    }
+    assert.deepEqual(offenders, []);
+  });
+
+  test('부품용 새 토큰', () => {
+    assert.equal(value('--text-button-large'), '18px');
+    assert.equal(value('--text-title-sheet'), '22px');
+    assert.equal(value('--lh-title-sheet'), '30px');
+    assert.equal(value('--press-scale-wide'), '0.976');
+    assert.equal(value('--press-scale-tight'), '0.955');
+  });
+
+  test('제목에 자간을 따로 주지 않는다 (SEED 에는 자간이 없다)', async () => {
+    const ui = await readFile(new URL('../app/styles/ui.css', import.meta.url), 'utf8');
+    for (const [name, text] of [['globals.css', css], ['ui.css', ui]]) {
+      assert.doesNotMatch(text, /letter-spacing:\s*-0\.01em/, `${name} 에 -0.01em 자간이 남아 있다`);
     }
   });
 });

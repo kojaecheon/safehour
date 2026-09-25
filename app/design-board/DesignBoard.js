@@ -58,8 +58,13 @@ function parseColor(value) {
   if (m) return m[1].split('').map((c) => parseInt(c + c, 16));
   m = v.match(/^#([0-9a-f]{6})$/);
   if (m) return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
-  m = v.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/);
-  if (m) return [Number(m[1]), Number(m[2]), Number(m[3])];
+  m = v.match(/^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)(?:[\s,/]+([\d.]+)(%?))?\s*\)$/);
+  if (m) {
+    // 반투명 색은 뒤 바탕에 따라 대비가 달라 짝으로 잴 수 없다 — 잴 수 없다고 돌려준다(대비 짝에는 불투명 색만 쓴다)
+    const alpha = m[4] === undefined ? 1 : Number(m[4]) / (m[5] ? 100 : 1);
+    if (alpha < 1) return null;
+    return [Number(m[1]), Number(m[2]), Number(m[3])];
+  }
   return null;
 }
 
@@ -168,10 +173,10 @@ function Swatch({ pair, values }) {
       ) : (
         <p
           className={passed ? 'designBoard-verdict is-pass' : 'designBoard-verdict'}
-          data-verdict={ratio === null ? 'measuring' : passed ? 'pass' : 'fail'}
+          data-verdict={ratio === null ? (values ? 'fail' : 'measuring') : passed ? 'pass' : 'fail'}
         >
           {ratio === null ? (
-            t('designBoard.measuring')
+            t(values ? 'designBoard.unmeasurable' : 'designBoard.measuring')
           ) : (
             <>
               <Icon name={passed ? 'check' : 'close'} size={16} strokeWidth={2.6} />

@@ -56,7 +56,7 @@ const CARD = {
   color: 'var(--ink)',
   border: '1px solid var(--line-strong)',
   borderLeft: '4px solid var(--accent)',
-  borderRadius: 'var(--radius)',
+  borderRadius: 'var(--radius-16)',
   boxShadow: 'var(--shadow-float)',
 };
 
@@ -66,7 +66,7 @@ const ICON = {
   flex: 'none',
   width: '32px',
   height: '32px',
-  borderRadius: 'var(--radius-pill)',
+  borderRadius: 'var(--radius-full)',
   background: 'var(--accent-soft)',
   color: 'var(--accent-strong)',
 };
@@ -91,7 +91,7 @@ const CLOSE = {
   width: 'var(--tap-min)',
   height: 'var(--tap-min)',
   border: 0,
-  borderRadius: 'var(--radius-pill)',
+  borderRadius: 'var(--radius-full)',
   background: 'transparent',
   color: 'var(--ink-soft)',
   cursor: 'pointer',

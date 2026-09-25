@@ -88,7 +88,7 @@
   height: 88px;
   padding: var(--space-3);
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
 }
 /* UI 경계 짝은 글자 대신 굵은 테두리로 보여준다 */
 .designBoard-chip.is-ui {
@@ -162,7 +162,7 @@
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface-alt);
 }
 .designBoard-lang-name {
@@ -202,7 +202,7 @@
   min-width: 0;
   padding: var(--space-5) var(--space-4);
   border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-24);
   background: var(--surface);
 }
 .designBoard-sub > h3 {
@@ -279,7 +279,7 @@
 }
 .designBoard-shadows > li {
   padding: var(--space-5) var(--space-4);
-  border-radius: var(--radius);
+  border-radius: var(--radius-16);
   background: var(--surface);
   color: var(--ink-soft);
 }
@@ -302,7 +302,7 @@
   width: 100%;
   height: auto;
   aspect-ratio: 16 / 10;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-12);
 }
 
 /* ── 화면 시안 (AX-321) ──
@@ -335,7 +335,7 @@
   height: calc(var(--designBoard-phone-h) * var(--designBoard-scale));
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-24);
   background: var(--bg);
   box-shadow: var(--shadow-card);
 }

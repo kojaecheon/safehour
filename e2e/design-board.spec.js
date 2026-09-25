@@ -6,6 +6,7 @@
 
 import { test, expect } from './fixtures.js';
 import { HOSPITAL_NAME, LODGING_NAME, evidenceShot, expectNoHorizontalScroll, startTrip } from './helpers.js';
+import { CONTRAST_GROUPS } from '../app/design-board/demoData.js';
 
 test.describe('시나리오 11 — /design-board', () => {
   test('토큰·부품·화면 시안이 그려지고 사용자 데이터를 읽지 않는다', async ({ page }) => {
@@ -40,7 +41,9 @@ test.describe('시나리오 11 — /design-board', () => {
     await expect(verdicts.first()).toBeVisible();
     await expect(page.locator('[data-verdict="measuring"]')).toHaveCount(0);
     await expect(page.locator('[data-verdict="fail"]')).toHaveCount(0);
-    expect(await page.locator('[data-verdict="pass"]').count()).toBeGreaterThanOrEqual(30);
+    // 잴 짝(장식 제외) 수와 통과 수가 같아야 한다 — 짝이 늘거나 줄면 이 수도 따라간다
+    const measured = CONTRAST_GROUPS.flatMap((group) => group.pairs).filter((pair) => pair.fg && !pair.decorative).length;
+    await expect(page.locator('[data-verdict="pass"]')).toHaveCount(measured);
     // SEED 층 짝이 보드에 그려진다
     await expect(page.getByRole('heading', { name: '층·선택·아이콘 (SEED)', level: 3 })).toBeVisible();
     await expectNoHorizontalScroll(page, '/design-board');
