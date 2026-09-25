@@ -254,4 +254,60 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
       (await styles(page.locator('#designBoard-c-empty .ui-empty'), ['background-color']))['background-color'],
     ).toBe('rgba(0, 0, 0, 0)');
   });
+
+  test('그릇 — 목록 행 높이·눌림, 흰 블록, 회색 바탕 층, 장소 카드 (설계서 5.5)', async ({ page }) => {
+    await pointerAway(page);
+    const list = page.locator('#designBoard-c-list');
+    const rows = list.locator('.ui-list-item');
+    await expect(rows).toHaveCount(3);
+
+    // 제목만이면 46px, 설명까지 66px 안팎. 설명은 14px 보조 글자
+    expect(Math.round((await rows.nth(2).boundingBox()).height)).toBe(46);
+    const withDesc = (await rows.nth(0).boundingBox()).height;
+    expect(withDesc).toBeGreaterThanOrEqual(62);
+    expect(withDesc).toBeLessThanOrEqual(70);
+    expect(await styles(rows.nth(0).locator('.ui-list-item-desc'), ['font-size', 'color'])).toEqual({
+      'font-size': '14px',
+      color: 'rgb(85, 93, 109)',
+    });
+
+    // 눌림: 바탕이 좌우 6px 안으로 들어온 모서리 10 면
+    const row = rows.nth(1);
+    const before = (property) => row.evaluate((el, p) => getComputedStyle(el, '::before').getPropertyValue(p), property);
+    await row.hover();
+    await page.mouse.down();
+    await expect.poll(() => before('background-color')).toBe('rgba(0, 0, 0, 0.027)');
+    expect([await before('left'), await before('right'), await before('border-top-left-radius')]).toEqual([
+      '6px',
+      '6px',
+      '10px',
+    ]);
+    await page.mouse.up();
+    await pointerAway(page);
+
+    // 흰 블록: 흰 면, 모서리·그림자 없음
+    expect(
+      await styles(list.locator('.ui-block').first(), ['background-color', 'box-shadow', 'border-top-left-radius']),
+    ).toEqual({ 'background-color': 'rgb(255, 255, 255)', 'box-shadow': 'none', 'border-top-left-radius': '0px' });
+
+    // 회색 바탕 층: main.page.is-basement 는 회색 면이고 그 안에서 카드 그림자를 끈다
+    const main = page.locator('main.page');
+    await main.evaluate((el) => el.classList.add('is-basement'));
+    expect(
+      await main.evaluate((el) => [
+        getComputedStyle(el).backgroundColor,
+        getComputedStyle(el).getPropertyValue('--shadow-card').trim(),
+      ]),
+    ).toEqual(['rgb(243, 244, 245)', 'none']);
+    await main.evaluate((el) => el.classList.remove('is-basement'));
+
+    // 장소 카드: 모서리 16 · 그림자 없음 · 1px 카드 테두리
+    expect(
+      await styles(page.locator('#designBoard-c-place .ui-place').first(), [
+        'border-top-left-radius',
+        'box-shadow',
+        'border-top-color',
+      ]),
+    ).toEqual({ 'border-top-left-radius': '16px', 'box-shadow': 'none', 'border-top-color': 'rgb(220, 222, 227)' });
+  });
 });

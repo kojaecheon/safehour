@@ -396,3 +396,11 @@
   line-height: var(--leading-snug);
   color: var(--ink-soft);
 }
+
+/* 회색 바탕 견본 — 흰 블록(.ui-block)의 음수 여백이 이 틀 안에서 끝나게 좌우 여백을 준다 */
+.designBoard-basement {
+  padding: var(--space-2) var(--gutter) 0;
+  background: var(--layer-basement);
+  border-radius: var(--radius-16);
+  overflow: hidden;
+}

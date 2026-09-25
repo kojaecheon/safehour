@@ -26,6 +26,9 @@ import {
   EmptyState,
   Icon,
   KoreanCard,
+  ListGroup,
+  ListHeader,
+  ListItem,
   MealSlot,
   PeriodEditor,
   PlaceCard,
@@ -485,6 +488,41 @@ export default function DesignBoard() {
                   </li>
                 ))}
               </ul>
+            </Sub>
+
+            <Sub id="designBoard-c-list" title={t('designBoard.cList')} wide>
+              <div className="designBoard-basement">
+                <section className="ui-block" aria-labelledby="designBoard-list-h">
+                  <ListHeader as="h4" id="designBoard-list-h">
+                    {t('designBoard.listHeader')}
+                  </ListHeader>
+                  <ListGroup>
+                    <li>
+                      <ListItem
+                        title={t('designBoard.listTitle')}
+                        description={t('designBoard.listDesc')}
+                        leading={<Icon name="navTrip" size={22} />}
+                        trailing="chevron"
+                        href="#designBoard-c-list"
+                      />
+                    </li>
+                    <li>
+                      <ListItem
+                        title={t('designBoard.listTitle2')}
+                        leading={<Icon name="globe" size={22} />}
+                        trailing={<span lang="ko">{LANG_NAMES.ko}</span>}
+                        onClick={() => {}}
+                      />
+                    </li>
+                    <li>
+                      <ListItem title={t('designBoard.listTitle3')} />
+                    </li>
+                  </ListGroup>
+                </section>
+                <section className="ui-block">
+                  <p>{t('designBoard.blockBody')}</p>
+                </section>
+              </div>
             </Sub>
 
             <Sub id="designBoard-c-meal" title={t('designBoard.cMeal')}>

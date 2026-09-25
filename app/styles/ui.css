@@ -614,13 +614,13 @@
 }
 
 /* ───────────────────────── 장소 카드 ───────────────────────── */
+/* 장소 카드 — 누르는 대상이라 카드로 둔다(SEED: 모서리 16 · 그림자 없음 · 1px 카드 테두리). 그림은 카드 가장자리에 붙는다 */
 .ui-place {
   position: relative;
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-24);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-16);
   overflow: hidden;
-  box-shadow: var(--shadow-card);
 }
 .ui-place-media {
   position: relative;
@@ -1114,4 +1114,124 @@
 }
 .ui-kcard-extra {
   padding: 0 var(--space-4) var(--space-4);
+}
+
+/* ───────────────────────── 바탕 층 · 흰 블록 · 목록 (SEED layer · List) ─────────────────────────
+ * 구역이 여럿인 화면: main.page 에 is-basement 를 주면 회색 바탕 위에 흰 블록(.ui-block)을 8px 틈으로 쌓는다.
+ * 회색 바탕에서는 카드 그림자가 필요 없다 — 이 범위에서 --shadow-card 를 끈다(설계서 4.5). 화면에 켜는 일은 ③층이다. */
+main.page.is-basement {
+  background: var(--layer-basement);
+  --shadow-card: none;
+}
+.ui-block {
+  margin: 0 calc(var(--gutter) * -1) var(--gap-section);
+  padding: var(--space-5) var(--gutter);
+  background: var(--layer-default);
+}
+.ui-block > :last-child {
+  margin-bottom: 0;
+}
+/* 목록 행을 담은 블록은 행이 좌우 여백을 스스로 갖는다 */
+.ui-block:has(> .ui-list) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ui-list {
+  list-style: none;
+}
+/* 반복 행 사이 1px 선 — 좌우 16px 들여씀(장식) */
+.ui-list > li + li::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 0 var(--gutter);
+  background: var(--line);
+}
+.ui-list-header {
+  margin: 0;
+  padding: var(--space-2) var(--gutter);
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.ui-list-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--gutter);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+.ui-list-item.is-interactive {
+  cursor: pointer;
+}
+/* 눌림 — 바탕이 좌우 6px 안으로 들어온 모서리 10 면. 내용만 줄어든다 */
+.ui-list-item.is-interactive::before {
+  content: '';
+  position: absolute;
+  inset: 0 6px;
+  border-radius: var(--radius-10);
+  background: transparent;
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.ui-list-item.is-interactive:active::before {
+  background: var(--pressed-transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-list-item.is-interactive:hover::before { background: var(--pressed-transparent); }
+}
+.ui-list-item.is-interactive:focus-visible {
+  outline-offset: -2px;
+}
+.ui-list-item-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 22px;
+  transition: transform var(--duration-fast) var(--ease-press);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-list-item.is-interactive:active .ui-list-item-inner { transform: scale(var(--press-scale-wide)); }
+}
+.ui-list-item-leading {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  color: var(--ink);
+}
+.ui-list-item-text {
+  display: grid;
+  gap: var(--space-0-5);
+  flex: 1;
+  min-width: 0;
+}
+.ui-list-item-title {
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-regular);
+  color: var(--ink);
+}
+.ui-list-item-desc {
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  color: var(--ink-soft);
+}
+.ui-list-item-trailing {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--ink-soft);
+}
+/* 화살표는 아이콘이라 --ink-subtle(흰 바탕 3.42:1) — 글자에는 쓰지 않는다 */
+.ui-list-item-trailing > .ui-icon {
+  color: var(--ink-subtle);
 }
