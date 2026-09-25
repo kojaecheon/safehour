@@ -275,9 +275,10 @@ svg.ui-icon {
 .app-shell[data-nav='on'] {
   --nav-offset: calc(var(--nav-height) + env(safe-area-inset-bottom));
 }
-/* 하단 긴급 바도 내비와 같은 자리를 차지한다 — 고정 요소와 본문 여백이 같은 값을 쓰게 한다 */
+/* 하단 긴급 바도 내비와 같은 자리를 차지한다 — 고정 요소와 본문 여백이 같은 값을 쓰게 한다.
+   바 높이 = 위아래 8 + 긴급 버튼 52 + 윗선 1 = 69px */
 .app-shell[data-emergency-bar='on'] {
-  --nav-offset: calc(64px + env(safe-area-inset-bottom));
+  --nav-offset: calc(69px + env(safe-area-inset-bottom));
 }
 
 main.page {
@@ -522,7 +523,9 @@ input[readonly] {
   background: var(--accent-soft);
 }
 
-/* ── 버튼 ── 주 버튼은 포인트 색 알약, 보조는 흰 면 + 테두리, 조용한 버튼은 밑줄 글자 */
+/* ── 버튼 (SEED Action Button) ──
+   큰 CTA 52px · 모서리 12 · 18/24 굵게. 작은 버튼 44px · 모서리 8 · 16/22 굵게(SEED 36·40px 은 터치 하한으로 올림).
+   채운 강조 버튼(주·critical)은 화면당 하나. 눌림은 면 색만 바꾸고 2px 만큼 줄어든다(설계서 4.6). */
 .btn {
   display: flex;
   align-items: center;
@@ -530,58 +533,74 @@ input[readonly] {
   gap: var(--space-2);
   width: 100%;
   min-height: 52px;
-  padding: 14px var(--space-5);
-  font-size: var(--text-button);
+  padding: var(--space-3) var(--space-5);
+  font-size: var(--text-button-large);
   font-weight: var(--weight-bold);
   font-family: inherit;
-  line-height: var(--leading-snug);
+  line-height: var(--lh-title-3);
   text-align: center;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-12);
   border: 1px solid transparent;
   cursor: pointer;
   background: var(--accent);
   color: var(--accent-ink);
-  transition: background-color var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out);
+  transition:
+    background-color var(--duration-fast) var(--ease-color),
+    transform var(--duration-fast) var(--ease-press);
 }
-.btn:hover { background: var(--accent-strong); }
-@media (prefers-reduced-motion: no-preference) {
-  .btn:active { transform: scale(0.98); }
+.btn:active { background: var(--accent-strong); }
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover { background: var(--accent-strong); }
 }
-/* 비활성 — 투명도 대신 색 교체로 글자 대비(6.01:1)를 유지한다 */
-.btn:disabled,
-.btn[aria-disabled='true'] {
-  background: var(--surface-alt);
-  color: var(--ink-soft);
-  border-color: var(--line-strong);
-  cursor: not-allowed;
-  transform: none;
-}
-.btn-secondary {
-  background: var(--surface);
-  color: var(--ink);
-  border-color: var(--line-input);
-}
-.btn-secondary:hover { background: var(--surface-alt); }
-.btn-quiet {
-  background: transparent;
-  color: var(--accent-strong);
-  text-decoration: underline;
-  text-underline-offset: 4px;
-  text-decoration-thickness: 1px;
-}
-.btn-quiet:hover { background: var(--accent-soft); }
 .btn-small {
   min-height: var(--tap-min);
-  font-size: var(--text-body);
   width: auto;
-  padding: 10px var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-button);
+  line-height: var(--lh-body);
+  border-radius: var(--radius-8);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn:active { transform: scale(var(--press-scale-wide)); }
+  .btn-small:active { transform: scale(var(--press-scale-tight)); }
+}
+
+/* 보조 (SEED neutralWeak) — 회색 채움. 흰 바탕 + 테두리를 대신한다 */
+.btn-secondary {
+  background: var(--surface-alt);
+  color: var(--ink);
+}
+.btn-secondary:active { background: var(--pressed-weak); }
+@media (hover: hover) and (pointer: fine) {
+  .btn-secondary:hover { background: var(--pressed-weak); }
+}
+/* 조용한 버튼 (SEED ghost) — 바탕 없는 글자 버튼. 문장 속 글자 링크는 .link-button(밑줄)을 쓴다 */
+.btn-quiet {
+  background: transparent;
+  color: var(--ink);
+}
+.btn-quiet:active { background: var(--pressed-transparent); }
+@media (hover: hover) and (pointer: fine) {
+  .btn-quiet:hover { background: var(--pressed-transparent); }
+}
+/* 되돌릴 수 없는 확인(동의 철회·데이터 지우기) — 긴급 빨강 채움. 화면당 하나 */
+.btn-critical {
+  background: var(--emergency);
+  color: var(--emergency-ink);
+}
+.btn-critical:active { background: var(--emergency-strong); }
+@media (hover: hover) and (pointer: fine) {
+  .btn-critical:hover { background: var(--emergency-strong); }
 }
 /* 즉시 복귀 — 안전 지시. 긴급(빨강)과 구분되는 짙은 먹색 */
 .btn-return {
   background: var(--ink);
   color: var(--on-dark); /* --ink 위 17.06:1 */
 }
-.btn-return:hover { background: var(--state-no-tourism-ink); }
+.btn-return:active { background: var(--state-no-tourism-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .btn-return:hover { background: var(--state-no-tourism-ink); }
+}
 
 /* 소셜 로그인 — 공급자 브랜드 규정을 따르되 톤을 최대한 낮춘다 (AX-219).
    카카오 노랑 위 어두운 글자는 14.3:1, 구글 흰 버튼은 테두리 3.42:1 로 경계가 보인다. */
@@ -590,13 +609,28 @@ input[readonly] {
   color: #191600;
   border-color: #e6cf00;
 }
-.btn-kakao:hover { background: #f2db00; }
+.btn-kakao:active { background: #f2db00; }
 .btn-google {
   background: var(--surface);
   color: var(--ink);
   border-color: var(--line-input);
 }
-.btn-google:hover { background: var(--surface-alt); }
+.btn-google:active { background: var(--surface-alt); }
+@media (hover: hover) and (pointer: fine) {
+  .btn-kakao:hover { background: #f2db00; }
+  .btn-google:hover { background: var(--surface-alt); }
+}
+
+/* 비활성 — 투명도 대신 색 교체. 글자는 --ink-subtle(회색 면 위 3.11:1): 무엇이 적혔는지 읽히고 누를 수 없음이 드러난다.
+   못 누르는 이유는 버튼 옆 글자로 알린다(설계서 5.1). 눌림·호버보다 뒤에 두어 이긴다 */
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  background: var(--surface-alt);
+  color: var(--ink-subtle);
+  border-color: transparent;
+  cursor: not-allowed;
+  transform: none;
+}
 /* 자격증명이 없는 공급자 — 버튼을 없애지 않고 비활성으로 남긴다 */
 .btn-kakao[aria-disabled='true'],
 .btn-google[aria-disabled='true'] {
@@ -605,6 +639,34 @@ input[readonly] {
   border-color: var(--line-strong);
   cursor: not-allowed;
 }
+/* 처리 중 — 눌린 색 + 가운데 회전 표시(18px·선 2px). 글자는 자리를 지키되 보이지 않는다(폭이 흔들리지 않게).
+   읽히는 이름은 남는다(opacity 는 접근성 트리에서 지우지 않는다) */
+.btn[aria-busy='true'] {
+  position: relative;
+  background: var(--accent-strong);
+  color: var(--accent-ink);
+  cursor: progress;
+  transform: none;
+}
+.btn[aria-busy='true'] > * { opacity: 0; }
+.btn[aria-busy='true']::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .btn[aria-busy='true']::after { animation: spin 0.9s linear infinite; }
+}
+.btn-secondary[aria-busy='true'] { background: var(--pressed-weak); color: var(--ink); }
+.btn-quiet[aria-busy='true'] { background: var(--pressed-transparent); color: var(--ink); }
+.btn-critical[aria-busy='true'] { background: var(--emergency-strong); color: var(--emergency-ink); }
 
 /* ── 추천 카드 (D08-CMP008) ── */
 .course-card {

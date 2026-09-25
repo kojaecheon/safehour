@@ -258,8 +258,16 @@ export const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
 /** axe 로 WCAG 2.1 AA 위반이 0건인지 본다 */
 export async function expectNoAxeViolations(page, where) {
-  // 시트가 떠오르는 애니메이션(투명도 0.6→1) 도중에는 대비가 실제보다 낮게 잰다 — 끝난 뒤의 화면을 본다
-  await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))));
+  // 시트가 떠오르는 애니메이션(투명도 0.6→1) 도중에는 대비가 실제보다 낮게 잰다 — 끝난 뒤의 화면을 본다.
+  // 끝이 없는 애니메이션(처리 중 버튼·로딩의 회전 표시)은 finished 가 오지 않으므로 기다리지 않는다
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+        .map((a) => a.finished.catch(() => null)),
+    ),
+  );
   const results = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
   const violations = results.violations.map((v) => ({
     id: v.id,

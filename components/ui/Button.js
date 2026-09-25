@@ -1,8 +1,10 @@
 // 버튼 (AX-304 · spec 7장)
 //
-//   <Button>다음</Button>                                 주 버튼 (포인트 색 한 가지)
-//   <Button variant="secondary">나중에</Button>           보조 버튼 (흰 바탕 + 테두리)
-//   <Button variant="quiet">자세히</Button>               조용한 버튼 (글자 + 밑줄)
+//   <Button>다음</Button>                                 주 버튼 (포인트 색 한 가지, 화면당 하나)
+//   <Button variant="secondary">나중에</Button>           보조 버튼 (회색 채움 — SEED neutralWeak)
+//   <Button variant="quiet">자세히</Button>               조용한 버튼 (바탕 없는 글자 — SEED ghost)
+//   <Button variant="critical">지우기</Button>            되돌릴 수 없는 확인 (긴급 빨강 채움, 화면당 하나)
+//   <Button loading>저장</Button>                         처리 중 — 눌린 색 + 회전 표시, 누를 수 없다
 //   <Button href="/trip">전체 일정</Button>               링크 모양 버튼 (next/link)
 //   <Button disabled>저장</Button>                        비활성 — 색 교체로 표시(투명도 감산 금지)
 //
@@ -17,16 +19,18 @@ const VARIANT_CLASS = {
   primary: '',
   secondary: 'btn-secondary',
   quiet: 'btn-quiet',
+  critical: 'btn-critical',
 };
 
 /**
  * @param {object} props
- * @param {'primary'|'secondary'|'quiet'} [props.variant]
+ * @param {'primary'|'secondary'|'quiet'|'critical'} [props.variant]
  * @param {'normal'|'small'} [props.size]   small 은 폭이 내용에 맞춰진다
  * @param {boolean} [props.block]            true 면 폭 100% (기본: normal 은 100%, small 은 내용 폭)
  * @param {string} [props.href]              있으면 링크로 그린다
  * @param {string} [props.icon]              앞에 붙는 아이콘 이름 (Icon.js)
  * @param {boolean} [props.disabled]
+ * @param {boolean} [props.loading]           처리 중 — 누르면 무시하고 aria-busy 로 알린다
  */
 export default function Button({
   variant = 'primary',
@@ -35,6 +39,7 @@ export default function Button({
   href,
   icon,
   disabled = false,
+  loading = false,
   type = 'button',
   className,
   children,
@@ -46,12 +51,12 @@ export default function Button({
   const style = block === false ? { width: 'auto' } : block === true ? { width: '100%' } : undefined;
   const content = (
     <>
-      {icon && <Icon name={icon} size={20} />}
+      {icon && <Icon name={icon} size={size === 'small' ? 16 : 22} />}
       <span>{children}</span>
     </>
   );
 
-  if (href && !disabled) {
+  if (href && !disabled && !loading) {
     return (
       <Link href={href} className={classes} style={style} {...rest}>
         {content}
@@ -65,9 +70,12 @@ export default function Button({
       className={classes}
       style={style}
       // 비활성 링크는 포커스를 남겨 둔다(키보드 위치 보존). 진짜 버튼은 disabled 로 막는다.
+      // 처리 중에는 포커스를 지키려고 disabled 대신 aria-disabled + 누름 무시로 막는다.
       disabled={href ? undefined : disabled}
-      aria-disabled={href && disabled ? 'true' : undefined}
+      aria-disabled={(href && disabled) || loading ? 'true' : undefined}
+      aria-busy={loading ? 'true' : undefined}
       {...rest}
+      onClick={loading ? undefined : rest.onClick}
     >
       {content}
     </button>

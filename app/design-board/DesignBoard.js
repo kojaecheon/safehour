@@ -123,9 +123,9 @@ function Section({ id, title, lead, children }) {
   );
 }
 
-function Sub({ title, note, children, wide = false }) {
+function Sub({ id, title, note, children, wide = false }) {
   return (
-    <div className={wide ? 'designBoard-sub is-wide' : 'designBoard-sub'}>
+    <div id={id} className={wide ? 'designBoard-sub is-wide' : 'designBoard-sub'}>
       <h3>{title}</h3>
       {note && <p className="designBoard-note">{note}</p>}
       <div className="designBoard-sample">{children}</div>
@@ -368,12 +368,14 @@ export default function DesignBoard() {
         {/* ── 4. 부품 ── */}
         <Section id="designBoard-components" title={t('designBoard.componentsTitle')}>
           <div className="designBoard-grid">
-            <Sub title={t('designBoard.cButton')}>
+            <Sub id="designBoard-c-button" title={t('designBoard.cButton')}>
               <div className="designBoard-stack">
                 <Button>{t('designBoard.btnPrimary')}</Button>
                 <Button variant="secondary">{t('designBoard.btnSecondary')}</Button>
                 <Button variant="quiet">{t('designBoard.btnQuiet')}</Button>
                 <Button disabled>{t('designBoard.btnDisabled')}</Button>
+                <Button variant="critical">{t('designBoard.btnCritical')}</Button>
+                <Button loading>{t('designBoard.btnLoading')}</Button>
                 <div className="designBoard-row">
                   <Button size="small" icon="plus">
                     {t('designBoard.btnSmall')}
@@ -388,7 +390,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            <Sub title={t('designBoard.cBadge')}>
+            <Sub id="designBoard-c-badge" title={t('designBoard.cBadge')}>
               <div className="designBoard-row">
                 {Object.keys(BADGE_KINDS).map((kind) => (
                   <Badge key={kind} kind={kind} />
@@ -401,7 +403,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            <Sub title={t('designBoard.cState')} note={t('designBoard.stateNote')} wide>
+            <Sub id="designBoard-c-state" title={t('designBoard.cState')} note={t('designBoard.stateNote')} wide>
               <div className="designBoard-states">
                 {DEMO_STATES.map(({ state, reasons }) => (
                   <StateBanner key={state} state={state} reasons={reasons} />
@@ -409,7 +411,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            <Sub title={t('designBoard.cDateChip')}>
+            <Sub id="designBoard-c-datechip" title={t('designBoard.cDateChip')}>
               <ul className="ui-date-strip" role="list">
                 {DEMO_DAYS.map((day) => (
                   <li key={day.date}>
@@ -423,7 +425,7 @@ export default function DesignBoard() {
               </ul>
             </Sub>
 
-            <Sub title={t('designBoard.cTimeline')} note={t('designBoard.timelineNote')} wide>
+            <Sub id="designBoard-c-timeline" title={t('designBoard.cTimeline')} note={t('designBoard.timelineNote')} wide>
               <div className="designBoard-grid is-two">
                 <div>
                   <h4 className="designBoard-h4">{t('designBoard.tlPatient')}</h4>
@@ -436,7 +438,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            <Sub title={t('designBoard.cPlace')} note={t('designBoard.placeNote')} wide>
+            <Sub id="designBoard-c-place" title={t('designBoard.cPlace')} note={t('designBoard.placeNote')} wide>
               <div className="designBoard-cards" id="designBoard-place">
                 <PlaceCard
                   title={t('designBoard.demoPalace')}
@@ -477,7 +479,7 @@ export default function DesignBoard() {
               </ul>
             </Sub>
 
-            <Sub title={t('designBoard.cMeal')}>
+            <Sub id="designBoard-c-meal" title={t('designBoard.cMeal')}>
               <div className="designBoard-stack">
                 <MealSlot slot="DINNER" status="FILLED" time="18:00–19:00">
                   {restaurantCard}
@@ -488,7 +490,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            <Sub title={t('designBoard.cAnswer')}>
+            <Sub id="designBoard-c-answer" title={t('designBoard.cAnswer')}>
               <AnswerInput legend={t('designBoard.qUv')} value={uv} onChange={setUv} />
               <AnswerInput legend={t('designBoard.qHeat')} value={heat} onChange={setHeat} />
               <AnswerInput legend={t('designBoard.qEscort')} value={escort} onChange={setEscort} disallowUnknown />
@@ -501,7 +503,7 @@ export default function DesignBoard() {
               />
             </Sub>
 
-            <Sub title={t('designBoard.cPeriod')} wide>
+            <Sub id="designBoard-c-period" title={t('designBoard.cPeriod')} wide>
               <div className="designBoard-grid is-two">
                 <PeriodEditor
                   title={t('designBoard.demoPeriodSelf')}
@@ -534,7 +536,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            <Sub title={t('designBoard.cSheet')}>
+            <Sub id="designBoard-c-sheet" title={t('designBoard.cSheet')}>
               <Button variant="secondary" onClick={() => setSheetOpen(true)}>
                 {t('designBoard.sheetOpen')}
               </Button>
@@ -549,7 +551,7 @@ export default function DesignBoard() {
               )}
             </Sub>
 
-            <Sub title={t('designBoard.cEmpty')}>
+            <Sub id="designBoard-c-empty" title={t('designBoard.cEmpty')}>
               <EmptyState
                 icon="navTrip"
                 headingLevel={4}
@@ -559,7 +561,7 @@ export default function DesignBoard() {
               />
             </Sub>
 
-            <Sub title={t('designBoard.cKorean')}>
+            <Sub id="designBoard-c-korean" title={t('designBoard.cKorean')}>
               <KoreanCard
                 title={t('designBoard.kcardTitle')}
                 korean={[translate('designBoard.kcardLine1', 'ko'), translate('designBoard.kcardLine2', 'ko')]}
@@ -569,7 +571,7 @@ export default function DesignBoard() {
               />
             </Sub>
 
-            <Sub title={t('designBoard.cSource')} wide>
+            <Sub id="designBoard-c-source" title={t('designBoard.cSource')} wide>
               <div className="designBoard-grid is-two">
                 <SourceArea source="hospital" title={t('designBoard.demoHospital')}>
                   <p lang="ko">{translate('designBoard.srcHospitalBody', 'ko')}</p>
@@ -591,7 +593,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            <Sub title={t('designBoard.cShell')} note={t('designBoard.shellNote')} wide>
+            <Sub id="designBoard-c-shell" title={t('designBoard.cShell')} note={t('designBoard.shellNote')} wide>
               <div className="designBoard-stack">
                 <ReadOnlyBanner preview="NO_SESSION" />
                 <ReadOnlyBanner preview="OFFLINE" />

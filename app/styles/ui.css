@@ -60,7 +60,8 @@
   text-underline-offset: 4px;
 }
 
-/* 긴급 연락 — 모든 화면 오른쪽 아래에 고정. 하단 내비·고정 복귀 버튼 위에 선다 */
+/* 긴급 연락 — 큰 CTA 모양(52px · 모서리 12 · 18px 굵게, 그림자 없음 — 설계서 5.1).
+   하단 긴급 바·시작 화면 하단 바 안(is-docked)과 시안 보드(is-preview)에 놓인다. 자리 규칙은 아래에 따로 있다 */
 .ui-emergency {
   position: fixed;
   z-index: 40;
@@ -68,19 +69,24 @@
   bottom: calc(var(--nav-offset) + var(--space-3));
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
-  min-height: 48px;
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border-radius: var(--radius-full);
+  min-height: 52px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-12);
   background: var(--emergency);
   color: var(--emergency-ink);
-  font-size: var(--text-body);
-  font-weight: var(--weight-heavy);
-  box-shadow: var(--shadow-float);
+  font-size: var(--text-button-large);
+  line-height: var(--lh-title-3);
+  font-weight: var(--weight-bold);
   white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease-color);
 }
-.ui-emergency:hover {
+.ui-emergency:active {
   background: var(--emergency-strong);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-emergency:hover { background: var(--emergency-strong); }
 }
 .app-shell[data-nav='off'] .ui-emergency:not(.is-docked) {
   bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
@@ -93,15 +99,6 @@
 .app-shell[data-nav='off']:has(.sticky-return) .ui-emergency:not(.is-docked) {
   bottom: calc(88px + env(safe-area-inset-bottom));
 }
-.ui-emergency-dot {
-  display: inline-grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-full);
-  background: var(--emergency-strong);
-}
-
 /* 하단 내비 4개 — 오늘 · 일정 · 조건 · 더보기 */
 /* 하단 긴급 바 — 내비가 없는 화면(로그인 전 흐름·보호자 열기)에서 긴급을 바닥에 붙인다.
    내비와 같은 자리·같은 처리(면 + 윗선)라 화면을 오갈 때 긴급의 위치가 흔들리지 않는다. */
