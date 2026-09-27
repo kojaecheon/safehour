@@ -53,6 +53,7 @@
 - 하루 화면: 타임라인을 하루 소개보다 먼저 보인다
 - SEED 적용 ①층(토큰): 회색·글자·간격·모서리·그림자·초점 링을 SEED 값으로 교체 — 설계서 `docs/superpowers/specs/2026-09-24-seed-design-adoption-design.md`
 - SEED 적용 ②층(부품): 버튼·입력·선택·배지·안내·시트·상단 바·하단 내비를 SEED 모양으로, 목록 행·흰 블록·스위치·확인 대화상자 부품 추가 — 계획서 `docs/superpowers/plans/2026-09-26-seed-layer2-components.md`
+- SEED 적용 ③층 1/15 시작 화면: 제목 26/35 먹색, 언어 선택 Select Box, 고지 3종·면책 Callout, 하단 바 긴급 짧은 글자(320px 네 언어 한 줄) — 계획서 `docs/superpowers/plans/2026-09-27-seed-layer3-01-start.md`
 
 **검증 장치**
 

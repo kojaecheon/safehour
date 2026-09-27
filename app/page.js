@@ -35,7 +35,7 @@ function Notice({ icon, titleKey, bodyKey }) {
   return (
     <li className="onboarding-notice">
       <span className="onboarding-notice-icon" aria-hidden="true">
-        <Icon name={icon} size={22} />
+        <Icon name={icon} size={20} />
       </span>
       <div className="onboarding-notice-text">
         <div lang={title.primary.lang}>
@@ -113,10 +113,11 @@ export default function HomePage() {
 
         {/* 하단 고정 바 — 긴급과 시작하기를 한 줄에 둔다.
             떠 있는 긴급 버튼은 어디에 두든 본문을 덮었다(시작하기 131x31px, 언어 칸 '中文' 41%).
-            바 안에 넣으면 덮는 것이 없고 둘 다 늘 닿는다. 셸은 이 경로에서 떠 있는 버튼을 그리지 않는다. */}
+            바 안에 넣으면 덮는 것이 없고 둘 다 늘 닿는다. 셸은 이 경로에서 떠 있는 버튼을 그리지 않는다.
+            긴급은 하단 내비와 같은 짧은 글자로 보여 320px 에서도 두 버튼이 한 줄에 들어간다(읽히는 이름은 온전하다). */}
         <div className="onboarding-cta sticky-return">
           <div className="onboarding-cta-row">
-            <EmergencyButton docked />
+            <EmergencyButton docked short />
             <Button href={START_HREF}>{t('home.cta')}</Button>
           </div>
         </div>
