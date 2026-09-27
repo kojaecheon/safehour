@@ -4,7 +4,7 @@
 //   <Button variant="secondary">나중에</Button>           보조 버튼 (회색 채움 — SEED neutralWeak)
 //   <Button variant="quiet">자세히</Button>               조용한 버튼 (바탕 없는 글자 — SEED ghost)
 //   <Button variant="critical">지우기</Button>            되돌릴 수 없는 확인 (긴급 빨강 채움, 화면당 하나)
-//   <Button loading>저장</Button>                         처리 중 — 눌린 색 + 회전 표시, 누를 수 없다
+//   <Button loading>저장</Button>                         처리 중 — 눌린 색 + 회전 표시, 누를 수 없다(form 제출도 막는다)
 //   <Button href="/trip">전체 일정</Button>               링크 모양 버튼 (next/link)
 //   <Button disabled>저장</Button>                        비활성 — 색 교체로 표시(투명도 감산 금지)
 //
@@ -30,7 +30,7 @@ const VARIANT_CLASS = {
  * @param {string} [props.href]              있으면 링크로 그린다
  * @param {string} [props.icon]              앞에 붙는 아이콘 이름 (Icon.js)
  * @param {boolean} [props.disabled]
- * @param {boolean} [props.loading]           처리 중 — 누르면 무시하고 aria-busy 로 알린다
+ * @param {boolean} [props.loading]           처리 중 — 누르면 무시하고 aria-busy 로 알린다(type="submit" 이어도 제출을 막는다)
  */
 export default function Button({
   variant = 'primary',
@@ -75,7 +75,13 @@ export default function Button({
       aria-disabled={(href && disabled) || loading ? 'true' : undefined}
       aria-busy={loading ? 'true' : undefined}
       {...rest}
-      onClick={loading ? undefined : rest.onClick}
+      onClick={(event) => {
+        if (loading) {
+          event.preventDefault();
+          return;
+        }
+        rest.onClick?.(event);
+      }}
     >
       {content}
     </button>

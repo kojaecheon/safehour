@@ -120,7 +120,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | 그림자 | `--shadow-card` SEED s1 — 회색 바탕(`main.page.is-basement`) 안에서는 `none` · `--shadow-float` SEED s3(떠 있는 메뉴) · `--shadow-sheet` 없음(하단 바는 1px 윗선) |
 | 배치 | `--shell-max` 480px(앱 셸 최대 폭) · `--gutter` 16px(좌우 여백) · `--tap-min` 44px · `--nav-height` 64px · `--nav-offset`(하단 내비가 있을 때 고정 요소가 올라서는 높이, 앱 셸이 켠다) |
 | 움직임 | `--ease-out`(시트 애니메이션 등 기존 전환) · `--ease-color`(색 전환) · `--ease-press`(눌림 축소) · `--duration-fast` 150ms · `--duration` 200ms · `--press-scale-wide` 0.976 · `--press-scale-tight` 0.955(눌리면 2px 만큼 줄어든다 — 넓은 큰 버튼·목록 행 / 44px 칸). 눌림은 면 색만 바꾸고(`--pressed*`), 호버는 `(hover: hover) and (pointer: fine)`에서만 눌림과 같은 색. 축소는 `prefers-reduced-motion: no-preference`일 때만 |
-| 포커스 | 모든 요소 `:focus-visible`은 `--focus-width`(2px) 코발트 윤곽선, 바깥 2px 띄움(상단 바 버튼·목록 행은 안쪽 −2px). 카드형 라디오·토글·답 칩은 안쪽 입력이 키보드 초점을 받을 때만(`:has(input:focus-visible)`) 칸 전체에 링. 글자 입력칸은 윤곽선 대신 2px `--line-contrast` 테두리. 짙은 면(주·critical·즉시 복귀 버튼, 긴급, 고른 날짜 칩) 위 링은 `--ink`. SEED 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지 |
+| 포커스 | 모든 요소 `:focus-visible`은 `--focus-width`(2px) 코발트 윤곽선, 바깥 2px 띄움(상단 바 버튼·목록 행은 안쪽 −2px). 카드형 라디오·토글·답 칩은 안쪽 입력이 키보드 초점을 받을 때만(`:has(input:focus-visible)`) 칸 전체에 링. 글자 입력칸은 윤곽선 대신 2px `--line-contrast` 테두리. 버튼(`.btn` 전부)·즉시 복귀·긴급·고른 날짜 칩의 링은 `--ink`. SEED 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지. 오류 표시된 입력칸은 빨간 테두리에 더해 코발트 윤곽선으로 초점을 보인다 |
 
 **호환 별칭**: 예전 화면이 쓰던 `--brand`·`--brand-hover`·`--brand-ink`·`--font-display`·`--font-body`는 새 토큰을 가리키는 별칭으로 남겼다. 새 코드는 쓰지 않는다.
 
@@ -146,7 +146,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | `KoreanCard` | `title`, `korean`(줄 배열), `explanation?`, `explanationLang?` | 큰 한국어 본문(`lang="ko"`) + 사용자 언어 설명. 고정 문구만(AI 금지). 네트워크를 쓰지 않는다 |
 | `EmptyState` | `icon`, `title`, `body?`, `action?`, `headingLevel?` | 무엇이 없는지 + 다음에 할 일. 오류 색·경고 아이콘 없음 |
 | `AlertDialog` | `title`, `titleLang?`, `description?`, `cancelLabel`, `confirmLabel`, `critical?`, `busy?`, `onConfirm({ requestClose })`, `onClose` | SEED Alert Dialog — 272px·모서리 20, 버튼 둘(취소·확인), 되돌릴 수 없으면 `critical`. 바깥을 눌러도 닫히지 않는다. `role="alertdialog"`, 포커스 가두기·복원·뒤로 가기는 `lib/useModalSheet.js` |
-| `ListItem` · `ListGroup` · `ListHeader` | `title`, `titleLang?`, `description?`, `leading?`, `trailing?`(`'chevron'`·노드), `href?`·`onClick?` / `label?` / `as?`, `id?` | SEED List Item — 위아래 12·좌우 16, 제목 16/22·설명 14/19 `--ink-soft`(한 줄 46·두 줄 66px). 누르면 좌우 6px 안으로 들어온 모서리 10 면. 반복 행 사이 1px 선 16px 들여씀. 행 안에서 따로 누를 것은 3개까지 |
+| `ListItem` · `ListGroup` · `ListHeader` | `title`, `titleLang?`, `description?`, `leading?`, `trailing?`(`'chevron'`·노드), `href?`·`onClick?` / `label?` / `as?`, `id?` | SEED List Item — 위아래 12·좌우 16, 제목 16/22·설명 14/19 `--ink-soft`(한 줄 46·두 줄 67px). 누르면 좌우 6px 안으로 들어온 모서리 10 면. 반복 행 사이 1px 선 16px 들여씀. 행 안에서 따로 누를 것은 3개까지 |
 | 클래스 `.ui-switch` · `.ui-block` · `main.page.is-basement` · `.hint.is-error` | — | 스위치(바로 적용되는 켬/끔, `role="switch"`, `.toggle-row` 라벨 안 — 끔 트랙 `--ink-subtle`), 흰 블록(화면 폭·8px 틈), 회색 바탕 층(그 안에서 카드 그림자 끔), 입력 오류 도움말(긴급 빨강, 입력은 `aria-invalid`) |
 | `TopBar` | `title`, `titleLang?`, `backHref?`·`onBack?`, `backLabel?`, `as?`, `actions?` | SEED Top Navigation — 높이 56·선 없음, 제목(기본 h1) 18/24 굵게·좁으면 말줄임, 뒤로 가기 44×44·모서리 8, 언어 선택(8장) |
 | `Icon` | `name`, `size?`, `strokeWidth?` | 인라인 SVG 선 아이콘(`ICON_NAMES`). 이름이 `Fill`로 끝나면 채운 모양(하단 내비 현재 칸). 상태 아이콘은 `STATE_ICON` |

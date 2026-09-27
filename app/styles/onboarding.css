@@ -489,6 +489,11 @@ fieldset.onboarding-card {
   border-color: var(--support-ink);
   box-shadow: inset 0 0 0 1px var(--support-ink);
 }
+.onboarding-form input[aria-invalid='true']:focus-visible,
+.onboarding-form select[aria-invalid='true']:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* 오류 요약 */
 .onboarding-summary {

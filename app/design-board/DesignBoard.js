@@ -210,6 +210,7 @@ export default function DesignBoard() {
   const [box, setBox] = useState('A');
   const [switchOn, setSwitchOn] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [busySubmits, setBusySubmits] = useState(0);
 
   const lodging = t('designBoard.demoLodging');
   const palaceCard = (
@@ -383,6 +384,18 @@ export default function DesignBoard() {
                 <Button disabled>{t('designBoard.btnDisabled')}</Button>
                 <Button variant="critical">{t('designBoard.btnCritical')}</Button>
                 <Button loading>{t('designBoard.btnLoading')}</Button>
+                <form
+                  className="designBoard-row"
+                  data-submits={busySubmits}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setBusySubmits((n) => n + 1);
+                  }}
+                >
+                  <Button type="submit" loading>
+                    {t('designBoard.btnLoadingSubmit')}
+                  </Button>
+                </form>
                 <div className="designBoard-row">
                   <Button size="small" icon="plus">
                     {t('designBoard.btnSmall')}

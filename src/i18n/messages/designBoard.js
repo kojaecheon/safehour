@@ -95,6 +95,7 @@ export const messages = {
   'designBoard.btnSmall': { ko: '작은 버튼', en: 'Small button', ja: '小さいボタン', zh: '小按钮' },
   'designBoard.btnCritical': { ko: '되돌릴 수 없는 확인', en: 'Irreversible confirm', ja: '取り消せない確認', zh: '不可撤销的确认' },
   'designBoard.btnLoading': { ko: '처리 중 버튼', en: 'Busy button', ja: '処理中のボタン', zh: '处理中按钮' },
+  'designBoard.btnLoadingSubmit': { ko: '처리 중 제출 버튼', en: 'Busy submit button', ja: '処理中の送信ボタン', zh: '处理中的提交按钮' },
   'designBoard.btnReturn': { ko: '즉시 복귀 안내', en: 'Return now', ja: 'すぐ戻る案内', zh: '立即返回指引' },
   'designBoard.cBadge': { ko: '배지 5종', en: 'Five badges', ja: 'バッジ5種', zh: '五种徽章' },
   'designBoard.cState': { ko: '상태 배너 (4상태)', en: 'State banner (four states)', ja: '状態バナー（4状態）', zh: '状态横幅（四种状态）' },

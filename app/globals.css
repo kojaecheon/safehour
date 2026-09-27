@@ -459,6 +459,11 @@ textarea {
   border-color: var(--emergency);
   box-shadow: inset 0 0 0 1px var(--emergency);
 }
+/* 오류 칸은 테두리가 이미 빨강이라 테두리 변화로 초점을 알릴 수 없다 — 코발트 윤곽선을 함께 보인다(WCAG 2.4.7) */
+:is(input, select, textarea):not([type='checkbox'], [type='radio'], [type='range'])[aria-invalid='true']:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}
 :is(input, select, textarea):not([type='checkbox'], [type='radio'], [type='range']):disabled,
 input[readonly] {
   background: var(--surface-alt);
@@ -826,8 +831,8 @@ details.disclosure > summary::after { content: '▾' / ''; color: var(--ink-soft
 details.disclosure[open] > summary::after { content: '▴' / ''; }
 
 /* ── 전환 (SEED Segmented Control) — 환자/보호자 ──
-   통: 회색 알약 + 4px 안쪽 여백. 칸: 44px 알약 · 16/22 굵게. 고른 칸은 흰 면 + 1px 선 + 진한 글자,
-   안 고른 칸은 보조 글자. 면·선·글자색이 함께 바뀐다(색 단독 금지) */
+   통: 회색 알약 + 4px 안쪽 여백. 칸: 44px 알약 · 16/22. 고른 칸은 흰 면 + 3:1 선(--line-input) + 진한 글자 + 굵게,
+   안 고른 칸은 보조 글자 + 보통 굵기. 굵기·선·면·글자색이 함께 바뀐다(색 단독 금지, WCAG 1.4.11) */
 .tabs {
   display: flex;
   gap: var(--space-1);
@@ -845,7 +850,7 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
   font-size: var(--text-body);
   line-height: var(--lh-body);
   font-family: inherit;
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-medium);
   color: var(--ink-soft);
   cursor: pointer;
   transition:
@@ -854,8 +859,9 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 }
 .tabs button[aria-selected='true'] {
   background: var(--surface);
-  border-color: var(--line-section);
+  border-color: var(--line-input);
   color: var(--ink);
+  font-weight: var(--weight-bold);
 }
 
 /* ── 변화 델타 ── */
@@ -917,10 +923,6 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
   padding: var(--space-3) var(--gutter) calc(var(--space-6) + env(safe-area-inset-bottom));
   max-height: 90dvh;
   overflow-y: auto;
-}
-.sheet > h2:first-child {
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--line);
 }
 @media (prefers-reduced-motion: no-preference) {
   .sheet { animation: sheet-rise var(--duration) var(--ease-out); }
@@ -1051,7 +1053,9 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
   cursor: pointer;
   text-align: left;
 }
-.lang-list button:hover { background: var(--surface-alt); }
+@media (hover: hover) and (pointer: fine) {
+  .lang-list button:hover { background: var(--surface-alt); }
+}
 /* 선택된 언어: 체크 아이콘 + 굵기 + 회색 면 (색 단독 금지 · '선택'은 코발트가 아니라 중립색) */
 .lang-list button.selected {
   background: var(--surface-alt);

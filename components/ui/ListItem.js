@@ -7,8 +7,10 @@
 //   </ListGroup>
 //
 // - 위아래 12 · 좌우 16. 제목 16/22, 설명 14/19 보조 글자(SEED 13px·옅은 회색을 하한으로 올림).
-//   제목만이면 46px, 설명까지 66px 안팎 — 터치 44px 이상.
+//   제목만이면 46px, 설명까지 67px 안팎 — 터치 44px 이상.
 // - href 면 링크, onClick 이면 버튼, 둘 다 없으면 누를 수 없는 행(div).
+//   href 와 onClick 을 함께 주면 href 가 이긴다 — onClick 은 무시되고 행은 링크로 이동한다(행 안에서만 동작하는
+//   onClick 이 필요하면 href 없이 onClick 만 준다).
 // - 누르면 바탕이 좌우 6px 안으로 들어온 모서리 10 면으로 바뀌고 내용만 조금 줄어든다.
 // - 행 안에서 따로 누를 것은 3개까지. 뒤에 버튼을 두는 행은 행 자체에 href·onClick 을 주지 않는다(누르는 곳이 겹친다).
 // - 앞 아이콘은 장식이다(aria-hidden). 뜻은 제목이 전한다.
@@ -41,8 +43,8 @@ export function ListHeader({ as: Heading = 'h2', id, children }) {
  * @param {React.ReactNode} [props.description]
  * @param {React.ReactNode} [props.leading]            22px 아이콘·그림
  * @param {'chevron'|React.ReactNode} [props.trailing] 'chevron' 이면 오른쪽 화살표
- * @param {string} [props.href]
- * @param {() => void} [props.onClick]
+ * @param {string} [props.href]              있으면 링크로 그린다 — onClick 과 함께 주면 href 가 이기고 onClick 은 무시된다
+ * @param {() => void} [props.onClick]       href 가 없을 때만 쓰인다
  */
 export default function ListItem({ title, titleLang, description, leading, trailing, href, onClick }) {
   const interactive = Boolean(href || onClick);

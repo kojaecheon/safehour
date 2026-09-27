@@ -81,7 +81,17 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
     await expect(busy).toHaveAttribute('aria-busy', 'true');
     await expect(busy).toHaveAttribute('aria-disabled', 'true');
 
-    // 눌림 — 면 색만 바뀐다
+    // 처리 중(loading) 버튼은 type="submit" 이어도 폼 제출을 막는다 — 클릭도, 키보드 Enter 도
+    const busyForm = area.locator('form[data-submits]');
+    const busySubmit = busyForm.getByRole('button', { name: '처리 중 제출 버튼' });
+    // aria-disabled='true' 라 Playwright 의 기본 클릭은 "활성화될 때까지" 기다린다 — 실제 마우스 클릭처럼 force 로 누른다
+    await busySubmit.click({ force: true });
+    await expect(busyForm).toHaveAttribute('data-submits', '0');
+    await busySubmit.focus();
+    await page.keyboard.press('Enter');
+    await expect(busyForm).toHaveAttribute('data-submits', '0');
+
+    // 눌림 — 면 색만 바뀐다 (호버로 먼저 확인 — 데스크톱 크로미움에선 호버 색과 눌림 색이 같은 값을 쓴다)
     const bg = (locator) => styles(locator, ['background-color']).then((s) => s['background-color']);
     await primary.hover();
     await page.mouse.down();
@@ -91,6 +101,22 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
     await page.mouse.down();
     await expect.poll(() => bg(secondary)).toBe('rgb(238, 239, 241)');
     await page.mouse.up();
+
+    // 위 확인은 호버 색과 눌림 색이 같아 :active 규칙을 지워도 통과한다 — 호버 없이 Space 로 :active 만 확인.
+    // 호버가 다 걷힐 때까지 먼저 기다린다 — 안 그러면 전환 중인 호버 잔상을 :active 값으로 착각해 잰다
+    await pointerAway(page);
+    await expect.poll(() => bg(primary)).toBe('rgb(10, 92, 255)');
+    await primary.focus();
+    await page.keyboard.down(' ');
+    await expect.poll(() => bg(primary)).toBe('rgb(0, 70, 209)');
+    await page.keyboard.up(' ');
+    await pointerAway(page);
+    await expect.poll(() => bg(secondary)).toBe('rgb(243, 244, 245)');
+    await secondary.focus();
+    await page.keyboard.down(' ');
+    await expect.poll(() => bg(secondary)).toBe('rgb(238, 239, 241)');
+    await page.keyboard.up(' ');
+    await pointerAway(page);
 
     // 긴급 버튼 — 큰 CTA 모양, 그림자 없음
     await pointerAway(page);
@@ -127,6 +153,13 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
       });
     const invalid = page.locator('#designBoard-input-error');
     expect((await styles(invalid, ['border-top-color']))['border-top-color']).toBe('rgb(200, 16, 46)');
+    // 오류 칸은 테두리가 이미 빨강이라 테두리만으로는 초점이 안 보인다 — 코발트 윤곽선을 덧그린다(WCAG 2.4.7)
+    expect((await styles(invalid, ['outline-style']))['outline-style']).toBe('none');
+    await invalid.focus();
+    await expect
+      .poll(() => styles(invalid, ['outline-style', 'outline-color', 'outline-width']))
+      .toEqual({ 'outline-style': 'solid', 'outline-color': 'rgb(10, 92, 255)', 'outline-width': '2px' });
+    await invalid.blur();
 
     // 답 칩: 44px 알약 · 16px · 3:1 테두리. 고르면 진한 테두리 + 회색 면 + 굵게 + 체크
     const yes = page.locator('#designBoard-c-answer .ui-answer').first().locator('.ui-answer-option').first();
@@ -154,6 +187,25 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
     });
     expect((await styles(boxes.nth(1), ['border-top-color']))['border-top-color']).toBe('rgb(134, 139, 148)');
 
+    // 카드형 라디오·답 칩의 키보드 초점 링 — :focus-visible 일 때만 칸 전체에 링, 안쪽 입력엔 없다(이중 링 방지)
+    await boxes.nth(0).locator('input[type="radio"]').focus();
+    await page.keyboard.press('ArrowDown');
+    const nextBox = boxes.nth(1);
+    await expect
+      .poll(() => styles(nextBox, ['outline-style', 'outline-width']))
+      .toEqual({ 'outline-style': 'solid', 'outline-width': '2px' });
+    expect((await styles(nextBox.locator('input[type="radio"]'), ['outline-style']))['outline-style']).toBe('none');
+
+    const answerOptions = page.locator('#designBoard-c-answer .ui-answer').first().locator('.ui-answer-option');
+    await answerOptions.nth(0).locator('input[type="radio"]').focus();
+    await page.keyboard.press('ArrowDown');
+    const nextAnswer = answerOptions.nth(1);
+    await expect
+      .poll(() => styles(nextAnswer, ['outline-style', 'outline-width']))
+      .toEqual({ 'outline-style': 'solid', 'outline-width': '2px' });
+    expect((await styles(nextAnswer.locator('input[type="radio"]'), ['outline-style']))['outline-style']).toBe('none');
+    await pointerAway(page);
+
     // 스위치: 52×32, 끔은 --ink-subtle, 켬은 --selected
     const sw = page.getByRole('switch', { name: '알림 켜기 (견본)' });
     expect(await styles(sw, ['width', 'height', 'background-color'])).toEqual({
@@ -172,9 +224,23 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
       'background-color': 'rgb(243, 244, 245)',
     });
     expect(
-      await styles(seg.locator('[aria-selected="true"]'), ['min-height', 'background-color', 'color', 'font-weight']),
-    ).toEqual({ 'min-height': '44px', 'background-color': 'rgb(255, 255, 255)', color: 'rgb(26, 28, 32)', 'font-weight': '700' });
-    expect((await styles(seg.locator('[aria-selected="false"]'), ['color'])).color).toBe('rgb(85, 93, 109)');
+      await styles(seg.locator('[aria-selected="true"]'), [
+        'min-height',
+        'background-color',
+        'color',
+        'font-weight',
+        'border-top-color',
+      ]),
+    ).toEqual({
+      'min-height': '44px',
+      'background-color': 'rgb(255, 255, 255)',
+      color: 'rgb(26, 28, 32)',
+      'font-weight': '700',
+      'border-top-color': 'rgb(134, 139, 148)',
+    });
+    expect(
+      await styles(seg.locator('[aria-selected="false"]'), ['color', 'font-weight']),
+    ).toEqual({ color: 'rgb(85, 93, 109)', 'font-weight': '500' });
 
     // 날짜 칩: 고른 날 진한 회색 채움 + 흰 글자, '오늘' 코발트 테두리, 나머지 회색 면
     const chips = page.locator('#designBoard-c-datechip .ui-date-chip');
@@ -283,6 +349,15 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
       '10px',
     ]);
     await page.mouse.up();
+    await pointerAway(page);
+    // 호버가 다 걷힐 때까지 기다린다 — 안 그러면 전환 중인 호버 잔상을 :active 값으로 착각해 잰다
+    await expect.poll(() => before('background-color')).toBe('rgba(0, 0, 0, 0)');
+
+    // 호버 색과 눌림 색이 같아 위 확인은 :active 규칙을 지워도 통과한다 — 호버 없이 Space 로 :active 만 확인
+    await row.focus();
+    await page.keyboard.down(' ');
+    await expect.poll(() => before('background-color')).toBe('rgba(0, 0, 0, 0.027)');
+    await page.keyboard.up(' ');
     await pointerAway(page);
 
     // 흰 블록: 흰 면, 모서리·그림자 없음
