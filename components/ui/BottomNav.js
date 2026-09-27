@@ -11,6 +11,7 @@
 
 import Link from 'next/link';
 import { useLang } from '../LanguageProvider.js';
+import { emergencySpokenName } from './EmergencyButton.js';
 import Icon from './Icon.js';
 
 export const NAV_ITEMS = Object.freeze([
@@ -52,8 +53,9 @@ export default function BottomNav({ pathname, preview = false }) {
               href={item.href}
               className={item.emergency ? 'is-emergency' : undefined}
               // 보이는 글자는 칸에 맞게 짧지만('긴급'·'SOS'), 읽히는 이름은 온전하게 둔다('긴급 연락').
-              // 안전 동작이라 스크린리더에서 줄이면 안 된다. 짧은 글자가 긴 이름에 들어 있어 라벨 규칙도 지킨다.
-              aria-label={item.emergency ? t('common.emergency') : undefined}
+              // 안전 동작이라 스크린리더에서 줄이면 안 된다. 짧은 글자가 긴 이름에 들어 있지 않은 언어(en)는
+              // '짧은, 긴' 으로 함께 읽혀 라벨 규칙(WCAG 2.5.3)을 지킨다.
+              aria-label={item.emergency ? emergencySpokenName(t(item.key), t('common.emergency')) : undefined}
               aria-current={active === item.href ? 'page' : undefined}
             >
               {/* 현재 칸은 채운 아이콘 — 선 아이콘과 모양이 달라 색 없이도 구분된다 */}

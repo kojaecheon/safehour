@@ -51,7 +51,7 @@
 
 /* 안전 문구 병기 (SEED Callout · neutral) — 왼쪽 띠 없이 회색 면 · 모서리 10.
    주 언어 한 줄 + 병기 언어 한 줄. 병기 줄도 16px·대비 유지(투명도 감산 금지).
-   시작·로그인·체류 설정이 같은 상자(SafetyNote)를 쓴다 */
+   시작 화면과 체류 설정 단계(여행·병원)가 같은 상자(SafetyNote)를 쓴다 */
 .onboarding-safety {
   margin: var(--space-4) 0;
   padding: 14px var(--space-4);
@@ -760,15 +760,4 @@ fieldset.onboarding-card {
   font-size: var(--text-body);
   font-weight: var(--weight-bold);
   color: var(--ink);
-}
-
-/* 넓은 화면 — 셸 폭(480px) 안이라 배치는 같다. 시작 화면 격자만 4열로 펼친다 */
-@media (min-width: 420px) {
-  .onboarding-lang-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-  .onboarding-lang-option {
-    justify-content: center;
-    padding: 0 var(--space-2);
-  }
 }

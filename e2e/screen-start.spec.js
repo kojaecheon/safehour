@@ -74,6 +74,7 @@ test.describe('③층 시작 화면 — SEED 배치', () => {
       'background-color': 'rgba(0, 0, 0, 0)',
       color: 'rgb(26, 28, 32)',
     });
+    expect((await page.locator('.onboarding-notice-icon svg').first().boundingBox()).width).toBe(20);
 
     // 면책 = 안내 상자: 왼쪽 띠 없이 회색 면 · 모서리 10
     expect(
@@ -85,11 +86,24 @@ test.describe('③층 시작 화면 — SEED 배치', () => {
     ).toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-left-width': '0px', 'border-top-left-radius': '10px' });
   });
 
-  for (const [code, langName, start] of [
-    ['ko', '한국어', '시작하기'],
-    ['en', 'English', 'Get started'],
-    ['ja', '日本語', 'はじめる'],
-    ['zh', '中文', '开始使用'],
+  test('430px — 언어 선택은 넓은 화면에서도 2×2 이다(설계서 6.2 1번)', async ({ page }) => {
+    await page.setViewportSize({ width: 430, height: 780 });
+    await page.goto('/');
+
+    const grid = page.locator('.onboarding-lang-grid');
+    const columns = (await styles(grid, ['grid-template-columns']))['grid-template-columns'];
+    expect(columns.trim().split(/\s+/)).toHaveLength(2);
+
+    const japanese = page.getByRole('button', { name: '日本語', exact: true });
+    expect(Math.round((await japanese.boundingBox()).height)).toBe(52);
+    expect((await styles(japanese, ['padding-left']))['padding-left']).toBe('16px');
+  });
+
+  for (const [code, langName, start, short, name] of [
+    ['ko', '한국어', '시작하기', '긴급', '긴급 연락'],
+    ['en', 'English', 'Get started', 'SOS', 'SOS, Emergency'],
+    ['ja', '日本語', 'はじめる', '緊急', '緊急連絡'],
+    ['zh', '中文', '开始使用', '紧急', '紧急联系'],
   ]) {
     test(`320px ${code} — 하단 바의 긴급·시작하기가 한 줄(52px)에 들어간다`, async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 720 });
@@ -102,10 +116,9 @@ test.describe('③층 시작 화면 — SEED 배치', () => {
       const emergency = bar.locator('.ui-emergency');
       expect(Math.round((await startLink.boundingBox()).height)).toBe(52);
       expect(Math.round((await emergency.boundingBox()).height)).toBe(52);
-      if (code === 'ko') {
-        // 보이는 글자는 짧아도 읽히는 이름은 온전하다
-        await expect(bar.getByRole('link', { name: '긴급 연락' })).toBeVisible();
-      }
+      // 보이는 글자는 짧아도 읽히는 이름은 온전하다(짧은 글자가 긴 이름에 없는 언어는 '짧은, 긴')
+      await expect(emergency).toHaveText(short);
+      await expect(emergency).toHaveAccessibleName(name);
     });
   }
 });
