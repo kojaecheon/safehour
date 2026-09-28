@@ -1,6 +1,7 @@
 'use client';
 
 // 로그인 (AX-219 · ADR-0004 · AX-314 새 디자인)
+// SEED ③층(설계서 6.2 2번): 26px 제목 → 로그인 수단 목록(데모는 회색 채움) → 안내 Callout. 자물쇠 원판은 두지 않는다.
 //
 // 화면 원칙
 //   - **로그인은 본인 확인이 아니다.** 어느 환자의 계획인지는 병원 발급 코드가 확인한다.
@@ -114,9 +115,6 @@ function LoginScreen() {
         )}
 
         <section className="onboarding-login-hero" aria-labelledby="login-title">
-          <span className="onboarding-login-mark" aria-hidden="true">
-            <Icon name="lock" size={28} />
-          </span>
           <h2 id="login-title" className="onboarding-login-title">
             {t('login.title')}
           </h2>
@@ -129,7 +127,7 @@ function LoginScreen() {
             <p>{t('login.checking')}</p>
           </div>
         ) : auth.authenticated ? (
-          <section className="onboarding-card onboarding-login-signed" aria-labelledby="login-signed">
+          <section className="onboarding-login-signed" aria-labelledby="login-signed">
             <p id="login-signed" className="onboarding-login-signed-title">
               <Icon name="check" size={20} strokeWidth={2.6} />
               <strong>{t('login.signedIn')}</strong>
@@ -164,19 +162,23 @@ function LoginScreen() {
                 href={href('kakao')}
               />
               {auth?.auth?.demoLogin && (
-                <>
+                // 데모 설명은 데모 버튼에 붙는다(8px) — 목록 간격(12px)과 나눠 어느 버튼의 설명인지 보이게
+                <div className="onboarding-login-demo">
                   <a className="btn btn-secondary" href={href('demo')}>
                     {t('login.demo')}
                   </a>
                   <p className="onboarding-hint">{t('login.demoNote')}</p>
-                </>
+                </div>
               )}
             </div>
           </section>
         )}
 
-        <div className="medical-callout" role="note">
-          {t('login.notIdentityCheck')}
+        <div className="medical-callout has-icon" role="note">
+          <span className="medical-callout-icon" aria-hidden="true">
+            <Icon name="info" size={20} />
+          </span>
+          <p>{t('login.notIdentityCheck')}</p>
         </div>
         <p className="onboarding-note">{t('login.hospitalNext')}</p>
       </main>

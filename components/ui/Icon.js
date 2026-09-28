@@ -34,6 +34,13 @@ const PATHS = {
       <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
     </>
   ),
+  // 안내 상자(SEED Callout) 앞 아이콘 — 원 + i
+  info: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v5.5M12 7.6v.01" />
+    </>
+  ),
   // 하단 내비
   navToday: (
     <>

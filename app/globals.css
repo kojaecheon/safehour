@@ -346,6 +346,21 @@ time,
   margin-bottom: var(--space-4);
 }
 
+/* 아이콘이 붙은 안내 상자 — 앞에 20px 아이콘 칸(상태 배너와 같은 짝), 원판 없이 먹색, 글자와 8px.
+   아이콘 칸 높이 = 첫 줄 높이(22px) — 아이콘이 첫 줄 가운데에 선다 */
+.medical-callout.has-icon {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+}
+.medical-callout-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+  color: var(--ink);
+}
+
 /* ── 상태 배너 (SEED Callout, D08-CMP006) — 색 + 문구 + 아이콘 ──
    모서리 10 · 안쪽 14 · 아이콘 20px · 라벨 16px(안전 문구 — SEED 14px 을 하한으로 올림).
    1px 상태 선은 남긴다 — ③층 회색 바탕 위에서도 NO_TOURISM 의 옅은 면이 사라지지 않게 */
@@ -637,7 +652,13 @@ input[readonly] {
 }
 
 /* 소셜 로그인 — 공급자 브랜드 규정을 따르되 톤을 최대한 낮춘다 (AX-219).
-   카카오 노랑 위 어두운 글자는 14.3:1, 구글 흰 버튼은 테두리 3.42:1 로 경계가 보인다. */
+   카카오 노랑 위 어두운 글자는 14.3:1, 구글 흰 버튼은 테두리 3.42:1(--line-input)로 경계가 보인다.
+   '준비 중' 배지가 이름 옆에 들어가지 않는 폭(320px 영어)에서는 배지가 다음 줄로 내려간다 — 이름이 쪼개지지 않게 */
+.btn-kakao,
+.btn-google {
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
+}
 .btn-kakao {
   background: #fee500;
   color: #191600;
@@ -649,10 +670,10 @@ input[readonly] {
   color: var(--ink);
   border-color: var(--line-input);
 }
-.btn-google:active { background: var(--surface-alt); }
+.btn-google:active { background: var(--pressed); }
 @media (hover: hover) and (pointer: fine) {
   .btn-kakao:hover { background: #f2db00; }
-  .btn-google:hover { background: var(--surface-alt); }
+  .btn-google:hover { background: var(--pressed); }
 }
 
 /* 비활성 — 투명도 대신 색 교체. 글자는 --ink-subtle(회색 면 위 3.11:1): 무엇이 적혔는지 읽히고 누를 수 없음이 드러난다.
@@ -664,14 +685,6 @@ input[readonly] {
   border-color: transparent;
   cursor: not-allowed;
   transform: none;
-}
-/* 자격증명이 없는 공급자 — 버튼을 없애지 않고 비활성으로 남긴다 */
-.btn-kakao[aria-disabled='true'],
-.btn-google[aria-disabled='true'] {
-  background: var(--surface-alt);
-  color: var(--ink-soft);
-  border-color: var(--line-strong);
-  cursor: not-allowed;
 }
 /* 처리 중 — 눌린 색 + 가운데 회전 표시(18px·선 2px). 글자는 자리를 지키되 보이지 않는다(폭이 흔들리지 않게).
    읽히는 이름은 남는다(opacity 는 접근성 트리에서 지우지 않는다) */

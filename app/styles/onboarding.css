@@ -12,7 +12,7 @@
  *
  * AX-314 배치
  *   - 시작(/): 일러스트 히어로 → 언어 선택 → 고지 3종(두 언어 병기) → 시작하기 → 면책(두 언어)
- *   - 로그인(/login): 자물쇠 표식 + 제목 → 공급자 버튼 묶음 → 본인 확인 아님 안내
+ *   - 로그인(/login): 제목 → 공급자 버튼 목록(데모는 회색 채움) → 본인 확인 아님 안내(Callout)
  *   - 체류 설정(/onboarding): 단계 표시 → 단계 제목 → 오류 요약 → 카드형 입력 → 이전/다음
  *   - 오류는 문장 + 왼쪽 굵은 띠 + 굵은 글자로 보인다(색만으로 알리지 않는다). 글자 색은 --support-ink(7.64:1).
  */
@@ -89,8 +89,9 @@
   width: 100%;
   height: 100%;
 }
-/* 화면 제목 (SEED screenTitle 26/35) — 두 줄 모두 먹색. 코발트는 주 버튼·링크·'오늘'에만 */
-.onboarding-hero-title {
+/* 화면 제목 (SEED screenTitle 26/35) — 먹색. 코발트는 주 버튼·링크·'오늘'에만. 로그인 제목도 같다 */
+.onboarding-hero-title,
+.onboarding-login-title {
   font-size: var(--text-display);
   line-height: var(--lh-display);
   font-weight: var(--weight-bold);
@@ -220,38 +221,36 @@
 
 /* ───────────────────────── 로그인 ───────────────────────── */
 
+/* SEED ③층 · 설계서 6.2 2번 — 흰 바탕 한 장:
+   26px 제목 → 설명 → 로그인 수단(전체 폭 버튼 목록, 데모는 회색 채움) → 안내 Callout.
+   상단 바 → 제목 20px 은 main.page 가 준다. 자물쇠 원판(코발트 면)은 두지 않는다 */
 .onboarding-login-hero {
-  padding: var(--space-4) 0 var(--space-5);
+  margin-bottom: var(--space-5);
 }
-.onboarding-login-mark {
-  display: inline-grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  margin-bottom: var(--space-4);
-  border-radius: var(--radius-full);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
+/* 제목 줄바꿈은 문구의 \n 을 따른다. h2 기본 아래 여백을 지워 설명과 6px(--gap-text) */
 .onboarding-login-title {
-  font-size: var(--text-title-1);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-tight);
-  font-weight: var(--weight-heavy);
   white-space: pre-line;
   margin-bottom: 0;
 }
 .onboarding-login-methods {
   margin-bottom: var(--space-5);
 }
+/* 로그인된 상태 — 그림자 카드 없이 흰 바탕 그대로: 상태 줄(초록 체크 + 먹색 굵은 글자) → [계속하기][로그아웃] */
 .onboarding-login-signed {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--gap-component);
+  margin-bottom: var(--space-5);
 }
 .onboarding-login-signed-title {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--ink);
+}
+.onboarding-login-signed-title .ui-icon {
+  flex: none;
   color: var(--state-together-ink);
 }
 
