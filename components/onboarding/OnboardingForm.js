@@ -277,7 +277,8 @@ export default function OnboardingForm() {
             />
           </section>
 
-          <div className="onboarding-actions">
+          {/* 하단 고정 바(설계서 6.1) — 하단 긴급 바 바로 위에 선다. [이전 3][다음 7] */}
+          <div className="onboarding-actions sticky-return">
             {step > 0 && (
               <Button variant="secondary" onClick={() => goTo(step - 1)}>
                 {t('onboarding.prev')}

@@ -13,7 +13,7 @@
  * AX-314 배치
  *   - 시작(/): 일러스트 히어로 → 언어 선택 → 고지 3종(두 언어 병기) → 시작하기 → 면책(두 언어)
  *   - 로그인(/login): 제목 → 공급자 버튼 목록(데모는 회색 채움) → 본인 확인 아님 안내(Callout)
- *   - 체류 설정(/onboarding): 단계 표시 → 단계 제목 → 오류 요약 → 카드형 입력 → 이전/다음
+ *   - 체류 설정(/onboarding): 단계 표시 → 단계 제목 → 오류 요약 → 입력 묶음 → 하단 고정 [이전 3][다음 7]
  *   - 오류는 문장 + 왼쪽 굵은 띠 + 굵은 글자로 보인다(색만으로 알리지 않는다). 글자 색은 --support-ink(7.64:1).
  */
 
@@ -89,9 +89,10 @@
   width: 100%;
   height: 100%;
 }
-/* 화면 제목 (SEED screenTitle 26/35) — 먹색. 코발트는 주 버튼·링크·'오늘'에만. 로그인 제목도 같다 */
+/* 화면 제목 (SEED screenTitle 26/35) — 먹색. 코발트는 주 버튼·링크·'오늘'에만. 로그인·체류 설정 단계 제목도 같다 */
 .onboarding-hero-title,
-.onboarding-login-title {
+.onboarding-login-title,
+.onboarding-step-title {
   font-size: var(--text-display);
   line-height: var(--lh-display);
   font-weight: var(--weight-bold);
@@ -200,8 +201,9 @@
 .onboarding-cta {
   margin-top: var(--space-6);
 }
-/* 하단 바 — 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리). 그라데이션은 뒤의 언어 칸이 비쳐 보인다 */
-.onboarding-cta.sticky-return {
+/* 하단 바(시작 화면·체류 설정) — 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리). 그라데이션은 뒤의 입력 칸이 비쳐 보인다 */
+.onboarding-cta.sticky-return,
+.onboarding-actions.sticky-return {
   background: var(--bg);
   border-top: 1px solid var(--line-strong);
 }
@@ -256,11 +258,12 @@
 
 /* ───────────────────────── 체류 설정 ───────────────────────── */
 
-.onboarding-page {
-  padding-top: var(--space-4);
-}
+/* SEED ③층 · 설계서 6.2 3번 — 흰 바탕 한 장:
+   단계 표시 → 26px 단계 제목 → Field 묶음 → 하단 고정 [이전 3][다음 7].
+   상단 바 → 단계 표시 20px 은 main.page 가 준다 */
 
-/* 단계 표시 — 숫자 원 5개. 모양으로도 구분한다: 체크(지남) · 채운 원(지금) · 실선(가 봄) · 파선(아직) */
+/* 단계 표시 — 숫자 원 5개. 코발트 없이 모양으로 구분한다:
+   체크(지남) · 진한 채움(지금 — SEED '선택됨') · 실선(가 봄) · 파선(아직) */
 .onboarding-steps {
   margin-bottom: var(--space-4);
 }
@@ -328,30 +331,26 @@
   border-style: dashed;
   color: var(--ink-soft);
 }
-.onboarding-steps-item.is-done .onboarding-steps-mark {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
 .onboarding-steps-item.is-current .onboarding-steps-mark {
   width: 40px;
   height: 40px;
-  border-color: var(--accent);
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: var(--weight-heavy);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  border-color: var(--selected);
+  background: var(--selected);
+  color: var(--on-dark);
 }
-.onboarding-steps-item > button:hover .onboarding-steps-mark {
-  background: var(--surface-alt);
+/* 누를 수 있는 칸(지남·가 봄) — 눌림은 면 색만 */
+.onboarding-steps-item > button:active .onboarding-steps-mark {
+  background: var(--pressed);
+}
+@media (hover: hover) and (pointer: fine) {
+  .onboarding-steps-item > button:hover .onboarding-steps-mark {
+    background: var(--pressed);
+  }
 }
 
+/* 단계 제목 — 크기·굵기·색은 위 화면 제목 규칙(26/35)을 함께 쓴다. h2 기본 아래 여백을 지워 설명과 6px */
 .onboarding-step-title {
-  font-size: var(--text-title-1);
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-tight);
-  font-weight: var(--weight-heavy);
-  margin-bottom: var(--space-2);
+  margin-bottom: 0;
   /* 초점이 올 때 고정 상단 바에 가리지 않게 */
   scroll-margin-top: 88px;
 }
@@ -363,8 +362,10 @@
   outline-offset: 2px;
 }
 .onboarding-lead {
-  margin-bottom: var(--space-5);
+  margin: var(--gap-text) 0 var(--space-5);
   font-size: var(--text-body);
+  line-height: var(--lh-article);
+  color: var(--ink-soft);
 }
 .onboarding-subhead {
   margin: var(--space-6) 0 var(--space-2);
@@ -726,15 +727,24 @@ fieldset.onboarding-card {
   pointer-events: none;
 }
 
-/* 이전 / 다음 · 저장 */
+/* 이전 / 다음 · 저장 — 하단 고정 바(설계서 6.1, 면·윗선은 위 하단 바 규칙). 하단 긴급 바 바로 위에 선다.
+   두 버튼은 3:7, 사이 8px. 버튼 셋을 한 줄에 두지 않으려고 긴급은 아래 긴급 바에 그대로 둔다 */
 .onboarding-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
-  gap: var(--space-3);
-  margin-top: var(--space-6);
+  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+  gap: var(--space-2);
 }
 .onboarding-actions > .btn:only-child {
   grid-column: 1 / -1;
+}
+/* 30% 칸(320px 에서 84px)에도 '上一步'(zh)가 한 줄로 들어가게 '이전'의 좌우 여백을 12px 로 줄인다 */
+.onboarding-actions > .btn-secondary {
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+}
+/* 두 고정 바(하단 긴급 바 69px + 이 바 77px 안팎)가 키보드 초점이 간 입력 칸을 덮지 않게 */
+html:has(.onboarding-actions.sticky-return) {
+  scroll-padding-bottom: 160px;
 }
 .onboarding-readonly {
   display: flex;
