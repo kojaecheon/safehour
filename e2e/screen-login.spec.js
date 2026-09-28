@@ -68,6 +68,8 @@ test.describe('③층 로그인 화면 — SEED 배치', () => {
     ).toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-top-left-radius': '10px', 'border-left-width': '0px' });
     const icon = callout.locator('.medical-callout-icon');
     expect((await styles(icon, ['color'])).color).toBe('rgb(26, 28, 32)');
+    // 문장은 전역 p 의 옅은 회색이 아니라 상자의 먹색
+    expect((await styles(callout.locator('p'), ['color'])).color).toBe('rgb(26, 28, 32)');
     expect((await icon.locator('svg').boundingBox()).width).toBe(20);
     await expect(callout).toHaveAttribute('role', 'note');
     await expect(callout).toHaveText('로그인은 본인 확인이 아닙니다. 어느 환자의 계획인지는 병원이 발급한 코드로 확인합니다.');

@@ -360,6 +360,10 @@ time,
   height: var(--lh-body);
   color: var(--ink);
 }
+/* 전역 p(--ink-soft)가 상자의 먹색을 덮지 않게 — 안내 상자 문장은 안전 문구라 먹색 그대로(상태 배너와 같다) */
+.medical-callout.has-icon > p {
+  color: inherit;
+}
 
 /* ── 상태 배너 (SEED Callout, D08-CMP006) — 색 + 문구 + 아이콘 ──
    모서리 10 · 안쪽 14 · 아이콘 20px · 라벨 16px(안전 문구 — SEED 14px 을 하한으로 올림).
