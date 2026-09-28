@@ -575,6 +575,11 @@ input[readonly] {
   border-color: var(--line-contrast);
   box-shadow: inset 0 0 0 1px var(--line-contrast);
 }
+/* 고르지 않아 오류인 묶음 — 선택지 칸 테두리를 긴급 빨강으로(라디오 점 자체에는 그리지 않는다).
+   글자 입력칸의 오류 규칙(2px 긴급 빨강)은 라디오를 빼므로 여기서 따로 알린다 */
+.radio-option:has(input[aria-invalid='true']) {
+  border-color: var(--emergency);
+}
 
 /* ── 버튼 (SEED Action Button) ──
    큰 CTA 52px · 모서리 12 · 18/24 굵게. 작은 버튼 44px · 모서리 8 · 16/22 굵게(SEED 36·40px 은 터치 하한으로 올림).

@@ -17,7 +17,7 @@ function joinIds(...ids) {
   return list.length > 0 ? list.join(' ') : undefined;
 }
 
-/** 필드 오류 문장 묶음. 문제가 없으면 그리지 않는다 */
+/** 필드 오류 문장 묶음 — 문장마다 앞에 20px 경고 아이콘(설계서 5.2). 문제가 없으면 그리지 않는다 */
 export function FieldErrors({ id, issues }) {
   const { t } = useLang();
   if (!issues || issues.length === 0) return null;
@@ -25,7 +25,12 @@ export function FieldErrors({ id, issues }) {
     <div id={id} className="onboarding-field-error">
       {issues.map((issue) => {
         const { key, vars } = issueMessage(issue);
-        return <p key={`${issue.field}-${issue.code}`}>{t(key, vars)}</p>;
+        return (
+          <p key={`${issue.field}-${issue.code}`}>
+            <Icon name="alert" size={20} />
+            <span>{t(key, vars)}</span>
+          </p>
+        );
       })}
     </div>
   );

@@ -272,3 +272,61 @@ test.describe('③층 체류 설정 — 입력 묶음', () => {
     await expect(page.locator('.onboarding-footer-note .onboarding-safety-icon svg')).toHaveCount(1);
   });
 });
+
+test.describe('③층 체류 설정 — 오류 표시', () => {
+  test('입력칸은 2px 긴급 빨강, 라디오는 선택지 칸 테두리, 문장은 빨강 + 경고 아이콘', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+    await submit(page);
+    await expect(page.locator('.onboarding-summary')).toBeVisible();
+
+    // 입력칸 = 공통 오류 규칙(설계서 5.2): 긴급 빨강 1px + 안쪽 1px
+    // border-color·box-shadow 는 --duration-fast(150ms) 전환이 걸려 있어(globals.css) submit 직후
+    // aria-invalid 가 막 붙은 값이 아직 안 옮았을 수 있다 — design-board-components.spec.js 와 같이 poll 로 기다린다
+    await expect
+      .poll(() => styles(page.locator('#ob-arrival-date'), ['border-top-color', 'box-shadow']))
+      .toEqual({
+        'border-top-color': 'rgb(200, 16, 46)',
+        'box-shadow': 'rgb(200, 16, 46) 0px 0px 0px 1px inset',
+      });
+    // 라디오 점에는 네모 그림자가 없고, 선택지 칸 테두리가 빨갛다
+    expect((await styles(page.locator('#ob-arrival-airport'), ['box-shadow']))['box-shadow']).toBe('none');
+    expect((await styles(page.locator('label[for="ob-arrival-airport"]'), ['border-top-color']))['border-top-color']).toBe(
+      'rgb(200, 16, 46)',
+    );
+
+    // 오류 문장 = 왼쪽 띠 없이 16px 굵은 긴급 빨강 + 20px 경고 아이콘
+    const error = page.locator('#ob-arrival-date-error');
+    expect((await styles(error, ['border-left-width']))['border-left-width']).toBe('0px');
+    const line = error.locator('p').first();
+    expect(await styles(line, ['color', 'font-size', 'font-weight'])).toEqual({
+      color: 'rgb(200, 16, 46)',
+      'font-size': '16px',
+      'font-weight': '700',
+    });
+    expect((await line.locator('svg').boundingBox()).width).toBe(20);
+  });
+
+  test('오류 요약 — 안내 상자 모양, 제목 16px 굵게 + 경고 아이콘, 항목 이름은 먹색', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+    await submit(page);
+
+    const summary = page.locator('.onboarding-summary');
+    await expect(summary).toBeFocused();
+    expect(
+      await styles(summary, ['border-top-left-radius', 'padding-top', 'border-top-width', 'background-color']),
+    ).toEqual({
+      'border-top-left-radius': '10px',
+      'padding-top': '14px',
+      'border-top-width': '1px',
+      'background-color': 'rgb(255, 233, 240)',
+    });
+    const title = summary.locator('.onboarding-summary-title');
+    expect(await styles(title, ['font-size', 'font-weight', 'color'])).toEqual({
+      'font-size': '16px',
+      'font-weight': '700',
+      color: 'rgb(26, 28, 32)',
+    });
+    expect((await title.locator('svg').boundingBox()).width).toBe(20);
+    expect((await styles(summary.locator('a strong').first(), ['color'])).color).toBe('rgb(26, 28, 32)');
+  });
+});

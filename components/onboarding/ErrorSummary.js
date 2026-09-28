@@ -7,6 +7,7 @@
 
 import { useId } from 'react';
 import { useLang } from '../LanguageProvider.js';
+import { Icon } from '../ui/index.js';
 import { fieldDomId, fieldLabelParts, issueMessage } from './draft.js';
 
 export default function ErrorSummary({ issues, ref }) {
@@ -16,7 +17,8 @@ export default function ErrorSummary({ issues, ref }) {
   return (
     <div className="onboarding-summary" role="group" aria-labelledby={titleId} tabIndex={-1} ref={ref}>
       <p className="onboarding-summary-title" id={titleId}>
-        {t('onboarding.errorsTitle', { n: issues.length })}
+        <Icon name="alert" size={20} />
+        <span>{t('onboarding.errorsTitle', { n: issues.length })}</span>
       </p>
       <ul role="list">
         {issues.map((issue) => {

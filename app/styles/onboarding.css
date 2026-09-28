@@ -14,7 +14,8 @@
  *   - 시작(/): 일러스트 히어로 → 언어 선택 → 고지 3종(두 언어 병기) → 시작하기 → 면책(두 언어)
  *   - 로그인(/login): 제목 → 공급자 버튼 목록(데모는 회색 채움) → 본인 확인 아님 안내(Callout)
  *   - 체류 설정(/onboarding): 단계 표시 → 단계 제목 → 오류 요약 → 입력 묶음 → 하단 고정 [이전 3][다음 7]
- *   - 오류는 문장 + 왼쪽 굵은 띠 + 굵은 글자로 보인다(색만으로 알리지 않는다). 글자 색은 --support-ink(7.64:1).
+ *   - 오류는 입력칸 2px 긴급 빨강(globals.css 공통 규칙) + 경고 아이콘 + 굵은 문장으로 보인다(색만으로 알리지 않는다).
+ *     글자 색은 --emergency(흰 바탕 5.88:1). 오류 요약만 분홍 면(--support-soft)이다.
  */
 
 /* ───────────────────────── 공통 ───────────────────────── */
@@ -484,46 +485,53 @@
   color: var(--ink-soft);
 }
 
-/* 오류 — 문장 + 왼쪽 굵은 띠 + 굵은 글자. 입력 칸은 테두리가 두꺼워진다(색만으로 알리지 않는다) */
+/* 오류 문장 (설계서 5.2) — 20px 경고 아이콘 + 16/22 굵은 긴급 빨강, 왼쪽 띠 없음.
+   16px(SEED 14px) — 다음 단계로 못 가는 이유라 본문 하한을 지킨다. 입력칸 테두리는 globals.css 공통 규칙이 그린다 */
 .onboarding-field-error {
   margin-top: var(--space-2);
-  padding-left: var(--space-3);
-  border-left: 4px solid var(--support-ink);
 }
 .onboarding-field-error p {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
   font-size: var(--text-body);
-  line-height: var(--leading-snug);
+  line-height: var(--lh-body);
   font-weight: var(--weight-bold);
-  color: var(--support-ink);
+  color: var(--emergency);
+}
+/* 20px 아이콘을 22px 첫 줄 가운데에 */
+.onboarding-field-error .ui-icon {
+  flex: none;
+  margin-top: 1px;
 }
 .onboarding-field-error p + p {
   margin-top: var(--space-1);
 }
-.onboarding-form input[aria-invalid='true'],
-.onboarding-form select[aria-invalid='true'] {
-  border-color: var(--support-ink);
-  box-shadow: inset 0 0 0 1px var(--support-ink);
-}
-.onboarding-form input[aria-invalid='true']:focus-visible,
-.onboarding-form select[aria-invalid='true']:focus-visible {
-  outline: var(--focus-width) solid var(--accent);
-  outline-offset: 2px;
-}
 
-/* 오류 요약 */
+/* 오류 요약 (SEED Callout 모양) — 분홍 면 + 1px 분홍 선 · 모서리 10 · 안쪽 14/16.
+   제목 16px 굵게 + 20px 경고 아이콘, 항목 이름은 먹색(오류 문장의 빨강과 겹치지 않게) */
 .onboarding-summary {
   margin-bottom: var(--space-5);
-  padding: var(--space-4);
-  border: 2px solid var(--support-ink);
-  border-radius: var(--radius-16);
+  padding: 14px var(--space-4);
+  border: 1px solid var(--support-ink);
+  border-radius: var(--radius-10);
   background: var(--support-soft);
   scroll-margin-top: 88px;
 }
 .onboarding-summary-title {
-  font-size: var(--text-title-3);
-  font-weight: var(--weight-heavy);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-bold);
   color: var(--ink);
   margin-bottom: var(--space-2);
+}
+.onboarding-summary-title .ui-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--support-ink);
 }
 .onboarding-summary ul {
   list-style: none;
@@ -543,7 +551,7 @@
   text-underline-offset: 3px;
 }
 .onboarding-summary a strong {
-  color: var(--support-ink);
+  color: var(--ink);
 }
 
 /* 주소 검색 */
@@ -572,11 +580,10 @@
 .onboarding-search-status:empty {
   margin-top: 0;
 }
+/* 검색 실패 — 오류 문장과 같은 굵은 긴급 빨강(왼쪽 띠 없음) */
 .onboarding-search-status.is-error {
-  padding-left: var(--space-3);
-  border-left: 4px solid var(--support-ink);
   font-weight: var(--weight-bold);
-  color: var(--support-ink);
+  color: var(--emergency);
 }
 .onboarding-results {
   list-style: none;
@@ -792,13 +799,13 @@ html:has(.onboarding-actions.sticky-return) {
   font-size: var(--text-body);
   color: var(--ink);
 }
+/* 저장 실패 — 오류 문장과 같은 굵은 긴급 빨강(왼쪽 띠 없음) */
 .onboarding-save-error {
   margin-top: var(--space-3);
-  padding-left: var(--space-3);
-  border-left: 4px solid var(--support-ink);
   font-size: var(--text-body);
+  line-height: var(--lh-body);
   font-weight: var(--weight-bold);
-  color: var(--support-ink);
+  color: var(--emergency);
 }
 .onboarding-saved {
   padding: var(--space-8) 0;

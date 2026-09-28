@@ -149,6 +149,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | `ListItem` · `ListGroup` · `ListHeader` | `title`, `titleLang?`, `description?`, `leading?`, `trailing?`(`'chevron'`·노드), `href?`·`onClick?` / `label?` / `as?`, `id?` | SEED List Item — 위아래 12·좌우 16, 제목 16/22·설명 14/19 `--ink-soft`(한 줄 46·두 줄 67px). 누르면 좌우 6px 안으로 들어온 모서리 10 면. 반복 행 사이 1px 선 16px 들여씀. 행 안에서 따로 누를 것은 3개까지 |
 | 클래스 `.ui-switch` · `.ui-block` · `main.page.is-basement` · `.hint.is-error` | — | 스위치(바로 적용되는 켬/끔, `role="switch"`, `.toggle-row` 라벨 안 — 끔 트랙 `--ink-subtle`), 흰 블록(화면 폭·8px 틈), 회색 바탕 층(그 안에서 카드 그림자 끔), 입력 오류 도움말(긴급 빨강, 입력은 `aria-invalid`) |
 | 클래스 `.medical-callout` · `.has-icon` | — | 일반 안내 상자(SEED Callout · neutral): 회색 면·모서리 10·16/22, 왼쪽 띠 없음, `role="note"`. `.has-icon`이면 앞에 20px 먹색 아이콘 칸(`.medical-callout-icon` — 첫 줄 가운데, 글자와 8px)을 두고 글자는 `<p>`에 넣는다. 기본 아이콘은 `info`(원 + i) |
+| 입력 오류 표시 | — | 입력칸은 공통 규칙(`aria-invalid` → 2px 긴급 빨강, 체크·라디오 제외). 라디오 묶음은 선택지 칸 테두리가 빨강(`.radio-option:has(input[aria-invalid])`). 오류 문장은 20px `alert` 아이콘(원 + 느낌표) + 16/22 굵은 `--emergency`, 왼쪽 띠 없음 — 체류 설정(`.onboarding-field-error`)이 먼저 쓴다 |
 | `TopBar` | `title`, `titleLang?`, `backHref?`·`onBack?`, `backLabel?`, `as?`, `actions?` | SEED Top Navigation — 높이 56·선 없음, 제목(기본 h1) 18/24 굵게·좁으면 말줄임, 뒤로 가기 44×44·모서리 8, 언어 선택(8장) |
 | `Icon` | `name`, `size?`, `strokeWidth?` | 인라인 SVG 선 아이콘(`ICON_NAMES`). 이름이 `Fill`로 끝나면 채운 모양(하단 내비 현재 칸). 상태 아이콘은 `STATE_ICON` |
 | `BottomNav` · `EmergencyButton` · `ReadOnlyBanner` · `AppShell` | 7장 | 앱 셸 |
