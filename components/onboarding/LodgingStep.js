@@ -70,7 +70,7 @@ export default function LodgingStep({ draft, update, issues }) {
             <div className="onboarding-card-head">
               <h3 id={titleId}>{t('onboarding.lodgingItem', { n: index + 1 })}</h3>
               {count > 1 && (
-                <Button variant="quiet" size="small" onClick={() => remove(index)}>
+                <Button variant="secondary" size="small" onClick={() => remove(index)}>
                   {t('onboarding.removeLodging', { n: index + 1 })}
                 </Button>
               )}

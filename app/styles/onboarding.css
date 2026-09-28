@@ -49,14 +49,25 @@
   margin-bottom: var(--space-1);
 }
 
-/* 안전 문구 병기 (SEED Callout · neutral) — 왼쪽 띠 없이 회색 면 · 모서리 10.
+/* 안전 문구 병기 (SEED Callout · neutral) — 왼쪽 띠 없이 회색 면 · 모서리 10, 앞에 20px 안내 아이콘.
    주 언어 한 줄 + 병기 언어 한 줄. 병기 줄도 16px·대비 유지(투명도 감산 금지).
    시작 화면과 체류 설정 단계(여행·병원)가 같은 상자(SafetyNote)를 쓴다 */
 .onboarding-safety {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
   margin: var(--space-4) 0;
   padding: 14px var(--space-4);
   border-radius: var(--radius-10);
   background: var(--surface-alt);
+}
+/* 아이콘 칸 높이 = 첫 줄 높이(24px) — 아이콘이 첫 줄 가운데에 선다 */
+.onboarding-safety-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-article);
+  color: var(--ink);
 }
 .onboarding-safety p {
   font-size: var(--text-body);
@@ -372,21 +383,22 @@
   font-size: var(--text-title-2);
 }
 
-/* 카드 — 숙소 구간·병원·일정·입국/출국 묶음 */
+/* 입력 묶음 — 숙소 구간·병원·일정·입국/출국. 그림자 카드 없이 흰 바탕 그대로(설계서 6.1 흰 바탕 한 장).
+   묶음 사이 32px, 묶음 이름(18/24 굵게)이 머리가 된다 */
 .onboarding-card {
   min-width: 0;
-  margin: 0 0 var(--space-4);
-  padding: var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-16);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
+  margin: 0 0 var(--space-8);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   scroll-margin-top: 88px;
 }
-fieldset.onboarding-card {
-  padding-top: var(--space-2);
-}
+/* 병원이 보낸 일정(읽기만) — 회색 면 상자로 입력 묶음과 나눈다 */
 .onboarding-card.is-locked {
+  padding: var(--space-4);
+  border-radius: var(--radius-12);
   background: var(--surface-alt);
 }
 .onboarding-card-head {
@@ -400,16 +412,14 @@ fieldset.onboarding-card {
 .onboarding-card-head h3,
 .onboarding-card-head h4 {
   font-size: var(--text-title-3);
-  line-height: var(--leading-snug);
+  line-height: var(--lh-title-3);
   margin: 0;
 }
-.onboarding-card-head .btn-quiet {
-  padding-left: var(--space-2);
-  padding-right: var(--space-2);
-}
 .onboarding-group-title {
-  padding: 0 var(--space-1);
+  padding: 0;
+  margin-bottom: var(--space-3);
   font-size: var(--text-title-3);
+  line-height: var(--lh-title-3);
   font-weight: var(--weight-bold);
   color: var(--ink);
 }
@@ -589,9 +599,14 @@ fieldset.onboarding-card {
   text-align: left;
   cursor: pointer;
 }
-.onboarding-result:hover {
-  background: var(--surface-alt);
-  border-color: var(--accent);
+/* 눌림·호버는 면 색만(코발트 테두리 없이) */
+.onboarding-result:active {
+  background: var(--pressed);
+}
+@media (hover: hover) and (pointer: fine) {
+  .onboarding-result:hover {
+    background: var(--pressed);
+  }
 }
 .onboarding-result-main {
   font-size: var(--text-body);
@@ -604,15 +619,16 @@ fieldset.onboarding-card {
 .onboarding-result .ui-badge {
   margin-top: var(--space-1);
 }
+/* 고른 주소 (SEED Select Box · 고른 칸) — 흰 면 + 2px 진한 테두리. 코발트 띠·면 없이 */
 .onboarding-picked {
   display: grid;
   gap: var(--space-1);
   justify-items: start;
   padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--accent);
-  border-left-width: 4px;
+  border: 1px solid var(--line-contrast);
   border-radius: var(--radius-12);
-  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--line-contrast);
+  background: var(--surface);
 }
 .onboarding-picked-caption {
   display: flex;
@@ -621,7 +637,7 @@ fieldset.onboarding-card {
   gap: var(--space-2);
   font-size: var(--text-body);
   font-weight: var(--weight-bold);
-  color: var(--accent-strong);
+  color: var(--ink);
 }
 .onboarding-picked-main {
   font-size: var(--text-body);
@@ -636,12 +652,12 @@ fieldset.onboarding-card {
   margin-top: var(--space-2);
 }
 
-/* 예상 종료 — '추정' 배지 + 굵은 시각 */
+/* 예상 종료 — 판정·추정 출처(Callout 모양, 모서리 10): 점선 + 회색 면 + '추정' 배지 + 굵은 시각 */
 .onboarding-estimate {
   margin-top: var(--space-2);
   padding: var(--space-3);
   border: 1px dotted var(--ink-soft);
-  border-radius: var(--radius-12);
+  border-radius: var(--radius-10);
   background: var(--surface-alt);
 }
 .onboarding-estimate p {
@@ -662,19 +678,17 @@ fieldset.onboarding-card {
   color: var(--ink);
 }
 
+/* 박 수 — 누르는 것이 아니므로 알약·코발트 면 없이 굵은 먹색 한 줄 */
 .onboarding-tally {
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--tap-min);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-full);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
+  margin-bottom: var(--space-3);
   font-size: var(--text-body);
+  line-height: var(--lh-body);
   font-weight: var(--weight-bold);
+  color: var(--ink);
 }
 
-/* 관심사 칩 — 선택: 포인트 테두리 + 옅은 바탕 + 체크 아이콘 + 굵기 (색 단독 금지) */
+/* 관심사 칩 (SEED Chip · outlineWeak — 답 칩과 같은 모양) — 44px 알약, 테두리 3:1(--line-input).
+   고르면 진한 테두리 + 회색 면 + 체크 아이콘 + 굵게(코발트 없이, 색 단독 금지). 링은 키보드 초점에만 */
 .onboarding-chips {
   list-style: none;
   display: flex;
@@ -695,6 +709,9 @@ fieldset.onboarding-card {
   font-size: var(--text-body);
   font-weight: var(--weight-medium);
   cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-color),
+    transform var(--duration-fast) var(--ease-press);
 }
 .onboarding-chip input {
   position: absolute;
@@ -705,19 +722,39 @@ fieldset.onboarding-card {
   opacity: 0;
   cursor: pointer;
 }
-.onboarding-chip:hover {
-  background: var(--surface-alt);
+.onboarding-chip:active {
+  background: var(--pressed);
 }
-.onboarding-chip:focus-within {
+@media (hover: hover) and (pointer: fine) {
+  .onboarding-chip:hover {
+    background: var(--pressed);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding-chip:active {
+    transform: scale(var(--press-scale-tight));
+  }
+}
+/* 키보드 초점일 때만 칩 전체에 링 — 안쪽 입력은 칩을 덮는 투명 층이라 자체 링을 지워 이중 링을 막는다 */
+.onboarding-chip:has(input:focus-visible) {
   outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
-.onboarding-chip.is-checked {
-  border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  font-weight: var(--weight-heavy);
+.onboarding-chip input:focus-visible {
+  outline: none;
+}
+/* 고른 칩은 눌러도 색을 바꾸지 않는다(색 자체가 상태) */
+.onboarding-chip.is-checked,
+.onboarding-chip.is-checked:active {
+  border-color: var(--line-contrast);
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+@media (hover: hover) and (pointer: fine) {
+  .onboarding-chip.is-checked:hover {
+    background: var(--surface-alt);
+  }
 }
 .onboarding-chip-mark {
   display: inline-grid;

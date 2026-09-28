@@ -31,6 +31,25 @@ async function fillTravel(page) {
   await page.check('#ob-departure-airport-GMP');
 }
 
+/** 2단계 — 숙소 이름 + 데모 주소 검색 첫 결과 */
+async function fillLodging(page) {
+  await page.fill('#ob-lodgings-0-name', '숙소');
+  await page.fill('#ob-lodgings-0-address', '명동');
+  await page.locator('#ob-lodgings .onboarding-search-row button').click();
+  await page.locator('.onboarding-result').first().click();
+}
+
+/** 3단계 — 병원 이름 + 데모 주소, 수술·시술 일정 내일 10:00 */
+async function fillHospital(page) {
+  await page.fill('#ob-hospitals-0-name', '병원');
+  await page.fill('#ob-hospitals-0-address', '압구정');
+  await page.locator('#ob-hospitals .onboarding-search-row button').click();
+  await page.locator('.onboarding-result').first().click();
+  await page.check('#ob-appointments-0-type');
+  await page.fill('#ob-appointments-0-date', kstDate(1));
+  await page.fill('#ob-appointments-0-start', '10:00');
+}
+
 test.describe('③층 체류 설정 — 단계 머리와 하단 바', () => {
   test('단계 표시에 코발트가 없고, 단계 제목은 26/35 먹색', async ({ page }) => {
     await loginDemo(page, '/onboarding');
@@ -134,5 +153,122 @@ test.describe('③층 체류 설정 — 단계 머리와 하단 바', () => {
       expect(Math.round((await bar.getByRole('button', { name }).boundingBox()).height)).toBe(52);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+});
+
+test.describe('③층 체류 설정 — 입력 묶음', () => {
+  test('그림자 카드 없이 흰 바탕, 박 수는 알약이 아니고, 삭제는 작은 회색 버튼', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+
+    // 입국·출국 묶음 = 흰 바탕 그대로(그림자·테두리·안쪽 여백 없음), 묶음 사이 32px
+    const groups = page.locator('fieldset.onboarding-card');
+    expect(
+      await styles(groups.first(), ['box-shadow', 'border-top-width', 'background-color', 'padding-left']),
+    ).toEqual({
+      'box-shadow': 'none',
+      'border-top-width': '0px',
+      'background-color': 'rgba(0, 0, 0, 0)',
+      'padding-left': '0px',
+    });
+    expect(gapBetween(await groups.nth(0).boundingBox(), await groups.nth(1).boundingBox())).toBe(32);
+
+    // 박 수 = 굵은 먹색 글자 한 줄(코발트 알약 아님)
+    await fillTravel(page);
+    const tally = page.locator('.onboarding-tally');
+    await expect(tally).toHaveText('3박 체류');
+    expect(await styles(tally, ['background-color', 'font-weight', 'color'])).toEqual({
+      'background-color': 'rgba(0, 0, 0, 0)',
+      'font-weight': '700',
+      color: 'rgb(26, 28, 32)',
+    });
+
+    // 숙소 삭제 = 작은 회색 버튼(44px · 모서리 8)
+    await submit(page);
+    await page.getByRole('button', { name: '숙소 구간 추가' }).click();
+    const remove = page.getByRole('button', { name: '숙소 1 삭제' });
+    expect(await styles(remove, ['background-color', 'min-height', 'border-top-left-radius'])).toEqual({
+      'background-color': 'rgb(243, 244, 245)',
+      'min-height': '44px',
+      'border-top-left-radius': '8px',
+    });
+  });
+
+  test('주소 검색 — 검색은 작은 회색 버튼, 고른 주소는 흰 면 + 진한 테두리', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+    await fillTravel(page);
+    await submit(page);
+
+    await page.fill('#ob-lodgings-0-address', '명동');
+    const search = page.getByRole('button', { name: '검색', exact: true });
+    expect((await styles(search, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    await search.click();
+    await page.getByRole('button', { name: /데모 숙소 \(명동 인근\)/ }).click();
+
+    // 고른 주소 = Select Box 고른 칸: 흰 면 + 2px 진한 테두리(1px + 안쪽 1px), 코발트 띠 없음
+    const picked = page.locator('.onboarding-picked');
+    expect(
+      await styles(picked, ['background-color', 'border-top-color', 'border-left-width', 'box-shadow', 'border-top-left-radius']),
+    ).toEqual({
+      'background-color': 'rgb(255, 255, 255)',
+      'border-top-color': 'rgb(26, 28, 32)',
+      'border-left-width': '1px',
+      'box-shadow': 'rgb(26, 28, 32) 0px 0px 0px 1px inset',
+      'border-top-left-radius': '12px',
+    });
+    expect((await styles(picked.locator('.onboarding-picked-caption'), ['color'])).color).toBe('rgb(26, 28, 32)');
+  });
+
+  test('관심사 칩 — 고르면 진한 테두리·회색 면·굵게, 링은 키보드 초점에만', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+    await fillTravel(page);
+    await submit(page);
+    await fillLodging(page);
+    await submit(page);
+    await fillHospital(page);
+    await submit(page);
+    await page.check('#ob-hasCompanion');
+    await submit(page);
+
+    // 마우스로 고르면 진한 테두리 + 회색 면 + 굵게, 링은 뜨지 않는다
+    // background-color 는 --duration-fast 전환이 걸려 있어(.ui-answer-option 과 같은 값) 클릭 직후 값이
+    // 아직 안 옮았을 수 있다 — design-board-components.spec.js 의 답 칩 검사와 같이 poll 로 기다린다
+    const cafe = page.locator('label[for="ob-interest-CAFE"]');
+    await cafe.click();
+    await page.mouse.move(0, 0);
+    await expect
+      .poll(() => styles(cafe, ['border-top-color', 'background-color', 'font-weight', 'color', 'outline-style']))
+      .toEqual({
+        'border-top-color': 'rgb(26, 28, 32)',
+        'background-color': 'rgb(243, 244, 245)',
+        'font-weight': '700',
+        color: 'rgb(26, 28, 32)',
+        'outline-style': 'none',
+      });
+    // 안 고른 칩은 3:1 테두리
+    expect((await styles(page.locator('label[for="ob-interest-FOOD"]'), ['border-top-color']))['border-top-color']).toBe(
+      'rgb(134, 139, 148)',
+    );
+
+    // 키보드로 옮기면 다음 칩(전시)에 코발트 링
+    await page.keyboard.press('Tab');
+    expect(await styles(page.locator('label[for="ob-interest-EXHIBITION"]'), ['outline-style', 'outline-color'])).toEqual({
+      'outline-style': 'solid',
+      'outline-color': 'rgb(10, 92, 255)',
+    });
+  });
+
+  test('면책 상자 — 앞에 20px 먹색 안내 아이콘, 두 언어 병기는 그대로', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+    const note = page.locator('.onboarding-safety');
+    const icon = note.locator('.onboarding-safety-icon');
+    await expect(icon.locator('svg')).toHaveCount(1);
+    expect((await icon.locator('svg').boundingBox()).width).toBe(20);
+    expect((await styles(icon, ['color'])).color).toBe('rgb(26, 28, 32)');
+    await expect(note).toHaveAttribute('role', 'note');
+    await expect(note.locator('p')).toHaveCount(2);
+
+    // 시작 화면 면책 상자도 같은 부품이다
+    await page.goto('/');
+    await expect(page.locator('.onboarding-footer-note .onboarding-safety-icon svg')).toHaveCount(1);
   });
 });

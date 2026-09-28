@@ -169,7 +169,7 @@ export default function AddressSearch({ field, issues, kind, value, onSelect }) 
           aria-invalid={own.length > 0 ? 'true' : undefined}
           aria-describedby={[hintId, statusId, errorId].filter(Boolean).join(' ')}
         />
-        <Button size="small" onClick={() => void run()} disabled={search.phase === 'loading'}>
+        <Button variant="secondary" size="small" onClick={() => void run()} disabled={search.phase === 'loading'}>
           {t('onboarding.searchButton')}
         </Button>
       </div>

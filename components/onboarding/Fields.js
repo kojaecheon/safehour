@@ -9,6 +9,7 @@
 //   - 라디오 묶음은 fieldset + legend, 칸 전체가 누를 수 있는 52px 이상 선택지다(.radio-option).
 
 import { useLang } from '../LanguageProvider.js';
+import { Icon } from '../ui/index.js';
 import { fieldDomId, issueMessage, issuesFor } from './draft.js';
 
 function joinIds(...ids) {
@@ -178,16 +179,22 @@ export function ChoiceGroup({ field, issues, legend, name, value, onChange, opti
 /**
  * 안전 문구(고지) 병기 — 주 언어 한 줄 + 병기 언어 한 줄 (spec 4.17).
  * 병기 언어는 useLang().pair() 가 정한다(ja·zh 는 검수 전이면 영어 + 한국어).
+ * 앞에 20px 안내 아이콘을 둔다(SEED Callout — 설계서 5.6). 시작 화면 면책 상자도 이 부품이다.
  */
 export function SafetyNote({ noticeKey, vars, className = 'onboarding-safety' }) {
   const { pair } = useLang();
   const { primary, secondary } = pair(noticeKey, vars);
   return (
     <div className={className} role="note">
-      <p lang={primary.lang}>{primary.text}</p>
-      <p className="onboarding-secondary" lang={secondary.lang}>
-        {secondary.text}
-      </p>
+      <span className="onboarding-safety-icon" aria-hidden="true">
+        <Icon name="info" size={20} />
+      </span>
+      <div className="onboarding-safety-text">
+        <p lang={primary.lang}>{primary.text}</p>
+        <p className="onboarding-secondary" lang={secondary.lang}>
+          {secondary.text}
+        </p>
+      </div>
     </div>
   );
 }

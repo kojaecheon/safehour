@@ -54,7 +54,7 @@ function AppointmentCard({ draft, appointment, index, issues, patch, onRemove, c
       <div className="onboarding-card-head">
         <h4 id={titleId}>{t('onboarding.appointmentItem', { n: index + 1 })}</h4>
         {canRemove && (
-          <Button variant="quiet" size="small" onClick={onRemove}>
+          <Button variant="secondary" size="small" onClick={onRemove}>
             {t('onboarding.removeAppointment', { n: index + 1 })}
           </Button>
         )}
@@ -199,7 +199,7 @@ export default function HospitalStep({ draft, update, issues, periods }) {
               <div className="onboarding-card-head">
                 <h4 id={titleId}>{t('onboarding.hospitalItem', { n: index + 1 })}</h4>
                 {hospitalCount > 1 && block === null && (
-                  <Button variant="quiet" size="small" onClick={() => removeHospital(index)}>
+                  <Button variant="secondary" size="small" onClick={() => removeHospital(index)}>
                     {t('onboarding.removeHospital', { n: index + 1 })}
                   </Button>
                 )}
