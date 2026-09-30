@@ -926,6 +926,10 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 .app-shell[data-nav='on'] .sticky-return {
   padding-bottom: var(--space-3);
 }
+/* 하단 긴급 바가 있는 화면 — 안전 영역은 긴급 바가 이미 품는다(--nav-offset) */
+.app-shell[data-emergency-bar='on'] .sticky-return {
+  padding-bottom: var(--space-3);
+}
 
 /* ── 모달 시트 (SEED Bottom Sheet) ── 최대 480 · 위 모서리 24 · 뒤 --overlay · 최대 높이 90% · 그림자 없음 */
 .sheet-backdrop {

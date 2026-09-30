@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useLang } from '../LanguageProvider.js';
-import { Badge, Button, EmptyState, TopBar, shouldShowReadOnly, useStoreStatus } from '../ui/index.js';
+import { Badge, Button, EmptyState, Icon, TopBar, shouldShowReadOnly, useStoreStatus } from '../ui/index.js';
 import { READ_ONLY_REASON, STORE_ERROR, getStore } from '@/lib/store/index.js';
 import { safeReturnTo } from '@/src/auth/config.js';
 import CompanionStep from './CompanionStep.js';
@@ -277,8 +277,21 @@ export default function OnboardingForm() {
             />
           </section>
 
-          {/* 하단 고정 바(설계서 6.1) — 하단 긴급 바 바로 위에 선다. [이전 3][다음 7] */}
+          {/* 하단 고정 바(설계서 6.1) — 하단 긴급 바 바로 위에 선다. [이전 3][다음 7].
+              저장 버튼을 못 누르는 이유(보기 전용·저장 실패)는 버튼 곁에 보이도록 바 안 맨 앞에 둔다 */}
           <div className="onboarding-actions sticky-return">
+            {step === LAST_STEP && readOnlyVisible && (
+              <p className="onboarding-readonly" id="ob-readonly">
+                <Badge kind="readOnly" />
+                <span>{t('onboarding.readOnlySave')}</span>
+              </p>
+            )}
+            {saveState.phase === 'error' && (
+              <p className="onboarding-save-error" role="alert">
+                <Icon name="alert" size={20} />
+                <span>{t(saveState.errorKey)}</span>
+              </p>
+            )}
             {step > 0 && (
               <Button variant="secondary" onClick={() => goTo(step - 1)}>
                 {t('onboarding.prev')}
@@ -292,18 +305,6 @@ export default function OnboardingForm() {
               <Button type="submit">{t('onboarding.next')}</Button>
             )}
           </div>
-
-          {step === LAST_STEP && readOnlyVisible && (
-            <p className="onboarding-readonly" id="ob-readonly">
-              <Badge kind="readOnly" />
-              <span>{t('onboarding.readOnlySave')}</span>
-            </p>
-          )}
-          {saveState.phase === 'error' && (
-            <p className="onboarding-save-error" role="alert">
-              {t(saveState.errorKey)}
-            </p>
-          )}
         </form>
       </main>
     </>

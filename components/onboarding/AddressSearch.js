@@ -10,7 +10,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useLang } from '../LanguageProvider.js';
-import { Badge, Button } from '../ui/index.js';
+import { Badge, Button, Icon } from '../ui/index.js';
 import { FieldErrors } from './Fields.js';
 import { KEYWORD_MAX_LENGTH, fieldDomId, issuesFor, normalizeKeyword, pickAddress, searchErrorKey } from './draft.js';
 
@@ -174,7 +174,14 @@ export default function AddressSearch({ field, issues, kind, value, onSelect }) 
         </Button>
       </div>
       <p id={statusId} role="status" className={search.phase === 'error' ? 'onboarding-search-status is-error' : 'onboarding-search-status'}>
-        {statusText}
+        {search.phase === 'error' ? (
+          <>
+            <Icon name="alert" size={20} />
+            <span>{statusText}</span>
+          </>
+        ) : (
+          statusText
+        )}
       </p>
       {search.results.length > 0 && (
         <ul className="onboarding-results" role="list" aria-label={t('onboarding.searchResultsAria')}>

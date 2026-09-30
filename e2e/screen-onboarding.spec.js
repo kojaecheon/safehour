@@ -50,6 +50,23 @@ async function fillHospital(page) {
   await page.fill('#ob-appointments-0-start', '10:00');
 }
 
+/** 4단계 — 동반 보호자 없음 → 5단계(관심사·강도)로 간다 */
+async function fillCompanion(page) {
+  await page.check('#ob-hasCompanion-no');
+}
+
+/** 1–4단계를 채우고 5단계(마지막)로 간다 */
+async function goToLastStep(page) {
+  await fillTravel(page);
+  await submit(page);
+  await fillLodging(page);
+  await submit(page);
+  await fillHospital(page);
+  await submit(page);
+  await fillCompanion(page);
+  await submit(page);
+}
+
 test.describe('③층 체류 설정 — 단계 머리와 하단 바', () => {
   test('단계 표시에 코발트가 없고, 단계 제목은 26/35 먹색', async ({ page }) => {
     await loginDemo(page, '/onboarding');
@@ -121,9 +138,6 @@ test.describe('③층 체류 설정 — 단계 머리와 하단 바', () => {
     });
     expect(gapBetween(await bar.boundingBox(), await page.locator('.ui-emergency-bar').boundingBox())).toBe(0);
 
-    // 두 고정 바가 키보드 초점 칸을 덮지 않게 스크롤 여백을 둔다
-    expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom)).toBe('160px');
-
     // 1단계는 '다음' 하나가 바 폭(좌우 여백 16 × 2 를 뺀 폭)을 다 쓴다
     const barBox = await bar.boundingBox();
     expect(Math.round((await bar.getByRole('button', { name: '다음' }).boundingBox()).width)).toBe(Math.round(barBox.width - 32));
@@ -153,6 +167,54 @@ test.describe('③층 체류 설정 — 단계 머리와 하단 바', () => {
       expect(Math.round((await bar.getByRole('button', { name }).boundingBox()).height)).toBe(52);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+
+  test('320px en — 두 줄 저장 버튼이어도 초점이 간 마지막 강도 선택지가 두 고정 바에 가려지지 않는다', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 600 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'English', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await loginDemo(page, '/onboarding');
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+
+    await goToLastStep(page);
+
+    // 'Save and set conditions' 는 320px en 에서 두 줄이라 바가 77px 이 아니라 ≈99px 이다
+    const bar = page.locator('.onboarding-actions');
+    const saveButton = bar.getByRole('button', { name: 'Save and set conditions' });
+    const barBox = await bar.boundingBox();
+    expect(barBox.height).toBeGreaterThan(60);
+
+    // 키보드로 마지막 강도(NORMAL)에 초점을 옮긴다 — 실제로 화면에 뜨고 저장 버튼을 가리지 않는다
+    const normalInput = page.locator('#ob-pace-NORMAL');
+    await normalInput.focus();
+    await expect(normalInput).toBeFocused();
+    const label = page.locator('label[for="ob-pace-NORMAL"]');
+    await expect(label).toBeInViewport();
+
+    // 실제 회귀 지점: scroll-padding-bottom 이 지금 실제로 뜬 두 고정 바(이 바 + 긴급 바)의 합친 높이를
+    // 덮어야 한다. main.page 의 기본 하단 여백(--nav-offset + 152px ≈ 221px)이 넉넉해 이 화면의 최종
+    // 스크롤 위치에서는 어떤 scroll-padding-bottom 값이든 이미 마지막 선택지가 가려지지 않는다 — 그래서
+    // 키보드 초점만으로는 160px 이던 예전 값의 결함이 재현되지 않는다(실측으로도 확인했다). 의도한 결함은
+    // "두 고정 바를 가릴 만큼 스크롤 여백이 좁다"이므로, 그 값 자체를 지금 뜬 바들의 실제 높이와 비교한다
+    const emergencyBox = await page.locator('.ui-emergency-bar').boundingBox();
+    const scrollPaddingBottom = parseFloat(
+      await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom),
+    );
+    expect(scrollPaddingBottom).toBeGreaterThanOrEqual(Math.round(barBox.height + emergencyBox.height));
+  });
+});
+
+test.describe('③층 체류 설정 — 세로가 짧은 화면', () => {
+  test('400×256 확대 화면 — 하단 바 고정이 풀리고 가로 스크롤이 없다', async ({ page }) => {
+    await page.setViewportSize({ width: 568, height: 320 });
+    await loginDemo(page, '/onboarding');
+    expect((await styles(page.locator('.onboarding-actions'), ['position']))['position']).toBe('static');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(568);
+
+    await page.goto('/');
+    expect((await styles(page.locator('.onboarding-cta'), ['position']))['position']).toBe('static');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(568);
   });
 });
 
@@ -270,6 +332,76 @@ test.describe('③층 체류 설정 — 입력 묶음', () => {
     // 시작 화면 면책 상자도 같은 부품이다
     await page.goto('/');
     await expect(page.locator('.onboarding-footer-note .onboarding-safety-icon svg')).toHaveCount(1);
+  });
+
+  test('입국·출국 묶음 사이 — 안쪽 마지막 선택지 여백이 밖으로 겹치지 않고 32px', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+
+    // fieldset 은 자기 블록 서식 문맥이라 안쪽 마지막 .onboarding-choice 의 16px 여백이 밖으로 합쳐지지 않는다.
+    // 눈에 보이는 간격은 입국 묶음의 '마지막 라디오 칸(도착 공항 두 번째 선택지)' 아래 끝부터
+    // 출국 묶음의 legend 위 끝까지다 — fieldset 박스 테두리끼리의 간격(32px, 위 테스트)과는 다른 지점이다
+    const lastArrivalOption = page.locator('label[for="ob-arrival-airport-GMP"]');
+    const departureLegend = page.locator('fieldset.onboarding-card').nth(1).locator('.onboarding-group-title');
+    expect(gapBetween(await lastArrivalOption.boundingBox(), await departureLegend.boundingBox())).toBe(32);
+  });
+});
+
+test.describe('③층 체류 설정 — 저장 버튼 곁 이유', () => {
+  test('보기 전용 — 5단계에서 이유가 저장 버튼 곁(하단 바 안)에 보인다', async ({ page }) => {
+    // 브리프는 "로그인하지 않고" 5단계까지 채워 가는 흐름을 요구하지만, 숙소·병원 주소 검색
+    // (app/api/address/search/route.js 의 withSession)이 세션을 요구한다 — 로그인 없이는
+    // 401 이라 결과가 없고 fillLodging/fillHospital 이 끝없이 기다린다(주소 없이는 lodgings/hospitals
+    // 필수 검증도 통과하지 못해 2·3단계를 벗어날 수 없다). "주소 검색은 로그인 없이도 데모 결과가
+    // 나온다"는 브리프의 전제가 이 코드베이스와 맞지 않아, 로그인 없는 시나리오는 infeasible 이다.
+    // 같은 보기 전용 코드 경로(useStoreStatus → shouldShowReadOnly → status.readOnly)를 OFFLINE
+    // 사유로 5단계에서 재현해 검증한다 — 로그인 상태로 주소 검색까지 마친 뒤 오프라인으로 전환한다.
+    // shouldShowReadOnly() 는 reason === OFFLINE 이면 sessionChecked 와 무관하게 true 이므로
+    // (components/ui/useStoreStatus.js), 화면이 그리는 조건·배치는 로그인 없음(NO_SESSION)일 때와 같다.
+    await loginDemo(page, '/onboarding');
+    await goToLastStep(page);
+    await page.context().setOffline(true);
+
+    // #ob-readonly 는 이제 .onboarding-actions 안에 있고, 뷰포트 안에서 저장 버튼보다 위에 보인다
+    const readonly = page.locator('.onboarding-actions #ob-readonly');
+    await expect(readonly).toHaveCount(1);
+    await expect(readonly).toBeInViewport();
+
+    const saveButton = page.locator('.onboarding-actions button[type="submit"]');
+    await expect(saveButton).toBeDisabled();
+    await expect(saveButton).toHaveAttribute('aria-describedby', 'ob-readonly');
+
+    const readonlyBox = await readonly.boundingBox();
+    const saveBox = await saveButton.boundingBox();
+    expect(Math.round(readonlyBox.y + readonlyBox.height)).toBeLessThanOrEqual(Math.round(saveBox.y));
+  });
+
+  test('저장 실패 — 이유가 아이콘과 함께 저장 버튼 곁(하단 바 안)에 보인다', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+    await goToLastStep(page);
+    await page.check('#ob-pace'); // 이동 강도(필수) — 느긋하게
+
+    // 기기 저장을 강제로 실패시킨다(환경 결함 주입 — draft.js·검증·저장 로직은 그대로 둔다).
+    // .stay 레코드 쓰기만 막아 store.writeStay() 가 STORE_ERROR.STORAGE_FAILED 를 돌려주게 한다
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function patchedSetItem(key, value) {
+        if (key.endsWith('.stay')) throw new Error('e2e-forced-storage-failure');
+        return original.call(this, key, value);
+      };
+    });
+
+    await submit(page);
+
+    const error = page.locator('.onboarding-actions .onboarding-save-error');
+    await expect(error).toBeVisible();
+    await expect(error).toBeInViewport();
+    await expect(error.locator('svg')).toHaveCount(1);
+    expect((await error.locator('svg').boundingBox()).width).toBe(20);
+
+    const saveButton = page.locator('.onboarding-actions button[type="submit"]');
+    const errorBox = await error.boundingBox();
+    const saveBox = await saveButton.boundingBox();
+    expect(Math.round(errorBox.y + errorBox.height)).toBeLessThanOrEqual(Math.round(saveBox.y));
   });
 });
 

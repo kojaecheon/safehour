@@ -219,6 +219,22 @@
   background: var(--bg);
   border-top: 1px solid var(--line-strong);
 }
+/* 세로가 짧은 화면(400% 확대 320×256, 가로 휴대폰)에서는 고정을 풀고 흐름 안에 둔다 —
+   상단 바·하단 바·긴급 바가 화면 대부분을 덮지 않게(WCAG 1.4.10). 긴급 바는 그대로 바닥에 붙는다 */
+@media (max-height: 480px) {
+  .onboarding-cta.sticky-return,
+  .onboarding-actions.sticky-return {
+    position: static;
+    transform: none;
+    width: auto;
+    max-width: none;
+    margin-top: var(--space-6);
+    padding: var(--space-3) 0;
+  }
+  html:has(.onboarding-actions.sticky-return) {
+    scroll-padding-bottom: 88px;
+  }
+}
 /* 하단 바 한 줄 — 긴급(내용 폭, 짧은 글자) + 시작하기(남는 폭). 320px 네 언어에서 둘 다 52px 한 줄이다 */
 .onboarding-cta-row {
   display: flex;
@@ -396,6 +412,11 @@
   box-shadow: none;
   scroll-margin-top: 88px;
 }
+/* fieldset 은 자기 블록 서식 문맥이라 안쪽 마지막 자식의 아래 여백이 밖으로 합쳐지지 않는다 —
+   묶음 사이가 32px(자기 margin-bottom) + 안쪽 마지막 자식의 여백으로 겹으로 보이지 않게 지운다 */
+.onboarding-card > :last-child {
+  margin-bottom: 0;
+}
 /* 병원이 보낸 일정(읽기만) — 회색 면 상자로 입력 묶음과 나눈다 */
 .onboarding-card.is-locked {
   padding: var(--space-4);
@@ -486,11 +507,14 @@
 }
 
 /* 오류 문장 (설계서 5.2) — 20px 경고 아이콘 + 16/22 굵은 긴급 빨강, 왼쪽 띠 없음.
-   16px(SEED 14px) — 다음 단계로 못 가는 이유라 본문 하한을 지킨다. 입력칸 테두리는 globals.css 공통 규칙이 그린다 */
+   16px(SEED 14px) — 다음 단계로 못 가는 이유라 본문 하한을 지킨다. 입력칸 테두리는 globals.css 공통 규칙이 그린다.
+   저장 실패·주소 검색 실패 문장도 같은 배치다(상태는 색 + 문구 + 아이콘으로 보인다) — 선택자를 묶는다 */
 .onboarding-field-error {
   margin-top: var(--space-2);
 }
-.onboarding-field-error p {
+.onboarding-field-error p,
+.onboarding-save-error,
+.onboarding-search-status.is-error {
   display: flex;
   align-items: flex-start;
   gap: var(--space-1-5);
@@ -500,7 +524,9 @@
   color: var(--emergency);
 }
 /* 20px 아이콘을 22px 첫 줄 가운데에 */
-.onboarding-field-error .ui-icon {
+.onboarding-field-error .ui-icon,
+.onboarding-save-error .ui-icon,
+.onboarding-search-status.is-error .ui-icon {
   flex: none;
   margin-top: 1px;
 }
@@ -580,11 +606,7 @@
 .onboarding-search-status:empty {
   margin-top: 0;
 }
-/* 검색 실패 — 오류 문장과 같은 굵은 긴급 빨강(왼쪽 띠 없음) */
-.onboarding-search-status.is-error {
-  font-weight: var(--weight-bold);
-  color: var(--emergency);
-}
+/* 검색 실패 배치(아이콘·굵기·색)는 위 오류 문장과 같은 묶인 규칙(.onboarding-field-error p 곁)을 쓴다 */
 .onboarding-results {
   list-style: none;
   display: grid;
@@ -781,14 +803,21 @@
 .onboarding-actions > .btn:only-child {
   grid-column: 1 / -1;
 }
+/* 저장 버튼을 못 누르는 이유(보기 전용·저장 실패)는 바 안 맨 앞, 두 칸 전체 폭에 — 버튼 줄은 늘 둘째 줄로 밀린다.
+   바의 grid gap 이 버튼 줄과의 간격을 주므로 문장 자신의 위 여백은 없앤다 */
+.onboarding-actions > .onboarding-readonly,
+.onboarding-actions > .onboarding-save-error {
+  grid-column: 1 / -1;
+  margin-top: 0;
+}
 /* 30% 칸(320px 에서 84px)에도 '上一步'(zh)가 한 줄로 들어가게 '이전'의 좌우 여백을 12px 로 줄인다 */
 .onboarding-actions > .btn-secondary {
   padding-left: var(--space-3);
   padding-right: var(--space-3);
 }
-/* 두 고정 바(하단 긴급 바 69px + 이 바 77px 안팎)가 키보드 초점이 간 입력 칸을 덮지 않게 */
+/* 두 고정 바(하단 긴급 바 69px + 이 바 77–99px, 저장 버튼 두 줄일 때)가 키보드 초점이 간 입력 칸을 덮지 않게 */
 html:has(.onboarding-actions.sticky-return) {
-  scroll-padding-bottom: 160px;
+  scroll-padding-bottom: 184px;
 }
 .onboarding-readonly {
   display: flex;
@@ -799,13 +828,10 @@ html:has(.onboarding-actions.sticky-return) {
   font-size: var(--text-body);
   color: var(--ink);
 }
-/* 저장 실패 — 오류 문장과 같은 굵은 긴급 빨강(왼쪽 띠 없음) */
+/* 저장 실패 배치(아이콘·굵기·색)는 위 오류 문장과 같은 묶인 규칙을 쓴다. 바 밖에서 쓰일 때를 대비한 기본 위 여백만 여기 둔다
+   (바 안에서는 .onboarding-actions > .onboarding-save-error 가 0으로 되돌린다) */
 .onboarding-save-error {
   margin-top: var(--space-3);
-  font-size: var(--text-body);
-  line-height: var(--lh-body);
-  font-weight: var(--weight-bold);
-  color: var(--emergency);
 }
 .onboarding-saved {
   padding: var(--space-8) 0;
