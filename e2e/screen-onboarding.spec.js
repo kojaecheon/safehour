@@ -403,6 +403,40 @@ test.describe('③층 체류 설정 — 저장 버튼 곁 이유', () => {
     const saveBox = await saveButton.boundingBox();
     expect(Math.round(errorBox.y + errorBox.height)).toBeLessThanOrEqual(Math.round(saveBox.y));
   });
+
+  test('저장 실패 뒤 1단계로 돌아가도 "다음"이 바 전체 폭 — 문장은 <p> 라 버튼 수만 센다', async ({ page }) => {
+    // saveState 는 goTo() 로 리셋되지 않는다(바꾸지 않는 기존 동작) — 저장 실패 문장이 1단계까지도 바 안에
+    // 남는다. .onboarding-actions > .btn:only-child 였다면 <p> 형제가 생긴 순간 더 이상 "버튼 하나뿐"이
+    // 아니게 되어 '다음'이 3fr 칸(≈30%)으로 줄어드는 회귀가 있었다 — :only-of-type 으로 고쳤다(버튼 수만 센다)
+    await loginDemo(page, '/onboarding');
+    await goToLastStep(page);
+    await page.check('#ob-pace');
+
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function patchedSetItem(key, value) {
+        if (key.endsWith('.stay')) throw new Error('e2e-forced-storage-failure');
+        return original.call(this, key, value);
+      };
+    });
+
+    await submit(page);
+    const bar = page.locator('.onboarding-actions');
+    await expect(bar.locator('.onboarding-save-error')).toBeVisible();
+
+    // 5단계(마지막, index 4)에서 1단계(index 0)까지 '이전'을 네 번 눌러 되돌아간다
+    for (let i = 0; i < 4; i += 1) {
+      await bar.getByRole('button', { name: '이전' }).click();
+    }
+
+    // 저장 실패 문장은 그대로 바 안에 남는다(기존 동작 — 이 수정에서 바꾸지 않는다)
+    await expect(bar.locator('.onboarding-save-error')).toBeVisible();
+    await expect(bar.getByRole('button', { name: '이전' })).toHaveCount(0);
+
+    const barBox = await bar.boundingBox();
+    const next = bar.getByRole('button', { name: '다음' });
+    expect(Math.round((await next.boundingBox()).width)).toBe(Math.round(barBox.width - 32));
+  });
 });
 
 test.describe('③층 체류 설정 — 오류 표시', () => {

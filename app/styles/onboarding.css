@@ -800,7 +800,9 @@
   grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
   gap: var(--space-2);
 }
-.onboarding-actions > .btn:only-child {
+/* 문장(.onboarding-readonly·.onboarding-save-error)은 <p> 라 버튼 수만 센다 — 저장 실패 뒤 1단계로 돌아가도
+   문장이 바 안에 남아 :only-child 는 더 이상 안 맞는다. 바 안 버튼은 늘 <button>(href 없는 Button)이다 */
+.onboarding-actions > .btn:only-of-type {
   grid-column: 1 / -1;
 }
 /* 저장 버튼을 못 누르는 이유(보기 전용·저장 실패)는 바 안 맨 앞, 두 칸 전체 폭에 — 버튼 줄은 늘 둘째 줄로 밀린다.
