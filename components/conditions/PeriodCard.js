@@ -5,11 +5,11 @@
 // - 날짜 범위, 출처(병원 발행 / 본인 체크), 제한 없음 표시, 병원 연동 데모 배지(데모 지침이면 늘)
 // - 병원 발행 기간: 지침 상태(유효·만료·철회)와 연결 병원. 고칠 수 없다(병원 값은 그대로 적용한다).
 // - 날짜별 분류 요약: 분류별 날짜 수 + 펼치면 날짜마다 분류와 사유
-// - 본인 체크 기간: 고치기 / 삭제(한 번 더 묻는다). 보기 전용이면 막는다.
+// - 본인 체크 기간: 고치기 / 삭제(확인 대화상자로 한 번 더 묻는다, 확인은 긴급 빨강). 보기 전용이면 막는다.
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Badge, Button, SourceTag } from '@/components/ui/index.js';
+import { AlertDialog, Badge, Button, SourceTag } from '@/components/ui/index.js';
 import { fmtDateTime } from '@/lib/format.js';
 import { hospitalPeriodConflict } from '@/src/stay/conditions.js';
 import CoverageTag from './CoverageTag.js';
@@ -37,8 +37,6 @@ const PLAN_STATE_KEY = {
 export default function PeriodCard({ period, stay, byDate, nowMs, readOnly, onEdit, onDelete }) {
   const { t, locale, reasonText } = useLang();
   const headingId = useId();
-  const questionId = useId();
-  const confirmRef = useRef(null);
   const [confirming, setConfirming] = useState(false);
   const isHospital = period.source === 'HOSPITAL';
   const linked = isHospital ? (stay.linkedPlans ?? []).find((lp) => lp?.plan?.planId === period.planId) : null;
@@ -47,10 +45,6 @@ export default function PeriodCard({ period, stay, byDate, nowMs, readOnly, onEd
   const days = periodCoverage(stay, period, byDate);
   const counts = coverageCounts(days);
   const state = isHospital ? planState(period, nowMs) : null;
-
-  useEffect(() => {
-    if (confirming) confirmRef.current?.focus();
-  }, [confirming]);
 
   return (
     <li className={`conditions-period conditions-period-${period.source}`}>
@@ -110,32 +104,29 @@ export default function PeriodCard({ period, stay, byDate, nowMs, readOnly, onEd
       )}
 
       {!isHospital && (
-        <div className="conditions-period-actions">
-          {confirming ? (
-            <div className="conditions-confirm" role="group" aria-labelledby={questionId}>
-              <p id={questionId} className="conditions-confirm-question">
-                {t('conditions.deleteQuestion')}
-              </p>
-              <div className="conditions-actions">
-                <Button ref={confirmRef} onClick={() => onDelete?.(period)} disabled={readOnly}>
-                  {t('conditions.deleteConfirm')}
-                </Button>
-                <Button variant="secondary" onClick={() => setConfirming(false)}>
-                  {t('conditions.cancel')}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="conditions-actions is-inline">
-              <Button variant="secondary" size="small" disabled={readOnly} onClick={() => onEdit?.(period)}>
-                {t('conditions.editPeriod')}
-              </Button>
-              <Button variant="secondary" size="small" disabled={readOnly} onClick={() => setConfirming(true)}>
-                {t('conditions.deletePeriod')}
-              </Button>
-            </div>
-          )}
+        <div className="conditions-actions is-inline conditions-period-actions">
+          <Button variant="secondary" size="small" disabled={readOnly} onClick={() => onEdit?.(period)}>
+            {t('conditions.editPeriod')}
+          </Button>
+          <Button variant="secondary" size="small" disabled={readOnly} onClick={() => setConfirming(true)}>
+            {t('conditions.deletePeriod')}
+          </Button>
         </div>
+      )}
+
+      {/* 되돌릴 수 없는 확인이라 대화상자로 묻는다(설계서 5.6). 초점 가두기·Escape·초점 복귀는 AlertDialog 가 한다 */}
+      {confirming && (
+        <AlertDialog
+          title={t('conditions.deleteQuestion')}
+          cancelLabel={t('conditions.cancel')}
+          confirmLabel={t('conditions.deleteConfirm')}
+          critical
+          onConfirm={({ requestClose }) => {
+            requestClose();
+            onDelete?.(period);
+          }}
+          onClose={() => setConfirming(false)}
+        />
       )}
     </li>
   );

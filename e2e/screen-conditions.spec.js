@@ -75,3 +75,43 @@ test.describe('③층 조건 화면, 회색 바탕과 블록', () => {
     expect((await readRecord(page, 'stay')).periods).toHaveLength(1);
   });
 });
+
+test.describe('③층 조건 화면, 조건 기간 목록', () => {
+  test('기간은 카드 테두리 없는 목록 행, 출처 표시는 그대로, 병원 지침 연결은 화살표 목록 행', async ({ page }) => {
+    await startTrip(page, {}, { path: '/conditions' });
+    const row = page.locator('.conditions-period').first();
+    expect(await styles(row, ['border-left-width', 'border-top-left-radius', 'background-color'])).toEqual({
+      'border-left-width': '0px',
+      'border-top-left-radius': '0px',
+      'background-color': 'rgba(0, 0, 0, 0)',
+    });
+    await expect(row.locator('.ui-source-tag-self')).toHaveCount(1);
+
+    // 채운 코발트 버튼은 '본인 체크 기간 추가' 하나, 병원 지침 연결은 목록 행 링크
+    const add = page.getByRole('button', { name: '본인 체크 기간 추가' });
+    expect((await styles(add, ['background-color']))['background-color']).toBe('rgb(10, 92, 255)');
+    const link = page.getByRole('link', { name: '병원 지침 연결' });
+    await expect(link).toHaveClass(/ui-list-item/);
+    await expect(link).toHaveAttribute('href', '/link');
+  });
+
+  test('기간 삭제는 확인 대화상자(빨간 확인): 취소하면 남고, 삭제하기면 지운다', async ({ page }) => {
+    await startTrip(page, {}, { path: '/conditions' });
+    const trigger = page.locator('.conditions-period').first().getByRole('button', { name: '삭제', exact: true });
+    await trigger.click();
+    const dialog = page.getByRole('alertdialog', { name: '이 기간을 삭제할까요?' });
+    await expect(dialog).toBeVisible();
+    expect(
+      (await styles(dialog.getByRole('button', { name: '삭제하기' }), ['background-color']))['background-color'],
+    ).toBe('rgb(200, 16, 46)');
+
+    await dialog.getByRole('button', { name: '취소' }).click();
+    await expect(dialog).toHaveCount(0);
+    expect((await readRecord(page, 'stay')).periods).toHaveLength(1);
+
+    await trigger.click();
+    await page.getByRole('alertdialog', { name: '이 기간을 삭제할까요?' }).getByRole('button', { name: '삭제하기' }).click();
+    await expect(page.getByText('기간을 삭제했어요.')).toBeVisible();
+    expect((await readRecord(page, 'stay')).periods).toEqual([]);
+  });
+});

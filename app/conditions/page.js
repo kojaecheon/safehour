@@ -13,7 +13,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Button, EmptyState, ListGroup, ListItem, TopBar, useStoreStatus } from '@/components/ui/index.js';
+import { Button, EmptyState, Icon, ListGroup, ListItem, TopBar, useStoreStatus } from '@/components/ui/index.js';
 import ConsentPanel from '@/components/conditions/ConsentPanel.js';
 import ConsentWithdraw from '@/components/conditions/ConsentWithdraw.js';
 import DayConditions from '@/components/conditions/DayConditions.js';
@@ -177,17 +177,35 @@ export default function ConditionsPage() {
                   <Button icon="plus" onClick={startNew} disabled={readOnly}>
                     {t('conditions.addPeriod')}
                   </Button>
-                  <Button variant="secondary" icon="hospital" href="/link">
-                    {t('conditions.linkHospital')}
-                  </Button>
-                  {hasLinkedPlans && (
-                    <Button variant="secondary" href="/guide">
-                      {t('conditions.openGuide')}
-                    </Button>
-                  )}
                 </div>
                 {readOnly && <p className="conditions-hint">{t('conditions.readOnlyHint')}</p>}
               </section>
+            )}
+
+            {/* 병원 지침 연결·병원 안내 보기: 다른 화면으로 가는 이동이라 화살표 목록 행(설계서 5.5) */}
+            {consented && !editing && (
+              <div className="ui-block">
+                <ListGroup>
+                  <li>
+                    <ListItem
+                      title={t('conditions.linkHospital')}
+                      leading={<Icon name="hospital" size={22} />}
+                      trailing="chevron"
+                      href="/link"
+                    />
+                  </li>
+                  {hasLinkedPlans && (
+                    <li>
+                      <ListItem
+                        title={t('conditions.openGuide')}
+                        leading={<Icon name="quote" size={22} />}
+                        trailing="chevron"
+                        href="/guide"
+                      />
+                    </li>
+                  )}
+                </ListGroup>
+              </div>
             )}
 
             {!editing && (
