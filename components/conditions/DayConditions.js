@@ -36,7 +36,7 @@ export default function DayConditions({ stay, byDate, error, nowMs }) {
   const hospitals = stay?.hospitals ?? [];
 
   return (
-    <section className="conditions-section" aria-labelledby={headingId}>
+    <section className="ui-block conditions-section" aria-labelledby={headingId}>
       <h2 id={headingId}>{t('conditions.dayTitle')}</h2>
       <p className="conditions-section-lead">{t('conditions.dayLead')}</p>
       {error || !day ? (

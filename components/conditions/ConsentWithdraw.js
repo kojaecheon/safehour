@@ -46,7 +46,7 @@ export default function ConsentWithdraw({ headingLevel = 2 }) {
   }
 
   return (
-    <section className="conditions-withdraw" aria-labelledby={headingId}>
+    <section className="ui-block conditions-withdraw" aria-labelledby={headingId}>
       <Heading id={headingId}>{t('conditions.withdrawTitle')}</Heading>
       {sensitive ? (
         <>

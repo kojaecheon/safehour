@@ -9,10 +9,11 @@
 //   - 날짜별 분류와 합성 결과(출처: 병원 발행 / 본인 체크 / 기본값 적용)를 보여준다(spec 4.5).
 //   - 이 화면은 저장소에만 쓴다. 일정 API 를 부르지 않는다 — 재계획은 저장소를 구독하는 동기화 작업(AX-316)이 한다.
 //   - 보기 전용(로그인 만료·오프라인)에서는 동의·입력·삭제를 모두 막는다.
+//   - SEED ③층(설계서 6.2 4번): 회색 바탕 위 흰 블록. 안내·동의 / 조건 기간 / 날짜별 적용 조건 / 동의 철회 / 체류 정보 고치기.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Button, EmptyState, TopBar, useStoreStatus } from '@/components/ui/index.js';
+import { Button, EmptyState, ListGroup, ListItem, TopBar, useStoreStatus } from '@/components/ui/index.js';
 import ConsentPanel from '@/components/conditions/ConsentPanel.js';
 import ConsentWithdraw from '@/components/conditions/ConsentWithdraw.js';
 import DayConditions from '@/components/conditions/DayConditions.js';
@@ -98,28 +99,34 @@ export default function ConditionsPage() {
   return (
     <>
       <TopBar title={t('conditions.header')} />
-      <main className="page conditions-page">
+      <main className="page conditions-page is-basement">
         {!hydrated ? (
-          <p className="conditions-hint">{t('conditions.loading')}</p>
+          <div className="ui-block">
+            <p className="conditions-hint">{t('conditions.loading')}</p>
+          </div>
         ) : !stay ? (
-          <EmptyState
-            icon="navConditions"
-            title={t('conditions.noStayTitle')}
-            body={t('conditions.noStayBody')}
-            action={<Button href="/onboarding">{t('conditions.noStayAction')}</Button>}
-          />
+          <div className="ui-block">
+            <EmptyState
+              icon="navConditions"
+              title={t('conditions.noStayTitle')}
+              body={t('conditions.noStayBody')}
+              action={<Button href="/onboarding">{t('conditions.noStayAction')}</Button>}
+            />
+          </div>
         ) : (
           <>
-            <p className="conditions-lead">{t('conditions.lead')}</p>
+            <div className="ui-block">
+              <p className="conditions-lead">{t('conditions.lead')}</p>
 
-            <ConsentPanel consent={stay.consent} readOnly={readOnly} />
+              <ConsentPanel consent={stay.consent} readOnly={readOnly} />
 
-            <div role="status" className={notice?.error ? 'conditions-notice is-error' : 'conditions-notice'}>
-              {notice ? t(notice.key) : ''}
+              <div role="status" className={notice?.error ? 'conditions-notice is-error' : 'conditions-notice'}>
+                {notice ? t(notice.key) : ''}
+              </div>
             </div>
 
             {consented && editing && (
-              <section className="conditions-section" aria-labelledby="conditions-editor-heading">
+              <section className="ui-block conditions-section" aria-labelledby="conditions-editor-heading">
                 <h2 id="conditions-editor-heading" tabIndex={-1} ref={editorHeadingRef}>
                   {editing.period ? t('conditions.editorEdit') : t('conditions.editorNew')}
                 </h2>
@@ -135,7 +142,7 @@ export default function ConditionsPage() {
             )}
 
             {consented && !editing && (
-              <section className="conditions-section" aria-labelledby="conditions-periods-heading">
+              <section className="ui-block conditions-section" aria-labelledby="conditions-periods-heading">
                 <h2 id="conditions-periods-heading" tabIndex={-1} ref={periodsHeadingRef}>
                   {t('conditions.periodsTitle')}
                 </h2>
@@ -194,10 +201,13 @@ export default function ConditionsPage() {
 
             {consented && !editing && <ConsentWithdraw />}
 
-            <div className="conditions-actions">
-              <Button variant="quiet" href="/onboarding">
-                {t('conditions.editStay')}
-              </Button>
+            {/* 다른 화면으로 가는 이동이라 버튼이 아니라 화살표 목록 행(설계서 5.5) */}
+            <div className="ui-block">
+              <ListGroup>
+                <li>
+                  <ListItem title={t('conditions.editStay')} trailing="chevron" href="/onboarding" />
+                </li>
+              </ListGroup>
             </div>
           </>
         )}

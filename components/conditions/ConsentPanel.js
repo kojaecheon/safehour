@@ -43,7 +43,7 @@ export default function ConsentPanel({ consent, readOnly, lead }) {
   if (sensitive) {
     return (
       <p className="conditions-consent-status">
-        <Icon name="check" size={18} strokeWidth={2.4} />
+        <Icon name="check" size={20} strokeWidth={2.4} />
         <span>
           {t('conditions.consentGranted', { at: fmtDateTime(sensitive.agreedAt, locale), version: sensitive.version })}
         </span>

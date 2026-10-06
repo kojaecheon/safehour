@@ -1120,6 +1120,8 @@
 main.page.is-basement {
   background: var(--layer-basement);
   --shadow-card: none;
+  /* 첫 흰 블록이 상단 바 바로 아래에서 시작한다. 상단 바와 첫 블록이 한 흰 면으로 이어진다 */
+  padding-top: 0;
 }
 .ui-block {
   margin: 0 calc(var(--gutter) * -1) var(--gap-section);

@@ -283,8 +283,13 @@ svg.ui-icon {
 
 main.page {
   flex: 1;
-  /* 아래 여백: 하단 내비 + 긴급 버튼 + 고정 복귀 버튼이 마지막 내용을 가리지 않게 한다 */
-  padding: var(--space-5) var(--gutter) calc(var(--nav-offset) + 152px);
+  /* 아래 여백: 하단 내비(또는 하단 긴급 바) 높이 + 화면 끝 56px(SEED screen-bottom).
+     긴급은 내비 칸·긴급 바 안에 있어 떠 있지 않다 */
+  padding: var(--space-5) var(--gutter) calc(var(--nav-offset) + var(--gap-screen-bottom));
+}
+/* 하단 고정 바(.sticky-return)가 있는 화면은 바 높이(77~99px)만큼 더 비운다 */
+.app-shell:has(.sticky-return) main.page {
+  padding-bottom: calc(var(--nav-offset) + 152px);
 }
 
 /* ── 타이포 ── 헤드라인도 산세리프. 무게와 자간으로 성격을 준다 */
