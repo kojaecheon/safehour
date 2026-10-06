@@ -114,4 +114,27 @@ test.describe('③층 조건 화면, 조건 기간 목록', () => {
     await expect(page.getByText('기간을 삭제했어요.')).toBeVisible();
     expect((await readRecord(page, 'stay')).periods).toEqual([]);
   });
+
+  test('병원 연결 화면의 병원 지침은 카드(청록 띠) 그대로, 조건 화면에서는 같은 기간이 목록 행', async ({ page }) => {
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await page.goto('/link');
+    await page.getByRole('button', { name: '예시 A — 외출 가능' }).click();
+    await page.getByRole('radio', { name: /데모 성형외과 E2E/ }).check();
+    await page.getByRole('button', { name: '이 병원으로 연결' }).click();
+    await expect(page.getByRole('heading', { name: '연결했어요' })).toBeVisible();
+
+    // /link 의 병원 지침 카드에는 출처 표시가 따로 없다. 청록 왼쪽 띠와 면이 병원 발행임을 알린다
+    await page.goto('/link');
+    const card = page.locator('.conditions-period-HOSPITAL').first();
+    expect(await styles(card, ['border-left-width', 'border-top-left-radius'])).toEqual({
+      'border-left-width': '6px',
+      'border-top-left-radius': '16px',
+    });
+
+    // 같은 기간이 조건 화면에서는 목록 행이고, 출처는 출처 표시가 알린다
+    await page.goto('/conditions');
+    const row = page.locator('.conditions-period-HOSPITAL').first();
+    expect((await styles(row, ['border-left-width']))['border-left-width']).toBe('0px');
+    await expect(row.locator('.ui-source-tag-hospital')).toHaveCount(1);
+  });
 });

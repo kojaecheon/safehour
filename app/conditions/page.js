@@ -155,7 +155,7 @@ export default function ConditionsPage() {
                     body={t('conditions.periodsEmptyBody')}
                   />
                 ) : (
-                  <ul className="conditions-period-list">
+                  <ul className="conditions-period-list is-rows">
                     {periods.map((period) => (
                       <PeriodCard
                         key={period.id}

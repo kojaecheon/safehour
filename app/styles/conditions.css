@@ -231,17 +231,41 @@
 }
 
 /* ───────────────────────── 기간 목록 ───────────────────────── */
-/* 기간 목록 (SEED 목록 행): 카드 테두리 없이 흰 블록 안의 행, 행 사이 1px 선.
-   출처는 행마다 출처 표시(SourceTag: 문구 + 아이콘 + 실선/파선 테두리)가 알린다 */
+/* 병원 연결 화면(/link)의 병원 지침 카드: 카드 모양 그대로(③층 14번 전까지).
+   병원 발행은 청록 왼쪽 띠·면이 출처를 알린다(이 카드에는 출처 표시가 따로 없다) */
 .conditions-period-list {
   list-style: none;
   padding: 0;
+  display: grid;
+  gap: var(--space-3);
 }
 .conditions-period {
-  padding: var(--space-4) 0;
+  border-radius: var(--radius-16);
+  padding: var(--space-4);
+  background: var(--surface);
   min-width: 0;
 }
-.conditions-period + .conditions-period {
+.conditions-period-SELF {
+  border: 2px dashed var(--source-self);
+}
+.conditions-period-HOSPITAL {
+  border: 1px solid var(--source-hospital);
+  border-left-width: 6px;
+  background: var(--source-hospital-bg);
+}
+/* 조건 화면의 기간 목록 (SEED 목록 행): 카드 테두리 없이 흰 블록 안의 행, 행 사이 1px 선.
+   출처는 행마다 출처 표시(SourceTag: 문구 + 아이콘 + 실선/파선 테두리)가 알린다.
+   /link·/guide 의 <main> 도 conditions-page 를 쓰므로 목록에 is-rows 를 달아 조건 화면만 고른다 */
+.conditions-period-list.is-rows {
+  display: block;
+}
+.conditions-period-list.is-rows > .conditions-period {
+  padding: var(--space-4) 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+.conditions-period-list.is-rows > .conditions-period + .conditions-period {
   border-top: 1px solid var(--line);
 }
 .conditions-period-head {
