@@ -213,28 +213,6 @@
 .onboarding-cta {
   margin-top: var(--space-6);
 }
-/* 하단 바(시작 화면·체류 설정) — 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리). 그라데이션은 뒤의 입력 칸이 비쳐 보인다 */
-.onboarding-cta.sticky-return,
-.onboarding-actions.sticky-return {
-  background: var(--bg);
-  border-top: 1px solid var(--line-strong);
-}
-/* 세로가 짧은 화면(400% 확대 320×256, 가로 휴대폰)에서는 고정을 풀고 흐름 안에 둔다 —
-   상단 바·하단 바·긴급 바가 화면 대부분을 덮지 않게(WCAG 1.4.10). 긴급 바는 그대로 바닥에 붙는다 */
-@media (max-height: 480px) {
-  .onboarding-cta.sticky-return,
-  .onboarding-actions.sticky-return {
-    position: static;
-    transform: none;
-    width: auto;
-    max-width: none;
-    margin-top: var(--space-6);
-    padding: var(--space-3) 0;
-  }
-  html:has(.onboarding-actions.sticky-return) {
-    scroll-padding-bottom: 88px;
-  }
-}
 /* 하단 바 한 줄 — 긴급(내용 폭, 짧은 글자) + 시작하기(남는 폭). 320px 네 언어에서 둘 다 52px 한 줄이다 */
 .onboarding-cta-row {
   display: flex;
@@ -816,10 +794,6 @@
 .onboarding-actions > .btn-secondary {
   padding-left: var(--space-3);
   padding-right: var(--space-3);
-}
-/* 두 고정 바(하단 긴급 바 69px + 이 바 77–99px, 저장 버튼 두 줄일 때)가 키보드 초점이 간 입력 칸을 덮지 않게 */
-html:has(.onboarding-actions.sticky-return) {
-  scroll-padding-bottom: 184px;
 }
 .onboarding-readonly {
   display: flex;

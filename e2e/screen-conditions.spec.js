@@ -210,3 +210,62 @@ test.describe('③층 조건 화면, 동의와 동의 철회', () => {
     expect((await readRecord(page, 'stay')).consent.sensitive).toBeNull();
   });
 });
+
+test.describe('③층 조건 화면, 편집기', () => {
+  test('[취소 3][저장 7] 하단 고정 바가 하단 내비 바로 위에 선다', async ({ page }) => {
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+
+    const bar = page.locator('.conditions-editor-actions');
+    expect(await styles(bar, ['position', 'background-color', 'border-top-width', 'border-top-color'])).toEqual({
+      position: 'fixed',
+      'background-color': 'rgb(255, 255, 255)',
+      'border-top-width': '1px',
+      'border-top-color': 'rgb(220, 222, 227)',
+    });
+    // 내비 윗선 1px 차이까지 허용한다(바 bottom = --nav-offset)
+    expect(
+      Math.abs(gapBetween(await bar.boundingBox(), await page.locator('.ui-bottom-nav').boundingBox())),
+    ).toBeLessThanOrEqual(1);
+
+    const cancel = await bar.getByRole('button', { name: '취소' }).boundingBox();
+    const save = await bar.getByRole('button', { name: '저장', exact: true }).boundingBox();
+    expect(cancel.width / (cancel.width + save.width)).toBeCloseTo(0.3, 2);
+    expect(Math.round(save.height)).toBe(52);
+  });
+
+  test('오류: 문장은 경고 아이콘 + 빨강, 요약은 1px 빨간 테두리 안내 상자, 따라오는 입력은 회색 선으로 묶는다', async ({ page }) => {
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+
+    const summary = page.locator('.conditions-error-summary');
+    await expect(summary).toBeVisible();
+    expect(
+      await styles(summary, ['border-left-width', 'border-top-left-radius', 'border-top-color', 'padding-top']),
+    ).toEqual({
+      'border-left-width': '1px',
+      'border-top-left-radius': '10px',
+      'border-top-color': 'rgb(200, 16, 46)',
+      'padding-top': '14px',
+    });
+    expect((await summary.locator('.conditions-error-summary-title svg').boundingBox()).width).toBe(20);
+
+    const error = page.locator('.conditions-field-error').first();
+    expect(await styles(error, ['color', 'font-size', 'font-weight'])).toEqual({
+      color: 'rgb(200, 16, 46)',
+      'font-size': '16px',
+      'font-weight': '700',
+    });
+    expect((await error.locator('svg').boundingBox()).width).toBe(20);
+
+    // '예'를 고르면 따라오는 입력 묶음의 왼쪽 선은 회색(코발트 아님)
+    await page
+      .getByRole('group', { name: '걷는 시간 제한이 있나요?' })
+      .getByRole('radio', { name: '예', exact: true })
+      .check();
+    expect(
+      (await styles(page.locator('.conditions-subfield').first(), ['border-left-color']))['border-left-color'],
+    ).toBe('rgb(220, 222, 227)');
+  });
+});

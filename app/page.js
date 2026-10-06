@@ -115,7 +115,7 @@ export default function HomePage() {
             떠 있는 긴급 버튼은 어디에 두든 본문을 덮었다(시작하기 131x31px, 언어 칸 '中文' 41%).
             바 안에 넣으면 덮는 것이 없고 둘 다 늘 닿는다. 셸은 이 경로에서 떠 있는 버튼을 그리지 않는다.
             긴급은 하단 내비와 같은 짧은 글자로 보여 320px 에서도 두 버튼이 한 줄에 들어간다(읽히는 이름은 온전하다). */}
-        <div className="onboarding-cta sticky-return">
+        <div className="onboarding-cta sticky-return is-flow">
           <div className="onboarding-cta-row">
             <EmergencyButton docked short />
             <Button href={START_HREF}>{t('home.cta')}</Button>

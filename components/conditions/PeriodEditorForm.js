@@ -201,7 +201,7 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
     if (!errors[field]) return null;
     return (
       <p className="conditions-field-error" id={errorId(field)} tabIndex={DATE_FIELDS.includes(field) ? -1 : undefined}>
-        <Icon name="close" size={16} strokeWidth={2.4} />
+        <Icon name="alert" size={20} />
         <span>{t(errorKey(field, errors[field]))}</span>
       </p>
     );
@@ -266,7 +266,10 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
     <form className="conditions-form" onSubmit={submit} noValidate>
       {errorFields.length > 0 && (
         <div className="conditions-error-summary" role="alert" tabIndex={-1} ref={summaryRef}>
-          <p className="conditions-error-summary-title">{t('conditions.errorSummary')}</p>
+          <p className="conditions-error-summary-title">
+            <Icon name="alert" size={20} />
+            <span>{t('conditions.errorSummary')}</span>
+          </p>
           <ul>
             {errorFields.map((field) => (
               <li key={field}>
@@ -289,16 +292,6 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
         minDate={stay?.arrival?.date}
         maxDate={stay?.departure?.date}
         disabled={readOnly}
-        actions={
-          <>
-            <Button type="submit" disabled={readOnly}>
-              {t('conditions.save')}
-            </Button>
-            <Button variant="secondary" onClick={onCancel}>
-              {t('conditions.cancel')}
-            </Button>
-          </>
-        }
       >
         {renderError('startDate')}
         {renderError('endDate')}
@@ -507,7 +500,7 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
                           </label>
                           {form.medication.times.length > 1 && (
                             <Button
-                              variant="quiet"
+                              variant="secondary"
                               size="small"
                               disabled={readOnly}
                               onClick={() =>
@@ -541,6 +534,16 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
           </>
         )}
       </PeriodEditor>
+
+      {/* 하단 고정 바(설계서 6.1): 하단 내비 바로 위에 [취소 3][저장 7] */}
+      <div className="conditions-editor-actions sticky-return is-flow">
+        <Button variant="secondary" onClick={onCancel}>
+          {t('conditions.cancel')}
+        </Button>
+        <Button type="submit" disabled={readOnly}>
+          {t('conditions.save')}
+        </Button>
+      </div>
     </form>
   );
 }

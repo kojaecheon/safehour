@@ -935,6 +935,31 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 .app-shell[data-emergency-bar='on'] .sticky-return {
   padding-bottom: var(--space-3);
 }
+/* 흐름 화면 하단 바(시작·체류 설정·조건 편집기·보호자): 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리).
+   '즉시 복귀' 안전 버튼은 is-flow 없이 늘 고정이다 */
+.sticky-return.is-flow {
+  background: var(--bg);
+  border-top: 1px solid var(--line-strong);
+}
+/* 두 고정 바(하단 내비·긴급 바 64~69px + 이 바 77~99px)가 키보드 초점이 간 칸을 덮지 않게 */
+html:has(.sticky-return.is-flow) {
+  scroll-padding-bottom: 184px;
+}
+/* 세로가 짧은 화면(400% 확대 320×256, 가로 휴대폰)에서는 고정을 풀고 흐름 안에 둔다(WCAG 1.4.10).
+   긴급 바·하단 내비는 그대로 바닥에 붙는다 */
+@media (max-height: 480px) {
+  .sticky-return.is-flow {
+    position: static;
+    transform: none;
+    width: auto;
+    max-width: none;
+    margin-top: var(--space-6);
+    padding: var(--space-3) 0;
+  }
+  html:has(.sticky-return.is-flow) {
+    scroll-padding-bottom: 88px;
+  }
+}
 
 /* ── 모달 시트 (SEED Bottom Sheet) ── 최대 480 · 위 모서리 24 · 뒤 --overlay · 최대 높이 90% · 그림자 없음 */
 .sheet-backdrop {

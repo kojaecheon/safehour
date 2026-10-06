@@ -150,6 +150,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | 클래스 `.ui-switch` · `.ui-block` · `main.page.is-basement` · `.hint.is-error` | — | 스위치(바로 적용되는 켬/끔, `role="switch"`, `.toggle-row` 라벨 안 — 끔 트랙 `--ink-subtle`), 흰 블록(화면 폭·8px 틈), 회색 바탕 층(그 안에서 카드 그림자 끔), 입력 오류 도움말(긴급 빨강, 입력은 `aria-invalid`) |
 | 클래스 `.medical-callout` · `.has-icon` | — | 일반 안내 상자(SEED Callout · neutral): 회색 면·모서리 10·16/22, 왼쪽 띠 없음, `role="note"`. `.has-icon`이면 앞에 20px 먹색 아이콘 칸(`.medical-callout-icon` — 첫 줄 가운데, 글자와 8px)을 두고 글자는 `<p>`에 넣는다. 기본 아이콘은 `info`(원 + i) |
 | 입력 오류 표시 | — | 입력칸은 공통 규칙(`aria-invalid` → 2px 긴급 빨강, 체크·라디오 제외). 라디오 묶음은 선택지 칸 테두리가 빨강(`.radio-option:has(input[aria-invalid])`). 오류 문장은 20px `alert` 아이콘(원 + 느낌표) + 16/22 굵은 `--emergency`, 왼쪽 띠 없음 — 체류 설정(`.onboarding-field-error`)이 먼저 쓴다 |
+| 클래스 `.sticky-return.is-flow` | 없음 | 흐름 화면 하단 바(시작·체류 설정·조건 편집기·보호자): 불투명 흰 면 + 1px 윗선, 세로 480px 이하에서 고정 해제, `scroll-padding-bottom` 184px. '즉시 복귀' 안전 버튼은 `is-flow` 없이 늘 고정이다. 회색 바탕 화면(`main.page.is-basement`)은 첫 흰 블록이 상단 바 바로 아래에서 시작하고, 모든 화면 끝 여백은 내비 + 56px(하단 고정 바가 있으면 + 152px) |
 | `TopBar` | `title`, `titleLang?`, `backHref?`·`onBack?`, `backLabel?`, `as?`, `actions?` | SEED Top Navigation — 높이 56·선 없음, 제목(기본 h1) 18/24 굵게·좁으면 말줄임, 뒤로 가기 44×44·모서리 8, 언어 선택(8장) |
 | `Icon` | `name`, `size?`, `strokeWidth?` | 인라인 SVG 선 아이콘(`ICON_NAMES`). 이름이 `Fill`로 끝나면 채운 모양(하단 내비 현재 칸). 상태 아이콘은 `STATE_ICON` |
 | `BottomNav` · `EmergencyButton` · `ReadOnlyBanner` · `AppShell` | 7장 | 앱 셸 |
