@@ -9,11 +9,11 @@
 // 철회하면 저장소(withdrawSensitiveConsent)가 SELF 기간, HOSPITAL 기간, 연동 지침 사본(연결 코드 포함)을 지우고
 // 병원 연결 표시를 끊는다. 그 날짜들은 NEEDS_INPUT(SENSITIVE_CONSENT_REQUIRED)이 되고,
 // 재계획은 저장소를 구독하는 동기화 작업(AX-316)이 한다. 이 부품은 일정 API 를 부르지 않는다.
-// 되돌릴 수 없으므로 한 번 더 묻는다. 보기 전용이면 막는다.
+// 되돌릴 수 없으므로 확인 대화상자로 한 번 더 묻는다(철회 버튼과 확인 버튼 모두 긴급 빨강). 보기 전용이면 막는다.
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Button, useStoreStatus } from '@/components/ui/index.js';
+import { AlertDialog, Button, Icon, useStoreStatus } from '@/components/ui/index.js';
 import { getStore } from '@/lib/store/index.js';
 import { fmtDateTime } from '@/lib/format.js';
 import SafetyText from './SafetyText.js';
@@ -27,21 +27,15 @@ export default function ConsentWithdraw({ headingLevel = 2 }) {
   const stay = useStay();
   const status = useStoreStatus();
   const headingId = useId();
-  const questionId = useId();
-  const confirmRef = useRef(null);
   const [confirming, setConfirming] = useState(false);
   const [result, setResult] = useState(null);
   const Heading = `h${headingLevel}`;
   const sensitive = stay?.consent?.sensitive ?? null;
   const readOnly = status.readOnly;
 
-  useEffect(() => {
-    if (confirming) confirmRef.current?.focus();
-  }, [confirming]);
-
-  function withdraw() {
+  function withdraw(requestClose) {
     const outcome = getStore().withdrawSensitiveConsent();
-    setConfirming(false);
+    requestClose();
     setResult(outcome.ok ? 'done' : 'failed');
   }
 
@@ -54,33 +48,28 @@ export default function ConsentWithdraw({ headingLevel = 2 }) {
             {t('conditions.consentGranted', { at: fmtDateTime(sensitive.agreedAt, locale), version: sensitive.version })}
           </p>
           <SafetyText k={'conditions.withdrawEffect'} className="conditions-callout" />
-          {confirming ? (
-            <div className="conditions-confirm" role="group" aria-labelledby={questionId}>
-              <p id={questionId} className="conditions-confirm-question">
-                {t('conditions.withdrawQuestion')}
-              </p>
-              <div className="conditions-actions">
-                <Button ref={confirmRef} onClick={withdraw} disabled={readOnly}>
-                  {t('conditions.withdrawConfirm')}
-                </Button>
-                <Button variant="secondary" onClick={() => setConfirming(false)}>
-                  {t('conditions.cancel')}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="conditions-actions">
-              <Button
-                variant="secondary"
-                disabled={readOnly}
-                onClick={() => {
-                  setResult(null);
-                  setConfirming(true);
-                }}
-              >
-                {t('conditions.withdrawAction')}
-              </Button>
-            </div>
+          <div className="conditions-actions">
+            <Button
+              variant="critical"
+              disabled={readOnly}
+              onClick={() => {
+                setResult(null);
+                setConfirming(true);
+              }}
+            >
+              {t('conditions.withdrawAction')}
+            </Button>
+          </div>
+          {confirming && (
+            <AlertDialog
+              title={t('conditions.withdrawTitle')}
+              description={t('conditions.withdrawQuestion')}
+              cancelLabel={t('conditions.cancel')}
+              confirmLabel={t('conditions.withdrawConfirm')}
+              critical
+              onConfirm={({ requestClose }) => withdraw(requestClose)}
+              onClose={() => setConfirming(false)}
+            />
           )}
           {readOnly && <p className="conditions-hint">{t('conditions.readOnlyHint')}</p>}
         </>
@@ -92,7 +81,8 @@ export default function ConsentWithdraw({ headingLevel = 2 }) {
       </div>
       {result === 'failed' && (
         <p className="conditions-field-error" role="alert">
-          {t('conditions.withdrawFailed')}
+          <Icon name="alert" size={20} />
+          <span>{t('conditions.withdrawFailed')}</span>
         </p>
       )}
     </section>

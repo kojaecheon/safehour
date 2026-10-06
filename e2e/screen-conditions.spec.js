@@ -138,3 +138,64 @@ test.describe('③층 조건 화면, 조건 기간 목록', () => {
     await expect(row.locator('.ui-source-tag-hospital')).toHaveCount(1);
   });
 });
+
+test.describe('③층 조건 화면, 동의와 동의 철회', () => {
+  test('동의 전: 동의 패널이 흰 블록과 한 면(카드 테두리 없음), 거부 안내 상자는 왼쪽 띠 없는 회색 면', async ({ page }) => {
+    await startTrip(page, { consent: false }, { path: '/conditions' });
+    const panel = page.locator('.conditions-consent');
+    expect(await styles(panel, ['border-top-width', 'box-shadow', 'padding-left'])).toEqual({
+      'border-top-width': '0px',
+      'box-shadow': 'none',
+      'padding-left': '0px',
+    });
+
+    await page.getByRole('button', { name: '동의하지 않습니다' }).click();
+    const callout = page.locator('.conditions-callout').first();
+    expect(
+      await styles(callout, ['border-left-width', 'border-top-left-radius', 'background-color', 'padding-top']),
+    ).toEqual({
+      'border-left-width': '0px',
+      'border-top-left-radius': '10px',
+      'background-color': 'rgb(243, 244, 245)',
+      'padding-top': '14px',
+    });
+
+    // 병원 연결 화면(/link)의 동의 패널은 ③층 14번 전까지 카드 그대로다
+    await page.goto('/link');
+    expect((await styles(page.locator('.conditions-consent'), ['border-top-width']))['border-top-width']).toBe('1px');
+  });
+
+  test('동의 철회: 빨간 버튼 → 확인 대화상자(초점 가둠, Escape, 초점 복귀, 취소) → 철회하기', async ({ page }) => {
+    await startTrip(page, {}, { path: '/conditions' });
+    const trigger = page.getByRole('button', { name: '동의 철회', exact: true });
+    expect((await styles(trigger, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
+
+    // 열면 초점이 대화상자 안으로 가고, Tab 을 눌러도 밖으로 나가지 않는다
+    await trigger.click();
+    const dialog = page.getByRole('alertdialog', { name: '민감정보 동의 철회' });
+    await expect(dialog).toBeVisible();
+    for (let i = 0; i < 4; i += 1) {
+      await page.keyboard.press('Tab');
+      expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    }
+
+    // Escape 로 닫히고 초점은 '동의 철회' 버튼으로 돌아온다
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+
+    // 취소는 아무것도 지우지 않는다
+    await trigger.click();
+    await page.getByRole('alertdialog', { name: '민감정보 동의 철회' }).getByRole('button', { name: '취소' }).click();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    expect((await readRecord(page, 'stay')).consent.sensitive).not.toBeNull();
+
+    // 철회하기(빨간 확인)를 누르면 동의가 지워지고 동의 패널이 다시 나온다
+    await trigger.click();
+    const confirm = page.getByRole('alertdialog', { name: '민감정보 동의 철회' }).getByRole('button', { name: '철회하기' });
+    expect((await styles(confirm, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
+    await confirm.click();
+    await expect(page.getByRole('heading', { name: '민감정보 처리 동의' })).toBeVisible();
+    expect((await readRecord(page, 'stay')).consent.sensitive).toBeNull();
+  });
+});

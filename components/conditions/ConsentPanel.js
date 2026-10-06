@@ -94,7 +94,8 @@ export default function ConsentPanel({ consent, readOnly, lead }) {
       )}
       {failed && (
         <p className="conditions-field-error" role="alert">
-          {t('conditions.consentFailed')}
+          <Icon name="alert" size={20} />
+          <span>{t('conditions.consentFailed')}</span>
         </p>
       )}
     </section>
