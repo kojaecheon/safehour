@@ -7,7 +7,7 @@
 // --accent rgb(10, 92, 255).
 
 import { test, expect } from './fixtures.js';
-import { readRecord, startTrip } from './helpers.js';
+import { readRecord, selfItems, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -73,6 +73,17 @@ test.describe('③층 조건 화면, 회색 바탕과 블록', () => {
     ).toBe('6px');
     await expect(day.locator('.ui-source-tag').first()).toBeVisible();
     expect((await readRecord(page, 'stay')).periods).toHaveLength(1);
+  });
+
+  test('날짜별 판정 상자 안의 복약 시각 미입력 안내는 흰 면: 같은 회색이면 상자 모양이 사라진다', async ({ page }) => {
+    // 복약 답이 '모르겠음'이면 합성 결과에 MEDICATION_TIMES_MISSING 경고가 붙는다
+    await startTrip(page, { items: selfItems({ medication: { kind: 'UNKNOWN' } }) }, { path: '/conditions' });
+    const day = page.locator('.conditions-day');
+    const callout = day.locator('.conditions-callout');
+    await expect(callout).toBeVisible();
+    await expect(callout).toContainText('복약 시각 미입력');
+    expect((await styles(callout, ['background-color']))['background-color']).toBe('rgb(255, 255, 255)');
+    expect((await styles(day, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
   });
 });
 

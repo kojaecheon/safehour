@@ -448,6 +448,10 @@
   background: var(--surface-alt);
   padding: 14px var(--space-4);
 }
+/* 판정 상자(회색 면) 안의 안내 상자는 흰 면으로 둔다: 같은 회색이면 상자 모양이 사라진다 */
+.conditions-day .conditions-callout {
+  background: var(--surface);
+}
 .conditions-day > p + p {
   margin-top: var(--space-2);
 }
