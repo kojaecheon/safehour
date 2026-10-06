@@ -56,6 +56,36 @@ test.describe('시나리오 11 — /design-board', () => {
     expect(apiCalls.filter((path) => path.startsWith('/api/itinerary'))).toEqual([]);
   });
 
+  test('화면 시안 틀 안: 하단 바는 고정이 아니고, 긴급 견본은 자기 틀의 하단 독 밖으로 밀려나지 않는다', async ({ page }) => {
+    await page.goto('/design-board');
+    await expect(page.getByRole('heading', { name: '화면 시안', level: 2 }).first()).toBeVisible();
+
+    // 조건 시안의 편집기 하단 바(.sticky-return)가 고정이면 틀의 transform 안에서 독을 덮고,
+    // 같은 보드의 긴급 견본이 '고정 복귀 버튼 위로 비켜서기' 규칙에 걸려 위로 밀린다
+    const positions = await page
+      .locator('.designBoard-phone .sticky-return')
+      .evaluateAll((els) => els.map((el) => getComputedStyle(el).position));
+    expect.soft(positions.filter((position) => position === 'fixed')).toEqual([]);
+
+    const result = await page.locator('.designBoard-phone').evaluateAll((frames) => {
+      const round = (rect) => ({ top: Math.round(rect.top), bottom: Math.round(rect.bottom) });
+      const outside = [];
+      let measured = 0;
+      frames.forEach((frame, index) => {
+        const sos = frame.querySelector('.designBoard-phone-sos .ui-emergency');
+        const dock = frame.querySelector('.designBoard-phone-dock');
+        if (!sos || !dock) return;
+        measured += 1;
+        const a = sos.getBoundingClientRect();
+        const b = dock.getBoundingClientRect();
+        if (a.top < b.top - 1 || a.bottom > b.bottom + 1) outside.push({ index, sos: round(a), dock: round(b) });
+      });
+      return { measured, outside };
+    });
+    expect(result.measured).toBeGreaterThan(0);
+    expect(result.outside).toEqual([]);
+  });
+
   test('내비에는 나오지 않는다', async ({ page }) => {
     await startTrip(page, {}, { path: '/more' });
     for (const path of ['/more', '/today', '/settings', '/trip']) {

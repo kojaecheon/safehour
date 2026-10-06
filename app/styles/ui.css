@@ -94,10 +94,11 @@
 }
 /* 고정 복귀 버튼이 있는 화면에서는 그 위로 비켜 선다 — 두 안전 버튼이 겹치지 않게.
    바 **안에** 들어간 긴급(is-docked)은 비켜설 필요가 없다 — 자리를 건드리면 바 밖으로 밀려 나간다. */
-.app-shell:has(.sticky-return) .ui-emergency:not(.is-docked) {
+/* 시안 보드 견본(is-preview)도 제자리에 그리므로 비켜서지 않는다: 보드의 화면 시안에 하단 바가 있어도 견본이 위로 밀리지 않게 */
+.app-shell:has(.sticky-return) .ui-emergency:not(.is-docked):not(.is-preview) {
   bottom: calc(var(--nav-offset) + 88px);
 }
-.app-shell[data-nav='off']:has(.sticky-return) .ui-emergency:not(.is-docked) {
+.app-shell[data-nav='off']:has(.sticky-return) .ui-emergency:not(.is-docked):not(.is-preview) {
   bottom: calc(88px + env(safe-area-inset-bottom));
 }
 /* 하단 내비 4개 — 오늘 · 일정 · 조건 · 더보기 */

@@ -376,6 +376,14 @@
   border-width: 1px 0 0;
   border-radius: 0;
 }
+/* 시안 틀 안의 하단 바(.sticky-return, 예: 조건 시안의 편집기 바)는 고정을 풀고 흐름 안에 둔다.
+   고정이면 틀의 transform 안에서 아래 독(긴급 견본·내비 견본)을 덮는다 */
+.designBoard-phone .sticky-return {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: none;
+}
 .designBoard-screen-caption {
   display: grid;
   gap: var(--space-1);
