@@ -118,6 +118,7 @@ export default function PeriodCard({ period, stay, byDate, nowMs, readOnly, onEd
       {confirming && (
         <AlertDialog
           title={t('conditions.deleteQuestion')}
+          description={t('conditions.dateRange', { start: fmtDay(period.startDate, locale), end: fmtDay(period.endDate, locale) })}
           cancelLabel={t('conditions.cancel')}
           confirmLabel={t('conditions.deleteConfirm')}
           critical

@@ -16,6 +16,9 @@ async function styles(locator, props) {
   );
 }
 
+// 버튼 면 색은 150ms 전환 중에 읽으면 중간값이 나오므로 목표 색에 닿을 때까지 기다린다
+const backgroundOf = (locator) => async () => (await styles(locator, ['background-color']))['background-color'];
+
 const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
 
 test.describe('③층 조건 화면, 회색 바탕과 블록', () => {
@@ -97,10 +100,14 @@ test.describe('③층 조건 화면, 조건 기간 목록', () => {
       'background-color': 'rgba(0, 0, 0, 0)',
     });
     await expect(row.locator('.ui-source-tag-self')).toHaveCount(1);
+    // 출처를 가르는 모양은 이제 출처 표시의 테두리 하나다: 본인 체크는 파선
+    const selfTag = row.locator('.ui-source-tag-self');
+    await expect(selfTag).toContainText('본인 체크');
+    expect((await styles(selfTag, ['border-top-style']))['border-top-style']).toBe('dashed');
 
     // 채운 코발트 버튼은 '본인 체크 기간 추가' 하나, 병원 지침 연결은 목록 행 링크
     const add = page.getByRole('button', { name: '본인 체크 기간 추가' });
-    expect((await styles(add, ['background-color']))['background-color']).toBe('rgb(10, 92, 255)');
+    await expect.poll(backgroundOf(add)).toBe('rgb(10, 92, 255)');
     const link = page.getByRole('link', { name: '병원 지침 연결' });
     await expect(link).toHaveClass(/ui-list-item/);
     await expect(link).toHaveAttribute('href', '/link');
@@ -109,12 +116,14 @@ test.describe('③층 조건 화면, 조건 기간 목록', () => {
   test('기간 삭제는 확인 대화상자(빨간 확인): 취소하면 남고, 삭제하기면 지운다', async ({ page }) => {
     await startTrip(page, {}, { path: '/conditions' });
     const trigger = page.locator('.conditions-period').first().getByRole('button', { name: '삭제', exact: true });
+    const rowRange = (await page.locator('.conditions-period').first().locator('h3').innerText()).trim();
     await trigger.click();
     const dialog = page.getByRole('alertdialog', { name: '이 기간을 삭제할까요?' });
     await expect(dialog).toBeVisible();
-    expect(
-      (await styles(dialog.getByRole('button', { name: '삭제하기' }), ['background-color']))['background-color'],
-    ).toBe('rgb(200, 16, 46)');
+    // 어느 기간을 지우는지 대화상자 안에서도 보인다(행 제목과 같은 날짜 범위 문구)
+    expect(rowRange.length).toBeGreaterThan(0);
+    await expect(dialog).toContainText(rowRange);
+    await expect.poll(backgroundOf(dialog.getByRole('button', { name: '삭제하기' }))).toBe('rgb(200, 16, 46)');
 
     await dialog.getByRole('button', { name: '취소' }).click();
     await expect(dialog).toHaveCount(0);
@@ -147,6 +156,10 @@ test.describe('③층 조건 화면, 조건 기간 목록', () => {
     const row = page.locator('.conditions-period-HOSPITAL').first();
     expect((await styles(row, ['border-left-width']))['border-left-width']).toBe('0px');
     await expect(row.locator('.ui-source-tag-hospital')).toHaveCount(1);
+    // 병원 발행은 실선 테두리(본인 체크의 파선과 모양으로 갈린다)
+    const hospitalTag = row.locator('.ui-source-tag-hospital');
+    await expect(hospitalTag).toContainText('병원 발행');
+    expect((await styles(hospitalTag, ['border-top-style']))['border-top-style']).toBe('solid');
   });
 });
 
@@ -179,7 +192,7 @@ test.describe('③층 조건 화면, 동의와 동의 철회', () => {
   test('동의 철회: 빨간 버튼 → 확인 대화상자(초점 가둠, Escape, 초점 복귀, 취소) → 철회하기', async ({ page }) => {
     await startTrip(page, {}, { path: '/conditions' });
     const trigger = page.getByRole('button', { name: '동의 철회', exact: true });
-    expect((await styles(trigger, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
+    await expect.poll(backgroundOf(trigger)).toBe('rgb(200, 16, 46)');
 
     // 열면 초점이 대화상자 안으로 가고, Tab 을 눌러도 밖으로 나가지 않는다
     await trigger.click();
@@ -204,7 +217,7 @@ test.describe('③층 조건 화면, 동의와 동의 철회', () => {
     // 철회하기(빨간 확인)를 누르면 동의가 지워지고 동의 패널이 다시 나온다
     await trigger.click();
     const confirm = page.getByRole('alertdialog', { name: '민감정보 동의 철회' }).getByRole('button', { name: '철회하기' });
-    expect((await styles(confirm, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
+    await expect.poll(backgroundOf(confirm)).toBe('rgb(200, 16, 46)');
     await confirm.click();
     await expect(page.getByRole('heading', { name: '민감정보 처리 동의' })).toBeVisible();
     expect((await readRecord(page, 'stay')).consent.sensitive).toBeNull();
@@ -267,5 +280,31 @@ test.describe('③층 조건 화면, 편집기', () => {
     expect(
       (await styles(page.locator('.conditions-subfield').first(), ['border-left-color']))['border-left-color'],
     ).toBe('rgb(220, 222, 227)');
+  });
+
+  test('편집 중에는 체류 정보 고치기 행이 없다: 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다', async ({ page }) => {
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await expect(page.getByRole('link', { name: '체류 정보 고치기' })).toHaveCount(1);
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await expect(page.locator('.conditions-editor-actions')).toBeVisible();
+    await expect(page.getByRole('link', { name: '체류 정보 고치기' })).toHaveCount(0);
+  });
+});
+
+test.describe('③층 병원 연결 화면, 연결 오류 상자', () => {
+  test('코드를 비우고 연결하면 1px 빨간 테두리 안내 상자 + 제목 앞 20px 경고 아이콘', async ({ page }) => {
+    await startTrip(page, {}, { path: '/link' });
+    await page.getByRole('button', { name: '회복 지침 연결' }).click();
+
+    const alert = page.locator('.conditions-alert');
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText('연결하지 못했습니다');
+    await expect(alert).toContainText('연결 코드를 입력해 주세요.');
+    expect(await styles(alert, ['border-left-width', 'border-top-width', 'border-top-color'])).toEqual({
+      'border-left-width': '1px',
+      'border-top-width': '1px',
+      'border-top-color': 'rgb(200, 16, 46)',
+    });
+    expect((await alert.locator('.conditions-alert-title svg').boundingBox()).width).toBe(20);
   });
 });

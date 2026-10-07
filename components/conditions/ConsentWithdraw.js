@@ -1,6 +1,7 @@
 'use client';
 
-// 민감정보 동의 철회 (AX-315 · spec 4.19) — /settings 와 /conditions 에서 쓴다
+// 민감정보 동의 철회 (AX-315 · spec 4.19): 지금은 /conditions 에서만 쓴다(설정 화면은 자체 시트).
+// 부품이 자기 흰 블록(ui-block)을 품고 있어, 흰 바탕 화면에 두면 좌우로 나간다.
 //
 //   import { ConsentWithdraw } from '@/components/conditions/index.js';
 //   <ConsentWithdraw />                  // 제목 h2

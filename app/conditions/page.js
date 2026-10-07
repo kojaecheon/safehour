@@ -219,14 +219,17 @@ export default function ConditionsPage() {
 
             {consented && !editing && <ConsentWithdraw />}
 
-            {/* 다른 화면으로 가는 이동이라 버튼이 아니라 화살표 목록 행(설계서 5.5) */}
-            <div className="ui-block">
-              <ListGroup>
-                <li>
-                  <ListItem title={t('conditions.editStay')} trailing="chevron" href="/onboarding" />
-                </li>
-              </ListGroup>
-            </div>
+            {/* 다른 화면으로 가는 이동이라 버튼이 아니라 화살표 목록 행(설계서 5.5).
+                편집 중에는 숨긴다: DOM 에서 하단 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다 */}
+            {!editing && (
+              <div className="ui-block">
+                <ListGroup>
+                  <li>
+                    <ListItem title={t('conditions.editStay')} trailing="chevron" href="/onboarding" />
+                  </li>
+                </ListGroup>
+              </div>
+            )}
           </>
         )}
       </main>

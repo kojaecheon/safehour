@@ -935,7 +935,7 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 .app-shell[data-emergency-bar='on'] .sticky-return {
   padding-bottom: var(--space-3);
 }
-/* 흐름 화면 하단 바(시작·체류 설정·조건 편집기·보호자): 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리).
+/* 흐름 화면 하단 바(시작·체류 설정·조건 편집기, 보호자 열기는 ③층 13번에서 쓸 예정): 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리).
    '즉시 복귀' 안전 버튼은 is-flow 없이 늘 고정이다 */
 .sticky-return.is-flow {
   background: var(--bg);

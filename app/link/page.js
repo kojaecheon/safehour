@@ -210,7 +210,10 @@ export default function LinkPage() {
               <>
                 {errorKey && (
                   <div className="conditions-alert" role="alert">
-                    <p className="conditions-alert-title">{t('link.errLabel')}</p>
+                    <p className="conditions-alert-title">
+                      <Icon name="alert" size={20} />
+                      <span>{t('link.errLabel')}</span>
+                    </p>
                     <p>{t(errorKey)}</p>
                   </div>
                 )}

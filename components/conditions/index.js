@@ -1,6 +1,6 @@
 // 조건·동의·병원 연동 부품 모음 (AX-315)
 //
-//   import { ConsentWithdraw } from '@/components/conditions/index.js';   // /settings 에서 동의 철회
+//   import { ConsentWithdraw } from '@/components/conditions/index.js';   // /conditions 에서 동의 철회
 //
 // 부품은 저장소(lib/store)에만 쓴다. 재계획은 저장소를 구독하는 동기화 작업(AX-316)이 한다.
 

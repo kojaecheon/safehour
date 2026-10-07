@@ -180,8 +180,8 @@
 /* 시안 보드용 미리보기 — 고정하지 않고 제자리에 그린다 */
 /* 고정을 풀고 흐름 안에 놓는 변형 — 시안 보드 견본(is-preview)과
    시작 화면 하단 바 안(is-docked)에서 쓴다. 떠 있으면 본문을 덮기 때문이다.
-   위의 `.app-shell:has(.sticky-return) .ui-emergency`(클래스 3개)보다 세야 하므로
-   `.app-shell` 을 앞에 붙여 자리 지정을 확실히 끈다 — 안 그러면 바 위로 88px 밀려 올라간다. */
+   고정 복귀 버튼 위로 비켜서는 위의 두 규칙은 `:not(.is-docked):not(.is-preview)` 로 이 둘을 이미 빼므로,
+   여기서는 기본 자리 지정(고정·inset·transform)만 끈다. */
 .ui-bottom-nav.is-preview,
 .ui-emergency.is-preview,
 .app-shell .ui-emergency.is-docked {

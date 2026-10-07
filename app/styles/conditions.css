@@ -449,7 +449,7 @@
 }
 /* 편집기 하단 바 [취소 3][저장 7] (설계서 6.1): 면·윗선·짧은 화면 처리는 globals.css 의 .sticky-return.is-flow.
    30% 칸(320px 에서 84px)에도 '取消'(zh)가 한 줄에 들어가게 '취소'의 좌우 여백을 12px 로 줄인다.
-   일본어 'キャンセル'는 이 폭에서 두 줄이 되어 바가 99px 까지 커진다(scroll-padding 184px 가 품는 높이) */
+   일본어 'キャンセル'는 320~390px 휴대폰 폭에서 두 줄이 되어 바가 99px 까지 커진다(scroll-padding 184px 안) */
 .conditions-editor-actions {
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);

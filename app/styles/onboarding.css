@@ -771,7 +771,7 @@
   pointer-events: none;
 }
 
-/* 이전 / 다음 · 저장 — 하단 고정 바(설계서 6.1, 면·윗선은 위 하단 바 규칙). 하단 긴급 바 바로 위에 선다.
+/* 이전 / 다음 · 저장: 하단 고정 바(설계서 6.1, 면·윗선·짧은 화면 처리는 globals.css 의 .sticky-return.is-flow). 하단 긴급 바 바로 위에 선다.
    두 버튼은 3:7, 사이 8px. 버튼 셋을 한 줄에 두지 않으려고 긴급은 아래 긴급 바에 그대로 둔다 */
 .onboarding-actions {
   display: grid;
