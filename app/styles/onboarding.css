@@ -772,10 +772,11 @@
 }
 
 /* 이전 / 다음 · 저장: 하단 고정 바(설계서 6.1, 면·윗선·짧은 화면 처리는 globals.css 의 .sticky-return.is-flow). 하단 긴급 바 바로 위에 선다.
-   두 버튼은 3:7, 사이 8px. 버튼 셋을 한 줄에 두지 않으려고 긴급은 아래 긴급 바에 그대로 둔다 */
+   두 버튼은 3:7, 사이 8px. 이전 칸은 3:7 이지만 글자 길이보다 좁아지지 않아 긴 글자도 한 줄이다.
+   버튼 셋을 한 줄에 두지 않으려고 긴급은 아래 긴급 바에 그대로 둔다 */
 .onboarding-actions {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 7fr);
+  grid-template-columns: minmax(max-content, 3fr) minmax(0, 7fr);
   gap: var(--space-2);
 }
 /* 문장(.onboarding-readonly·.onboarding-save-error)은 <p> 라 버튼 수만 센다 — 저장 실패 뒤 1단계로 돌아가도
@@ -784,11 +785,13 @@
   grid-column: 1 / -1;
 }
 /* 저장 버튼을 못 누르는 이유(보기 전용·저장 실패)는 바 안 맨 앞, 두 칸 전체 폭에 — 버튼 줄은 늘 둘째 줄로 밀린다.
-   바의 grid gap 이 버튼 줄과의 간격을 주므로 문장 자신의 위 여백은 없앤다 */
+   바의 grid gap 이 버튼 줄과의 간격을 주므로 문장 자신의 위 여백은 없앤다.
+   contain: inline-size 는 긴 문장의 한 줄 폭이 이전 칸(글자 길이만큼 자라는 칸)을 밀어 바가 넘치지 않게 한다 */
 .onboarding-actions > .onboarding-readonly,
 .onboarding-actions > .onboarding-save-error {
   grid-column: 1 / -1;
   margin-top: 0;
+  contain: inline-size;
 }
 /* 30% 칸(320px 에서 84px)에도 '上一步'(zh)가 한 줄로 들어가게 '이전'의 좌우 여백을 12px 로 줄인다 */
 .onboarding-actions > .btn-secondary {

@@ -189,10 +189,10 @@ test.describe('③층 조건 화면, 동의와 동의 철회', () => {
     expect((await styles(page.locator('.conditions-consent'), ['border-top-width']))['border-top-width']).toBe('1px');
   });
 
-  test('동의 철회: 빨간 버튼 → 확인 대화상자(초점 가둠, Escape, 초점 복귀, 취소) → 철회하기', async ({ page }) => {
+  test('동의 철회: 회색 버튼 → 확인 대화상자(초점 가둠, Escape, 초점 복귀, 취소) → 철회하기(빨간 확인)', async ({ page }) => {
     await startTrip(page, {}, { path: '/conditions' });
     const trigger = page.getByRole('button', { name: '동의 철회', exact: true });
-    await expect.poll(backgroundOf(trigger)).toBe('rgb(200, 16, 46)');
+    await expect.poll(backgroundOf(trigger)).toBe('rgb(243, 244, 245)');
 
     // 열면 초점이 대화상자 안으로 가고, Tab 을 눌러도 밖으로 나가지 않는다
     await trigger.click();
@@ -245,6 +245,22 @@ test.describe('③층 조건 화면, 편집기', () => {
     const save = await bar.getByRole('button', { name: '저장', exact: true }).boundingBox();
     expect(cancel.width / (cancel.width + save.width)).toBeCloseTo(0.3, 2);
     expect(Math.round(save.height)).toBe(52);
+  });
+
+  test('360px 일본어: 취소 칸은 글자 길이만큼 자라 キャンセル 이 한 줄(52px)에 들어간다', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto('/');
+    await page.getByRole('button', { name: '日本語', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await page.getByRole('button', { name: '本人チェックの期間を追加' }).click();
+
+    const bar = page.locator('.conditions-editor-actions');
+    const cancel = bar.getByRole('button', { name: 'キャンセル' });
+    await expect(cancel).toBeVisible();
+    expect(Math.round((await cancel.boundingBox()).height)).toBe(52);
+    const save = bar.getByRole('button', { name: '保存する', exact: true });
+    expect(Math.round((await save.boundingBox()).height)).toBe(52);
   });
 
   test('오류: 문장은 경고 아이콘 + 빨강, 요약은 1px 빨간 테두리 안내 상자, 따라오는 입력은 회색 선으로 묶는다', async ({ page }) => {

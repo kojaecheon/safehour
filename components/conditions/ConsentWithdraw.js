@@ -10,7 +10,7 @@
 // 철회하면 저장소(withdrawSensitiveConsent)가 SELF 기간, HOSPITAL 기간, 연동 지침 사본(연결 코드 포함)을 지우고
 // 병원 연결 표시를 끊는다. 그 날짜들은 NEEDS_INPUT(SENSITIVE_CONSENT_REQUIRED)이 되고,
 // 재계획은 저장소를 구독하는 동기화 작업(AX-316)이 한다. 이 부품은 일정 API 를 부르지 않는다.
-// 되돌릴 수 없으므로 확인 대화상자로 한 번 더 묻는다(철회 버튼과 확인 버튼 모두 긴급 빨강). 보기 전용이면 막는다.
+// 되돌릴 수 없으므로 확인 대화상자로 한 번 더 묻는다(확인 버튼만 긴급 빨강, 철회 버튼은 회색: 채운 강조 버튼은 화면당 하나이고 빨간 채움은 긴급 버튼 색이다). 보기 전용이면 막는다.
 
 import { useId, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
@@ -51,7 +51,7 @@ export default function ConsentWithdraw({ headingLevel = 2 }) {
           <SafetyText k={'conditions.withdrawEffect'} className="conditions-callout" />
           <div className="conditions-actions">
             <Button
-              variant="critical"
+              variant="secondary"
               disabled={readOnly}
               onClick={() => {
                 setResult(null);
