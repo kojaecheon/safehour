@@ -79,43 +79,55 @@
 
 /* ── 날짜 목록 (/trip): SEED 목록 행, 흰 바탕 한 장(설계서 6.2 5번) ──
    [날짜 칩][날짜 · 상태 · 장소 수 · 사유][화살표]. 카드 테두리 없이 행 사이 1px 선.
-   행 전체가 그 날짜로 가는 마우스 누름 자리다(제목 링크를 행 크기로 늘림). 키보드·스크린리더는 날짜 칩 링크 하나만 만난다 */
+   행 전체가 그 날짜로 가는 마우스 누름 자리다(숨긴 링크를 행 크기로 늘림). 키보드·스크린리더는 날짜 칩 링크 하나만 만난다 */
 .trip-days {
   list-style: none;
 }
 .trip-day-row {
   position: relative;
+  /* 날짜 칩·늘린 링크의 z-index 가 행 안에서만 쌓이게 가둔다(시안 보드 틀 안에서 내비 견본을 덮지 않게) */
+  isolation: isolate;
+  --trip-row-bleed: calc(6px - var(--gutter));
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
   padding: var(--space-3) 0;
-  transition: background-color var(--duration-fast) var(--ease-color);
 }
 .trip-day-row + .trip-day-row {
   border-top: 1px solid var(--line);
 }
-/* 제목 링크를 행 전체로 늘린다. 날짜 칩과 고칠 곳 링크는 그 위에 두어 제 동작을 지킨다 */
+/* 숨긴 링크를 눌림 면과 같은 크기(행 + 좌우 바깥 10px)로 늘린다. 날짜 칩과 고칠 곳 링크는 그 위에 두어 제 동작을 지킨다 */
 .trip-day-link {
-  color: inherit;
-  text-decoration: none;
-}
-.trip-day-link::after {
-  content: '';
   position: absolute;
-  inset: 0;
+  inset: 0 var(--trip-row-bleed);
 }
 .trip-day-row .ui-date-chip,
 .trip-day-fix a {
   position: relative;
   z-index: 1;
 }
-/* 눌림·호버는 행 면 색만 바꾼다 */
-.trip-day-row:has(.trip-day-link:active) {
+/* 눌림·호버: 목록 행(.ui-list-item)과 같은 모양(설계서 4.6, 5.5). 바탕이 화면 끝에서 6px 안쪽(행 좌우 여백 0 + 화면 여백 16px 이므로 -10px)
+   모서리 10 면으로 깔리고, 눌렀을 때는 내용만 줄어든다. 행 자체에는 바탕을 칠하지 않는다 */
+.trip-day-row::before {
+  content: '';
+  position: absolute;
+  inset: 0 var(--trip-row-bleed);
+  border-radius: var(--radius-10);
+  background: transparent;
+  z-index: -1;
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.trip-day-row:has(.trip-day-link:active)::before {
   background: var(--pressed-transparent);
 }
 @media (hover: hover) and (pointer: fine) {
-  .trip-day-row:has(.trip-day-link:hover) {
+  .trip-day-row:has(.trip-day-link:hover)::before {
     background: var(--pressed-transparent);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .trip-day-row:has(.trip-day-link:active) > .trip-day-info {
+    transform: scale(var(--press-scale-wide));
   }
 }
 .trip-day-chevron {
@@ -130,6 +142,7 @@
   min-width: 0;
   display: grid;
   gap: var(--space-1);
+  transition: transform var(--duration-fast) var(--ease-press);
 }
 .trip-day-title {
   display: flex;
@@ -170,8 +183,8 @@
   font-size: var(--text-body);
   color: var(--ink);
 }
-/* '변경됨'·'즉시 복귀' 표시 (설계서 5.4 배지 모양: 모서리 6, 위아래 4 · 좌우 8, 14/19 굵게).
-   '변경됨'은 코발트 대신 회색 면 + 3:1 테두리, '즉시 복귀'는 안전 지시라 먹색 채움을 유지한다 */
+/* '변경됨'·'즉시 복귀' 표시 (설계서 5.4 배지 모양: 모서리 6, 위아래 4 · 좌우 8, 14/19).
+   '변경됨'은 약한 배지라 코발트 대신 회색 면 + 3:1 테두리에 보통 굵기(500), '즉시 복귀'는 안전 지시라 먹색 채움과 굵게(700)를 유지한다 */
 .trip-changed-tag,
 .trip-return-tag {
   display: inline-flex;
@@ -180,17 +193,18 @@
   border-radius: var(--radius-6);
   font-size: var(--text-caption);
   line-height: var(--lh-caption);
-  font-weight: var(--weight-bold);
 }
 .trip-changed-tag {
   border: 1px solid var(--line-input);
   color: var(--ink);
   background: var(--surface-alt);
+  font-weight: var(--weight-medium);
 }
 .trip-return-tag {
   border: 1px solid var(--ink);
   color: var(--on-dark);
   background: var(--ink);
+  font-weight: var(--weight-bold);
 }
 
 /* ── 하루 일정 (/trip/[date]) ── */

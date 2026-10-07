@@ -86,6 +86,26 @@ test.describe('시나리오 11 — /design-board', () => {
     expect(result.outside).toEqual([]);
   });
 
+  test('화면 시안 틀 안: 전체 일정 시안의 날짜 칩이 하단 내비 견본 위로 올라오지 않는다', async ({ page }) => {
+    await page.goto('/design-board');
+    const phone = page.locator('figure.designBoard-screen').filter({ has: page.locator('code', { hasText: /^\/trip$/ }) });
+    await expect(phone.locator('.trip-day-row').first()).toBeVisible();
+    const today = phone.locator('.ui-bottom-nav a[href="/today"]');
+    await today.scrollIntoViewIfNeeded();
+
+    // 틀 안은 inert 라 눌림 대상 검사에서 빠진다. 쌓임 순서만 보려고 검사하는 동안만 inert 를 푼다
+    const result = await phone.evaluate((figure) => {
+      const screen = figure.querySelector('.designBoard-phone-screen');
+      const nav = figure.querySelector('.ui-bottom-nav a[href="/today"]');
+      const rect = nav.getBoundingClientRect();
+      screen.inert = false;
+      const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+      screen.inert = true;
+      return { ok: Boolean(top) && (nav === top || nav.contains(top)), top: top ? `${top.tagName}.${top.className}` : null };
+    });
+    expect(result.ok, `내비 견본 가운데에서 가장 위에 있는 요소: ${result.top}`).toBe(true);
+  });
+
   test('내비에는 나오지 않는다', async ({ page }) => {
     await startTrip(page, {}, { path: '/more' });
     for (const path of ['/more', '/today', '/settings', '/trip']) {

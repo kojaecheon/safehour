@@ -88,10 +88,7 @@ export default function TripPage() {
               />
               <div className="trip-day-info">
                 <p className="trip-day-title">
-                  {/* 날짜 칩과 같은 곳으로 가는 마우스 누름 자리, CSS 로 행 전체로 늘린다. 키보드·스크린리더는 날짜 칩 링크 하나만 만난다 */}
-                  <Link className="trip-day-link" href={`/trip/${row.date}`} tabIndex={-1} aria-hidden="true">
-                    {formatDate(row.date, locale)}
-                  </Link>
+                  <span aria-hidden="true">{formatDate(row.date, locale)}</span>
                   {row.changed && <span className="trip-changed-tag">{t('trip.changed')}</span>}
                   {row.returnNow && <span className="trip-return-tag">{t('trip.returnNowTag')}</span>}
                 </p>
@@ -134,6 +131,9 @@ export default function TripPage() {
               <span className="trip-day-chevron" aria-hidden="true">
                 <Icon name="chevronRight" size={18} />
               </span>
+              {/* 날짜 칩과 같은 곳으로 가는 마우스 누름 자리, CSS 로 행 전체로 늘린다. 키보드·스크린리더는 날짜 칩 링크 하나만 만난다.
+                  눌렀을 때 줄어드는 정보 묶음 밖(행의 마지막 칸)에 둔다. 줄어드는 상자 안에 두면 늘린 영역이 그 상자 크기로 줄어든다 */}
+              <Link className="trip-day-link" href={`/trip/${row.date}`} tabIndex={-1} aria-hidden="true" />
             </li>
           ))}
         </ol>
