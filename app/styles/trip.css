@@ -77,23 +77,53 @@
   background: var(--state-standby-bg);
 }
 
-/* ── 날짜 목록 (/trip) ── */
+/* ── 날짜 목록 (/trip): SEED 목록 행, 흰 바탕 한 장(설계서 6.2 5번) ──
+   [날짜 칩][날짜 · 상태 · 장소 수 · 사유][화살표]. 카드 테두리 없이 행 사이 1px 선.
+   행 전체가 그 날짜로 가는 마우스 누름 자리다(제목 링크를 행 크기로 늘림). 키보드·스크린리더는 날짜 칩 링크 하나만 만난다 */
 .trip-days {
   list-style: none;
-  display: grid;
-  gap: var(--space-3);
 }
 .trip-day-row {
+  position: relative;
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
-  padding: var(--space-3);
-  border: 1px solid var(--line-strong);
-  border-radius: var(--radius-16);
-  background: var(--surface);
+  padding: var(--space-3) 0;
+  transition: background-color var(--duration-fast) var(--ease-color);
 }
-.trip-day-row.is-past {
-  background: var(--surface-alt);
+.trip-day-row + .trip-day-row {
+  border-top: 1px solid var(--line);
+}
+/* 제목 링크를 행 전체로 늘린다. 날짜 칩과 고칠 곳 링크는 그 위에 두어 제 동작을 지킨다 */
+.trip-day-link {
+  color: inherit;
+  text-decoration: none;
+}
+.trip-day-link::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+.trip-day-row .ui-date-chip,
+.trip-day-fix a {
+  position: relative;
+  z-index: 1;
+}
+/* 눌림·호버는 행 면 색만 바꾼다 */
+.trip-day-row:has(.trip-day-link:active) {
+  background: var(--pressed-transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .trip-day-row:has(.trip-day-link:hover) {
+    background: var(--pressed-transparent);
+  }
+}
+.trip-day-chevron {
+  flex: none;
+  align-self: center;
+  display: inline-grid;
+  place-items: center;
+  color: var(--ink-subtle);
 }
 .trip-day-info {
   flex: 1;
@@ -107,8 +137,13 @@
   align-items: center;
   gap: var(--space-2);
   font-size: var(--text-title-3);
+  line-height: var(--lh-title-3);
   font-weight: var(--weight-bold);
   color: var(--ink);
+}
+/* 지난 날: 회색 카드 면 대신 날짜 제목만 보조 글자색(순서와 '오늘' 표시가 지난 날을 알린다) */
+.trip-day-row.is-past .trip-day-title {
+  color: var(--ink-soft);
 }
 .trip-day-meta {
   display: flex;
@@ -135,19 +170,22 @@
   font-size: var(--text-body);
   color: var(--ink);
 }
+/* '변경됨'·'즉시 복귀' 표시 (설계서 5.4 배지 모양: 모서리 6, 위아래 4 · 좌우 8, 14/19 굵게).
+   '변경됨'은 코발트 대신 회색 면 + 3:1 테두리, '즉시 복귀'는 안전 지시라 먹색 채움을 유지한다 */
 .trip-changed-tag,
 .trip-return-tag {
   display: inline-flex;
   align-items: center;
-  padding: 2px var(--space-2);
-  border-radius: var(--radius-8);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-6);
   font-size: var(--text-caption);
-  font-weight: var(--weight-heavy);
+  line-height: var(--lh-caption);
+  font-weight: var(--weight-bold);
 }
 .trip-changed-tag {
-  border: 1px solid var(--accent);
-  color: var(--accent-strong);
-  background: var(--accent-soft);
+  border: 1px solid var(--line-input);
+  color: var(--ink);
+  background: var(--surface-alt);
 }
 .trip-return-tag {
   border: 1px solid var(--ink);

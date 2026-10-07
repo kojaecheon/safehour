@@ -7,11 +7,12 @@
 //     상태는 오늘이면 매일 확인·병원 안내 대기를 덧씌운 표시용 값이다(저장 일정은 그대로).
 //   - 입력이 필요한 날짜(NEEDS_INPUT)는 사유에 맞는 고칠 곳으로 잇는다(숙소 → 체류 설정, 동의·조건 → 조건 화면).
 //   - 일정은 기기 저장소의 확정 일정만 읽는다. 로그인 만료·오프라인에서도 보기 전용으로 보인다.
+//   - SEED ③층(설계서 6.2 5번): 흰 바탕 한 장, 날짜마다 목록 행 [날짜 칩][날짜 · 상태 · 장소 수 · 사유][화살표].
 
 import { useState } from 'react';
 import Link from 'next/link';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Button, DateChip, EmptyState, TopBar } from '@/components/ui/index.js';
+import { Button, DateChip, EmptyState, Icon, TopBar } from '@/components/ui/index.js';
 import CoverageTag from '@/components/conditions/CoverageTag.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import { formatDate, tripDateRows } from '@/components/trip/viewModel.js';
@@ -77,7 +78,7 @@ export default function TripPage() {
         </p>
         <ol className="trip-days">
           {rows.map((row) => (
-            <li key={row.date} className={row.isPast ? 'trip-day-row is-past' : 'trip-day-row'}>
+            <li key={row.date} data-date={row.date} className={row.isPast ? 'trip-day-row is-past' : 'trip-day-row'}>
               <DateChip
                 date={row.date}
                 state={row.state ?? undefined}
@@ -87,8 +88,8 @@ export default function TripPage() {
               />
               <div className="trip-day-info">
                 <p className="trip-day-title">
-                  {/* 날짜 칩과 같은 곳으로 가는 마우스용 넓은 누름 자리 — 키보드·스크린리더는 날짜 칩 링크 하나만 만난다 */}
-                  <Link href={`/trip/${row.date}`} tabIndex={-1} aria-hidden="true">
+                  {/* 날짜 칩과 같은 곳으로 가는 마우스 누름 자리, CSS 로 행 전체로 늘린다. 키보드·스크린리더는 날짜 칩 링크 하나만 만난다 */}
+                  <Link className="trip-day-link" href={`/trip/${row.date}`} tabIndex={-1} aria-hidden="true">
                     {formatDate(row.date, locale)}
                   </Link>
                   {row.changed && <span className="trip-changed-tag">{t('trip.changed')}</span>}
@@ -130,6 +131,9 @@ export default function TripPage() {
                   </p>
                 )}
               </div>
+              <span className="trip-day-chevron" aria-hidden="true">
+                <Icon name="chevronRight" size={18} />
+              </span>
             </li>
           ))}
         </ol>
