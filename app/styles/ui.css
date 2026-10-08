@@ -371,11 +371,14 @@
   line-height: var(--lh-title-2);
   font-variant-numeric: tabular-nums;
 }
+/* 상태·병원 표시 원판 둘은 4px 겹쳐 칩 폭 60px 안에 든다(원판 안쪽 여백이 4px 라 아이콘끼리는 겹치지 않는다) */
 .ui-date-marks {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-0-5);
   margin-top: var(--space-0-5);
+}
+.ui-date-marks > * + * {
+  margin-left: calc(var(--space-1) * -1);
 }
 /* 상태 아이콘은 흰 원판 위 상태 색 — 고른 칩(진한 면)에서도 상태 색이 살아 있다 */
 .ui-date-state {

@@ -56,24 +56,24 @@
 .trip-notice-slot:empty {
   display: none;
 }
+/* 알림 상자 (SEED Callout · neutral, 설계서 5.6): 왼쪽 띠 없이 회색 면 · 모서리 10 · 안쪽 14/16 */
 .trip-notice {
   display: grid;
   gap: var(--space-2);
   justify-items: start;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line-strong);
-  border-left: 4px solid var(--accent);
-  border-radius: var(--radius-12);
-  background: var(--surface);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
   font-size: var(--text-body);
+  line-height: var(--lh-body);
   color: var(--ink);
 }
 .trip-notice p {
   color: var(--ink);
 }
-/* 실패 알림 — 오류 빨강 대신 대기 색 + 굵은 왼쪽 띠 (판정 상태와 헷갈리지 않게 글자로 밝힌다) */
+/* 실패 알림: 오류 빨강 대신 대기 색 면 + 1px 대기 선(판정 상태와 헷갈리지 않게 문구로 밝힌다) */
 .trip-notice.is-error {
-  border-left-color: var(--state-standby-ink);
+  border: 1px solid var(--state-standby-line);
   background: var(--state-standby-bg);
 }
 
@@ -208,6 +208,27 @@
 }
 
 /* ── 하루 일정 (/trip/[date]) ── */
+/* 하루 일정 (설계서 6.2 6번): 회색 바탕 위 흰 블록. 블록 틈(8px)이 간격을 주므로 화면 공통 세로 간격을 끈다 */
+.trip-day.is-basement {
+  gap: 0;
+}
+.trip-status-block,
+.trip-timeline-block,
+.trip-tools-block {
+  display: grid;
+  gap: var(--space-3);
+}
+.trip-timeline-block > .tabs {
+  margin-bottom: 0;
+}
+/* 날짜 칩 줄: 블록 좌우 안쪽 여백을 줄로 옮겨 칩이 화면 끝까지 흐른다 */
+.ui-block.trip-strip {
+  padding: var(--space-3) 0;
+}
+.trip-strip .ui-date-strip {
+  padding: var(--space-1) var(--gutter) var(--space-2);
+  scroll-padding-inline: var(--gutter);
+}
 .trip-changed {
   justify-content: flex-start;
 }

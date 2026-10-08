@@ -17,6 +17,7 @@
 //   - AI/정해진 문장 소개는 판정 영역과 떨어진 별도 영역이다.
 //   - 데모 사건 패널은 '병원 연동 데모' 모드의 오늘에만 단다.
 //   - 시트는 뒤로 가기로 시트만 닫힌다.
+//   - SEED ③층(설계서 6.2 6번): 회색 바탕 위 흰 블록. 날짜 칩 줄 / 상태 / 전환·타임라인 / 소개 / 도구.
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
@@ -255,10 +256,12 @@ export default function DayScreen() {
     return (
       <>
         {top}
-        <main className="page trip-page">
-          <p className="trip-loading" role="status">
-            {t('trip.loading')}
-          </p>
+        <main className="page trip-page trip-day is-basement">
+          <div className="ui-block">
+            <p className="trip-loading" role="status">
+              {t('trip.loading')}
+            </p>
+          </div>
         </main>
       </>
     );
@@ -267,36 +270,42 @@ export default function DayScreen() {
   let body;
   if (!stay) {
     body = (
-      <EmptyState
-        icon="navTrip"
-        title={t('today.noStayTitle')}
-        body={t('today.noStayBody')}
-        action={<Button href="/onboarding">{t('today.noStayAction')}</Button>}
-      />
+      <div className="ui-block">
+        <EmptyState
+          icon="navTrip"
+          title={t('today.noStayTitle')}
+          body={t('today.noStayBody')}
+          action={<Button href="/onboarding">{t('today.noStayAction')}</Button>}
+        />
+      </div>
     );
   } else if (!valid || !inStay) {
     body = (
-      <EmptyState
-        icon="navTrip"
-        title={t('trip.notInStayTitle')}
-        body={t('trip.notInStayBody')}
-        action={<Button href="/trip">{t('trip.backToTrip')}</Button>}
-      />
+      <div className="ui-block">
+        <EmptyState
+          icon="navTrip"
+          title={t('trip.notInStayTitle')}
+          body={t('trip.notInStayBody')}
+          action={<Button href="/trip">{t('trip.backToTrip')}</Button>}
+        />
+      </div>
     );
   } else if (!day) {
     body = (
-      <EmptyState
-        icon="navTrip"
-        title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
-        body={trip.syncing ? t('today.generatingBody') : t('trip.noDayBody')}
-        action={
-          !trip.syncing && !trip.readOnly ? (
-            <Button variant="secondary" onClick={() => trip.retry()}>
-              {t('today.retry')}
-            </Button>
-          ) : null
-        }
-      />
+      <div className="ui-block">
+        <EmptyState
+          icon="navTrip"
+          title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
+          body={trip.syncing ? t('today.generatingBody') : t('trip.noDayBody')}
+          action={
+            !trip.syncing && !trip.readOnly ? (
+              <Button variant="secondary" onClick={() => trip.retry()}>
+                {t('today.retry')}
+              </Button>
+            ) : null
+          }
+        />
+      </div>
     );
   } else {
     const patientEntries = toTimeline(timelineEntries(day, { role: 'P', stay }));
@@ -304,168 +313,174 @@ export default function DayScreen() {
     const returnTitle = pair('return.title');
     body = (
       <>
-        <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
+        <div className="ui-block trip-status-block">
+          <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
 
-        {delta?.unseen && (
-          <button type="button" className="btn btn-secondary trip-changed" onClick={() => setSheet({ kind: 'delta' })}>
-            <span className="trip-changed-dot" aria-hidden="true" />
-            {t('trip.changedCta')}
-          </button>
-        )}
-
-        {stored?.returnNow && (
-          <section className="trip-return-banner" aria-labelledby={`${tabsId}-return`}>
-            <h2 id={`${tabsId}-return`} lang={returnTitle.primary.lang}>
-              {returnTitle.primary.text}
-            </h2>
-            <p className="trip-pair-secondary" lang={returnTitle.secondary.lang}>
-              {returnTitle.secondary.text}
-            </p>
-            {!trip.immediateReturn && (
-              <button type="button" className="btn btn-return" onClick={() => setSheet({ kind: 'return' })}>
-                {t('return.reopen')}
-              </button>
-            )}
-          </section>
-        )}
-
-        {isToday && trip.dailyCheckPending && (
-          <p className="trip-notice">
-            {t('trip.gatedToday')}{' '}
-            <Link className="trip-inline-link" href="/today">
-              {t('trip.goDailyCheck')}
-            </Link>
-          </p>
-        )}
-        {isToday && trip.unconfirmedHospitalUpdate && (
-          <p className="trip-notice">
-            {t('today.unconfirmedTitle')}{' '}
-            <Link className="trip-inline-link" href="/guide">
-              {t('today.unconfirmedCta')}
-            </Link>
-          </p>
-        )}
-
-        {fix && (
-          <section className="trip-fix" aria-labelledby={`${tabsId}-fix`}>
-            <h2 id={`${tabsId}-fix`}>{t('trip.fixTitle')}</h2>
-            <Button href={trip.readOnly ? undefined : fix.href} disabled={trip.readOnly}>
-              {t(fix.key)}
-            </Button>
-          </section>
-        )}
-
-        <div className="tabs" role="tablist" aria-label={t('trip.tabsLabel')}>
-          {[
-            ['P', t('trip.tabPatient')],
-            ['G', t('trip.tabGuardian')],
-          ].map(([role, label]) => (
-            <button
-              key={role}
-              type="button"
-              role="tab"
-              id={`${tabsId}-tab-${role}`}
-              aria-selected={tab === role}
-              aria-controls={`${tabsId}-panel-${role}`}
-              tabIndex={tab === role ? 0 : -1}
-              onClick={() => setTab(role)}
-              onKeyDown={onTabKey}
-            >
-              {label}
-              {role === 'G' && guardian.locked && (
-                <span className="trip-tab-lock">
-                  <Icon name="lock" size={16} />
-                  <span className="visually-hidden">{t('trip.lockedLabel')}</span>
-                </span>
-              )}
+          {delta?.unseen && (
+            <button type="button" className="btn btn-secondary trip-changed" onClick={() => setSheet({ kind: 'delta' })}>
+              <span className="trip-changed-dot" aria-hidden="true" />
+              {t('trip.changedCta')}
             </button>
+          )}
+
+          {stored?.returnNow && (
+            <section className="trip-return-banner" aria-labelledby={`${tabsId}-return`}>
+              <h2 id={`${tabsId}-return`} lang={returnTitle.primary.lang}>
+                {returnTitle.primary.text}
+              </h2>
+              <p className="trip-pair-secondary" lang={returnTitle.secondary.lang}>
+                {returnTitle.secondary.text}
+              </p>
+              {!trip.immediateReturn && (
+                <button type="button" className="btn btn-return" onClick={() => setSheet({ kind: 'return' })}>
+                  {t('return.reopen')}
+                </button>
+              )}
+            </section>
+          )}
+
+          {isToday && trip.dailyCheckPending && (
+            <p className="trip-notice">
+              {t('trip.gatedToday')}{' '}
+              <Link className="trip-inline-link" href="/today">
+                {t('trip.goDailyCheck')}
+              </Link>
+            </p>
+          )}
+          {isToday && trip.unconfirmedHospitalUpdate && (
+            <p className="trip-notice">
+              {t('today.unconfirmedTitle')}{' '}
+              <Link className="trip-inline-link" href="/guide">
+                {t('today.unconfirmedCta')}
+              </Link>
+            </p>
+          )}
+
+          {fix && (
+            <section className="trip-fix" aria-labelledby={`${tabsId}-fix`}>
+              <h2 id={`${tabsId}-fix`}>{t('trip.fixTitle')}</h2>
+              <Button href={trip.readOnly ? undefined : fix.href} disabled={trip.readOnly}>
+                {t(fix.key)}
+              </Button>
+            </section>
+          )}
+        </div>
+
+        <div className="ui-block trip-timeline-block">
+          <div className="tabs" role="tablist" aria-label={t('trip.tabsLabel')}>
+            {[
+              ['P', t('trip.tabPatient')],
+              ['G', t('trip.tabGuardian')],
+            ].map(([role, label]) => (
+              <button
+                key={role}
+                type="button"
+                role="tab"
+                id={`${tabsId}-tab-${role}`}
+                aria-selected={tab === role}
+                aria-controls={`${tabsId}-panel-${role}`}
+                tabIndex={tab === role ? 0 : -1}
+                onClick={() => setTab(role)}
+                onKeyDown={onTabKey}
+              >
+                {label}
+                {role === 'G' && guardian.locked && (
+                  <span className="trip-tab-lock">
+                    <Icon name="lock" size={16} />
+                    <span className="visually-hidden">{t('trip.lockedLabel')}</span>
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div role="status" className={notice?.error ? 'trip-notice is-error' : 'trip-notice-slot'}>
+            {notice ? t(notice.key) : ''}
+          </div>
+
+          {['P', 'G'].map((role) => (
+            <section
+              key={role}
+              id={`${tabsId}-panel-${role}`}
+              role="tabpanel"
+              aria-labelledby={`${tabsId}-tab-${role}`}
+              hidden={tab !== role}
+              className="trip-panel"
+            >
+              <h2 className="trip-panel-title" tabIndex={-1} ref={tab === role ? timelineHeadingRef : undefined}>
+                {role === 'P' ? t('trip.timelinePatient') : t('trip.timelineGuardian')}
+              </h2>
+              {role === 'G' && guardian.reason ? (
+                <div className={guardian.locked ? 'trip-guardian-lock is-locked' : 'trip-guardian-lock'}>
+                  <p className="trip-guardian-head">
+                    <Icon name={guardian.locked ? 'lock' : 'stateSplit'} size={20} />
+                    <span>{guardian.locked ? t('trip.guardianLockTitle') : t('trip.guardianInfoTitle')}</span>
+                  </p>
+                  <p lang={safetyLang}>{t(GUARDIAN_REASON_KEY[guardian.reason])}</p>
+                  {(guardian.sources.length > 0 || guardian.defaulted) && (
+                    <p className="trip-guardian-tags">
+                      {guardian.sources.map((source) => (
+                        <SourceTag key={source} source={source === 'HOSPITAL' ? 'hospital' : 'self'} />
+                      ))}
+                      {guardian.defaulted && <Badge kind="defaulted" />}
+                    </p>
+                  )}
+                </div>
+              ) : null}
+              {(role === 'P' ? patientEntries : guardianEntries).length > 0 ? (
+                <DayTimeline
+                  label={role === 'P' ? t('trip.timelinePatient') : t('trip.timelineGuardian')}
+                  person={role === 'P' ? 'patient' : 'guardian'}
+                  entries={role === 'P' ? patientEntries : guardianEntries}
+                />
+              ) : role === 'P' ? (
+                <p className="trip-empty-line">{t('trip.noTimeline')}</p>
+              ) : null}
+            </section>
           ))}
         </div>
-
-        <div role="status" className={notice?.error ? 'trip-notice is-error' : 'trip-notice-slot'}>
-          {notice ? t(notice.key) : ''}
-        </div>
-
-        {['P', 'G'].map((role) => (
-          <section
-            key={role}
-            id={`${tabsId}-panel-${role}`}
-            role="tabpanel"
-            aria-labelledby={`${tabsId}-tab-${role}`}
-            hidden={tab !== role}
-            className="trip-panel"
-          >
-            <h2 className="trip-panel-title" tabIndex={-1} ref={tab === role ? timelineHeadingRef : undefined}>
-              {role === 'P' ? t('trip.timelinePatient') : t('trip.timelineGuardian')}
-            </h2>
-            {role === 'G' && guardian.reason ? (
-              <div className={guardian.locked ? 'trip-guardian-lock is-locked' : 'trip-guardian-lock'}>
-                <p className="trip-guardian-head">
-                  <Icon name={guardian.locked ? 'lock' : 'stateSplit'} size={20} />
-                  <span>{guardian.locked ? t('trip.guardianLockTitle') : t('trip.guardianInfoTitle')}</span>
-                </p>
-                <p lang={safetyLang}>{t(GUARDIAN_REASON_KEY[guardian.reason])}</p>
-                {(guardian.sources.length > 0 || guardian.defaulted) && (
-                  <p className="trip-guardian-tags">
-                    {guardian.sources.map((source) => (
-                      <SourceTag key={source} source={source === 'HOSPITAL' ? 'hospital' : 'self'} />
-                    ))}
-                    {guardian.defaulted && <Badge kind="defaulted" />}
-                  </p>
-                )}
-              </div>
-            ) : null}
-            {(role === 'P' ? patientEntries : guardianEntries).length > 0 ? (
-              <DayTimeline
-                label={role === 'P' ? t('trip.timelinePatient') : t('trip.timelineGuardian')}
-                person={role === 'P' ? 'patient' : 'guardian'}
-                entries={role === 'P' ? patientEntries : guardianEntries}
-              />
-            ) : role === 'P' ? (
-              <p className="trip-empty-line">{t('trip.noTimeline')}</p>
-            ) : null}
-          </section>
-        ))}
 
         {/* 하루 소개는 타임라인 **뒤에** 둔다. 앞에 두면 일정이 첫 화면 밖으로 밀리는데,
             소개는 아래 타임라인을 한 줄로 요약한 것이라 먼저 읽을 이유가 없다.
             판정·사유 영역과 떨어진 별도 영역이라는 점은 그대로다(spec 4.16). */}
         <IntroArea day={day} stay={stay} readOnly={trip.readOnly} />
 
-        <section className="trip-tools" aria-labelledby={`${tabsId}-tools`}>
-          <h2 id={`${tabsId}-tools`} className="visually-hidden">
-            {t('trip.toolsTitle')}
-          </h2>
-          <Button variant="secondary" disabled={!edit.allowed || busy} onClick={() => setSheet({ kind: 'regenerate' })}>
-            {t('trip.regenerate')}
-          </Button>
-          {!edit.allowed && edit.reasonKey && <p className="trip-map-note">{t(edit.reasonKey)}</p>}
-        </section>
+        <div className="ui-block trip-tools-block">
+          <section className="trip-tools" aria-labelledby={`${tabsId}-tools`}>
+            <h2 id={`${tabsId}-tools`} className="visually-hidden">
+              {t('trip.toolsTitle')}
+            </h2>
+            <Button variant="secondary" disabled={!edit.allowed || busy} onClick={() => setSheet({ kind: 'regenerate' })}>
+              {t('trip.regenerate')}
+            </Button>
+            {!edit.allowed && edit.reasonKey && <p className="trip-map-note">{t(edit.reasonKey)}</p>}
+          </section>
 
-        <AppliedConditions day={day} stay={stay} />
-        <ExcludedList day={day} />
+          <AppliedConditions day={day} stay={stay} />
+          <ExcludedList day={day} />
 
-        {demo && (
-          <EventPanel
-            day={stored}
-            nowMin={nowMin ?? 0}
-            events={trip.todayEvents}
-            busy={busy || trip.syncing}
-            readOnly={trip.readOnly}
-            onEvent={async (event) => {
-              const res = await run(() => trip.addDemoEvent(event));
-              if (res) done(res.ok ? 'trip.demoApplied' : editErrorKey(res.code), !res.ok);
-            }}
-            onReset={async () => {
-              const res = await run(() => trip.resetDemoEvents());
-              if (res) done(res.ok ? 'trip.demoResetDone' : editErrorKey(res.code), !res.ok);
-            }}
-          />
-        )}
+          {demo && (
+            <EventPanel
+              day={stored}
+              nowMin={nowMin ?? 0}
+              events={trip.todayEvents}
+              busy={busy || trip.syncing}
+              readOnly={trip.readOnly}
+              onEvent={async (event) => {
+                const res = await run(() => trip.addDemoEvent(event));
+                if (res) done(res.ok ? 'trip.demoApplied' : editErrorKey(res.code), !res.ok);
+              }}
+              onReset={async () => {
+                const res = await run(() => trip.resetDemoEvents());
+                if (res) done(res.ok ? 'trip.demoResetDone' : editErrorKey(res.code), !res.ok);
+              }}
+            />
+          )}
 
-        <p className="trip-footer" lang={safetyLang}>
-          {t('trip.footer')}
-        </p>
+          <p className="trip-footer" lang={safetyLang}>
+            {t('trip.footer')}
+          </p>
+        </div>
       </>
     );
   }
@@ -473,9 +488,9 @@ export default function DayScreen() {
   return (
     <>
       {top}
-      <main className="page trip-page trip-day">
+      <main className="page trip-page trip-day is-basement">
         {stripDates.length > 0 && (
-          <nav aria-label={t('trip.stripLabel')}>
+          <nav className="ui-block trip-strip" aria-label={t('trip.stripLabel')}>
             <ul className="ui-date-strip" role="list">
               {stripDates.map((d) => {
                 const shown = d === today ? trip.today.day : trip.tripPlan?.days?.[d] ?? null;
@@ -497,14 +512,16 @@ export default function DayScreen() {
         )}
 
         {trip.updateFailed && (
-          <div className="trip-notice is-error" role="alert">
-            <p>{t('today.updateFailedTitle')}</p>
-            <p>{t('today.updateFailedBody')}</p>
-            {!trip.readOnly && (
-              <Button variant="secondary" size="small" onClick={() => trip.retry()}>
-                {t('today.retry')}
-              </Button>
-            )}
+          <div className="ui-block">
+            <div className="trip-notice is-error" role="alert">
+              <p>{t('today.updateFailedTitle')}</p>
+              <p>{t('today.updateFailedBody')}</p>
+              {!trip.readOnly && (
+                <Button variant="secondary" size="small" onClick={() => trip.retry()}>
+                  {t('today.retry')}
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
