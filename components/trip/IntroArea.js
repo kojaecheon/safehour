@@ -10,6 +10,7 @@
 //     템플릿이면 머리글의 '정해진 문장'만으로 출처가 드러난다 — 같은 말을 한 줄 더 쓰지 않는다.
 //     어느 쪽이든 판정·사유 영역과 시각적으로 떨어진 별도 영역이다. 이 문장은 판정에 쓰지 않는다.
 //   - 실패하면 아무것도 보이지 않는다(판정과 무관한 보강이다).
+//   - 하루 일정의 흰 블록 하나를 차지한다(설계서 6.2 6번 소개 블록). 소개가 없으면 블록도 그리지 않는다.
 
 import { useEffect, useId, useMemo, useSyncExternalStore } from 'react';
 import { useLang } from '../LanguageProvider.js';
@@ -73,18 +74,22 @@ export default function IntroArea({ day, stay, readOnly }) {
 
   if (intro.source === 'AI') {
     return (
-      <SourceArea source="ai" title={t('trip.introTitle')} note={t('trip.introAiNote')}>
-        <p>{intro.text}</p>
-      </SourceArea>
+      <div className="ui-block trip-intro-block">
+        <SourceArea source="ai" title={t('trip.introTitle')} note={t('trip.introAiNote')}>
+          <p>{intro.text}</p>
+        </SourceArea>
+      </div>
     );
   }
   return (
-    <section className="trip-intro" aria-labelledby={labelId}>
-      <p className="trip-intro-head" id={labelId}>
-        <Icon name="quote" size={18} />
-        <span>{t('trip.introTemplateLabel')}</span>
-      </p>
-      <p className="trip-intro-text">{intro.text}</p>
-    </section>
+    <div className="ui-block trip-intro-block">
+      <section className="trip-intro" aria-labelledby={labelId}>
+        <p className="trip-intro-head" id={labelId}>
+          <Icon name="quote" size={18} />
+          <span>{t('trip.introTemplateLabel')}</span>
+        </p>
+        <p className="trip-intro-text">{intro.text}</p>
+      </section>
+    </div>
   );
 }

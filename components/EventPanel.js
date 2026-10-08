@@ -76,7 +76,7 @@ export default function EventPanel({ day, nowMin, events = [], busy = false, rea
         )}
         <button
           type="button"
-          className="btn btn-quiet btn-small"
+          className="btn btn-secondary btn-small"
           aria-disabled={blocked || events.length === 0 ? 'true' : undefined}
           onClick={() => {
             if (!blocked && events.length > 0) onReset();

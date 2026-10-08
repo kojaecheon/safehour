@@ -111,3 +111,34 @@ test.describe('③층 하루 일정, 상태 상자와 정거장 버튼', () => {
     });
   });
 });
+
+test.describe('③층 하루 일정, 소개와 도구', () => {
+  test('적용 조건·빠진 장소: 카드 없이 도구 블록 안에서 1px 선으로 나눈 펼침 행', async ({ page }) => {
+    await startTrip(page, {}, { path: `/trip/${kstDate(1)}` });
+    const facts = page.locator('.trip-tools-block .trip-facts');
+    await expect(facts.first()).toBeVisible();
+    for (const row of await facts.all()) {
+      expect(await styles(row, ['border-left-width', 'border-top-left-radius', 'border-top-width'])).toEqual({
+        'border-left-width': '0px',
+        'border-top-left-radius': '0px',
+        'border-top-width': '1px',
+      });
+    }
+  });
+
+  test('하루 소개(정해진 문장): 자기 흰 블록 안의 인용 모양(두 줄 왼쪽 띠, 바깥 테두리 없음)', async ({ page }) => {
+    await startTrip(page, {}, { path: `/trip/${kstDate(1)}` });
+    const intro = page.locator('.trip-intro-block .trip-intro, .trip-intro-block .ui-source').first();
+    await expect(intro).toBeVisible({ timeout: 15_000 });
+    const isTemplate = await intro.evaluate((el) => el.classList.contains('trip-intro'));
+    if (isTemplate) {
+      expect(await styles(intro, ['border-left-style', 'border-top-width'])).toEqual({
+        'border-left-style': 'double',
+        'border-top-width': '0px',
+      });
+    }
+    expect((await styles(page.locator('.trip-intro-block'), ['background-color']))['background-color']).toBe(
+      'rgb(255, 255, 255)',
+    );
+  });
+});
