@@ -34,6 +34,7 @@ import { AppliedConditions, ExcludedList } from './DayFacts.js';
 import IntroArea from './IntroArea.js';
 import RegenerateSheet from './RegenerateSheet.js';
 import SwapSheet from './SwapSheet.js';
+import TripNotice from './TripNotice.js';
 import useKstClock from './useKstClock.js';
 import {
   DEADLINE_REASON_KEY,
@@ -342,20 +343,20 @@ export default function DayScreen() {
           )}
 
           {isToday && trip.dailyCheckPending && (
-            <p className="trip-notice">
+            <TripNotice as="p">
               {t('trip.gatedToday')}{' '}
               <Link className="trip-inline-link" href="/today">
                 {t('trip.goDailyCheck')}
               </Link>
-            </p>
+            </TripNotice>
           )}
           {isToday && trip.unconfirmedHospitalUpdate && (
-            <p className="trip-notice">
+            <TripNotice as="p">
               {t('today.unconfirmedTitle')}{' '}
               <Link className="trip-inline-link" href="/guide">
                 {t('today.unconfirmedCta')}
               </Link>
-            </p>
+            </TripNotice>
           )}
 
           {fix && (
@@ -396,9 +397,10 @@ export default function DayScreen() {
             ))}
           </div>
 
-          <div role="status" className={notice?.error ? 'trip-notice is-error' : 'trip-notice-slot'}>
+          {/* 알림 자리: 진행·완료 알림은 상자 없이 글자만, 실패 알림만 실패 상자로 */}
+          <TripNotice slot role="status" error={Boolean(notice?.error)} plain={!notice?.error}>
             {notice ? t(notice.key) : ''}
-          </div>
+          </TripNotice>
 
           {['P', 'G'].map((role) => (
             <section
@@ -515,7 +517,7 @@ export default function DayScreen() {
 
         {trip.updateFailed && (
           <div className="ui-block">
-            <div className="trip-notice is-error" role="alert">
+            <TripNotice error role="alert">
               <p>{t('today.updateFailedTitle')}</p>
               <p>{t('today.updateFailedBody')}</p>
               {!trip.readOnly && (
@@ -523,7 +525,7 @@ export default function DayScreen() {
                   {t('today.retry')}
                 </Button>
               )}
-            </div>
+            </TripNotice>
           </div>
         )}
 

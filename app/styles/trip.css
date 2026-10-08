@@ -56,17 +56,38 @@
 .trip-notice-slot:empty {
   display: none;
 }
-/* 알림 상자 (SEED Callout · neutral, 설계서 5.6): 왼쪽 띠 없이 회색 면 · 모서리 10 · 안쪽 14/16 */
+/* 알림 상자 (SEED Callout · neutral, 설계서 5.6): 왼쪽 띠 없이 회색 면 · 모서리 10 · 안쪽 14/16.
+   부품은 components/trip/TripNotice.js. 앞 20px 아이콘 칸(로그인 .medical-callout.has-icon 과 같은 짝) + 본문 칸, 사이 8px */
 .trip-notice {
   display: grid;
-  gap: var(--space-2);
-  justify-items: start;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
   padding: 14px var(--space-4);
   border-radius: var(--radius-10);
   background: var(--surface-alt);
   font-size: var(--text-body);
   line-height: var(--lh-body);
   color: var(--ink);
+}
+/* 아이콘 칸 높이 = 첫 줄 높이(22px): 아이콘이 첫 줄 가운데에 선다. 실패 알림도 먹색(긴급 빨강을 쓰지 않는다) */
+.trip-notice-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+  color: var(--ink);
+}
+/* 본문 칸: p·링크·버튼을 세로로 쌓고 왼쪽 정렬 */
+.trip-notice-body {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+}
+/* 한 문단 알림(p): 문장 뒤에 링크가 이어지므로 줄로 가르지 않는다 */
+p.trip-notice > .trip-notice-body {
+  display: block;
 }
 .trip-notice p {
   color: var(--ink);
@@ -246,6 +267,7 @@
   line-height: var(--lh-body);
   font-weight: var(--weight-bold);
   text-align: left;
+  justify-content: flex-start;
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-color);
 }
@@ -383,14 +405,9 @@
 
 /* 근거, 적용한 조건·빠진 장소 (SEED 목록 행): 도구 블록 안에서 카드 없이 1px 선으로 나눈 펼침 행 */
 .trip-facts {
-  border: none;
   border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-  padding: 0;
 }
 .trip-facts > summary {
-  min-height: var(--tap-min);
   padding: var(--space-2) 0;
   gap: var(--space-2);
 }

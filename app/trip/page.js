@@ -15,6 +15,7 @@ import { useLang } from '@/components/LanguageProvider.js';
 import { Button, DateChip, EmptyState, Icon, TopBar } from '@/components/ui/index.js';
 import CoverageTag from '@/components/conditions/CoverageTag.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
+import TripNotice from '@/components/trip/TripNotice.js';
 import { formatDate, tripDateRows } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
 
@@ -142,9 +143,9 @@ export default function TripPage() {
           <h2 id="trip-tools-h" className="visually-hidden">
             {t('trip.toolsTitle')}
           </h2>
-          <div role="status" className={notice ? 'trip-notice' : 'trip-notice-slot'}>
+          <TripNotice slot role="status">
             {notice ? t(notice) : ''}
-          </div>
+          </TripNotice>
           <Button variant="secondary" disabled={!regenerate.allowed} onClick={() => setSheet(true)}>
             {t('trip.regenerateAll')}
           </Button>
@@ -159,7 +160,7 @@ export default function TripPage() {
       <TopBar title={t('trip.header')} />
       <main className="page trip-page">
         {trip.updateFailed && (
-          <div className="trip-notice is-error" role="alert">
+          <TripNotice error role="alert">
             <p>{t('today.updateFailedTitle')}</p>
             <p>{t('today.updateFailedBody')}</p>
             {!trip.readOnly && (
@@ -167,7 +168,7 @@ export default function TripPage() {
                 {t('today.retry')}
               </Button>
             )}
-          </div>
+          </TripNotice>
         )}
         {body}
       </main>

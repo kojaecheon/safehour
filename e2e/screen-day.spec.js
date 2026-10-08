@@ -5,7 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245).
 
 import { test, expect } from './fixtures.js';
-import { kstDate, startTrip } from './helpers.js';
+import { acknowledgeGuide, kstDate, linkDemoPlan, readRecord, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -38,7 +38,8 @@ test.describe('③층 하루 일정, 회색 바탕과 블록', () => {
     await startTrip(page, {}, { path: `/trip/${kstDate(1)}` });
     const strip = page.locator('.ui-date-strip a.ui-date-chip');
     await expect(strip).not.toHaveCount(0);
-    await expect(page.locator('.ui-date-strip .ui-date-appt')).not.toHaveCount(0);
+    // 상태 표시와 병원 표시가 함께 있는 칩(가장 넓어질 수 있는 칩)이 실제로 있어야 60px 단언이 뜻을 갖는다
+    await expect(page.locator('.ui-date-strip .ui-date-marks:has(.ui-date-state + .ui-date-appt)')).not.toHaveCount(0);
     const widths = await strip.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
     expect([...new Set(widths)]).toEqual([60]);
 
@@ -62,6 +63,7 @@ test.describe('③층 하루 일정, 회색 바탕과 블록', () => {
         'background-color': 'rgb(243, 244, 245)',
         'padding-top': '14px',
       });
+    await expect(notice.locator('.trip-notice-icon svg')).toHaveCount(1);
   });
 
   test('320px English: 하루 일정에 가로 스크롤이 없다', async ({ page }) => {
@@ -80,8 +82,10 @@ test.describe('③층 하루 일정, 회색 바탕과 블록', () => {
 test.describe('③층 하루 일정, 상태 상자와 정거장 버튼', () => {
   test('정거장 버튼: 바꾸기·빼기가 모두 작은 회색 버튼', async ({ page }) => {
     await startTrip(page, {}, { path: `/trip/${kstDate(1)}` });
-    const actions = page.locator('.trip-stop-actions').first();
-    await expect(actions).toBeVisible();
+    const actions = page.locator('.trip-stop-actions');
+    await expect(actions.first()).toBeVisible();
+    // 첫 정거장은 식사 칸일 수 있다. 모든 정거장을 돌아야 '빼기'를 실제로 본다
+    expect(await actions.getByRole('button', { name: /빼기/ }).count()).toBeGreaterThan(0);
     for (const button of await actions.locator('button').all()) {
       await expect
         .poll(() => styles(button, ['background-color', 'min-height', 'border-top-left-radius']))
@@ -98,6 +102,7 @@ test.describe('③층 하루 일정, 상태 상자와 정거장 버튼', () => {
       'border-top-left-radius': '10px',
       'padding-top': '14px',
     });
+    await expect(fix.getByRole('link').or(fix.getByRole('button'))).toHaveCount(1);
   });
 
   test('동행 보호자가 없는 날의 보호자 탭: 잠금 상자는 Callout(모서리 10 · 안쪽 14)', async ({ page }) => {
@@ -140,5 +145,81 @@ test.describe('③층 하루 일정, 소개와 도구', () => {
     expect((await styles(page.locator('.trip-intro-block'), ['background-color']))['background-color']).toBe(
       'rgb(255, 255, 255)',
     );
+  });
+});
+
+test.describe('③층 하루 일정, 안전 표시 회귀 가드', () => {
+  // 데모 사건 패널은 '병원 연동 데모' 모드의 오늘에만 있다(e2e/demo-events.spec.js 와 같은 흐름).
+  // 데모 지침 A 를 연결하고 병원 안내를 확인한 뒤, 오늘 일정에 병원 발행 출처가 실리면 오늘 화면을 연다.
+  async function openDemoToday(page) {
+    await startTrip(page);
+    await linkDemoPlan(page, 'A');
+    await acknowledgeGuide(page);
+    const today = kstDate(0);
+    await expect
+      .poll(async () => JSON.stringify((await readRecord(page, 'tripPlan'))?.days?.[today]?.effective ?? {}).includes('HOSPITAL'), {
+        message: '데모 지침 연결 뒤 오늘 재계획',
+      })
+      .toBe(true);
+    await page.goto(`/trip/${today}`);
+    const panel = page.getByRole('region', { name: '변화 시연 (병원 연동 데모)' });
+    await expect(panel).toBeVisible();
+    return panel;
+  }
+
+  /** 사건 버튼이 눌릴 수 있을 때까지(동기화 중이 아닐 때) 기다렸다가 누른다 */
+  async function fire(panel, name) {
+    const button = panel.getByRole('button', { name });
+    await expect(button).not.toHaveAttribute('aria-disabled', 'true');
+    await button.click();
+  }
+
+  test('데모 패널은 2px 점선 · 모서리 12, 즉시 복귀 배너는 2px 먹색 실선 · 모서리 12', async ({ page }) => {
+    const panel = await openDemoToday(page);
+
+    // (a) 데모 표시: 2px 대기 색 점선을 지키고 모서리만 12
+    await expect
+      .poll(() => styles(page.locator('.trip-demo'), ['border-top-style', 'border-top-width', 'border-top-left-radius']))
+      .toEqual({ 'border-top-style': 'dashed', 'border-top-width': '2px', 'border-top-left-radius': '12px' });
+
+    // 환자 호출 → 즉시 복귀 시트가 자동으로 열린다. '확인했어요'로 닫는다
+    await fire(panel, /환자 호출/);
+    const sheet = page.getByRole('dialog', { name: '지금 돌아가세요' });
+    await expect(sheet).toBeVisible();
+    await sheet.getByRole('button', { name: '확인했어요' }).click();
+    await expect(sheet).toHaveCount(0);
+    // 호버 면이 색 단언에 섞이지 않게 마우스를 비켜 둔다
+    await page.mouse.move(0, 0);
+
+    // (b) '사건 초기화'(되돌리기)는 사건 기록이 있어야 눌린다: 작은 회색 버튼
+    const reset = panel.getByRole('button', { name: '사건 초기화' });
+    await expect(reset).not.toHaveAttribute('aria-disabled', 'true');
+    await expect
+      .poll(() => styles(reset, ['background-color', 'border-top-left-radius']))
+      .toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-top-left-radius': '8px' });
+
+    // (c) 즉시 복귀 배너: 안전 지시의 2px 먹색 실선을 지키고 모서리만 12
+    const banner = page.locator('.trip-return-banner');
+    await expect(banner).toBeVisible();
+    await expect
+      .poll(() =>
+        styles(banner, ['border-top-style', 'border-top-width', 'border-top-color', 'border-top-left-radius']),
+      )
+      .toEqual({
+        'border-top-style': 'solid',
+        'border-top-width': '2px',
+        'border-top-color': 'rgb(26, 28, 32)',
+        'border-top-left-radius': '12px',
+      });
+
+    // (d) 변경됨 알림이 함께 보이면: 회색 면 · 모서리 10, 문구 칸과 화살표 아이콘 하나
+    const changed = page.locator('.trip-changed');
+    if ((await changed.count()) > 0) {
+      await expect
+        .poll(() => styles(changed, ['background-color', 'border-top-left-radius']))
+        .toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-top-left-radius': '10px' });
+      await expect(changed.locator('.trip-changed-text')).toHaveCount(1);
+      await expect(changed.locator('svg')).toHaveCount(1);
+    }
   });
 });

@@ -23,6 +23,7 @@ import { Badge, Button, EmptyState, Icon, StateBanner, TopBar } from '@/componen
 import DailyCheckCard from '@/components/trip/DailyCheckCard.js';
 import MapLinks from '@/components/trip/MapLinks.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
+import TripNotice from '@/components/trip/TripNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
 import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
@@ -178,9 +179,9 @@ export default function TodayPage() {
 
         <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
 
-        <div role="status" className={notice ? 'trip-notice' : 'trip-notice-slot'}>
+        <TripNotice slot role="status">
           {notice ? t(notice) : ''}
-        </div>
+        </TripNotice>
 
         {delta?.unseen && (
           <button type="button" className="btn btn-secondary trip-changed" onClick={() => setSheet('delta')}>
@@ -300,7 +301,7 @@ export default function TodayPage() {
       {top}
       <main className="page today-page">
         {trip.updateFailed && (
-          <div className="trip-notice is-error" role="alert">
+          <TripNotice error role="alert">
             <p>{t('today.updateFailedTitle')}</p>
             <p>{t('today.updateFailedBody')}</p>
             {!trip.readOnly && (
@@ -308,7 +309,7 @@ export default function TodayPage() {
                 {t('today.retry')}
               </Button>
             )}
-          </div>
+          </TripNotice>
         )}
         {trip.syncing && trip.tripPlan && (
           <p className="today-syncing" role="status">

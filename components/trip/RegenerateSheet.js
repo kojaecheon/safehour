@@ -8,6 +8,7 @@
 import { useId, useState } from 'react';
 import { useLang } from '../LanguageProvider.js';
 import { Sheet } from '../ui/index.js';
+import TripNotice from './TripNotice.js';
 import { editErrorKey } from './viewModel.js';
 
 /**
@@ -76,9 +77,9 @@ export default function RegenerateSheet({ date, dateLabel, initialScope = 'DAY',
         </div>
       </fieldset>
       {errorKey && (
-        <p className="trip-notice is-error" role="alert">
+        <TripNotice as="p" error role="alert">
           {t(errorKey)}
-        </p>
+        </TripNotice>
       )}
     </Sheet>
   );

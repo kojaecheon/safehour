@@ -12,6 +12,7 @@ import { useEffect, useState } from 'react';
 import CourseCard from '../CourseCard.js';
 import { useLang } from '../LanguageProvider.js';
 import { Sheet } from '../ui/index.js';
+import TripNotice from './TripNotice.js';
 import { editErrorKey } from './viewModel.js';
 
 /**
@@ -65,9 +66,9 @@ export default function SwapSheet({ date, outingId, stop, loadAlternatives, appl
             {picking && t('trip.working')}
           </div>
           {state.errorKey && (
-            <p className="trip-notice is-error" role="alert">
+            <TripNotice as="p" error role="alert">
               {t(state.errorKey)}
-            </p>
+            </TripNotice>
           )}
           {state.status === 'ready' && state.alternatives.length === 0 && (
             <p className="trip-swap-empty">{state.paused ? t('trip.swapPaused') : t('trip.swapEmpty')}</p>
