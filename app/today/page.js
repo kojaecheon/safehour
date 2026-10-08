@@ -11,6 +11,7 @@
 //   - '변경됨'은 전후 비교 시트로 연다(닫으면 본 것으로 기록). 즉시 복귀 시트는 앱 셸 옆 TripRuntime 이 자동으로 연다.
 //   - 업데이트 실패·보호자 링크 다시 보내기·동반 보호자 '다시 만들기' 안내를 보인다.
 //   - 로그인 만료·오프라인에서는 보기 전용이다 — 오늘 일정과 복귀 마감은 보이고, 확인·편집은 막는다.
+//   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 동기화 / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
@@ -19,11 +20,12 @@ import CourseCard from '@/components/CourseCard.js';
 import DeltaSheet from '@/components/DeltaSheet.js';
 import ReturnSheet from '@/components/ReturnSheet.js';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Badge, Button, EmptyState, Icon, StateBanner, TopBar } from '@/components/ui/index.js';
+import { Badge, Button, EmptyState, Icon, ListGroup, ListItem, StateBanner, TopBar } from '@/components/ui/index.js';
 import DailyCheckCard from '@/components/trip/DailyCheckCard.js';
 import MapLinks from '@/components/trip/MapLinks.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import TripNotice from '@/components/trip/TripNotice.js';
+import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
 import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
@@ -107,168 +109,192 @@ export default function TodayPage() {
 
   if (!today) {
     body = (
-      <p className="today-loading" role="status">
-        {t('today.loading')}
-      </p>
+      <div className="ui-block">
+        <p className="today-loading" role="status">
+          {t('today.loading')}
+        </p>
+      </div>
     );
   } else if (!stay) {
     body = (
-      <EmptyState
-        icon="navToday"
-        title={t('today.noStayTitle')}
-        body={t('today.noStayBody')}
-        action={<Button href="/onboarding">{t('today.noStayAction')}</Button>}
-      />
+      <div className="ui-block">
+        <EmptyState
+          icon="navToday"
+          title={t('today.noStayTitle')}
+          body={t('today.noStayBody')}
+          action={<Button href="/onboarding">{t('today.noStayAction')}</Button>}
+        />
+      </div>
     );
   } else if (!trip.tripPlan) {
     body = (
-      <EmptyState
-        icon="navToday"
-        title={trip.syncing ? t('today.generatingTitle') : t('today.noPlanTitle')}
-        body={trip.syncing ? t('today.generatingBody') : trip.readOnly ? t('today.noPlanReadOnly') : t('today.noPlanBody')}
-        action={
-          !trip.syncing && !trip.readOnly ? (
-            <Button variant="secondary" onClick={() => trip.retry()}>
-              {t('today.retry')}
-            </Button>
-          ) : null
-        }
-      />
+      <div className="ui-block">
+        <EmptyState
+          icon="navToday"
+          title={trip.syncing ? t('today.generatingTitle') : t('today.noPlanTitle')}
+          body={trip.syncing ? t('today.generatingBody') : trip.readOnly ? t('today.noPlanReadOnly') : t('today.noPlanBody')}
+          action={
+            !trip.syncing && !trip.readOnly ? (
+              <Button variant="secondary" onClick={() => trip.retry()}>
+                {t('today.retry')}
+              </Button>
+            ) : null
+          }
+        />
+      </div>
     );
   } else if (!inStay) {
     const before = stay.arrival?.date && today < stay.arrival.date;
     body = (
-      <EmptyState
-        icon="navTrip"
-        title={before ? t('today.beforeTripTitle') : t('today.afterTripTitle')}
-        body={before ? t('today.beforeTripBody', { date: formatDate(stay.arrival.date, locale) }) : t('today.afterTripBody')}
-        action={<Button href="/trip">{t('today.seeTrip')}</Button>}
-      />
+      <div className="ui-block">
+        <EmptyState
+          icon="navTrip"
+          title={before ? t('today.beforeTripTitle') : t('today.afterTripTitle')}
+          body={before ? t('today.beforeTripBody', { date: formatDate(stay.arrival.date, locale) }) : t('today.afterTripBody')}
+          action={<Button href="/trip">{t('today.seeTrip')}</Button>}
+        />
+      </div>
     );
   } else if (!day) {
     body = (
-      <EmptyState
-        icon="navToday"
-        title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
-        body={trip.syncing ? t('today.generatingBody') : t('trip.noDayBody')}
-        action={
-          !trip.syncing && !trip.readOnly ? (
-            <Button variant="secondary" onClick={() => trip.retry()}>
-              {t('today.retry')}
-            </Button>
-          ) : null
-        }
-      />
+      <div className="ui-block">
+        <EmptyState
+          icon="navToday"
+          title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
+          body={trip.syncing ? t('today.generatingBody') : t('trip.noDayBody')}
+          action={
+            !trip.syncing && !trip.readOnly ? (
+              <Button variant="secondary" onClick={() => trip.retry()}>
+                {t('today.retry')}
+              </Button>
+            ) : null
+          }
+        />
+      </div>
     );
   } else {
     const focus = nowMin === null ? null : todayFocus(day, nowMin);
     const delta = deltaSummary(day);
     const fix = needsInputFix(day);
     const returnTitle = pair('return.title');
+    const outingNow = Boolean(focus && focus.phase !== 'DONE' && focus.outing);
+    const outingDone = focus?.phase === 'DONE';
+    const outingNone = !focus && nowMin !== null && !fix && !stored?.returnNow;
+    const hasOutingBlock = outingNow || outingDone || outingNone || Boolean(focus?.nextAppointment);
     body = (
       <>
         {trip.dailyCheckPending && (
-          <DailyCheckCard day={stored} stay={stay} readOnly={trip.readOnly} onSame={confirmSame} onChanged={changed} />
+          <div className="ui-block today-check-block">
+            <DailyCheckCard day={stored} stay={stay} readOnly={trip.readOnly} onSame={confirmSame} onChanged={changed} />
+          </div>
         )}
 
-        <p className="today-date" tabIndex={-1} ref={dateRef}>
-          <span>{formatDate(today, locale)}</span>
-          {/* 연결된 지침이 데모면 늘 밝힌다 — 데모를 실제 연동처럼 보이지 않게 (spec 4.20 · 9.1) */}
-          {isDemoMode(stay) && <Badge kind="demo" label={t('link.demoBadge')} />}
-        </p>
-
-        <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
-
-        <TripNotice slot role="status">
-          {notice ? t(notice) : ''}
-        </TripNotice>
-
-        {delta?.unseen && (
-          <button type="button" className="btn btn-secondary trip-changed" onClick={() => setSheet('delta')}>
-            <span className="trip-changed-dot" aria-hidden="true" />
-            {t('trip.changedCta')}
-          </button>
-        )}
-
-        {stored?.returnNow && !trip.immediateReturn && (
-          <section className="trip-return-banner" aria-labelledby="today-return-h">
-            <h2 id="today-return-h" lang={returnTitle.primary.lang}>
-              {returnTitle.primary.text}
-            </h2>
-            <p className="trip-pair-secondary" lang={returnTitle.secondary.lang}>
-              {returnTitle.secondary.text}
-            </p>
-            <button type="button" className="btn btn-return" onClick={() => setSheet('return')}>
-              {t('return.reopen')}
-            </button>
-          </section>
-        )}
-
-        {trip.unconfirmedHospitalUpdate && (
-          <section className="today-callout" aria-labelledby="today-hospital-h">
-            <h2 id="today-hospital-h">
-              <Icon name="hospital" size={20} /> {t('today.unconfirmedTitle')}
-            </h2>
-            <p>{t('today.unconfirmedBody')}</p>
-            <Button href="/guide" variant="secondary">
-              {t('today.unconfirmedCta')}
-            </Button>
-          </section>
-        )}
-
-        {fix && (
-          <section className="today-callout" aria-labelledby="today-fix-h">
-            <h2 id="today-fix-h">{t('today.needsInputTitle')}</h2>
-            <Button href={trip.readOnly ? undefined : fix.href} disabled={trip.readOnly}>
-              {t(fix.key)}
-            </Button>
-          </section>
-        )}
-
-        {focus && focus.phase !== 'DONE' && focus.outing && (
-          <section className="today-focus" aria-labelledby="today-focus-h">
-            <h2 id="today-focus-h">{focus.phase === 'OUT' ? t('today.nextOutTitle') : t('today.nextNextTitle')}</h2>
-            <p className="today-focus-depart">{t('today.departAt', { time: focus.outing.departAt })}</p>
-            <Deadline outing={focus.outing} day={day} stay={stay} />
-            {focus.stop && (
-              <div className="today-next-stop">
-                <h3>{t('today.nextStop')}</h3>
-                <CourseCard stop={focus.stop} variant="compact" headingLevel={4} />
-                <MapLinks stop={focus.stop} disabled={gated || focus.outing.actionable === false} disabledKey={trip.dailyCheckPending ? 'today.gatedMaps' : 'today.gatedHospital'} showNote />
-              </div>
-            )}
-          </section>
-        )}
-        {focus?.phase === 'DONE' && (
-          <section className="today-callout" aria-labelledby="today-done-h">
-            <h2 id="today-done-h">{t('today.nextDoneTitle')}</h2>
-          </section>
-        )}
-        {!focus && nowMin !== null && !fix && !stored?.returnNow && (
-          <section className="today-callout" aria-labelledby="today-none-h">
-            <h2 id="today-none-h">{t('today.noOutingTitle')}</h2>
-            <p>{t('today.noOutingBody')}</p>
-          </section>
-        )}
-        {focus?.nextAppointment && (
-          <p className="today-appointment">
-            <Icon name="hospital" size={18} /> {t('today.appointmentLine', { start: focus.nextAppointment.start, end: focus.nextAppointment.end })}
+        <div className="ui-block today-status-block">
+          <p className="today-date" tabIndex={-1} ref={dateRef}>
+            <span>{formatDate(today, locale)}</span>
+            {/* 연결된 지침이 데모면 늘 밝힌다 — 데모를 실제 연동처럼 보이지 않게 (spec 4.20 · 9.1) */}
+            {isDemoMode(stay) && <Badge kind="demo" label={t('link.demoBadge')} />}
           </p>
-        )}
 
-        <div className="today-links">
-          <Button href={`/trip/${today}`} icon="navTrip">
-            {t('today.fullDay')}
-          </Button>
-          {hasTomorrow && (
-            <Button href={`/trip/${tomorrow}`} variant="secondary">
-              {t('today.tomorrow')}
-            </Button>
+          <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
+
+          <TripNotice slot role="status">
+            {notice ? t(notice) : ''}
+          </TripNotice>
+
+          {delta?.unseen && (
+            <button type="button" className="btn btn-secondary trip-changed" onClick={() => setSheet('delta')}>
+              <span className="trip-changed-dot" aria-hidden="true" />
+              {t('trip.changedCta')}
+            </button>
+          )}
+
+          {stored?.returnNow && !trip.immediateReturn && (
+            <section className="trip-return-banner" aria-labelledby="today-return-h">
+              <h2 id="today-return-h" lang={returnTitle.primary.lang}>
+                {returnTitle.primary.text}
+              </h2>
+              <p className="trip-pair-secondary" lang={returnTitle.secondary.lang}>
+                {returnTitle.secondary.text}
+              </p>
+              <button type="button" className="btn btn-return" onClick={() => setSheet('return')}>
+                {t('return.reopen')}
+              </button>
+            </section>
+          )}
+
+          {trip.unconfirmedHospitalUpdate && (
+            <section className="today-callout" aria-labelledby="today-hospital-h">
+              <h2 id="today-hospital-h">
+                <Icon name="hospital" size={20} /> {t('today.unconfirmedTitle')}
+              </h2>
+              <p>{t('today.unconfirmedBody')}</p>
+              <Button href="/guide" variant="secondary">
+                {t('today.unconfirmedCta')}
+              </Button>
+            </section>
+          )}
+
+          {fix && (
+            <section className="today-callout" aria-labelledby="today-fix-h">
+              <h2 id="today-fix-h">{t('today.needsInputTitle')}</h2>
+              <Button href={trip.readOnly ? undefined : fix.href} disabled={trip.readOnly}>
+                {t(fix.key)}
+              </Button>
+            </section>
           )}
         </div>
 
+        {hasOutingBlock && (
+          <div className="ui-block today-outing-block">
+            {outingNow && (
+              <section className="today-focus" aria-labelledby="today-focus-h">
+                <h2 id="today-focus-h">{focus.phase === 'OUT' ? t('today.nextOutTitle') : t('today.nextNextTitle')}</h2>
+                <p className="today-focus-depart">{t('today.departAt', { time: focus.outing.departAt })}</p>
+                <Deadline outing={focus.outing} day={day} stay={stay} />
+                {focus.stop && (
+                  <div className="today-next-stop">
+                    <h3>{t('today.nextStop')}</h3>
+                    <CourseCard stop={focus.stop} variant="compact" headingLevel={4} />
+                    <MapLinks stop={focus.stop} disabled={gated || focus.outing.actionable === false} disabledKey={trip.dailyCheckPending ? 'today.gatedMaps' : 'today.gatedHospital'} showNote />
+                  </div>
+                )}
+              </section>
+            )}
+            {outingDone && (
+              <section className="today-callout" aria-labelledby="today-done-h">
+                <h2 id="today-done-h">{t('today.nextDoneTitle')}</h2>
+              </section>
+            )}
+            {outingNone && (
+              <section className="today-callout" aria-labelledby="today-none-h">
+                <h2 id="today-none-h">{t('today.noOutingTitle')}</h2>
+                <p>{t('today.noOutingBody')}</p>
+              </section>
+            )}
+            {focus?.nextAppointment && (
+              <p className="today-appointment">
+                <Icon name="hospital" size={18} /> {t('today.appointmentLine', { start: focus.nextAppointment.start, end: focus.nextAppointment.end })}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="ui-block today-links-block">
+          <ListGroup>
+            <li>
+              <ListItem title={t('today.fullDay')} leading={<Icon name="navTrip" size={22} />} trailing="chevron" href={`/trip/${today}`} />
+            </li>
+            {hasTomorrow && (
+              <li>
+                <ListItem title={t('today.tomorrow')} leading={<Icon name="navTrip" size={22} />} trailing="chevron" href={`/trip/${tomorrow}`} />
+              </li>
+            )}
+          </ListGroup>
+        </div>
+
         {trip.guardianResendNeeded && (
-          <section className="today-callout" aria-labelledby="today-guardian-h">
+          <section className="ui-block today-callout" aria-labelledby="today-guardian-h">
             <h2 id="today-guardian-h">{t('today.guardianResendTitle')}</h2>
             <p>{t('today.guardianResendBody')}</p>
             <Button href={trip.readOnly ? undefined : '/guardian'} variant="secondary" disabled={trip.readOnly}>
@@ -278,7 +304,7 @@ export default function TodayPage() {
         )}
 
         {trip.companionChangeNeedsRegenerate && (
-          <section className="today-callout" aria-labelledby="today-companion-h">
+          <section className="ui-block today-callout" aria-labelledby="today-companion-h">
             <h2 id="today-companion-h">{t('today.companionTitle')}</h2>
             <p>{t('today.companionBody')}</p>
             <div className="today-callout-actions">
@@ -299,22 +325,16 @@ export default function TodayPage() {
   return (
     <>
       {top}
-      <main className="page today-page">
-        {trip.updateFailed && (
-          <TripNotice error role="alert">
-            <p>{t('today.updateFailedTitle')}</p>
-            <p>{t('today.updateFailedBody')}</p>
-            {!trip.readOnly && (
-              <Button variant="secondary" size="small" onClick={() => trip.retry()}>
-                {t('today.retry')}
-              </Button>
+      <main className="page today-page is-basement">
+        {(trip.updateFailed || (trip.syncing && trip.tripPlan)) && (
+          <div className="ui-block today-sync-block">
+            {trip.updateFailed && <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />}
+            {trip.syncing && trip.tripPlan && (
+              <p className="today-syncing" role="status">
+                {t('today.syncing')}
+              </p>
             )}
-          </TripNotice>
-        )}
-        {trip.syncing && trip.tripPlan && (
-          <p className="today-syncing" role="status">
-            {t('today.syncing')}
-          </p>
+          </div>
         )}
         {body}
         <p className="trip-footer">

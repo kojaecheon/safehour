@@ -35,6 +35,7 @@ import IntroArea from './IntroArea.js';
 import RegenerateSheet from './RegenerateSheet.js';
 import SwapSheet from './SwapSheet.js';
 import TripNotice from './TripNotice.js';
+import UpdateFailedNotice from './UpdateFailedNotice.js';
 import useKstClock from './useKstClock.js';
 import {
   DEADLINE_REASON_KEY,
@@ -517,15 +518,7 @@ export default function DayScreen() {
 
         {trip.updateFailed && (
           <div className="ui-block">
-            <TripNotice error role="alert">
-              <p>{t('today.updateFailedTitle')}</p>
-              <p>{t('today.updateFailedBody')}</p>
-              {!trip.readOnly && (
-                <Button variant="secondary" size="small" onClick={() => trip.retry()}>
-                  {t('today.retry')}
-                </Button>
-              )}
-            </TripNotice>
+            <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />
           </div>
         )}
 

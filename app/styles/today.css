@@ -20,6 +20,21 @@
 .today-page > * {
   min-width: 0;
 }
+/* 오늘 (설계서 6.2 7번): 회색 바탕 위 흰 블록. 블록 틈(8px)이 간격을 주므로 화면 공통 세로 간격을 끈다 */
+.today-page.is-basement {
+  gap: 0;
+}
+.today-sync-block,
+.today-status-block,
+.today-outing-block {
+  display: grid;
+  gap: var(--space-3);
+}
+/* 개인정보 맺음 줄: 회색 바탕 위 글자 링크라 위 선을 두지 않는다 */
+.today-page.is-basement > .trip-footer {
+  border-top: 0;
+  padding-top: 0;
+}
 .today-loading,
 .today-syncing {
   font-size: var(--text-body);

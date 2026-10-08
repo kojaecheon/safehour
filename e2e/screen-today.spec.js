@@ -1,0 +1,105 @@
+// ③층 오늘(/today): SEED 화면 배치 (설계서 6.2 7번)
+//
+// 회색 바탕 위 흰 블록: 동기화 / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 목록 / 보호자·동반 안내.
+// 체류는 e2e 도우미 startTrip 으로 심는다(기본: 어제 입국 → 4일 뒤 출국, 동의 있음, 오늘 매일 확인 마침).
+// 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245),
+// --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
+
+import { test, expect } from './fixtures.js';
+import { buildStay, kstDate, startTrip } from './helpers.js';
+
+async function styles(locator, props) {
+  return locator.evaluate(
+    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
+    props,
+  );
+}
+
+const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+
+/**
+ * 다음 재계획을 실패시킨다: 일정 API 를 503 으로 막고, 다른 탭에서 체류를 바꾼 것처럼 storage 이벤트를 보낸다
+ * (같은 탭의 localStorage 쓰기는 이벤트가 나지 않는다). 출국을 하루 늦춰 영향 날짜가 생기게 한다.
+ */
+async function failNextSync(page) {
+  await page.route('**/api/itinerary/plan', (route) =>
+    route.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' }),
+  );
+  await page.evaluate(async (stay) => {
+    const { accountKey } = await (await fetch('/api/auth/session', { cache: 'no-store' })).json();
+    const key = `safehour.v2.${accountKey}.stay`;
+    const oldValue = localStorage.getItem(key);
+    const newValue = JSON.stringify({ schemaVersion: 2, data: stay });
+    localStorage.setItem(key, newValue);
+    window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue, storageArea: localStorage }));
+  }, buildStay({ departure: 5 }));
+}
+
+test.describe('③층 오늘, 회색 바탕과 블록', () => {
+  test('회색 바탕 위 흰 블록: 날짜·상태 블록이 상단 바 바로 아래, 블록 사이 8px', async ({ page }) => {
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    await expect(page.locator('.today-syncing')).toHaveCount(0);
+
+    const main = page.locator('main.today-page');
+    expect((await styles(main, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    const blocks = main.locator(':scope > .ui-block');
+    expect(await blocks.count()).toBeGreaterThanOrEqual(3);
+    const status = main.locator(':scope > .today-status-block');
+    await expect(status.locator('.today-date')).toHaveCount(1);
+    await expect(status.locator('.state-banner')).toHaveCount(1);
+    expect(gapBetween(await page.locator('.top-bar').boundingBox(), await blocks.first().boundingBox())).toBe(0);
+    expect(gapBetween(await blocks.nth(0).boundingBox(), await blocks.nth(1).boundingBox())).toBe(8);
+  });
+
+  test('바로가기 목록: 오늘 전체 일정·내일 일정은 화살표 목록 행이고 코발트 채움이 없다', async ({ page }) => {
+    await startTrip(page);
+    const block = page.locator('main.today-page > .today-links-block');
+    const full = block.getByRole('link', { name: '오늘 전체 일정', exact: true });
+    const next = block.getByRole('link', { name: '내일 일정', exact: true });
+    await expect(full).toHaveAttribute('href', `/trip/${kstDate(0)}`);
+    await expect(next).toHaveAttribute('href', `/trip/${kstDate(1)}`);
+    for (const row of [full, next]) {
+      await expect(row).toHaveClass(/ui-list-item/);
+      await expect(row.locator('.ui-list-item-trailing svg')).toHaveCount(1);
+      await expect.poll(async () => (await styles(row, ['background-color']))['background-color']).toBe('rgba(0, 0, 0, 0)');
+    }
+  });
+
+  test('갱신 실패: 흰 블록 안의 대기 색 알림 상자, ! 아이콘, 굵은 제목, 다시 시도', async ({ page }) => {
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    await failNextSync(page);
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('main.today-page > .today-sync-block').getByRole('alert')).toHaveCount(1);
+    await expect(alert.locator('.trip-notice-icon svg')).toHaveCount(1);
+    await expect
+      .poll(() => styles(alert, ['background-color']))
+      .toEqual({ 'background-color': 'rgb(255, 244, 217)' });
+    expect((await styles(alert.locator('.trip-notice-title'), ['font-weight']))['font-weight']).toBe('700');
+    await expect(alert.getByRole('button', { name: '다시 시도' })).toBeVisible();
+  });
+
+  for (const confirmToday of [true, false]) {
+    test(`빈 흰 블록이 없다: ${confirmToday ? '확인 마친 오늘' : '매일 확인 전 오늘'}`, async ({ page }) => {
+      await startTrip(page, {}, { confirmToday });
+      await expect(page.locator('.state-banner')).toBeVisible();
+      const texts = await page
+        .locator('main.today-page > .ui-block')
+        .evaluateAll((els) => els.map((el) => el.innerText.trim().length));
+      expect(texts.length).toBeGreaterThan(0);
+      expect(texts.every((n) => n > 0), `빈 블록: ${JSON.stringify(texts)}`).toBe(true);
+    });
+  }
+
+  test('320px English, 매일 확인 전: 오늘 화면에 가로 스크롤이 없다', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'English', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await startTrip(page, { hasCompanion: true }, { confirmToday: false });
+    await expect(page.locator('.today-check')).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+});

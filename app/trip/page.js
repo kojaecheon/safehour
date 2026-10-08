@@ -16,6 +16,7 @@ import { Button, DateChip, EmptyState, Icon, TopBar } from '@/components/ui/inde
 import CoverageTag from '@/components/conditions/CoverageTag.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import TripNotice from '@/components/trip/TripNotice.js';
+import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import { formatDate, tripDateRows } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
 
@@ -159,17 +160,7 @@ export default function TripPage() {
     <>
       <TopBar title={t('trip.header')} />
       <main className="page trip-page">
-        {trip.updateFailed && (
-          <TripNotice error role="alert">
-            <p>{t('today.updateFailedTitle')}</p>
-            <p>{t('today.updateFailedBody')}</p>
-            {!trip.readOnly && (
-              <Button variant="secondary" size="small" onClick={() => trip.retry()}>
-                {t('today.retry')}
-              </Button>
-            )}
-          </TripNotice>
-        )}
+        {trip.updateFailed && <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />}
         {body}
       </main>
       {sheet && (
