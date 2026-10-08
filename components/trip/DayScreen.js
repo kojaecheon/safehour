@@ -84,12 +84,12 @@ function StopActions({ stop, slot, onSwap, onDelete, onClearMeal, busy }) {
         <span className="visually-hidden"> — {stop.title}</span>
       </button>
       {stop.isMeal && slot ? (
-        <button type="button" className="btn btn-quiet btn-small" aria-disabled={busy ? 'true' : undefined} onClick={guard(onClearMeal)}>
+        <button type="button" className="btn btn-secondary btn-small" aria-disabled={busy ? 'true' : undefined} onClick={guard(onClearMeal)}>
           {t('trip.actionClearMeal')}
           <span className="visually-hidden"> — {stop.title}</span>
         </button>
       ) : (
-        <button type="button" className="btn btn-quiet btn-small" aria-disabled={busy ? 'true' : undefined} onClick={guard(onDelete)}>
+        <button type="button" className="btn btn-secondary btn-small" aria-disabled={busy ? 'true' : undefined} onClick={guard(onDelete)}>
           {t('trip.actionDelete')}
           <span className="visually-hidden"> — {stop.title}</span>
         </button>
@@ -316,10 +316,12 @@ export default function DayScreen() {
         <div className="ui-block trip-status-block">
           <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
 
+          {/* 변경됨 알림 (SEED Callout · actionable, 설계서 5.6): 누르면 전후 비교 시트 */}
           {delta?.unseen && (
-            <button type="button" className="btn btn-secondary trip-changed" onClick={() => setSheet({ kind: 'delta' })}>
+            <button type="button" className="trip-changed" onClick={() => setSheet({ kind: 'delta' })}>
               <span className="trip-changed-dot" aria-hidden="true" />
-              {t('trip.changedCta')}
+              <span className="trip-changed-text">{t('trip.changedCta')}</span>
+              <Icon name="chevronRight" size={18} />
             </button>
           )}
 

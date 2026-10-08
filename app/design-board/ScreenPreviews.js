@@ -225,7 +225,7 @@ function StopActions({ stop }) {
       <button type="button" className="btn btn-secondary btn-small">
         {t('trip.actionSwap')}
       </button>
-      <button type="button" className="btn btn-quiet btn-small">
+      <button type="button" className="btn btn-secondary btn-small">
         {stop.isMeal ? t('trip.actionClearMeal') : t('trip.actionDelete')}
       </button>
     </div>
@@ -309,9 +309,10 @@ function DayDetailScreen({ demo }) {
         </ul>
         <StateBanner state={day.dayState} reasons={day.reasons ?? []} />
         {delta?.unseen && (
-          <button type="button" className="btn btn-secondary trip-changed">
+          <button type="button" className="trip-changed">
             <span className="trip-changed-dot" aria-hidden="true" />
-            {t('trip.changedCta')}
+            <span className="trip-changed-text">{t('trip.changedCta')}</span>
+            <Icon name="chevronRight" size={18} />
           </button>
         )}
         <div className="tabs" role="tablist" aria-label={t('trip.tabsLabel')}>

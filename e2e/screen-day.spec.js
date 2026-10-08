@@ -76,3 +76,38 @@ test.describe('③층 하루 일정, 회색 바탕과 블록', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
 });
+
+test.describe('③층 하루 일정, 상태 상자와 정거장 버튼', () => {
+  test('정거장 버튼: 바꾸기·빼기가 모두 작은 회색 버튼', async ({ page }) => {
+    await startTrip(page, {}, { path: `/trip/${kstDate(1)}` });
+    const actions = page.locator('.trip-stop-actions').first();
+    await expect(actions).toBeVisible();
+    for (const button of await actions.locator('button').all()) {
+      await expect
+        .poll(() => styles(button, ['background-color', 'min-height', 'border-top-left-radius']))
+        .toEqual({ 'background-color': 'rgb(243, 244, 245)', 'min-height': '44px', 'border-top-left-radius': '8px' });
+    }
+  });
+
+  test('입력이 필요한 날: 고칠 곳 상자는 점선 Callout(모서리 10 · 안쪽 14)', async ({ page }) => {
+    await startTrip(page, { consent: false }, { path: `/trip/${kstDate(1)}` });
+    const fix = page.locator('.trip-fix');
+    await expect(fix).toBeVisible();
+    expect(await styles(fix, ['border-top-style', 'border-top-left-radius', 'padding-top'])).toEqual({
+      'border-top-style': 'dashed',
+      'border-top-left-radius': '10px',
+      'padding-top': '14px',
+    });
+  });
+
+  test('동행 보호자가 없는 날의 보호자 탭: 잠금 상자는 Callout(모서리 10 · 안쪽 14)', async ({ page }) => {
+    await startTrip(page, { hasCompanion: false }, { path: `/trip/${kstDate(1)}` });
+    await page.getByRole('tab', { name: /보호자/ }).click();
+    const lock = page.locator('.trip-guardian-lock');
+    await expect(lock).toBeVisible();
+    expect(await styles(lock, ['border-top-left-radius', 'padding-top'])).toEqual({
+      'border-top-left-radius': '10px',
+      'padding-top': '14px',
+    });
+  });
+});
