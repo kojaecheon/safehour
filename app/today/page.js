@@ -262,12 +262,12 @@ export default function TodayPage() {
               </section>
             )}
             {outingDone && (
-              <section className="today-callout" aria-labelledby="today-done-h">
+              <section className="today-outing-empty" aria-labelledby="today-done-h">
                 <h2 id="today-done-h">{t('today.nextDoneTitle')}</h2>
               </section>
             )}
             {outingNone && (
-              <section className="today-callout" aria-labelledby="today-none-h">
+              <section className="today-outing-empty" aria-labelledby="today-none-h">
                 <h2 id="today-none-h">{t('today.noOutingTitle')}</h2>
                 <p>{t('today.noOutingBody')}</p>
               </section>

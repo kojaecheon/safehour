@@ -45,6 +45,7 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
     expect((await styles(main, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
     const blocks = main.locator(':scope > .ui-block');
     expect(await blocks.count()).toBeGreaterThanOrEqual(3);
+    await expect(blocks.first()).toHaveClass(/today-status-block/);
     const status = main.locator(':scope > .today-status-block');
     await expect(status.locator('.today-date')).toHaveCount(1);
     await expect(status.locator('.state-banner')).toHaveCount(1);
@@ -101,5 +102,56 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
     await startTrip(page, { hasCompanion: true }, { confirmToday: false });
     await expect(page.locator('.today-check')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+});
+
+test.describe('③층 오늘, 매일 확인과 다음 외출', () => {
+  test('매일 확인 블록: 카드 테두리·면 없이 흰 블록, 확인 필요는 대기 색 글자 + 아이콘, 요약은 회색 면 모서리 10', async ({ page }) => {
+    await startTrip(page, {}, { confirmToday: false });
+    const check = page.locator('main.today-page > .today-check-block .today-check');
+    await expect(check).toBeVisible();
+    await expect
+      .poll(() => styles(check, ['border-top-width', 'background-color']))
+      .toEqual({ 'border-top-width': '0px', 'background-color': 'rgba(0, 0, 0, 0)' });
+    const flag = check.locator('.today-check-flag');
+    expect((await styles(flag, ['color']))['color']).toBe('rgb(122, 74, 0)');
+    await expect(flag.locator('svg')).toHaveCount(1);
+    expect(await styles(check.locator('.today-check-list').first(), ['background-color', 'border-top-left-radius'])).toEqual({
+      'background-color': 'rgb(243, 244, 245)',
+      'border-top-left-radius': '10px',
+    });
+    // 매일 확인 전에는 '그대로예요'가 화면의 주 버튼(코발트 채움 rgb(10, 92, 255))이다
+    const same = check.getByRole('button', { name: '그대로예요' });
+    await expect.poll(async () => (await styles(same, ['background-color']))['background-color']).toBe('rgb(10, 92, 255)');
+  });
+
+  test('제한 항목 펼치기: 코발트·테두리 없는 먹색 펼침 행, 높이 44 이상', async ({ page }) => {
+    await startTrip(page, {}, { confirmToday: false });
+    const summary = page.locator('.today-check-more > summary');
+    await expect(summary).toBeVisible();
+    await expect
+      .poll(() => styles(summary, ['color', 'border-top-width', 'background-color']))
+      .toEqual({ color: 'rgb(26, 28, 32)', 'border-top-width': '0px', 'background-color': 'rgba(0, 0, 0, 0)' });
+    expect((await summary.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('다음 외출 블록: 카드 없이 블록, 복귀 마감은 왼쪽 띠 없는 회색 안내 상자(모서리 10 · 안쪽 14)', async ({ page }) => {
+    await startTrip(page);
+    const block = page.locator('main.today-page > .today-outing-block');
+    await expect(block).toBeVisible();
+    test.skip((await block.locator('.today-focus').count()) === 0, '오늘 남은 외출이 없는 시각이다');
+    expect(await styles(block.locator('.today-focus'), ['border-top-width', 'box-shadow'])).toEqual({
+      'border-top-width': '0px',
+      'box-shadow': 'none',
+    });
+    expect(
+      await styles(block.locator('.today-deadline'), ['border-left-width', 'border-top-left-radius', 'background-color', 'padding-top']),
+    ).toEqual({
+      'border-left-width': '0px',
+      'border-top-left-radius': '10px',
+      'background-color': 'rgb(243, 244, 245)',
+      'padding-top': '14px',
+    });
+    await expect(block.locator('.today-deadline-main svg')).toHaveCount(1);
   });
 });
