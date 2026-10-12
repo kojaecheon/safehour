@@ -10,6 +10,7 @@
 //   - 지도 링크 2개는 목적지(이 장소)의 이름·좌표만 넘긴다. 매일 확인 전인 오늘 장소면 길찾기를 막는다(규칙 32·39).
 //   - 주문 카드 라벨이면 한국어 식이 카드(/cards)로 잇는다. 한국어 원문 이름·주소는 택시 기사에게 보여 줄 수 있게 따로 둔다.
 //   - 상세는 보강이다. 오프라인·로그인 만료·실패여도 일정 속 정보는 그대로 보인다. 출처 'ⓒ한국관광공사'를 늘 붙인다.
+//   - SEED ③층(설계서 6.2 8번): 회색 바탕 위 흰 블록. 그림·이름 / 지도 / 이 장소의 일정(추정) / 주문 카드 / 관광공사 원문 / 접근성 / 사진.
 
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -110,10 +111,12 @@ function PlaceDetail() {
     return (
       <>
         {top}
-        <main className="page place-page">
-          <p className="place-loading" role="status">
-            {t('place.loading')}
-          </p>
+        <main className="page place-page is-basement">
+          <div className="ui-block">
+            <p className="place-loading" role="status">
+              {t('place.loading')}
+            </p>
+          </div>
         </main>
       </>
     );
@@ -123,13 +126,15 @@ function PlaceDetail() {
     return (
       <>
         {top}
-        <main className="page place-page">
-          <EmptyState
-            icon="map"
-            title={t('place.notFoundTitle')}
-            body={t('place.notFoundBody')}
-            action={<Button href="/trip">{t('place.notFoundCta')}</Button>}
-          />
+        <main className="page place-page is-basement">
+          <div className="ui-block">
+            <EmptyState
+              icon="map"
+              title={t('place.notFoundTitle')}
+              body={t('place.notFoundBody')}
+              action={<Button href="/trip">{t('place.notFoundCta')}</Button>}
+            />
+          </div>
         </main>
       </>
     );
@@ -148,62 +153,66 @@ function PlaceDetail() {
   return (
     <>
       {top}
-      <main className="page place-page">
-        <CourseCard stop={stop} link={false} variant="feature" headingLevel={2} showTime={false} />
+      <main className="page place-page is-basement">
+        <div className="ui-block place-hero">
+          <CourseCard stop={stop} link={false} variant="feature" headingLevel={2} showTime={false} />
+        </div>
 
-        <section className="place-block" aria-labelledby="place-maps-h">
+        <section className="ui-block place-block place-maps" aria-labelledby="place-maps-h">
           <h2 id="place-maps-h">{t('place.mapsTitle')}</h2>
           <MapLinks stop={stop} disabled={gated} disabledKey={trip.dailyCheckPending ? 'today.gatedMaps' : 'today.gatedHospital'} showNote />
         </section>
 
-        <SourceArea source="estimate" title={t('place.planTitle')} note={t('place.estimateNote')}>
-          <dl className="place-facts">
-            <div>
-              <dt>{t('place.visit')}</dt>
-              <dd>
-                {formatDate(found.date, locale)} · {stop.arriveAt}–{stop.leaveAt} · {role}
-              </dd>
-            </div>
-            <div>
-              <dt>{t('place.stay')}</dt>
-              <dd>
-                {t('trip.stayMin', { n: stop.stayMin })}
-                {stop.shortened ? ` · ${t('trip.shortened')}` : ''}
-              </dd>
-            </div>
-            {leg && (
+        <div className="ui-block place-plan-block">
+          <SourceArea source="estimate" title={t('place.planTitle')} note={t('place.estimateNote')}>
+            <dl className="place-facts">
               <div>
-                <dt>{t('place.leg')}</dt>
+                <dt>{t('place.visit')}</dt>
                 <dd>
-                  {leg} <Badge kind="estimate" />
+                  {formatDate(found.date, locale)} · {stop.arriveAt}–{stop.leaveAt} · {role}
                 </dd>
               </div>
-            )}
-            {Number.isFinite(stop.walkBurdenMin) && (
               <div>
-                <dt>{t('place.walk')}</dt>
+                <dt>{t('place.stay')}</dt>
                 <dd>
-                  {t('place.walkValue', { n: stop.walkBurdenMin })} <Badge kind="estimate" />
+                  {t('trip.stayMin', { n: stop.stayMin })}
+                  {stop.shortened ? ` · ${t('trip.shortened')}` : ''}
                 </dd>
               </div>
-            )}
-            <div>
-              <dt>{t('place.indoor')}</dt>
-              <dd>{t(stop.indoor === true ? 'trip.indoor' : stop.indoor === false ? 'trip.outdoor' : 'trip.indoorUnknown')}</dd>
-            </div>
-            {stop.pinned && (
+              {leg && (
+                <div>
+                  <dt>{t('place.leg')}</dt>
+                  <dd>
+                    {leg} <Badge kind="estimate" />
+                  </dd>
+                </div>
+              )}
+              {Number.isFinite(stop.walkBurdenMin) && (
+                <div>
+                  <dt>{t('place.walk')}</dt>
+                  <dd>
+                    {t('place.walkValue', { n: stop.walkBurdenMin })} <Badge kind="estimate" />
+                  </dd>
+                </div>
+              )}
               <div>
-                <dt>{t('place.picked')}</dt>
-                <dd>{t('trip.pinned')}</dd>
+                <dt>{t('place.indoor')}</dt>
+                <dd>{t(stop.indoor === true ? 'trip.indoor' : stop.indoor === false ? 'trip.outdoor' : 'trip.indoorUnknown')}</dd>
               </div>
-            )}
-          </dl>
-          {flags.badges.includes('hoursUnconfirmed') && <p className="place-note">{t('place.hoursNote')}</p>}
-          {flags.dietEstimated && <p className="place-note">{t('place.dietNote')}</p>}
-        </SourceArea>
+              {stop.pinned && (
+                <div>
+                  <dt>{t('place.picked')}</dt>
+                  <dd>{t('trip.pinned')}</dd>
+                </div>
+              )}
+            </dl>
+            {flags.badges.includes('hoursUnconfirmed') && <p className="place-note">{t('place.hoursNote')}</p>}
+            {flags.dietEstimated && <p className="place-note">{t('place.dietNote')}</p>}
+          </SourceArea>
+        </div>
 
         {flags.orderCard && (
-          <section className="place-block" aria-labelledby="place-order-h">
+          <section className="ui-block place-block" aria-labelledby="place-order-h">
             <h2 id="place-order-h">{t('trip.orderCard')}</h2>
             <p>{t('place.orderCardBody')}</p>
             <Button href="/cards#cards-diet" variant="secondary">
@@ -212,69 +221,73 @@ function PlaceDetail() {
           </section>
         )}
 
-        <SourceArea source="tourism" title={t('place.koTitle')} lang="ko">
-          {stop.ko?.title ? (
-            <>
-              <p className="place-ko-name">{stop.ko.title}</p>
-              {stop.ko.address && <p>{stop.ko.address}</p>}
-            </>
-          ) : (
-            <p lang={lang}>
-              {stop.address} — {t('place.koMissing')}
+        <div className="ui-block place-source-block">
+          <SourceArea source="tourism" title={t('place.koTitle')} lang="ko">
+            {stop.ko?.title ? (
+              <>
+                <p className="place-ko-name">{stop.ko.title}</p>
+                {stop.ko.address && <p>{stop.ko.address}</p>}
+              </>
+            ) : (
+              <p lang={lang}>
+                {stop.address} — {t('place.koMissing')}
+              </p>
+            )}
+            <p>
+              <Link className="trip-inline-link" href="/cards#cards-move" lang={lang}>
+                {t('place.moveCard')}
+              </Link>
+            </p>
+          </SourceArea>
+
+          {current.status === 'loading' && (
+            <p className="place-loading" role="status">
+              {t('place.loadingDetails')}
             </p>
           )}
-          <p>
-            <Link className="trip-inline-link" href="/cards#cards-move" lang={lang}>
-              {t('place.moveCard')}
-            </Link>
-          </p>
-        </SourceArea>
-
-        {current.status === 'loading' && (
-          <p className="place-loading" role="status">
-            {t('place.loadingDetails')}
-          </p>
-        )}
-        {(current.status === 'error' || (!canFetch && trip.readOnly)) && (
-          <p className="place-note" role="status">
-            {t(current.errorKey ?? 'place.errDetailOffline')}
-          </p>
-        )}
-
-        {details?.overview && (
-          <SourceArea source="tourism" title={`${t('place.overviewTitle')} · ${t(OVERVIEW_LANG_KEY[overviewLang] ?? 'place.langKo')}`} note={t('place.source')}>
-            <p lang={overviewLang} className="place-overview">
-              {details.overview}
+          {(current.status === 'error' || (!canFetch && trip.readOnly)) && (
+            <p className="place-note" role="status">
+              {t(current.errorKey ?? 'place.errDetailOffline')}
             </p>
-          </SourceArea>
-        )}
+          )}
 
-        {details && (
-          <SourceArea source="tourism" title={t('place.scheduleTitle')} note={t('place.scheduleNote')}>
-            {scheduleEntries.length > 0 ? (
-              <dl className="place-schedule">
-                {scheduleEntries.map(([field, value]) => (
-                  <div key={field}>
-                    <dt lang={lang}>{SCHEDULE_FIELD_KEY[field] ? t(SCHEDULE_FIELD_KEY[field]) : field}</dt>
-                    <dd>{value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <p lang={lang}>{t('place.scheduleEmpty')}</p>
-            )}
-          </SourceArea>
-        )}
+          {details?.overview && (
+            <SourceArea source="tourism" title={`${t('place.overviewTitle')} · ${t(OVERVIEW_LANG_KEY[overviewLang] ?? 'place.langKo')}`} note={t('place.source')}>
+              <p lang={overviewLang} className="place-overview">
+                {details.overview}
+              </p>
+            </SourceArea>
+          )}
+
+          {details && (
+            <SourceArea source="tourism" title={t('place.scheduleTitle')} note={t('place.scheduleNote')}>
+              {scheduleEntries.length > 0 ? (
+                <dl className="place-schedule">
+                  {scheduleEntries.map(([field, value]) => (
+                    <div key={field}>
+                      <dt lang={lang}>{SCHEDULE_FIELD_KEY[field] ? t(SCHEDULE_FIELD_KEY[field]) : field}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : (
+                <p lang={lang}>{t('place.scheduleEmpty')}</p>
+              )}
+            </SourceArea>
+          )}
+
+          {details?.errors?.length > 0 && <p className="place-note">{t('place.partialErrors', { count: details.errors.length })}</p>}
+        </div>
 
         {stop.sourceIds?.barrierFree && (
-          <section className="place-block" aria-labelledby="place-access-h">
+          <section className="ui-block place-block" aria-labelledby="place-access-h">
             <h2 id="place-access-h">{t('place.accessTitle')}</h2>
             <p>{t('place.accessBody')}</p>
           </section>
         )}
 
         {details?.images?.length > 0 && (
-          <section className="place-block" aria-labelledby="place-photos-h">
+          <section className="ui-block place-block" aria-labelledby="place-photos-h">
             <h2 id="place-photos-h">{t('place.photosTitle')}</h2>
             <div className="place-photos">
               {details.images.slice(0, 4).map((image) => (
@@ -294,8 +307,6 @@ function PlaceDetail() {
             </div>
           </section>
         )}
-
-        {details?.errors?.length > 0 && <p className="place-note">{t('place.partialErrors', { count: details.errors.length })}</p>}
 
         <p className="trip-footer" lang={safetyLang}>
           {t('place.footer')}
