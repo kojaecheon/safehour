@@ -5,7 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245).
 
 import { test, expect } from './fixtures.js';
-import { fireDemoEvent, kstDate, openDemoToday, startTrip } from './helpers.js';
+import { findEditableStop, fireDemoEvent, kstDate, openDemoToday, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -81,7 +81,11 @@ test.describe('③층 하루 일정, 회색 바탕과 블록', () => {
 
 test.describe('③층 하루 일정, 상태 상자와 정거장 버튼', () => {
   test('정거장 버튼: 바꾸기·빼기가 모두 작은 회색 버튼', async ({ page }) => {
-    await startTrip(page, {}, { path: `/trip/${kstDate(1)}` });
+    // 요일 휴무로 어떤 날은 식사 칸만 있다. 식사 아닌 정거장이 있는 날을 골라 '빼기'를 실제로 본다
+    const { tripPlan } = await startTrip(page);
+    const found = findEditableStop(tripPlan, { meal: false });
+    expect(found, '식사 아닌 정거장이 있는 날이 있어야 한다').not.toBeNull();
+    await page.goto(`/trip/${found.date}`);
     const actions = page.locator('.trip-stop-actions');
     await expect(actions.first()).toBeVisible();
     // 첫 정거장은 식사 칸일 수 있다. 모든 정거장을 돌아야 '빼기'를 실제로 본다
