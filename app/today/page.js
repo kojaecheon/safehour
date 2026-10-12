@@ -202,10 +202,12 @@ export default function TodayPage() {
             {notice ? t(notice) : ''}
           </TripNotice>
 
+          {/* 변경됨 알림 (SEED Callout · actionable, 설계서 5.6): 누르면 전후 비교 시트 */}
           {delta?.unseen && (
-            <button type="button" className="btn btn-secondary trip-changed" onClick={() => setSheet('delta')}>
+            <button type="button" className="trip-changed" onClick={() => setSheet('delta')}>
               <span className="trip-changed-dot" aria-hidden="true" />
-              {t('trip.changedCta')}
+              <span className="trip-changed-text">{t('trip.changedCta')}</span>
+              <Icon name="chevronRight" size={18} />
             </button>
           )}
 
@@ -223,20 +225,8 @@ export default function TodayPage() {
             </section>
           )}
 
-          {trip.unconfirmedHospitalUpdate && (
-            <section className="today-callout" aria-labelledby="today-hospital-h">
-              <h2 id="today-hospital-h">
-                <Icon name="hospital" size={20} /> {t('today.unconfirmedTitle')}
-              </h2>
-              <p>{t('today.unconfirmedBody')}</p>
-              <Button href="/guide" variant="secondary">
-                {t('today.unconfirmedCta')}
-              </Button>
-            </section>
-          )}
-
           {fix && (
-            <section className="today-callout" aria-labelledby="today-fix-h">
+            <section className="trip-fix" aria-labelledby="today-fix-h">
               <h2 id="today-fix-h">{t('today.needsInputTitle')}</h2>
               <Button href={trip.readOnly ? undefined : fix.href} disabled={trip.readOnly}>
                 {t(fix.key)}
@@ -244,6 +234,18 @@ export default function TodayPage() {
             </section>
           )}
         </div>
+
+        {trip.unconfirmedHospitalUpdate && (
+          <section className="ui-block today-section" aria-labelledby="today-hospital-h">
+            <h2 id="today-hospital-h">
+              <Icon name="hospital" size={20} /> {t('today.unconfirmedTitle')}
+            </h2>
+            <p>{t('today.unconfirmedBody')}</p>
+            <Button href="/guide" variant="secondary">
+              {t('today.unconfirmedCta')}
+            </Button>
+          </section>
+        )}
 
         {hasOutingBlock && (
           <div className="ui-block today-outing-block">
@@ -294,7 +296,7 @@ export default function TodayPage() {
         </div>
 
         {trip.guardianResendNeeded && (
-          <section className="ui-block today-callout" aria-labelledby="today-guardian-h">
+          <section className="ui-block today-section" aria-labelledby="today-guardian-h">
             <h2 id="today-guardian-h">{t('today.guardianResendTitle')}</h2>
             <p>{t('today.guardianResendBody')}</p>
             <Button href={trip.readOnly ? undefined : '/guardian'} variant="secondary" disabled={trip.readOnly}>
@@ -304,14 +306,14 @@ export default function TodayPage() {
         )}
 
         {trip.companionChangeNeedsRegenerate && (
-          <section className="ui-block today-callout" aria-labelledby="today-companion-h">
+          <section className="ui-block today-section" aria-labelledby="today-companion-h">
             <h2 id="today-companion-h">{t('today.companionTitle')}</h2>
             <p>{t('today.companionBody')}</p>
-            <div className="today-callout-actions">
+            <div className="today-section-actions">
               <Button variant="secondary" disabled={trip.readOnly || trip.dailyCheckPending} onClick={() => setSheet('regenerate')}>
                 {t('today.companionCta')}
               </Button>
-              <Button variant="quiet" onClick={() => trip.dismissCompanionNotice()}>
+              <Button variant="secondary" onClick={() => trip.dismissCompanionNotice()}>
                 {t('today.companionDismiss')}
               </Button>
             </div>

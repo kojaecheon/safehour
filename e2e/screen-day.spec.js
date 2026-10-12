@@ -5,7 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245).
 
 import { test, expect } from './fixtures.js';
-import { acknowledgeGuide, kstDate, linkDemoPlan, readRecord, startTrip } from './helpers.js';
+import { fireDemoEvent, kstDate, openDemoToday, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -149,31 +149,6 @@ test.describe('③층 하루 일정, 소개와 도구', () => {
 });
 
 test.describe('③층 하루 일정, 안전 표시 회귀 가드', () => {
-  // 데모 사건 패널은 '병원 연동 데모' 모드의 오늘에만 있다(e2e/demo-events.spec.js 와 같은 흐름).
-  // 데모 지침 A 를 연결하고 병원 안내를 확인한 뒤, 오늘 일정에 병원 발행 출처가 실리면 오늘 화면을 연다.
-  async function openDemoToday(page) {
-    await startTrip(page);
-    await linkDemoPlan(page, 'A');
-    await acknowledgeGuide(page);
-    const today = kstDate(0);
-    await expect
-      .poll(async () => JSON.stringify((await readRecord(page, 'tripPlan'))?.days?.[today]?.effective ?? {}).includes('HOSPITAL'), {
-        message: '데모 지침 연결 뒤 오늘 재계획',
-      })
-      .toBe(true);
-    await page.goto(`/trip/${today}`);
-    const panel = page.getByRole('region', { name: '변화 시연 (병원 연동 데모)' });
-    await expect(panel).toBeVisible();
-    return panel;
-  }
-
-  /** 사건 버튼이 눌릴 수 있을 때까지(동기화 중이 아닐 때) 기다렸다가 누른다 */
-  async function fire(panel, name) {
-    const button = panel.getByRole('button', { name });
-    await expect(button).not.toHaveAttribute('aria-disabled', 'true');
-    await button.click();
-  }
-
   test('데모 패널은 2px 점선 · 모서리 12, 즉시 복귀 배너는 2px 먹색 실선 · 모서리 12', async ({ page }) => {
     const panel = await openDemoToday(page);
 
@@ -183,7 +158,7 @@ test.describe('③층 하루 일정, 안전 표시 회귀 가드', () => {
       .toEqual({ 'border-top-style': 'dashed', 'border-top-width': '2px', 'border-top-left-radius': '12px' });
 
     // 환자 호출 → 즉시 복귀 시트가 자동으로 열린다. '확인했어요'로 닫는다
-    await fire(panel, /환자 호출/);
+    await fireDemoEvent(panel, /환자 호출/);
     const sheet = page.getByRole('dialog', { name: '지금 돌아가세요' });
     await expect(sheet).toBeVisible();
     await sheet.getByRole('button', { name: '확인했어요' }).click();

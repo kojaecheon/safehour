@@ -365,3 +365,31 @@ export async function acknowledgeGuide(page) {
   await page.getByRole('button', { name: '전체 확인 처리' }).click();
   await expect(page.getByText('중요 안내를 모두 확인했어요.')).toBeVisible();
 }
+
+/**
+ * 데모 사건 패널이 있는 오늘 일정(/trip/오늘)을 연다.
+ * 데모 지침 A 를 연결하고 병원 안내를 확인한 뒤, 오늘 일정에 병원 발행 출처가 실리면 연다(e2e/demo-events.spec.js 와 같은 흐름).
+ * @returns {Promise<import('@playwright/test').Locator>} 데모 사건 패널 region
+ */
+export async function openDemoToday(page) {
+  await startTrip(page);
+  await linkDemoPlan(page, 'A');
+  await acknowledgeGuide(page);
+  const today = kstDate(0);
+  await expect
+    .poll(async () => JSON.stringify((await readRecord(page, 'tripPlan'))?.days?.[today]?.effective ?? {}).includes('HOSPITAL'), {
+      message: '데모 지침 연결 뒤 오늘 재계획',
+    })
+    .toBe(true);
+  await page.goto(`/trip/${today}`);
+  const panel = page.getByRole('region', { name: '변화 시연 (병원 연동 데모)' });
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+/** 사건 버튼이 눌릴 수 있을 때까지(동기화 중이 아닐 때) 기다렸다가 누른다 */
+export async function fireDemoEvent(panel, name) {
+  const button = panel.getByRole('button', { name });
+  await expect(button).not.toHaveAttribute('aria-disabled', 'true');
+  await button.click();
+}

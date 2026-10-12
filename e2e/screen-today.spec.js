@@ -6,7 +6,7 @@
 // --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
 
 import { test, expect } from './fixtures.js';
-import { buildStay, kstDate, startTrip } from './helpers.js';
+import { buildStay, fireDemoEvent, kstDate, linkDemoPlan, openDemoToday, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -139,7 +139,12 @@ test.describe('③층 오늘, 매일 확인과 다음 외출', () => {
     await startTrip(page);
     const block = page.locator('main.today-page > .today-outing-block');
     await expect(block).toBeVisible();
-    test.skip((await block.locator('.today-focus').count()) === 0, '오늘 남은 외출이 없는 시각이다');
+    if ((await block.locator('.today-focus').count()) === 0) {
+      // 오늘 남은 외출이 없는 시각: 외출 끝 구역이 상자 없이 블록 안에 놓인다
+      await expect(block.locator('.today-outing-empty')).toHaveCount(1);
+      expect((await styles(block.locator('.today-outing-empty'), ['border-top-width']))['border-top-width']).toBe('0px');
+      return;
+    }
     expect(await styles(block.locator('.today-focus'), ['border-top-width', 'box-shadow'])).toEqual({
       'border-top-width': '0px',
       'box-shadow': 'none',
@@ -153,5 +158,70 @@ test.describe('③층 오늘, 매일 확인과 다음 외출', () => {
       'padding-top': '14px',
     });
     await expect(block.locator('.today-deadline-main svg')).toHaveCount(1);
+  });
+});
+
+test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
+  test('확인하지 않은 병원 안내: 자기 흰 블록, 회색 버튼이 흰 면 위에 보인다', async ({ page }) => {
+    await startTrip(page);
+    await linkDemoPlan(page, 'A');
+    await page.goto('/today');
+    const section = page.getByRole('region', { name: '확인하지 않은 병원 안내가 있어요' });
+    await expect(section).toBeVisible({ timeout: 30_000 });
+    await expect(section).toHaveClass(/ui-block/);
+    await expect(section).toHaveClass(/today-section/);
+    expect((await styles(section, ['background-color']))['background-color']).toBe('rgb(255, 255, 255)');
+    const button = section.getByRole('link', { name: '병원 안내 확인하기' });
+    await expect.poll(async () => (await styles(button, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+  });
+
+  test('입력이 필요한 오늘: 고칠 곳은 하루 일정과 같은 점선 상자(모서리 10 · 안쪽 14), 상태 블록 안', async ({ page }) => {
+    await startTrip(page, { consent: false });
+    const fix = page.locator('main.today-page > .today-status-block .trip-fix');
+    await expect(fix).toBeVisible();
+    expect(await styles(fix, ['border-top-style', 'border-top-left-radius', 'padding-top'])).toEqual({
+      'border-top-style': 'dashed',
+      'border-top-left-radius': '10px',
+      'padding-top': '14px',
+    });
+    await expect(fix.getByRole('heading', { name: '오늘 일정을 만들려면 입력이 필요해요' })).toBeVisible();
+    await expect(fix.getByRole('link').or(fix.getByRole('button'))).toHaveCount(1);
+    // 고칠 곳이 있어도 빈 흰 블록은 없다(다음 외출 블록 조건 포함)
+    const texts = await page
+      .locator('main.today-page > .ui-block')
+      .evaluateAll((els) => els.map((el) => el.innerText.trim().length));
+    expect(texts.length).toBeGreaterThan(0);
+    expect(texts.every((n) => n > 0), `빈 블록: ${JSON.stringify(texts)}`).toBe(true);
+  });
+
+  test('데모 사건 뒤 오늘: 변경됨은 하루 일정과 같은 누르는 안내 상자, 즉시 복귀 배너는 2px 먹색', async ({ page }) => {
+    const panel = await openDemoToday(page);
+    await fireDemoEvent(panel, /환자 호출/);
+    const returnSheet = page.getByRole('dialog', { name: '지금 돌아가세요' });
+    await expect(returnSheet).toBeVisible();
+    await returnSheet.getByRole('button', { name: '확인했어요' }).click();
+    await expect(returnSheet).toHaveCount(0);
+
+    await page.goto('/today');
+    // 앱 셸의 즉시 복귀 시트가 /today 에서 다시 열리면 닫고 이어 간다
+    const reopened = page.getByRole('dialog', { name: '지금 돌아가세요' });
+    if (await reopened.isVisible()) {
+      await reopened.getByRole('button', { name: '확인했어요' }).click();
+      await expect(reopened).toHaveCount(0);
+    }
+    const status = page.locator('main.today-page > .today-status-block');
+    const changed = status.locator('button.trip-changed');
+    await expect(changed).toHaveCount(1);
+    await expect(changed).not.toHaveClass(/btn/);
+    await expect(changed.locator('.trip-changed-text')).toHaveCount(1);
+    await expect(changed.locator('svg')).toHaveCount(1);
+    await page.mouse.move(0, 0);
+    await expect
+      .poll(() => styles(changed, ['background-color', 'border-top-left-radius', 'justify-content']))
+      .toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-top-left-radius': '10px', 'justify-content': 'flex-start' });
+    const banner = status.locator('.trip-return-banner');
+    await expect
+      .poll(() => styles(banner, ['border-top-style', 'border-top-width', 'border-top-color']))
+      .toEqual({ 'border-top-style': 'solid', 'border-top-width': '2px', 'border-top-color': 'rgb(26, 28, 32)' });
   });
 });
