@@ -243,9 +243,8 @@ p.trip-notice > .trip-notice-body {
   display: grid;
   gap: var(--space-3);
 }
-/* 상태 블록 안 상태 배너: 바깥 아래 여백(16px) 대신 블록의 grid 간격(12px)을 쓴다 (오늘 화면도 같다) */
-.trip-status-block > .state-banner,
-.today-status-block > .state-banner {
+/* 상태 블록 안 상태 배너: 바깥 아래 여백(16px) 대신 블록의 grid 간격(12px)을 쓴다 (오늘 화면 규칙은 today.css) */
+.trip-status-block > .state-banner {
   margin-bottom: 0;
 }
 .trip-timeline-block > .tabs {

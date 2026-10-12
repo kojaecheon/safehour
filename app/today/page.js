@@ -11,7 +11,8 @@
 //   - '변경됨'은 전후 비교 시트로 연다(닫으면 본 것으로 기록). 즉시 복귀 시트는 앱 셸 옆 TripRuntime 이 자동으로 연다.
 //   - 업데이트 실패·보호자 링크 다시 보내기·동반 보호자 '다시 만들기' 안내를 보인다.
 //   - 로그인 만료·오프라인에서는 보기 전용이다 — 오늘 일정과 복귀 마감은 보이고, 확인·편집은 막는다.
-//   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 동기화 / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
+//   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
+//     '새로 고치는 중' 줄은 따로 블록을 두지 않고 날짜·상태 블록 안 날짜 줄 아래에 둔다(열 때마다 화면이 흔들리지 않게).
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
@@ -196,6 +197,13 @@ export default function TodayPage() {
             {isDemoMode(stay) && <Badge kind="demo" label={t('link.demoBadge')} />}
           </p>
 
+          {/* 새로 고치는 중: 따로 흰 블록을 띄우면 열 때마다 화면이 흔들린다. 상태 블록 안 날짜 줄 바로 아래 한 줄로 둔다 */}
+          {trip.syncing && trip.tripPlan && (
+            <p className="today-syncing" role="status">
+              {t('today.syncing')}
+            </p>
+          )}
+
           <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
 
           <TripNotice slot role="status">
@@ -309,12 +317,13 @@ export default function TodayPage() {
           <section className="ui-block today-section" aria-labelledby="today-companion-h">
             <h2 id="today-companion-h">{t('today.companionTitle')}</h2>
             <p>{t('today.companionBody')}</p>
+            {/* 닫기 + 행동 (설계서 5.1): [나중에 3][다시 만들기 7]. 보이는 순서와 DOM 순서가 같다 */}
             <div className="today-section-actions">
-              <Button variant="secondary" disabled={trip.readOnly || trip.dailyCheckPending} onClick={() => setSheet('regenerate')}>
-                {t('today.companionCta')}
-              </Button>
               <Button variant="secondary" onClick={() => trip.dismissCompanionNotice()}>
                 {t('today.companionDismiss')}
+              </Button>
+              <Button variant="secondary" disabled={trip.readOnly || trip.dailyCheckPending} onClick={() => setSheet('regenerate')}>
+                {t('today.companionCta')}
               </Button>
             </div>
             {trip.dailyCheckPending && <p className="trip-map-note">{t('trip.editGated')}</p>}
@@ -328,14 +337,9 @@ export default function TodayPage() {
     <>
       {top}
       <main className="page today-page is-basement">
-        {(trip.updateFailed || (trip.syncing && trip.tripPlan)) && (
+        {trip.updateFailed && (
           <div className="ui-block today-sync-block">
-            {trip.updateFailed && <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />}
-            {trip.syncing && trip.tripPlan && (
-              <p className="today-syncing" role="status">
-                {t('today.syncing')}
-              </p>
-            )}
+            <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />
           </div>
         )}
         {body}

@@ -1,6 +1,6 @@
 // ③층 오늘(/today): SEED 화면 배치 (설계서 6.2 7번)
 //
-// 회색 바탕 위 흰 블록: 동기화 / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 목록 / 보호자·동반 안내.
+// 회색 바탕 위 흰 블록: 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 목록 / 보호자·동반 안내.
 // 체류는 e2e 도우미 startTrip 으로 심는다(기본: 어제 입국 → 4일 뒤 출국, 동의 있음, 오늘 매일 확인 마침).
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245),
 // --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
@@ -44,7 +44,8 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
     const main = page.locator('main.today-page');
     expect((await styles(main, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
     const blocks = main.locator(':scope > .ui-block');
-    expect(await blocks.count()).toBeGreaterThanOrEqual(3);
+    // 날짜·상태와 바로가기는 늘 있다. 다음 외출 블록은 KST 자정 근처에 빠질 수 있다
+    expect(await blocks.count()).toBeGreaterThanOrEqual(2);
     await expect(blocks.first()).toHaveClass(/today-status-block/);
     const status = main.locator(':scope > .today-status-block');
     await expect(status.locator('.today-date')).toHaveCount(1);
@@ -101,6 +102,10 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await startTrip(page, { hasCompanion: true }, { confirmToday: false });
     await expect(page.locator('.today-check')).toBeVisible();
+    // 제한 항목을 펼친 상태에서도 넘치지 않아야 한다
+    const more = page.locator('.today-check-more');
+    await more.locator(':scope > summary').click();
+    await expect(more).toHaveAttribute('open', '');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
 });
@@ -203,12 +208,11 @@ test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
     await expect(returnSheet).toHaveCount(0);
 
     await page.goto('/today');
-    // 앱 셸의 즉시 복귀 시트가 /today 에서 다시 열리면 닫고 이어 간다
+    // 즉시 복귀 시트는 새로 불러올 때마다 다시 열린다(닫은 기록이 메모리에만 있다). 닫고 나서 배너를 본다
     const reopened = page.getByRole('dialog', { name: '지금 돌아가세요' });
-    if (await reopened.isVisible()) {
-      await reopened.getByRole('button', { name: '확인했어요' }).click();
-      await expect(reopened).toHaveCount(0);
-    }
+    await expect(reopened).toBeVisible();
+    await reopened.getByRole('button', { name: '확인했어요' }).click();
+    await expect(reopened).toHaveCount(0);
     const status = page.locator('main.today-page > .today-status-block');
     const changed = status.locator('button.trip-changed');
     await expect(changed).toHaveCount(1);
@@ -223,5 +227,20 @@ test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
     await expect
       .poll(() => styles(banner, ['border-top-style', 'border-top-width', 'border-top-color']))
       .toEqual({ 'border-top-style': 'solid', 'border-top-width': '2px', 'border-top-color': 'rgb(26, 28, 32)' });
+  });
+
+  test('복귀 마감 안내 상자(시안 보드 견본, 시각과 무관): 왼쪽 띠 없는 회색 면 · 모서리 10 · 안쪽 14, 깃발 아이콘', async ({ page }) => {
+    await page.goto('/design-board');
+    const deadline = page.locator('.today-deadline').first();
+    // 견본은 시안 틀(overflow: hidden)의 첫 화면 아래에 있다. 틀 안을 굴려 실제로 보이게 한 뒤 본다
+    await deadline.scrollIntoViewIfNeeded();
+    await expect(deadline).toBeVisible();
+    expect(await styles(deadline, ['border-left-width', 'border-top-left-radius', 'background-color', 'padding-top'])).toEqual({
+      'border-left-width': '0px',
+      'border-top-left-radius': '10px',
+      'background-color': 'rgb(243, 244, 245)',
+      'padding-top': '14px',
+    });
+    await expect(deadline.locator('.today-deadline-main svg')).toHaveCount(1);
   });
 });
