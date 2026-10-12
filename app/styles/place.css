@@ -55,6 +55,12 @@
 .place-block p {
   font-size: var(--text-body);
 }
+/* 지도 버튼 [구글][카카오] (설계서 6.2 8번): 회색 작은 버튼을 늘 한 줄 반반으로. 글자가 길면 버튼 안에서 줄을 바꾼다 */
+.place-maps .trip-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-2);
+}
 
 /* SafeHour 판정·추정 값 — 이름과 값을 두 줄로 */
 .place-facts {

@@ -5,7 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245), 흰 면 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { findEditableStop, startTrip } from './helpers.js';
+import { findEditableStop, kstDate, startTrip, stopsOf } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -77,6 +77,67 @@ test.describe('③층 장소 상세, 회색 바탕과 블록', () => {
     await page.getByRole('button', { name: 'English', exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await openPlace(page);
+    await expect(page.locator('.place-loading')).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+});
+
+test.describe('③층 장소 상세, 지도 버튼과 상태별 블록', () => {
+  /** 두 버튼이 한 줄에 같은 폭으로(반반) 놓였는지 */
+  async function expectHalves(row) {
+    const items = row.locator(':scope > *');
+    await expect(items).toHaveCount(2);
+    const [a, b] = [await items.nth(0).boundingBox(), await items.nth(1).boundingBox()];
+    expect(Math.round(a.y)).toBe(Math.round(b.y));
+    expect(Math.abs(a.width - b.width)).toBeLessThanOrEqual(1);
+  }
+
+  test('지도 버튼 [구글][카카오]: 회색 작은 버튼 반반', async ({ page }) => {
+    await openPlace(page);
+    const row = page.locator('main.place-page > .place-maps .trip-map-row');
+    await expectHalves(row);
+    const google = row.getByRole('link', { name: /구글 지도로 열기/ });
+    await expect.poll(async () => (await styles(google, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+  });
+
+  test('320px English: 두 줄 글자여도 지도 버튼은 한 줄 반반', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'English', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await openPlace(page);
+    await expectHalves(page.locator('main.place-page > .place-maps .trip-map-row'));
+  });
+
+  test('매일 확인 전인 오늘 장소: 막힌 두 버튼도 반반, 막은 이유가 지도 블록 안', async ({ page }) => {
+    const { tripPlan } = await startTrip(page, {}, { path: '/trip', confirmToday: false });
+    const stop = stopsOf(tripPlan.days[kstDate(0)] ?? { outings: [] })[0];
+    test.skip(!stop, '오늘 남은 정거장이 없는 시각이다');
+    await page.goto(placeHrefOf(stop));
+    const maps = page.locator('main.place-page > .place-maps');
+    await expect(maps.getByRole('button', { name: /구글 지도로 열기/ })).toBeDisabled();
+    await expectHalves(maps.locator('.trip-map-row'));
+    await expect(maps.getByText('매일 확인을 마치면 길찾기를 쓸 수 있어요.')).toBeVisible();
+  });
+
+  test('상세 불러오기 실패: 안내 문장은 관광공사 원문 블록 안, 추정 블록은 그대로', async ({ page }) => {
+    await page.route('**/api/place', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: '{"ok":false}' }));
+    await openPlace(page);
+    const source = page.locator('main.place-page > .place-source-block');
+    await expect(source.getByText('상세 정보를 불러오지 못했어요. 일정 속 정보는 그대로예요.')).toBeVisible();
+    await expect(page.locator('main.place-page > .place-plan-block .ui-source-estimate')).toBeVisible();
+  });
+
+  test('식사 장소: 주문 카드는 테두리 없는 흰 블록, 회색 버튼이 흰 면 위에 보인다', async ({ page }) => {
+    await openPlace(page, { meal: true });
+    const order = page.getByRole('region', { name: '주문할 때 보여 줄 한국어 카드' });
+    test.skip((await order.count()) === 0, '이 식사 정거장에는 주문 카드 라벨이 없다');
+    await expect(order).toHaveClass(/ui-block/);
+    expect(await styles(order, ['border-top-width', 'background-color'])).toEqual({
+      'border-top-width': '0px',
+      'background-color': 'rgb(255, 255, 255)',
+    });
+    const button = order.getByRole('link', { name: '식이 카드 열기' });
+    await expect.poll(async () => (await styles(button, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
   });
 });

@@ -175,6 +175,7 @@ test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
     await expect(section).toBeVisible({ timeout: 30_000 });
     await expect(section).toHaveClass(/ui-block/);
     await expect(section).toHaveClass(/today-section/);
+    await expect(page.locator('main.today-page > .today-status-block + .today-section')).toHaveCount(1);
     expect((await styles(section, ['background-color']))['background-color']).toBe('rgb(255, 255, 255)');
     const button = section.getByRole('link', { name: '병원 안내 확인하기' });
     await expect.poll(async () => (await styles(button, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
