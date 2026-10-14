@@ -85,6 +85,8 @@ test.describe('③층 한국어 카드, 회색 바탕과 블록', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await startTrip(page, { hasCompanion: true }, { path: '/cards' });
     await expect(page.locator('.cards-jump')).toBeVisible();
+    // 영어로 열렸는지 확인한다(칩 이름은 cards.moveTitle 의 en 값)
+    await expect(page.locator('.cards-jump').getByRole('link', { name: 'Directions card' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
 });

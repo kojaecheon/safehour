@@ -34,7 +34,7 @@ export default function MorePage() {
   return (
     <>
       <TopBar title={t('settings.moreHeader')} />
-      <main className="page settings-page more-page is-basement">
+      <main className="page more-page is-basement">
         <nav aria-label={t('settings.moreMenuAria')}>
           {GROUPS.map((group) => (
             <section key={group.id} className="ui-block" aria-labelledby={`${group.id}-h`}>

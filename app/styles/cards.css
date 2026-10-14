@@ -17,9 +17,6 @@
   display: grid;
   gap: var(--space-3);
 }
-.cards-top-block > * {
-  margin-bottom: 0;
-}
 .cards-intro {
   font-size: var(--text-body);
   color: var(--ink);
@@ -48,7 +45,9 @@
   font-size: var(--text-body);
   font-weight: var(--weight-medium);
   text-decoration: none;
-  transition: background-color var(--duration-fast) var(--ease-color);
+  transition:
+    background-color var(--duration-fast) var(--ease-color),
+    transform var(--duration-fast) var(--ease-press);
 }
 .cards-jump a:active {
   background: var(--pressed-weak);
@@ -56,6 +55,12 @@
 @media (hover: hover) and (pointer: fine) {
   .cards-jump a:hover {
     background: var(--pressed-weak);
+  }
+}
+/* 눌림 축소 (설계서 4.6): 요소 전체가 줄어든다. .ui-date-chip 과 같은 값 */
+@media (prefers-reduced-motion: no-preference) {
+  .cards-jump a:active {
+    transform: scale(var(--press-scale-tight));
   }
 }
 
