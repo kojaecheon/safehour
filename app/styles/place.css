@@ -55,11 +55,25 @@
 .place-block p {
   font-size: var(--text-body);
 }
+/* 구역 안 버튼(주문 카드): 제목과 문장 사이 8px, 문장과 버튼 사이 12px (설계서 6.1 부품 사이 12px, 오늘 화면 안내 구역과 같다) */
+.place-block > .btn {
+  margin-top: var(--space-1);
+}
 /* 지도 버튼 [구글][카카오] (설계서 6.2 8번): 회색 작은 버튼을 늘 한 줄 반반으로. 글자가 길면 버튼 안에서 줄을 바꾼다 */
 .place-maps .trip-map-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-2);
+}
+/* 좁은 폭(지도 구역 340px 이하)에서는 아이콘을 글자 위로 올려 글자 칸을 넓힌다. 네 언어 모두 두 줄 이내 */
+.place-maps .trip-maps {
+  container-type: inline-size;
+}
+@container (max-width: 340px) {
+  .place-maps .trip-map-row > .btn {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
 }
 
 /* SafeHour 판정·추정 값 — 이름과 값을 두 줄로 */

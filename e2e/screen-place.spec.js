@@ -64,6 +64,8 @@ test.describe('③층 장소 상세, 회색 바탕과 블록', () => {
 
   test('빈 흰 블록이 없다', async ({ page }) => {
     await openPlace(page);
+    // 상세(사진·접근성 등)를 다 불러온 뒤 잰다
+    await expect(page.locator('.place-loading')).toHaveCount(0);
     const texts = await page
       .locator('main.place-page > .ui-block')
       .evaluateAll((els) => els.map((el) => el.innerText.trim().length));
@@ -109,6 +111,27 @@ test.describe('③층 장소 상세, 지도 버튼과 상태별 블록', () => {
     await expectHalves(page.locator('main.place-page > .place-maps .trip-map-row'));
   });
 
+  for (const [code, langName] of [
+    ['ja', '日本語'],
+    ['zh', '中文'],
+  ]) {
+    test(`320px ${code}: 지도 버튼은 반반, 버튼 글자는 두 줄 이내(좁은 지도 구역은 아이콘이 글자 위)`, async ({ page }) => {
+      await page.setViewportSize({ width: 320, height: 720 });
+      await page.goto('/');
+      await page.getByRole('button', { name: langName, exact: true }).click();
+      await expect(page.locator('html')).toHaveAttribute('lang', code);
+      await openPlace(page);
+      const row = page.locator('main.place-page > .place-maps .trip-map-row');
+      await expectHalves(row);
+      // 보이는 글자 칸: components/trip/MapLinks.js 의 아이콘(svg) 다음 span. 숨긴 이름(.visually-hidden)은 뺀다
+      const lines = await row
+        .locator(':scope > .btn > span:not(.visually-hidden)')
+        .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight))));
+      expect(lines).toHaveLength(2);
+      expect(lines.every((n) => n <= 2), `버튼별 글자 줄 수: ${JSON.stringify(lines)}`).toBe(true);
+    });
+  }
+
   test('매일 확인 전인 오늘 장소: 막힌 두 버튼도 반반, 막은 이유가 지도 블록 안', async ({ page }) => {
     const { tripPlan } = await startTrip(page, {}, { path: '/trip', confirmToday: false });
     const stop = stopsOf(tripPlan.days[kstDate(0)] ?? { outings: [] })[0];
@@ -129,9 +152,11 @@ test.describe('③층 장소 상세, 지도 버튼과 상태별 블록', () => {
   });
 
   test('식사 장소: 주문 카드는 테두리 없는 흰 블록, 회색 버튼이 흰 면 위에 보인다', async ({ page }) => {
-    await openPlace(page, { meal: true });
+    const found = await openPlace(page, { meal: true });
+    // 데이터로 건너뛴다(components/trip/viewModel.js stopBadges: labels 에 ORDER_CARD 가 있어야 주문 카드를 그린다)
+    test.skip(!(found.stop.labels ?? []).includes('ORDER_CARD'), '이 식사 정거장에는 주문 카드 라벨이 없다');
     const order = page.getByRole('region', { name: '주문할 때 보여 줄 한국어 카드' });
-    test.skip((await order.count()) === 0, '이 식사 정거장에는 주문 카드 라벨이 없다');
+    await expect(order).toHaveCount(1);
     await expect(order).toHaveClass(/ui-block/);
     expect(await styles(order, ['border-top-width', 'background-color'])).toEqual({
       'border-top-width': '0px',

@@ -136,7 +136,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | `StateBanner` | `state`, `reasons`, `live?` | SEED Callout 모양(모서리 10·안쪽 14·아이콘 20·라벨 16, 1px 상태 선). 상태 라벨 + 아이콘 + 안전 문구 두 언어 병기 + 사유 목록. `live`면 갱신을 `aria-live="polite"`로 알린다 |
 | `DateChip` | `date`, `state?`, `isToday?`, `selected?`, `hasAppointment?`, `href?`·`onClick?` | 60×92px·모서리 12. 고른 날 `--selected` 채움 + 흰 글자, '오늘'은 코발트 2px 테두리 + '오늘' 글자, 나머지 회색 면. 요일·날짜·상태 아이콘·병원 표시. 스크린리더에는 전체 날짜·오늘·상태·병원 일정을 한 문장으로 읽힌다 |
 | `DayTimeline` | `entries`, `label`, `person`(`patient`·`guardian`) | 지하철 노선도. 항목 `kind`: `depart`·`stop`·`meal`·`return`·`appointment`·`medication`·`rest`. 종류 이름은 늘 글자로 보이고, 이동 시간(`leg`)에는 늘 '추정' 배지 |
-| `PlaceCard` | `title`, `titleLang?`, `category`, `imageUrl?`, `time?`, `meta?`, `badges?`, `credit?`, `href?`, `variant`(`feature`·`compact`), `headingLevel` | 사진은 URL 참조만(내려받기·서버 가공 금지, `next/image` 안 씀). 사진이 없거나 실패하면 `CategoryArt`. 사진 위 글자는 흰 알약 위. 모서리 16·그림자 없음·1px `--line-strong` 테두리 |
+| `PlaceCard` | `title`, `titleLang?`, `category`, `imageUrl?`, `time?`, `meta?`, `badges?`, `credit?`, `href?`, `variant`(`feature`·`compact`), `headingLevel` | 사진은 URL 참조만(내려받기·서버 가공 금지, `next/image` 안 씀). 사진이 없거나 실패하면 `CategoryArt`. 사진 위 글자는 흰 알약 위. 모서리 16·그림자 없음·1px `--line-strong` 테두리. 장소 상세 그림 블록(`.place-hero`)에서는 테두리·모서리 없이 화면 폭 |
 | `CategoryArt` | `category` | 유형별 인라인 SVG 일러스트(장식, `aria-hidden`) |
 | `MealSlot` | `slot`(`LUNCH`·`DINNER`), `status`(`FILLED`·`NONE_AVAILABLE`·`CLEARED`·`NOT_APPLICABLE`), `time?`, `reasons?` | '추천 장소 없음'은 정상 결과 — 점선 칸 + 중립 회색 + 사유 문구 |
 | `AnswerInput` | `legend`, `value`(`YES`·`NO`·`UNKNOWN`·`null`), `onChange`, `disallowUnknown?`, `hint?`, `disabled?`, `showMeaning?` | 예/아니오/모르겠음 — 44px 알약 칩(테두리 `--line-input` 3:1). 고르면 진한 테두리 + 회색 면 + 체크 + 굵게. `fieldset`+`legend`+표준 라디오. 고른 뒤 '아니오'(제한 없음)와 '모르겠음'(가장 엄격한 기본값)의 뜻을 한 줄로 보인다. 필수 항목은 '모르겠음' 없음 |
@@ -153,6 +153,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | 클래스 `.trip-changed` | 없음 | 누르는 안내 상자(SEED Callout · actionable). 회색 면·모서리 10, 앞 먹색 점, 뒤 화살표, 왼쪽 정렬. 누르면 전후 비교 시트를 연다 |
 | 부품 `UpdateFailedNotice` | `readOnly`, `onRetry` | 일정 갱신 실패 알림(/today·/trip·/trip/[날짜] 공용, `components/trip/UpdateFailedNotice.js`). 대기 색 알림 상자(`TripNotice error`) + `alert` 아이콘, 굵은 제목(`.trip-notice-title`), 보기 전용이면 다시 시도 숨김. 회색 바탕 화면에서는 흰 블록 안 |
 | 클래스 `.today-section` | 없음 | 오늘 화면 안내 구역(병원 안내 미확인·보호자 링크·동반 보호자). 테두리 상자 없이 흰 블록 하나가 구역, 회색 버튼, 두 버튼은 3:7(`.today-section-actions`, [나중에][다시 만들기]) |
+| 클래스 `.place-maps` | 없음 | 장소 상세 지도 버튼 [구글][카카오]. 회색 작은 버튼 반반 grid(`.trip-map-row`), 지도 구역(`.trip-maps`)이 340px 이하면 아이콘을 글자 위로(container query) |
 | 입력 오류 표시 | — | 입력칸은 공통 규칙(`aria-invalid` → 2px 긴급 빨강, 체크·라디오 제외). 라디오 묶음은 선택지 칸 테두리가 빨강(`.radio-option:has(input[aria-invalid])`). 오류 문장은 20px `alert` 아이콘(원 + 느낌표) + 16/22 굵은 `--emergency`, 왼쪽 띠 없음 — 체류 설정(`.onboarding-field-error`)이 먼저 쓴다 |
 | 클래스 `.sticky-return.is-flow` | 없음 | 흐름 화면 하단 바(시작·체류 설정·조건 편집기·보호자): 불투명 흰 면 + 1px 윗선, 세로 480px 이하에서 고정 해제, `scroll-padding-bottom` 184px. '즉시 복귀' 안전 버튼은 `is-flow` 없이 늘 고정이다. 회색 바탕 화면(`main.page.is-basement`)은 첫 흰 블록이 상단 바 바로 아래에서 시작하고, 모든 화면 끝 여백은 내비 + 56px(하단 고정 바가 있으면 + 152px) |
 | `TopBar` | `title`, `titleLang?`, `backHref?`·`onBack?`, `backLabel?`, `as?`, `actions?` | SEED Top Navigation — 높이 56·선 없음, 제목(기본 h1) 18/24 굵게·좁으면 말줄임, 뒤로 가기 44×44·모서리 8, 언어 선택(8장) |
