@@ -15,9 +15,8 @@ export default function CardsPage() {
   return (
     <>
       <TopBar title={t('cards.header')} backHref="/more" />
-      <main className="page cards-page">
-        <p className="cards-intro">{t('cards.intro')}</p>
-        <TodayCards />
+      <main className="page cards-page is-basement">
+        <TodayCards intro={<p className="cards-intro">{t('cards.intro')}</p>} />
       </main>
     </>
   );

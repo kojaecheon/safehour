@@ -9,6 +9,7 @@
 // - **보기 전용·오프라인에서도 보인다.** 기기 저장소의 마지막 계정 사본만 읽고, 쓰기·네트워크가 없다.
 // - 복귀·병원 카드는 주소 글자만 보여준다. 숙소·병원 좌표·지도 링크를 두지 않는다(spec 4.14 · 규칙 39).
 // - 매일 확인 전이면 이동 카드 위에 '오늘 조건 확인 전' 안전 문구를 병기한다(spec 4.6). 카드 자체는 가리지 않는다.
+// - SEED ③층(설계서 6.2 9번): 회색 바탕 위 흰 블록. 첫 블록(안내·날짜·바로가기 칩) / 식이 / 이동 / 복귀 / 병원. 칩은 바로가기 링크다(카드는 늘 모두 보인다).
 
 import Link from 'next/link';
 import { useLang } from '../LanguageProvider.js';
@@ -57,7 +58,7 @@ function formatDate(date, locale) {
 
 function Section({ id, title, children }) {
   return (
-    <section className="cards-section" id={id} aria-labelledby={`${id}-title`} tabIndex={-1}>
+    <section className="ui-block cards-section" id={id} aria-labelledby={`${id}-title`} tabIndex={-1}>
       <h2 className="cards-section-title" id={`${id}-title`}>
         {title}
       </h2>
@@ -142,7 +143,7 @@ function MoveCard({ move }) {
   );
 }
 
-export default function TodayCards() {
+export default function TodayCards({ intro = null }) {
   const { t, lang, locale } = useLang();
   const hydrated = useHydrated();
   const stay = useStay();
@@ -151,8 +152,11 @@ export default function TodayCards() {
 
   if (!hydrated || !todayTomorrow) {
     return (
-      <div className="loading-block">
-        <div className="spinner" aria-hidden="true" />
+      <div className="ui-block cards-top-block">
+        {intro}
+        <div className="loading-block">
+          <div className="spinner" aria-hidden="true" />
+        </div>
       </div>
     );
   }
@@ -163,12 +167,17 @@ export default function TodayCards() {
 
   if (!hasAnything) {
     return (
-      <EmptyState
-        icon="quote"
-        title={t('cards.emptyTitle')}
-        body={t('cards.emptyBody')}
-        action={<Button href="/onboarding">{t('cards.emptyAction')}</Button>}
-      />
+      <>
+        <div className="ui-block cards-top-block">{intro}</div>
+        <div className="ui-block">
+          <EmptyState
+            icon="quote"
+            title={t('cards.emptyTitle')}
+            body={t('cards.emptyBody')}
+            action={<Button href="/onboarding">{t('cards.emptyAction')}</Button>}
+          />
+        </div>
+      </>
     );
   }
 
@@ -182,19 +191,22 @@ export default function TodayCards() {
 
   return (
     <>
-      <p className="cards-date">{t('cards.todayLabel', { date: formatDate(date, locale) })}</p>
+      <div className="ui-block cards-top-block">
+        {intro}
+        <p className="cards-date">{t('cards.todayLabel', { date: formatDate(date, locale) })}</p>
 
-      <nav className="cards-jump" aria-label={t('cards.jumpAria')}>
-        <ul role="list">
-          {SECTIONS.map((section) => (
-            <li key={section.id}>
-              <a href={`#${section.id}`}>{t(section.key)}</a>
-            </li>
-          ))}
-        </ul>
-      </nav>
+        <nav className="cards-jump" aria-label={t('cards.jumpAria')}>
+          <ul role="list">
+            {SECTIONS.map((section) => (
+              <li key={section.id}>
+                <a href={`#${section.id}`}>{t(section.key)}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-      {outsideStay && <Note>{t('cards.outsideStay')}</Note>}
+        {outsideStay && <Note>{t('cards.outsideStay')}</Note>}
+      </div>
 
       <Section id="cards-diet" title={t('cards.dietTitle')}>
         <DietSection diet={cards.diet} />
