@@ -47,9 +47,9 @@ test.describe('③층 한국어 카드, 회색 바탕과 블록', () => {
 
   test('바로가기를 누르면 그 카드 제목이 상단 바에 가리지 않는다', async ({ page }) => {
     await startTrip(page, {}, { path: '/cards' });
-    await page.locator('.cards-jump').getByRole('link', { name: '병원 카드' }).click();
-    await expect(page).toHaveURL(/#cards-hospital$/);
-    const heading = page.locator('#cards-hospital-title');
+    await page.locator('.cards-jump').getByRole('link', { name: '이동 카드' }).click();
+    await expect(page).toHaveURL(/#cards-move$/);
+    const heading = page.locator('#cards-move-title');
     await expect(heading).toBeVisible();
     await expect
       .poll(async () => {
