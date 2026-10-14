@@ -1,0 +1,61 @@
+// ③층 더보기(/more): SEED 화면 배치 (설계서 6.2 11번)
+//
+// 회색 바탕 위 흰 블록 두 개: 도구(한국어 안내 카드·보호자 링크·조건·체류 수정·설정) / 정보(개인정보와 면책 안내).
+// 각 블록은 목록 머리 + 목록 행(앞 아이콘 · 제목 · 설명 · 화살표).
+
+import { test, expect } from './fixtures.js';
+import { startTrip } from './helpers.js';
+
+async function styles(locator, props) {
+  return locator.evaluate(
+    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
+    props,
+  );
+}
+
+const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+
+test.describe('③층 더보기, 목록 묶음 두 개', () => {
+  test('회색 바탕 위 흰 블록 두 개: 도구(5행) · 정보(1행), 첫 블록이 상단 바 바로 아래, 블록 사이 8px', async ({ page }) => {
+    await startTrip(page, {}, { path: '/more' });
+    const main = page.locator('main.more-page');
+    expect((await styles(main, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    const blocks = main.locator('.ui-block');
+    await expect(blocks).toHaveCount(2);
+    await expect(blocks.nth(0).getByRole('heading', { name: '도구' })).toBeVisible();
+    await expect(blocks.nth(1).getByRole('heading', { name: '정보' })).toBeVisible();
+    await expect(blocks.nth(0).locator('.ui-list > li')).toHaveCount(5);
+    await expect(blocks.nth(1).locator('.ui-list > li')).toHaveCount(1);
+    expect(gapBetween(await page.locator('.top-bar').boundingBox(), await blocks.nth(0).boundingBox())).toBe(0);
+    expect(gapBetween(await blocks.nth(0).boundingBox(), await blocks.nth(1).boundingBox())).toBe(8);
+  });
+
+  test('목록 행: 목적지 그대로, 행 전체가 링크, 화살표, 높이 44 이상', async ({ page }) => {
+    await startTrip(page, {}, { path: '/more' });
+    const expected = [
+      ['한국어 안내 카드', '/cards'],
+      ['보호자 링크', '/guardian'],
+      ['조건', '/conditions'],
+      ['개인정보와 면책 안내', '/privacy'],
+    ];
+    for (const [name, href] of expected) {
+      const row = page.locator('main.more-page').getByRole('link', { name: new RegExp(name) });
+      await expect(row).toHaveAttribute('href', href);
+      await expect(row).toHaveClass(/ui-list-item/);
+      await expect(row.locator('.ui-list-item-trailing svg')).toHaveCount(1);
+      expect((await row.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    }
+    await expect(page.locator('main.more-page a[href="/onboarding?edit=1"]')).toHaveCount(1);
+    await expect(page.locator('main.more-page a[href="/settings"]')).toHaveCount(1);
+  });
+
+  test('320px English: 더보기에 가로 스크롤이 없다', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/');
+    await page.getByRole('button', { name: 'English', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+    await startTrip(page, {}, { path: '/more' });
+    await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+});

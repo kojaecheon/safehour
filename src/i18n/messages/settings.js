@@ -153,6 +153,8 @@ export const messages = {
   // ── 더보기 (/more) ──
   'settings.moreHeader': { ko: '더보기', en: 'More', ja: 'その他', zh: '更多' },
   'settings.moreMenuAria': { ko: '더보기 메뉴', en: 'More menu', ja: 'その他のメニュー', zh: '更多菜单' },
+  'settings.moreGroupTools': { ko: '도구', en: 'Tools', ja: 'ツール', zh: '工具' },
+  'settings.moreGroupInfo': { ko: '정보', en: 'Information', ja: '情報', zh: '信息' },
   'settings.moreCardsDesc': {
     ko: '식당·택시에서 보여 줄 한국어 문장',
     en: 'Korean sentences to show at restaurants and in taxis',

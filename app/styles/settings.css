@@ -26,54 +26,9 @@
   margin-top: var(--space-1);
 }
 
-/* ── /more (AX-318) ── */
-.settings-menu {
-  display: grid;
-  gap: var(--space-2);
-  list-style: none;
-}
-.settings-menu-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 64px;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-16);
-  background: var(--surface);
-  color: var(--ink);
-  text-decoration: none;
-  box-shadow: var(--shadow-card);
-}
-.settings-menu-link:hover {
-  background: var(--surface-alt);
-}
-.settings-menu-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  flex: none;
-  border-radius: var(--radius-full);
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-}
-.settings-menu-text {
-  display: grid;
-  flex: 1;
-  min-width: 0;
-}
-.settings-menu-label {
-  font-size: var(--text-body);
-  font-weight: var(--weight-bold);
-  color: var(--ink);
-}
-.settings-menu-desc {
-  font-size: var(--text-body);
-  color: var(--ink-soft);
-}
-.settings-menu-chevron {
-  color: var(--ink-soft);
+/* ── /more (설계서 6.2 11번): 회색 바탕 위 흰 블록 두 개(도구 · 정보), 목록 행(components/ui ListItem) ── */
+.more-page.is-basement > nav > .ui-block:last-child {
+  margin-bottom: 0;
 }
 
 /* ── /settings (AX-318) ── */
