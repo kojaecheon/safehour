@@ -23,6 +23,7 @@
   margin-bottom: var(--space-5);
   border-radius: var(--radius-10);
   background: var(--surface-alt);
+  line-height: var(--lh-body);
 }
 .emergency-lead-icon {
   display: inline-grid;
@@ -47,10 +48,6 @@
   margin-top: var(--space-2);
   font-size: var(--text-body);
   color: var(--ink-soft);
-}
-/* 119 는 긴급 빨강 채움(btn-critical). 빨강 면 위 코발트 초점 링은 잘 안 보여 먹색으로 */
-.emergency-call.btn-critical:focus-visible {
-  outline-color: var(--ink);
 }
 
 .emergency-intl {
@@ -81,6 +78,7 @@
 }
 .emergency-hospital {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   padding: var(--space-3) 0;
 }

@@ -5,7 +5,7 @@
 // --ink rgb(26, 28, 32), 흰 글자 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { HOSPITAL_NAME, HOSPITAL_PHONE, startTrip } from './helpers.js';
+import { HOSPITAL_NAME, HOSPITAL_PHONE, buildStay, loginDemo, seedStay, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -91,6 +91,18 @@ test.describe('③층 긴급, SEED 배치', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     await startTrip(page, {}, { path: '/emergency' });
     await expect(page.getByRole('link', { name: 'Call 119', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+
+  test('320px 한국어: 공백 없는 긴 병원 이름도 가로 스크롤을 만들지 않는다', async ({ page }) => {
+    const longName = '가나다라마바사아자차카타파하가나다라마바사아자차카타파하';
+    await page.setViewportSize({ width: 320, height: 720 });
+    await loginDemo(page, '/privacy');
+    const stay = buildStay();
+    stay.hospitals[0].name = longName;
+    await seedStay(page, stay, { confirmToday: true });
+    await page.goto('/emergency');
+    await expect(page.locator('.emergency-hospital-name').filter({ hasText: longName })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
 });
