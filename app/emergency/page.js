@@ -7,6 +7,7 @@
 // - 로그인 전·로그인 만료·오프라인·추천 중단 스위치에서도 동작한다. 서버를 부르지 않고, 저장소에 쓰지 않는다.
 //   병원 전화는 이 기기에 마지막으로 로그인한 계정의 체류 사본에서 읽기만 한다.
 // - 긴급 버튼(앱 셸)은 이 화면을 현재 위치로 표시한다(aria-current).
+// - SEED ③층(설계서 6.2 10번): 흰 바탕 한 장. 안내 Callout / 119(긴급 빨강 채움 52px) / 1330(회색 채움) + 해외 발신 링크 / 등록한 병원 행.
 
 import { useLang } from '@/components/LanguageProvider.js';
 import PairText from '@/components/settings/PairText.js';
@@ -35,13 +36,9 @@ function HospitalList() {
         <li key={contact.hospitalId} className="emergency-hospital">
           <p className="emergency-hospital-name">{contact.name}</p>
           {contact.href ? (
-            <a className="emergency-call is-secondary" href={contact.href}>
-              <span className="emergency-call-icon">
-                <Icon name="phone" size={20} />
-              </span>
-              <span className="emergency-call-text">
-                <strong>{t('emergency.callNumber', { number: contact.phone })}</strong>
-              </span>
+            <a className="btn btn-secondary btn-small emergency-hospital-call" href={contact.href}>
+              <Icon name="phone" size={20} />
+              <span>{t('emergency.callNumber', { number: contact.phone })}</span>
             </a>
           ) : (
             <p className="emergency-no-phone">{t('emergency.hospitalNoPhone')}</p>
@@ -59,21 +56,26 @@ export default function EmergencyPage() {
       <TopBar title={t('emergency.header')} />
       <main className="page emergency-page">
         <div className="emergency-lead" role="note">
+          <span className="emergency-lead-icon" aria-hidden="true">
+            <Icon name="alert" size={20} />
+          </span>
           <PairText k={LEAD_KEY} />
         </div>
 
         <ul className="emergency-lines" role="list">
           {EMERGENCY_LINES.map((line) => (
             <li key={line.id} className="emergency-line">
-              <a className={line.id === '119' ? 'emergency-call is-urgent' : 'emergency-call'} href={line.href}>
-                <span className="emergency-call-icon">
-                  <Icon name="phone" size={22} strokeWidth={2.4} />
-                </span>
-                <span className="emergency-call-text">
-                  <strong>{t('emergency.callNumber', { number: line.number })}</strong>
-                  <span>{t(LINE_DESC[line.id])}</span>
-                </span>
+              <a
+                className={line.id === '119' ? 'btn btn-critical emergency-call' : 'btn btn-secondary emergency-call'}
+                href={line.href}
+                aria-describedby={`emergency-desc-${line.id}`}
+              >
+                <Icon name="phone" size={22} strokeWidth={2.4} />
+                <span>{t('emergency.callNumber', { number: line.number })}</span>
               </a>
+              <p className="emergency-line-desc" id={`emergency-desc-${line.id}`}>
+                {t(LINE_DESC[line.id])}
+              </p>
               {line.intl && (
                 <p className="emergency-intl">
                   <span>{t('emergency.intlLabel')}</span>
