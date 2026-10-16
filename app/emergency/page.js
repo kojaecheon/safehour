@@ -37,7 +37,7 @@ function HospitalList() {
           <p className="emergency-hospital-name">{contact.name}</p>
           {contact.href ? (
             <a className="btn btn-secondary btn-small emergency-hospital-call" href={contact.href}>
-              <Icon name="phone" size={20} />
+              <Icon name="phone" size={16} />
               <span>{t('emergency.callNumber', { number: contact.phone })}</span>
             </a>
           ) : (

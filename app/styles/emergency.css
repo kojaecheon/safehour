@@ -45,7 +45,7 @@
   margin-bottom: var(--space-6);
 }
 .emergency-line-desc {
-  margin-top: var(--space-2);
+  margin-top: var(--gap-text);
   font-size: var(--text-body);
   color: var(--ink-soft);
 }
@@ -55,7 +55,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 0 var(--space-2);
-  margin-top: var(--space-1);
+  margin-top: var(--gap-component);
   font-size: var(--text-body);
   color: var(--ink-soft);
 }

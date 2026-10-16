@@ -105,4 +105,19 @@ test.describe('③층 긴급, SEED 배치', () => {
     await expect(page.locator('.emergency-hospital-name').filter({ hasText: longName })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
   });
+
+  test('119 키보드 초점: 긴급 빨강 면 위라 링이 먹색 2px 로 구분된다', async ({ page }) => {
+    await page.goto('/emergency');
+    const call = page.getByRole('link', { name: '119 전화 걸기', exact: true });
+    // 마우스가 아니라 Tab 으로 닿아야 :focus-visible 이 걸린다
+    for (let i = 0; i < 10; i += 1) {
+      await page.keyboard.press('Tab');
+      if (await call.evaluate((el) => el === document.activeElement)) break;
+    }
+    await expect(call).toBeFocused();
+    expect(await call.evaluate((el) => el.matches(':focus-visible'))).toBe(true);
+    await expect
+      .poll(() => styles(call, ['outline-color', 'outline-width']))
+      .toEqual({ 'outline-color': 'rgb(26, 28, 32)', 'outline-width': '2px' });
+  });
 });

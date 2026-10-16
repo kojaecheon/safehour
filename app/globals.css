@@ -646,6 +646,7 @@ input[readonly] {
 @media (hover: hover) and (pointer: fine) {
   .btn-quiet:hover { background: var(--pressed-transparent); }
 }
+/* 두 번째 쓰임: /emergency 의 119 전화 버튼도 이 긴급 빨강 채움을 쓴다 */
 /* 되돌릴 수 없는 확인(동의 철회·데이터 지우기) — 긴급 빨강 채움. 화면당 하나 */
 .btn-critical {
   background: var(--emergency);
