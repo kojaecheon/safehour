@@ -272,8 +272,10 @@ svg.ui-icon {
      본문 위치를 지키려고 배너만큼 내려가 배너가 화면 밖으로 밀린다 — 안전 안내가 가려지지 않게 끈다. */
   overflow-anchor: none;
 }
+/* 하단 내비 높이 = 칸 줄 --nav-height + 윗선 1px(+ 안전 영역). 윗선도 높이에 든다: 긴급 바의 69px 이 윗선 1px 을 세는 것과 같다.
+   --nav-height 는 내비 칸 줄(ul) 높이라 그대로 둔다 */
 .app-shell[data-nav='on'] {
-  --nav-offset: calc(var(--nav-height) + env(safe-area-inset-bottom));
+  --nav-offset: calc(var(--nav-height) + 1px + env(safe-area-inset-bottom));
 }
 /* 하단 긴급 바도 내비와 같은 자리를 차지한다 — 고정 요소와 본문 여백이 같은 값을 쓰게 한다.
    바 높이 = 위아래 8 + 긴급 버튼 52 + 윗선 1 = 69px */

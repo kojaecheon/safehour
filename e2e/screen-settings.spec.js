@@ -27,6 +27,9 @@ test.describe('③층 설정, 회색 바탕과 블록', () => {
     expect(gapBetween(await page.locator('.top-bar').boundingBox(), await blocks.first().boundingBox())).toBe(0);
     expect(gapBetween(await blocks.nth(0).boundingBox(), await blocks.nth(1).boundingBox())).toBe(8);
     expect((await styles(blocks.last(), ['margin-bottom']))['margin-bottom']).toBe('0px');
+    // 화면 끝까지 내리면 마지막 블록과 하단 내비 사이가 화면 끝 여백 56px 이다(블록 틈 8px 은 더하지 않는다)
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    expect(gapBetween(await blocks.last().boundingBox(), await page.locator('.ui-bottom-nav').boundingBox())).toBeGreaterThanOrEqual(56);
   });
 
   test('언어 Radio 행: 칸 테두리 없이 선으로 나눈 행, 원 24px, 고른 원은 --selected 채움', async ({ page }) => {
