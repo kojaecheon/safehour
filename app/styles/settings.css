@@ -53,6 +53,21 @@
 .settings-radio-rows .radio-option + .radio-option {
   border-top: 1px solid var(--line);
 }
+/* 위의 background: none 이 전역 .radio-option 의 눌림·호버 면을 가리므로 여기서 다시 낸다.
+   행에 옆 안쪽 여백이 없어 흰 면 위 --pressed 가 아니라 바탕 없는 요소의 --pressed-transparent 를 쓴다 */
+.settings-radio-rows .radio-option:active {
+  background: var(--pressed-transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .settings-radio-rows .radio-option:hover {
+    background: var(--pressed-transparent);
+  }
+}
+/* 전역 .radio-option:has(input:focus-visible) 가 모서리를 12 로 만든다. 목록 행 눌림과 같은 10 으로 맞춘다.
+   선택자 가중치가 더 커서 이긴다. 초점 링 자체는 그대로 보인다 */
+.settings-radio-rows .radio-option:has(input:focus-visible) {
+  border-radius: var(--radius-10);
+}
 .settings-radio-rows .radio-option.selected {
   box-shadow: none;
   font-weight: var(--weight-bold);

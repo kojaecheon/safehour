@@ -50,6 +50,12 @@ test.describe('③층 설정, 회색 바탕과 블록', () => {
       'border-top-color': 'rgb(134, 139, 148)',
       'border-top-width': '1px',
     });
+    // 호버하면 행 전체가 --pressed-transparent 로 눌림 면 색을 낸다(전역 .radio-option 규칙을 가리지 않는다)
+    const englishRow = rows.filter({ has: english });
+    await englishRow.hover();
+    await expect
+      .poll(async () => (await styles(englishRow, ['background-color']))['background-color'])
+      .toBe('rgba(0, 0, 0, 0.027)');
   });
 
   test('알림: 스위치(52×32, role=switch)와 띠 없는 안내 Callout(아이콘 · 모서리 10 · 안쪽 14)', async ({ page }) => {
@@ -80,6 +86,8 @@ test.describe('③층 설정, 회색 바탕과 블록', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     const row = page.locator('.settings-radio-rows .radio-option').filter({ has: page.getByRole('radio', { name: 'English' }) });
     await expect.poll(async () => (await styles(row, ['outline-style']))['outline-style']).toBe('solid');
+    // 초점 링의 모서리는 목록 행 눌림과 같은 10px 이다(전역 규칙의 12px 가 아니다)
+    expect((await styles(row, ['border-top-left-radius']))['border-top-left-radius']).toBe('10px');
   });
 
   test('320px English: 설정에 가로 스크롤이 없다', async ({ page }) => {
@@ -90,5 +98,36 @@ test.describe('③층 설정, 회색 바탕과 블록', () => {
     await startTrip(page, {}, { path: '/settings' });
     await expect(page.getByRole('switch')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+});
+
+test.describe('③층 설정, 되돌릴 수 없는 확인', () => {
+  test('동의 철회 시트: 확인 버튼만 긴급 빨강, 철회 버튼과 취소는 회색, 시트 뒤 블록은 눌리지 않는다', async ({ page }) => {
+    await startTrip(page, {}, { path: '/settings' });
+    const withdraw = page.getByRole('button', { name: '동의 철회' });
+    await expect.poll(async () => (await styles(withdraw, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    await withdraw.click();
+    const sheet = page.getByRole('dialog', { name: '민감정보 동의를 철회할까요?' });
+    await expect(sheet).toBeVisible();
+    const confirm = sheet.getByRole('button', { name: '철회하기' });
+    await expect.poll(async () => (await styles(confirm, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
+    const cancel = sheet.getByRole('button', { name: '취소' });
+    await expect.poll(async () => (await styles(cancel, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    await expect(page.locator('section[aria-labelledby="settings-lang-title"]')).toHaveAttribute('inert', '');
+    await cancel.click();
+    await expect(sheet).toHaveCount(0);
+  });
+
+  test('내 정보 지우기: 확인 단계의 지우기만 긴급 빨강, 취소하면 처음 버튼으로', async ({ page }) => {
+    await startTrip(page, {}, { path: '/settings' });
+    const start = page.getByRole('button', { name: '이 기기에서 내 정보 지우기' });
+    await expect.poll(async () => (await styles(start, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    await start.click();
+    const confirm = page.getByRole('button', { name: '지우기', exact: true });
+    await expect.poll(async () => (await styles(confirm, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
+    const cancel = page.getByRole('button', { name: '취소', exact: true });
+    await expect.poll(async () => (await styles(cancel, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    await cancel.click();
+    await expect(page.getByRole('button', { name: '이 기기에서 내 정보 지우기' })).toBeVisible();
   });
 });

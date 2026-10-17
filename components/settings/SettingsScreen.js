@@ -10,6 +10,7 @@
 //   알림을 실제로 보내는 일은 알림 모듈(T16b)이 Prefs.notifications 를 읽어 한다.
 // - 동의 철회: 확인 시트에서 효과를 먼저 알린 뒤 lib/store withdrawSensitiveConsent() 를 부른다
 //   (SELF 기간·연동 지침 사본·연결 코드 삭제). 재계획은 저장소 구독자(일정 작업)가 한다.
+//   (확인 버튼만 긴급 빨강, 운영자 결정 2026-10)
 // - 내 정보 지우기: ClearSessionButton(stayOnPage) — 결과와 로그아웃 보류 여부를 이 자리에 보여준다.
 // - 보기 전용이면 알림·동의 철회를 막는다(저장소도 READ_ONLY 로 거절한다). 지우기와 언어는 된다.
 // - SEED ③층(설계서 6.2 12번): 회색 바탕 위 흰 블록. 언어(Radio 행) / 알림(Switch 행 + 안내) / 민감정보 동의 / 내 정보.
@@ -197,7 +198,9 @@ function ConsentSection({ readOnly, showReadOnly, sheetOpen, setSheetOpen }) {
           onClose={() => setSheetOpen(false)}
           footer={({ requestClose }) => (
             <>
-              <Button onClick={() => withdraw(requestClose)}>{t('settings.consentConfirm')}</Button>
+              <Button variant="critical" onClick={() => withdraw(requestClose)}>
+                {t('settings.consentConfirm')}
+              </Button>
               <Button variant="secondary" onClick={requestClose}>
                 {t('settings.cancel')}
               </Button>
