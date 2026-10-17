@@ -1126,6 +1126,9 @@ main.page.is-basement {
   --shadow-card: none;
   /* 첫 흰 블록이 상단 바 바로 아래에서 시작한다. 상단 바와 첫 블록이 한 흰 면으로 이어진다 */
   padding-top: 0;
+  /* 화면 끝 56px 는 하단 내비 윗선까지 잰다: 내비는 윗선 1px 이 더해져 --nav-height 보다 1px 높으므로 1px 더 비운다.
+     하단 고정 바가 있는 화면은 globals.css 의 더 구체적인 규칙이 아래 여백을 정한다 */
+  padding-bottom: calc(var(--nav-offset) + var(--gap-screen-bottom) + 1px);
 }
 .ui-block {
   margin: 0 calc(var(--gutter) * -1) var(--gap-section);
@@ -1133,6 +1136,11 @@ main.page.is-basement {
   background: var(--layer-default);
 }
 .ui-block > :last-child {
+  margin-bottom: 0;
+}
+/* 회색 화면의 마지막 흰 블록 아래에는 8px 틈을 두지 않는다: 화면 끝 여백은 main 의 아래 안쪽 여백(56px + 하단 내비)이 맡는다(설계서 6.1).
+   마지막 자식이 맺음 글인 화면은 블록과 맺음 글 사이 8px 이 그대로다 */
+main.page.is-basement > .ui-block:last-child {
   margin-bottom: 0;
 }
 /* 목록 행을 담은 블록은 행이 좌우 여백을 스스로 갖는다 */

@@ -12,6 +12,7 @@
 //   (SELF 기간·연동 지침 사본·연결 코드 삭제). 재계획은 저장소 구독자(일정 작업)가 한다.
 // - 내 정보 지우기: ClearSessionButton(stayOnPage) — 결과와 로그아웃 보류 여부를 이 자리에 보여준다.
 // - 보기 전용이면 알림·동의 철회를 막는다(저장소도 READ_ONLY 로 거절한다). 지우기와 언어는 된다.
+// - SEED ③층(설계서 6.2 12번): 회색 바탕 위 흰 블록. 언어(Radio 행) / 알림(Switch 행 + 안내) / 민감정보 동의 / 내 정보.
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -19,7 +20,7 @@ import { getStore } from '@/lib/store/index.js';
 import { LANGS, LANG_NAMES } from '@/src/i18n/index.js';
 import ClearSessionButton from '../ClearSessionButton.js';
 import { useLang } from '../LanguageProvider.js';
-import { Button, Sheet } from '../ui/index.js';
+import { Button, Icon, Sheet } from '../ui/index.js';
 import useStoreStatus, { shouldShowReadOnly } from '../ui/useStoreStatus.js';
 import { useHydrated, usePrefs, useStay } from '../cards/useDeviceData.js';
 import PairText from './PairText.js';
@@ -49,11 +50,11 @@ function formatDate(iso, locale) {
 function LanguageSection({ inert }) {
   const { t, lang, setLang } = useLang();
   return (
-    <section className="card settings-section" aria-labelledby="settings-lang-title" inert={inert}>
+    <section className="ui-block settings-section" aria-labelledby="settings-lang-title" inert={inert}>
       <h2 id="settings-lang-title">{t('settings.langTitle')}</h2>
       <fieldset className="settings-fieldset">
         <legend className="visually-hidden">{t('settings.langTitle')}</legend>
-        <div className="radio-group">
+        <div className="radio-group settings-radio-rows">
           {LANGS.map((code) => (
             <label key={code} className={lang === code ? 'radio-option selected' : 'radio-option'}>
               <input
@@ -114,20 +115,30 @@ function NotificationSection({ readOnly, showReadOnly, inert }) {
   }
 
   return (
-    <section className="card settings-section" aria-labelledby="settings-notify-title" inert={inert}>
+    <section className="ui-block settings-section" aria-labelledby="settings-notify-title" inert={inert}>
       <h2 id="settings-notify-title">{t('settings.notifyTitle')}</h2>
       <label className="toggle-row settings-toggle">
         <span className="label">
           {t('settings.notifyToggle')}
           <span className="settings-toggle-hint">{t('settings.notifyHint')}</span>
         </span>
-        <input type="checkbox" checked={on} disabled={readOnly || busy || prefs === null} onChange={onChange} />
+        <input
+          type="checkbox"
+          role="switch"
+          className="ui-switch"
+          checked={on}
+          disabled={readOnly || busy || prefs === null}
+          onChange={onChange}
+        />
       </label>
       <div role="status" className="settings-status">
         {message && <p>{t(NOTIFY_MESSAGE[message])}</p>}
       </div>
       {showReadOnly && <p className="settings-text">{t('settings.readOnlyNote')}</p>}
       <div className="settings-disclosure" role="note">
+        <span className="settings-disclosure-icon" aria-hidden="true">
+          <Icon name="info" size={20} />
+        </span>
         <PairText k={DISCLOSURE_KEY} />
       </div>
     </section>
@@ -153,7 +164,7 @@ function ConsentSection({ readOnly, showReadOnly, sheetOpen, setSheetOpen }) {
   }
 
   return (
-    <section className="card settings-section" aria-labelledby="settings-consent-title">
+    <section className="ui-block settings-section" aria-labelledby="settings-consent-title">
       <h2 id="settings-consent-title">{t('settings.consentTitle')}</h2>
       {hydrated && (
         <p className="settings-text">
@@ -221,7 +232,7 @@ export default function SettingsScreen() {
         sheetOpen={sheetOpen}
         setSheetOpen={setSheetOpen}
       />
-      <section className="card settings-section" aria-labelledby="settings-data-title" inert={sheetOpen}>
+      <section className="ui-block settings-section" aria-labelledby="settings-data-title" inert={sheetOpen}>
         <h2 id="settings-data-title">{t('settings.dataTitle')}</h2>
         <ClearSessionButton stayOnPage />
       </section>

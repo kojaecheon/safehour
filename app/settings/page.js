@@ -12,7 +12,7 @@ export default function SettingsPage() {
   return (
     <>
       <TopBar title={t('settings.header')} backHref="/more" />
-      <main className="page settings-page">
+      <main className="page settings-page is-basement">
         <SettingsScreen />
       </main>
     </>
