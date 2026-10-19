@@ -99,6 +99,21 @@ test.describe('③층 시작 화면 — SEED 배치', () => {
     expect((await styles(japanese, ['padding-left']))['padding-left']).toBe('16px');
   });
 
+  test('하단 고지의 지우기 확인은 회색이다(빨강은 긴급에만, 운영자 결정 2026-10-20). 개인정보 화면은 빨강 그대로', async ({ page }) => {
+    const background = (locator) => async () => (await styles(locator, ['background-color']))['background-color'];
+
+    await page.goto('/');
+    await page.getByRole('button', { name: '이 기기에서 내 정보 지우기' }).click();
+    const quiet = page.getByRole('button', { name: '지우기', exact: true });
+    await expect.poll(background(quiet)).toBe('rgb(243, 244, 245)');
+    await page.getByRole('button', { name: '취소', exact: true }).click();
+    await expect(page.getByRole('button', { name: '이 기기에서 내 정보 지우기' })).toBeVisible();
+
+    await page.goto('/privacy');
+    await page.getByRole('button', { name: '이 기기에서 내 정보 지우기' }).click();
+    await expect.poll(background(page.getByRole('button', { name: '지우기', exact: true }))).toBe('rgb(200, 16, 46)');
+  });
+
   for (const [code, langName, start, short, name] of [
     ['ko', '한국어', '시작하기', '긴급', '긴급 연락'],
     ['en', 'English', 'Get started', 'SOS', 'SOS, Emergency'],

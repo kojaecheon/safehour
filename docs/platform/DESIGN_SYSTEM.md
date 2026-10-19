@@ -131,7 +131,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 | 부품 | 주요 props | 지키는 것 |
 | --- | --- | --- |
-| `Button` | `variant`(`primary`·`secondary`·`quiet`·`critical`), `size`(`normal`·`small`), `block`, `href`, `icon`, `disabled`, `loading`, `type` | SEED Action Button. 큰 CTA 52px·모서리 12·18/24, 작은 44px·모서리 8·16/22. 보조 = 회색 채움, 조용한 = 바탕 없는 글자, critical = 긴급 빨강(되돌릴 수 없는 확인, /emergency의 119 전화). 채운 강조 버튼은 화면당 하나. `loading`은 눌린 색 + 회전 표시(`aria-busy`). `href`면 링크, 비활성 링크는 `aria-disabled` 버튼. 비활성은 투명도가 아니라 회색 면 + `--ink-subtle` 글자 |
+| `Button` | `variant`(`primary`·`secondary`·`quiet`·`critical`), `size`(`normal`·`small`), `block`, `href`, `icon`, `disabled`, `loading`, `type` | SEED Action Button. 큰 CTA 52px·모서리 12·18/24, 작은 44px·모서리 8·16/22. 보조 = 회색 채움, 조용한 = 바탕 없는 글자, critical = 긴급 빨강(되돌릴 수 없는 확인, /emergency의 119 전화. 시작 화면 하단 고지의 지우기 확인만 회색: `ClearSessionButton quietConfirm`). 채운 강조 버튼은 화면당 하나. `loading`은 눌린 색 + 회전 표시(`aria-busy`). `href`면 링크, 비활성 링크는 `aria-disabled` 버튼. 비활성은 투명도가 아니라 회색 면 + `--ink-subtle` 글자 |
 | `Badge` | `kind`(5장), `label?` | 14/19·모서리 6·높이 28 안팎. 아이콘 + 면·테두리 모양 + 문구. `label`로 문구만 바꿀 수 있고 뜻이 다른 배지를 만들지 않는다 |
 | `StateBanner` | `state`, `reasons`, `live?` | SEED Callout 모양(모서리 10·안쪽 14·아이콘 20·라벨 16, 1px 상태 선). 상태 라벨 + 아이콘 + 안전 문구 두 언어 병기 + 사유 목록. `live`면 갱신을 `aria-live="polite"`로 알린다 |
 | `DateChip` | `date`, `state?`, `isToday?`, `selected?`, `hasAppointment?`, `href?`·`onClick?` | 60×92px·모서리 12. 고른 날 `--selected` 채움 + 흰 글자, '오늘'은 코발트 2px 테두리 + '오늘' 글자, 나머지 회색 면. 요일·날짜·상태 아이콘·병원 표시. 스크린리더에는 전체 날짜·오늘·상태·병원 일정을 한 문장으로 읽힌다 |

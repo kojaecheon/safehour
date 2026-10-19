@@ -6,7 +6,8 @@
 // (모든 계정 이름공간, 보호자 사본, 알림 예약, AI 문장 캐시, 언어 외 설정, 예전 탭 저장 키), 로그아웃한다.
 // 보기 전용(로그인 만료·오프라인)에서도 동작한다.
 //
-//   - 되돌릴 수 없으므로 한 번 확인한다. (확인 버튼은 긴급 빨강)
+//   - 되돌릴 수 없으므로 한 번 확인한다. (확인 버튼은 긴급 빨강. quietConfirm 이면 회색: 시작 화면 하단 고지는
+//     긴급·시작하기 두 채운 버튼이 늘 보여 빨강을 긴급에만 남긴다, 운영자 결정 2026-10-20)
 //   - 로그아웃까지 끝나면(기본) **전체 새로고침**으로 시작 화면에 간다 — React 메모리 사본까지 버리고,
 //     시작 화면이 삭제 안내를 한 번 띄운다(lib/session.js 의 삭제 표시).
 //   - 로그아웃이 서버에 닿지 못했으면(오프라인) 이 자리에 결과를 남긴다: 기기 삭제는 끝났고,
@@ -26,9 +27,9 @@ function goHome() {
 }
 
 /**
- * @param {{ stayOnPage?: boolean }} props
+ * @param {{ stayOnPage?: boolean, quietConfirm?: boolean }} props
  */
-export default function ClearSessionButton({ stayOnPage = false }) {
+export default function ClearSessionButton({ stayOnPage = false, quietConfirm = false }) {
   const { t } = useLang();
   const status = useStoreStatus();
   /** 'idle' | 'confirm' | 'working' | 'done' */
@@ -83,7 +84,7 @@ export default function ClearSessionButton({ stayOnPage = false }) {
             </button>
             <button
               type="button"
-              className="btn btn-critical btn-small"
+              className={quietConfirm ? 'btn btn-secondary btn-small' : 'btn btn-critical btn-small'}
               disabled={phase === 'working'}
               onClick={handleClear}
             >

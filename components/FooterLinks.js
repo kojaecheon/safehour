@@ -6,6 +6,7 @@
 // 화면마다 같은 자리에 둔다. 지우기는 기기 저장소 전체 삭제 + 로그아웃이다
 // (ClearSessionButton → lib/store deleteAllMyData · spec 4.19 · 규칙 41).
 // 같은 두 가지는 더보기(/more) → 설정·개인정보 화면에도 있다.
+// 시작 화면에서만 쓰여 지우기 확인 버튼은 회색이다(quietConfirm, 하단 바의 긴급·시작하기와 겹치지 않게).
 
 import Link from 'next/link';
 import ClearSessionButton from './ClearSessionButton.js';
@@ -20,7 +21,7 @@ export default function FooterLinks() {
           {t('privacy.link')}
         </Link>
       </p>
-      <ClearSessionButton />
+      <ClearSessionButton quietConfirm />
     </>
   );
 }
