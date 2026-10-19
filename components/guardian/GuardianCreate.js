@@ -17,7 +17,7 @@
 
 import { useId, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Button, EmptyState, TopBar, useStoreStatus, shouldShowReadOnly } from '@/components/ui/index.js';
+import { Button, EmptyState, Icon, TopBar, useStoreStatus, shouldShowReadOnly } from '@/components/ui/index.js';
 import { getStore } from '@/lib/store/index.js';
 import {
   GUARDIAN_ERROR,
@@ -29,6 +29,7 @@ import {
 } from '@/src/guardian/index.js';
 import { parseInstantMs } from '@/src/stay/index.js';
 import { dateLabel, kstClock, kstDate } from './errorView.js';
+import { ErrorText, WarningNote } from './Feedback.js';
 import { useGuardianResendNeeded, useHydrated, useStoreRecord } from './hooks.js';
 import SafetyNote from './SafetyNote.js';
 import { buildShareSnapshot, shareRecordFor } from './share.js';
@@ -116,7 +117,7 @@ function LinkResult({ result, onNewLink, headingRef }) {
   }
 
   return (
-    <section className="card guardian-result" aria-labelledby="guardian-result-title">
+    <section className="guardian-result" aria-labelledby="guardian-result-title">
       <h2 id="guardian-result-title" ref={headingRef} tabIndex={-1}>
         {t('guardian.linkTitle')}
       </h2>
@@ -147,18 +148,10 @@ function LinkResult({ result, onNewLink, headingRef }) {
       <p className="guardian-feedback" role="status">
         {feedback ? t(feedback) : ''}
       </p>
-      {result.overBudget && (
-        <p className="guardian-warning" role="note">
-          {t('guardian.longLink', { n: result.linkChars })}
-        </p>
-      )}
+      {result.overBudget && <WarningNote>{t('guardian.longLink', { n: result.linkChars })}</WarningNote>}
       <p className="guardian-pin-reminder">{t('guardian.pinReminder')}</p>
       {expires && <p className="guardian-meta">{t('guardian.expiresNote', expires)}</p>}
-      {!result.shareSaved && (
-        <p className="guardian-warning" role="note">
-          {t('guardian.saveShareFailed')}
-        </p>
-      )}
+      {!result.shareSaved && <WarningNote>{t('guardian.saveShareFailed')}</WarningNote>}
       <Button variant="quiet" onClick={onNewLink}>
         {t('guardian.newLink')}
       </Button>
@@ -236,20 +229,30 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
 
   return (
     <form className="guardian-form" onSubmit={onSubmit} noValidate aria-busy={busy}>
-      <section className="card" aria-labelledby="guardian-consent-title">
+      <section className="guardian-section" aria-labelledby="guardian-consent-title">
         <h2 id="guardian-consent-title" ref={consentHeadingRef} tabIndex={-1}>
           {t('guardian.consentTitle')}
         </h2>
         <h3 className="guardian-list-title">{t('guardian.includedTitle')}</h3>
-        <ul className="guardian-list guardian-list-in">
+        <ul className="guardian-list guardian-list-in" role="list">
           {INCLUDED_KEYS.map((key) => (
-            <li key={key}>{t(key)}</li>
+            <li key={key}>
+              <span className="guardian-list-icon" aria-hidden="true">
+                <Icon name="check" size={20} />
+              </span>
+              <span>{t(key)}</span>
+            </li>
           ))}
         </ul>
         <h3 className="guardian-list-title">{t('guardian.excludedTitle')}</h3>
-        <ul className="guardian-list guardian-list-out">
+        <ul className="guardian-list guardian-list-out" role="list">
           {EXCLUDED_KEYS.map((key) => (
-            <li key={key}>{t(key)}</li>
+            <li key={key}>
+              <span className="guardian-list-icon" aria-hidden="true">
+                <Icon name="close" size={20} />
+              </span>
+              <span>{t(key)}</span>
+            </li>
           ))}
         </ul>
         <SafetyNote messageKey={'guardian.hospitalReturnNote'} icon="hospital" />
@@ -268,14 +271,10 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
             aria-describedby={errors.consent ? ids.consentError : undefined}
           />
         </div>
-        {errors.consent && (
-          <p id={ids.consentError} className="guardian-error" role="alert">
-            {t(errors.consent)}
-          </p>
-        )}
+        {errors.consent && <ErrorText id={ids.consentError}>{t(errors.consent)}</ErrorText>}
       </section>
 
-      <section className="card" aria-labelledby="guardian-pin-title">
+      <section className="guardian-section" aria-labelledby="guardian-pin-title">
         <h2 id="guardian-pin-title">{t('guardian.pinTitle')}</h2>
         <div className="field">
           <label htmlFor={ids.pin}>{t('guardian.pinLabel')}</label>
@@ -296,11 +295,7 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
           <p id={ids.pinHint} className="guardian-hint">
             {t('guardian.pinHint')}
           </p>
-          {errors.pin && (
-            <p id={ids.pinError} className="guardian-error" role="alert">
-              {t(errors.pin)}
-            </p>
-          )}
+          {errors.pin && <ErrorText id={ids.pinError}>{t(errors.pin)}</ErrorText>}
         </div>
         <div className="field">
           <label htmlFor={ids.pin2}>{t('guardian.pinConfirmLabel')}</label>
@@ -318,23 +313,18 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
             aria-invalid={errors.pin2 ? 'true' : undefined}
             aria-describedby={errors.pin2 ? ids.pin2Error : undefined}
           />
-          {errors.pin2 && (
-            <p id={ids.pin2Error} className="guardian-error" role="alert">
-              {t(errors.pin2)}
-            </p>
-          )}
+          {errors.pin2 && <ErrorText id={ids.pin2Error}>{t(errors.pin2)}</ErrorText>}
         </div>
       </section>
 
-      {errors.form && (
-        <p className="guardian-error guardian-form-error" role="alert">
-          {t(errors.form)}
-        </p>
-      )}
-      {readOnlyShown && <p className="guardian-meta">{t('guardian.readOnlyBlocked')}</p>}
-      <Button type="submit" disabled={!canCreate || busy}>
-        {busy ? t('guardian.creating') : t('guardian.createButton')}
-      </Button>
+      {/* 하단 고정 바(설계서 6.1): 만들 수 없는 이유(실패·보기 전용)는 버튼 곁에 보이도록 바 안 맨 앞에 둔다 */}
+      <div className="guardian-bar sticky-return is-flow">
+        {errors.form && <ErrorText>{t(errors.form)}</ErrorText>}
+        {readOnlyShown && <p className="guardian-meta guardian-bar-note">{t('guardian.readOnlyBlocked')}</p>}
+        <Button type="submit" disabled={!canCreate || busy}>
+          {busy ? t('guardian.creating') : t('guardian.createButton')}
+        </Button>
+      </div>
     </form>
   );
 }

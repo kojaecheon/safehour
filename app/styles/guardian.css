@@ -15,10 +15,9 @@
 .guardian-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-6);
 }
-.guardian-page > .card,
-.guardian-page .guardian-form > .card {
+.guardian-page > .card {
   margin-bottom: 0;
 }
 .guardian-lead {
@@ -35,24 +34,30 @@
   color: var(--ink-soft);
 }
 
-/* 안내 덩이 — 아이콘 + 문장. 색만으로 뜻을 나누지 않는다(문장이 뜻을 말한다) */
+/* 안내 덩이 (SEED Callout · neutral): 띠 없는 회색 면 · 모서리 10 · 안쪽 14/16. 앞 20px 아이콘 칸 + 문장 칸, 사이 8px.
+   색만으로 뜻을 나누지 않는다(문장이 뜻을 말한다). 아이콘이 없는 안내는 문장 칸 하나로 둔다 */
 .guardian-note {
-  display: flex;
-  gap: var(--space-3);
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
   margin-top: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line-strong);
-  border-left: 4px solid var(--ink-soft);
-  border-radius: var(--radius-12);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
   background: var(--surface-alt);
+  line-height: var(--lh-body);
 }
+.guardian-note:not(:has(> .guardian-note-icon)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+/* 아이콘 칸 높이 = 첫 줄 높이(22px): 아이콘이 첫 줄 가운데에 선다 */
 .guardian-note-icon {
-  flex: none;
   display: inline-grid;
   place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+  padding-top: 0;
   color: var(--ink);
-  padding-top: 2px;
 }
 .guardian-note-text {
   min-width: 0;
@@ -65,34 +70,59 @@
   margin-top: var(--space-1);
   font-weight: var(--weight-medium);
 }
-.guardian-note-strong {
-  border-left-color: var(--ink);
+/* 띠 대신 굵은 글자로 한 단계 더 눈에 띄게 */
+.guardian-note-strong .guardian-note-text p {
+  font-weight: var(--weight-bold);
 }
 
-/* 입력 오류 — 문장 + 왼쪽 띠 + 굵기 (색만으로 알리지 않는다) */
+/* 입력 오류: 경고 아이콘 + 굵은 긴급 빨강 문장 (체류 설정 .onboarding-field-error p 와 같은 배치. 색만으로 알리지 않는다) */
 .guardian-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
   margin-top: var(--space-2);
-  padding-left: var(--space-3);
-  border-left: 4px solid var(--support-ink);
-  color: var(--support-ink);
+  color: var(--emergency);
   font-size: var(--text-body);
+  line-height: var(--lh-body);
   font-weight: var(--weight-bold);
+}
+/* 20px 아이콘을 22px 첫 줄 가운데에 */
+.guardian-error .ui-icon {
+  flex: none;
+  margin-top: 1px;
 }
 .guardian-error.is-empty {
   margin: 0;
-  padding: 0;
-  border: 0;
 }
-/* 주의 안내 — 긴 링크, 저장 실패, 연결 없음 */
+/* 주의 안내 (SEED Callout · 대기 색, 일정 화면 .trip-notice.is-error 와 같은 모양): 긴 링크, 저장 실패, 연결 없음.
+   대기 색 면 + 1px 대기 선 · 모서리 10 · 안쪽 14/16. 앞 20px 경고 아이콘(먹색) 칸 + 문장 칸. 아이콘이 없으면 문장 칸 하나 */
 .guardian-warning {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
   margin-top: var(--space-3);
-  padding: var(--space-3) var(--space-4);
+  padding: 14px var(--space-4);
   border: 1px solid var(--state-standby-line);
-  border-left: 4px solid var(--state-standby-ink);
-  border-radius: var(--radius-12);
+  border-radius: var(--radius-10);
   background: var(--state-standby-bg);
   color: var(--ink);
   font-size: var(--text-body);
+  line-height: var(--lh-body);
+}
+.guardian-warning:not(:has(> .guardian-warning-icon)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.guardian-warning-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+  color: var(--ink);
+}
+/* 전역 p(--ink-soft)가 상자의 먹색을 덮지 않게 */
+.guardian-warning > p {
+  color: inherit;
 }
 .guardian-block {
   margin-top: 0;
@@ -108,24 +138,44 @@
 .guardian-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-6);
+}
+/* 흰 바탕 한 장: 카드 대신 섹션. 섹션 사이는 구역선 하나(위 24 · 선 · 아래 24) */
+.guardian-section + .guardian-section {
+  border-top: 1px solid var(--line-section);
+  padding-top: var(--space-6);
 }
 .guardian-list-title {
   margin-top: var(--space-4);
   margin-bottom: var(--space-2);
   font-size: var(--text-body);
 }
+/* 앞 아이콘 목록: 담기는 것은 체크, 담기지 않는 것은 X. 점 대신 20px 아이콘 칸(첫 줄 높이 22px) + 문장, 사이 8px */
 .guardian-list {
   display: grid;
   gap: var(--space-2);
-  padding-left: var(--space-5);
+  padding-left: 0;
+  list-style: none;
   color: var(--ink);
 }
 .guardian-list li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
   font-size: var(--text-body);
+  line-height: var(--lh-body);
 }
-.guardian-list-in { list-style: disc; }
-.guardian-list-out { list-style: circle; }
+.guardian-list-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+}
+/* 담기지 않는 것은 한 단계 옅은 아이콘(문장은 그대로 먹색) */
+.guardian-list-out .guardian-list-icon {
+  color: var(--ink-soft);
+}
 .guardian-consent {
   margin-top: var(--space-4);
   border-top: 1px solid var(--line);
@@ -139,25 +189,25 @@
   align-items: center;
   cursor: pointer;
 }
+/* 다시 보내기 안내 (SEED Callout · neutral): 코발트 면·띠 없이 회색 면. 안의 안내 문장은 상자 없이 둔다 */
 .guardian-resend {
-  padding: var(--space-4);
-  border: 1px solid var(--accent);
-  border-left: 6px solid var(--accent);
-  border-radius: var(--radius-16);
-  background: var(--accent-soft);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
 }
 .guardian-resend h2 {
   margin-bottom: var(--space-2);
 }
 .guardian-resend .guardian-note {
-  background: var(--surface);
+  padding: 0;
+  background: none;
 }
 .guardian-resend .guardian-meta {
   margin: var(--space-3) 0;
 }
 .guardian-sent {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-12);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
   background: var(--surface-alt);
 }
 .guardian-link-field {
@@ -182,6 +232,16 @@
   margin-top: var(--space-3);
   color: var(--ink);
   font-weight: var(--weight-bold);
+}
+/* 하단 고정 바(.sticky-return.is-flow, 바 면·윗선·짧은 화면 풀림은 globals 몫): 만들 수 없는 이유(실패·보기 전용)가 버튼 위에 선다.
+   contain: inline-size 는 320px 일본어 이유 문장의 한 줄 폭이 바를 밀어 넘치지 않게 한다 */
+.guardian-bar {
+  display: grid;
+  gap: var(--space-2);
+  contain: inline-size;
+}
+.guardian-bar > p {
+  margin: 0;
 }
 .guardian-result h2:focus,
 .guardian-asof h2:focus {
