@@ -33,11 +33,11 @@ test.describe('③층 조건 화면, 회색 바탕과 블록', () => {
     expect(gapBetween(await page.locator('.top-bar').boundingBox(), await blocks.first().boundingBox())).toBe(0);
     expect(gapBetween(await blocks.nth(0).boundingBox(), await blocks.nth(1).boundingBox())).toBe(8);
 
-    // 화면 끝까지 내리면 마지막 블록과 하단 내비 사이가 블록 틈 8px + 화면 끝 56px 안팎이다(예전에는 160px 안팎)
+    // 화면 끝까지 내리면 마지막 블록과 하단 내비 사이가 화면 끝 56px 안팎이다(회색 화면의 마지막 블록 아래 틈 0, 하단 내비 윗선 포함)
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     const gap = gapBetween(await blocks.last().boundingBox(), await page.locator('.ui-bottom-nav').boundingBox());
     expect(gap).toBeGreaterThanOrEqual(56);
-    expect(gap).toBeLessThanOrEqual(72);
+    expect(gap).toBeLessThanOrEqual(57);
   });
 
   test('동의 상태는 초록 안내 상자(먹색 글자, 초록 체크 20px, 모서리 10), 체류 정보 고치기는 화살표 행', async ({ page }) => {
@@ -236,10 +236,10 @@ test.describe('③층 조건 화면, 편집기', () => {
       'border-top-width': '1px',
       'border-top-color': 'rgb(220, 222, 227)',
     });
-    // 내비 윗선 1px 차이까지 허용한다(바 bottom = --nav-offset)
+    // 바 bottom = --nav-offset(내비 윗선 1px 포함)이라 바와 내비 사이 틈이 0이다
     expect(
       Math.abs(gapBetween(await bar.boundingBox(), await page.locator('.ui-bottom-nav').boundingBox())),
-    ).toBeLessThanOrEqual(1);
+    ).toBeLessThanOrEqual(0);
 
     const cancel = await bar.getByRole('button', { name: '취소' }).boundingBox();
     const save = await bar.getByRole('button', { name: '저장', exact: true }).boundingBox();

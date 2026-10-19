@@ -623,6 +623,15 @@ export default function DesignBoard() {
                   onChange={(event) => setSwitchOn(event.target.checked)}
                 />
               </label>
+              {/* 막힌 스위치(보기 전용 등): 같은 마크업에 disabled. 켬·끔이 면 색과 알맹이 위치로 함께 읽힌다 */}
+              <label className="toggle-row">
+                <span className="label">{t('designBoard.switchDisabledOn')}</span>
+                <input type="checkbox" role="switch" className="ui-switch" defaultChecked disabled />
+              </label>
+              <label className="toggle-row">
+                <span className="label">{t('designBoard.switchDisabledOff')}</span>
+                <input type="checkbox" role="switch" className="ui-switch" disabled />
+              </label>
             </Sub>
 
             <Sub id="designBoard-c-period" title={t('designBoard.cPeriod')} wide>

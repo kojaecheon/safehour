@@ -5,7 +5,7 @@
 // --selected rgb(42, 48, 56), --line-input rgb(134, 139, 148), --emergency rgb(200, 16, 46).
 
 import { test, expect } from './fixtures.js';
-import { startTrip } from './helpers.js';
+import { accountKeyOf, evidenceShot, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -13,6 +13,13 @@ async function styles(locator, props) {
     props,
   );
 }
+
+// 스위치 알맹이(::before)의 색과 위치
+const thumbOf = (locator) =>
+  locator.evaluate((el) => {
+    const cs = getComputedStyle(el, '::before');
+    return { background: cs.backgroundColor, transform: cs.transform };
+  });
 
 const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
 
@@ -27,9 +34,12 @@ test.describe('③층 설정, 회색 바탕과 블록', () => {
     expect(gapBetween(await page.locator('.top-bar').boundingBox(), await blocks.first().boundingBox())).toBe(0);
     expect(gapBetween(await blocks.nth(0).boundingBox(), await blocks.nth(1).boundingBox())).toBe(8);
     expect((await styles(blocks.last(), ['margin-bottom']))['margin-bottom']).toBe('0px');
-    // 화면 끝까지 내리면 마지막 블록과 하단 내비 사이가 화면 끝 여백 56px 이다(블록 틈 8px 은 더하지 않는다)
+    // 화면 끝까지 내리면 마지막 블록과 하단 내비 사이가 화면 끝 여백 56px 이다(블록 틈 8px 은 더하지 않는다).
+    // 위쪽 한계(57)가 8px 틈이 몰래 돌아오는 것을 막는다(1px 은 반올림 여유)
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    expect(gapBetween(await blocks.last().boundingBox(), await page.locator('.ui-bottom-nav').boundingBox())).toBeGreaterThanOrEqual(56);
+    const endGap = gapBetween(await blocks.last().boundingBox(), await page.locator('.ui-bottom-nav').boundingBox());
+    expect(endGap).toBeGreaterThanOrEqual(56);
+    expect(endGap).toBeLessThanOrEqual(57);
   });
 
   test('언어 Radio 행: 칸 테두리 없이 선으로 나눈 행, 원 24px, 고른 원은 --selected 채움', async ({ page }) => {
@@ -90,6 +100,50 @@ test.describe('③층 설정, 회색 바탕과 블록', () => {
     expect((await styles(row, ['border-top-left-radius']))['border-top-left-radius']).toBe('10px');
   });
 
+  test('보기 전용: 막힌 스위치도 켬(--ink-subtle 채움)과 끔(회색 면 + 3:1 테두리)이 면 색과 위치로 갈린다', async ({ page }) => {
+    await startTrip(page, {}, { path: '/settings' });
+    // 알림을 켠 상태로 기기 저장소에 둔다(seedStay 가 prefs 를 쓰는 방식 그대로)
+    const key = await accountKeyOf(page);
+    await page.evaluate((key) => {
+      localStorage.setItem(
+        `safehour.v2.${key}.prefs`,
+        JSON.stringify({ schemaVersion: 2, data: { notifications: true } }),
+      );
+    }, key);
+    // 서버 세션이 사라진다. 기기에는 마지막 계정의 사본만 남아 보기 전용이 된다
+    await page.context().clearCookies();
+    await page.goto('/settings');
+    const sw = page.getByRole('switch', { name: /복귀·복약·병원 일정 알림 받기/ });
+    await expect(
+      page.locator('section[aria-labelledby="settings-notify-title"]').getByText('보기 전용에서는 바꿀 수 없어요. 로그인하면 바꿀 수 있어요.'),
+    ).toBeVisible();
+    await expect(sw).toBeDisabled();
+    await expect(sw).toBeChecked();
+    // 켬·막힘: 흰 바탕 3.42:1 인 --ink-subtle 채움, 알맹이는 흰색이고 오른쪽(20px 이동)
+    await expect.poll(async () => (await styles(sw, ['background-color']))['background-color']).toBe('rgb(134, 139, 148)');
+    await expect.poll(() => thumbOf(sw)).toEqual({ background: 'rgb(255, 255, 255)', transform: 'matrix(1, 0, 0, 1, 20, 0)' });
+    await sw.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await evidenceShot(page, 'settings-readonly-switch-on', { fullPage: false });
+
+    // 끔·막힘: 회색 면 + 3:1 테두리(--line-input) + 회색 알맹이(--ink-subtle), 왼쪽
+    await page.evaluate((key) => {
+      localStorage.setItem(
+        `safehour.v2.${key}.prefs`,
+        JSON.stringify({ schemaVersion: 2, data: { notifications: false } }),
+      );
+    }, key);
+    await page.goto('/settings');
+    await expect(sw).toBeDisabled();
+    await expect(sw).not.toBeChecked();
+    await expect
+      .poll(async () => (await styles(sw, ['box-shadow']))['box-shadow'])
+      .toContain('rgb(134, 139, 148)');
+    expect((await styles(sw, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    await expect.poll(() => thumbOf(sw)).toEqual({ background: 'rgb(134, 139, 148)', transform: 'none' });
+    await sw.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+    await evidenceShot(page, 'settings-readonly-switch-off', { fullPage: false });
+  });
+
   test('320px English: 설정에 가로 스크롤이 없다', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });
     await page.goto('/');
@@ -113,7 +167,10 @@ test.describe('③층 설정, 되돌릴 수 없는 확인', () => {
     await expect.poll(async () => (await styles(confirm, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
     const cancel = sheet.getByRole('button', { name: '취소' });
     await expect.poll(async () => (await styles(cancel, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
-    await expect(page.locator('section[aria-labelledby="settings-lang-title"]')).toHaveAttribute('inert', '');
+    // 시트가 열리면 나머지 세 블록은 모두 inert 다(두 확인 버튼을 동시에 누를 수 없다)
+    for (const id of ['settings-lang-title', 'settings-notify-title', 'settings-data-title']) {
+      await expect(page.locator(`section[aria-labelledby="${id}"]`)).toHaveAttribute('inert', '');
+    }
     await cancel.click();
     await expect(sheet).toHaveCount(0);
   });

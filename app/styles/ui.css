@@ -913,9 +913,22 @@
 .ui-switch:checked::before {
   transform: translateX(20px);
 }
+/* 막힌 스위치(보기 전용 등): 켬·끔이 함께 읽혀야 한다. 끔 = 회색 면 + 3:1 테두리 + 회색 알맹이(왼쪽),
+   켬 = --ink-subtle 채움(흰 바탕 3.42:1) + 흰 알맹이(오른쪽). 면 색과 위치가 함께 바뀐다 */
 .ui-switch:disabled {
-  background: var(--line-strong);
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--line-input);
   cursor: not-allowed;
+}
+.ui-switch:disabled::before {
+  background: var(--ink-subtle);
+}
+.ui-switch:disabled:checked {
+  background: var(--ink-subtle);
+  box-shadow: none;
+}
+.ui-switch:disabled:checked::before {
+  background: var(--on-dark);
 }
 
 /* ───────────────────────── 조건 기간 편집기 틀 ───────────────────────── */

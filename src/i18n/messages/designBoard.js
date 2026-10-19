@@ -156,6 +156,8 @@ export const messages = {
   'designBoard.selectB': { ko: '김포공항', en: 'Gimpo Airport', ja: '金浦空港', zh: '金浦机场' },
   'designBoard.selectBSub': { ko: '서울 도심까지 차로 약 40분 (추정)', en: 'About 40 minutes to central Seoul by car (estimate)', ja: 'ソウル都心まで車で約40分（推定）', zh: '驾车至首尔市中心约40分钟（估算）' },
   'designBoard.switchLabel': { ko: '알림 켜기 (견본)', en: 'Turn on alerts (sample)', ja: '通知をオン（見本）', zh: '开启通知（样例）' },
+  'designBoard.switchDisabledOn': { ko: '알림 켬, 보기 전용 (견본)', en: 'Alerts on, view-only (sample)', ja: '通知オン・閲覧専用（見本）', zh: '通知已开启，只读（样例）' },
+  'designBoard.switchDisabledOff': { ko: '알림 끔, 보기 전용 (견본)', en: 'Alerts off, view-only (sample)', ja: '通知オフ・閲覧専用（見本）', zh: '通知已关闭，只读（样例）' },
   'designBoard.cAnswer': { ko: '예 / 아니오 / 모르겠음 입력', en: 'Yes / No / Not sure input', ja: 'はい／いいえ／わからない入力', zh: '是／否／不确定 输入' },
   'designBoard.answerHospitalNote': {
     ko: '병원 발행 항목 — 모르겠음이 없고 고칠 수 없습니다',

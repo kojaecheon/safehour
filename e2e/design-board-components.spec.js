@@ -217,6 +217,19 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
     await pointerAway(page);
     await expect.poll(() => styles(sw, ['background-color']).then((s) => s['background-color'])).toBe('rgb(42, 48, 56)');
 
+    // 막힌 스위치(보기 전용): 켬은 --ink-subtle 채움 + 흰 알맹이, 끔은 회색 면 + 3:1 테두리 + 회색 알맹이
+    const lockedOn = page.getByRole('switch', { name: '알림 켬, 보기 전용 (견본)' });
+    await expect(lockedOn).toBeDisabled();
+    await expect(lockedOn).toBeChecked();
+    expect((await styles(lockedOn, ['background-color']))['background-color']).toBe('rgb(134, 139, 148)');
+    const lockedOff = page.getByRole('switch', { name: '알림 끔, 보기 전용 (견본)' });
+    await expect(lockedOff).toBeDisabled();
+    await expect(lockedOff).not.toBeChecked();
+    expect(await styles(lockedOff, ['background-color', 'box-shadow'])).toEqual({
+      'background-color': 'rgb(243, 244, 245)',
+      'box-shadow': 'rgb(134, 139, 148) 0px 0px 0px 1px inset',
+    });
+
     // 전환(Segmented): 회색 알약 통, 고른 칸은 흰 면 + 진한 글자, 안 고른 칸은 보조 글자
     const seg = page.locator('.tabs').first();
     expect(await styles(seg, ['border-top-left-radius', 'background-color'])).toEqual({
