@@ -17,7 +17,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLang } from '@/components/LanguageProvider.js';
-import { Badge, Button, EmptyState, Icon, TopBar, useStoreStatus } from '@/components/ui/index.js';
+import { AlertDialog, Badge, Button, EmptyState, Icon, SourceTag, TopBar, useStoreStatus } from '@/components/ui/index.js';
 import ConsentPanel from '@/components/conditions/ConsentPanel.js';
 import SafetyText from '@/components/conditions/SafetyText.js';
 import useStay, { useHydrated, useNowMs } from '@/components/conditions/useStay.js';
@@ -219,7 +219,7 @@ export default function LinkPage() {
                 )}
 
                 {done && (
-                  <section className="card conditions-done" aria-labelledby="link-done-heading">
+                  <section className="conditions-done" aria-labelledby="link-done-heading">
                     <h2 id="link-done-heading" tabIndex={-1} ref={doneHeadingRef}>
                       <Icon name="check" size={22} strokeWidth={2.6} />
                       <span>{t('link.doneTitle')}</span>
@@ -244,7 +244,7 @@ export default function LinkPage() {
                 )}
 
                 {fetched ? (
-                  <section className="card conditions-choose" aria-labelledby="link-choose-heading">
+                  <section className="conditions-choose" aria-labelledby="link-choose-heading">
                     <h2 id="link-choose-heading" tabIndex={-1} ref={chooseHeadingRef}>
                       {t('link.chooseTitle')}
                     </h2>
@@ -295,21 +295,22 @@ export default function LinkPage() {
                     </fieldset>
                     {choiceError && (
                       <p className="conditions-field-error" id="link-choose-error" role="alert">
-                        {t('link.chooseRequired')}
+                        <Icon name="alert" size={20} />
+                        <span>{t('link.chooseRequired')}</span>
                       </p>
                     )}
-                    <div className="conditions-actions">
-                      <Button onClick={confirmLink} disabled={readOnly}>
-                        {t('link.confirm')}
-                      </Button>
+                    <div className="conditions-actions link-bar sticky-return is-flow">
                       <Button variant="secondary" onClick={() => setFetched(null)}>
                         {t('link.cancel')}
+                      </Button>
+                      <Button onClick={confirmLink} disabled={readOnly}>
+                        {t('link.confirm')}
                       </Button>
                     </div>
                   </section>
                 ) : (
                   <>
-                    <section className="card">
+                    <section className="link-section">
                       <form
                         onSubmit={(e) => {
                           e.preventDefault();
@@ -330,13 +331,13 @@ export default function LinkPage() {
                             placeholder={t('link.codePlaceholder')}
                           />
                         </div>
-                        <Button type="submit" disabled={busy || readOnly}>
+                        <Button type="submit" variant={done ? 'secondary' : 'primary'} disabled={busy || readOnly}>
                           {busy ? t('link.submitting') : t('link.submit')}
                         </Button>
                       </form>
                     </section>
 
-                    <section className="card conditions-demo" aria-labelledby="link-demo-heading">
+                    <section className="conditions-demo" aria-labelledby="link-demo-heading">
                       <div className="conditions-section-head">
                         <h2 id="link-demo-heading">{t('link.demoTitle')}</h2>
                         <Badge kind="demo" />
@@ -361,15 +362,16 @@ export default function LinkPage() {
                 {linkedPlans.length > 0 && (
                   <section className="conditions-section" aria-labelledby="link-list-heading">
                     <h2 id="link-list-heading">{t('link.listTitle')}</h2>
-                    <ul className="conditions-period-list">
+                    <ul className="conditions-period-list is-rows">
                       {linkedPlans.map((lp) => {
                         const state = planState(lp.plan, nowMs);
                         const hospitalName = hospitals.find((h) => h.id === lp.hospitalId)?.name ?? '';
                         return (
-                          <li key={lp.code} className="conditions-period conditions-period-HOSPITAL">
+                          <li key={lp.code} className="conditions-period">
                             <div className="conditions-period-head">
                               <h3>{t('link.connected', { issuer: lp.plan?.issuer?.name ?? '' })}</h3>
                               <span className="conditions-tags">
+                                <SourceTag source="hospital" />
                                 {lp.plan?.demo === true && <Badge kind="demo" />}
                                 <span className={`conditions-plain-tag conditions-state-${state}`}>{t(STATE_KEY[state])}</span>
                               </span>
@@ -380,39 +382,37 @@ export default function LinkPage() {
                               <p>{t('link.fetchedAt', { at: fmtDateTime(lp.fetchedAt, locale) })}</p>
                               <p>{t('link.expires', { at: fmtDateTime(lp.plan?.expiresAt, locale) })}</p>
                             </div>
-                            {disconnecting === lp.code ? (
-                              <div className="conditions-confirm" role="group" aria-labelledby={`link-q-${lp.code}`}>
-                                <p id={`link-q-${lp.code}`} className="conditions-confirm-question">
-                                  {t('link.disconnectQuestion')}
-                                </p>
-                                <div className="conditions-actions">
-                                  <Button onClick={() => disconnect(lp.code)} disabled={readOnly}>
-                                    {t('link.disconnectConfirm')}
-                                  </Button>
-                                  <Button variant="secondary" onClick={() => setDisconnecting(null)}>
-                                    {t('conditions.cancel')}
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="conditions-actions is-inline">
-                                <Button variant="secondary" size="small" href="/guide">
-                                  {t('conditions.openGuide')}
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="small"
-                                  disabled={readOnly}
-                                  onClick={() => setDisconnecting(lp.code)}
-                                >
-                                  {t('link.disconnect')}
-                                </Button>
-                              </div>
-                            )}
+                            <div className="conditions-actions is-inline">
+                              <Button variant="secondary" size="small" href="/guide">
+                                {t('conditions.openGuide')}
+                              </Button>
+                              <Button
+                                variant="secondary"
+                                size="small"
+                                disabled={readOnly}
+                                onClick={() => setDisconnecting(lp.code)}
+                              >
+                                {t('link.disconnect')}
+                              </Button>
+                            </div>
                           </li>
                         );
                       })}
                     </ul>
+                    {/* 되돌릴 수 없는 확인이라 대화상자로 묻는다(설계서 5.6). 초점 가두기·Escape·초점 복귀는 AlertDialog 가 한다 */}
+                    {disconnecting && (
+                      <AlertDialog
+                        title={t('link.disconnectQuestion')}
+                        cancelLabel={t('conditions.cancel')}
+                        confirmLabel={t('link.disconnectConfirm')}
+                        critical
+                        onConfirm={({ requestClose }) => {
+                          requestClose();
+                          disconnect(disconnecting);
+                        }}
+                        onClose={() => setDisconnecting(null)}
+                      />
+                    )}
                   </section>
                 )}
               </>

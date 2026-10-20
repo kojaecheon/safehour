@@ -135,7 +135,7 @@ test.describe('③층 조건 화면, 조건 기간 목록', () => {
     expect((await readRecord(page, 'stay')).periods).toEqual([]);
   });
 
-  test('병원 연결 화면의 병원 지침은 카드(청록 띠) 그대로, 조건 화면에서는 같은 기간이 목록 행', async ({ page }) => {
+  test('병원 연결 화면과 조건 화면의 병원 지침은 모두 목록 행, 출처는 출처 표시가 알린다', async ({ page }) => {
     await startTrip(page, { periods: [] }, { path: '/conditions' });
     await page.goto('/link');
     await page.getByRole('button', { name: '예시 A — 외출 가능' }).click();
@@ -143,15 +143,13 @@ test.describe('③층 조건 화면, 조건 기간 목록', () => {
     await page.getByRole('button', { name: '이 병원으로 연결' }).click();
     await expect(page.getByRole('heading', { name: '연결했어요' })).toBeVisible();
 
-    // /link 의 병원 지침 카드에는 출처 표시가 따로 없다. 청록 왼쪽 띠와 면이 병원 발행임을 알린다
+    // /link 의 연결된 지침도 카드 없는 목록 행이고, 출처는 출처 표시가 알린다(③층 14번)
     await page.goto('/link');
-    const card = page.locator('.conditions-period-HOSPITAL').first();
-    expect(await styles(card, ['border-left-width', 'border-top-left-radius'])).toEqual({
-      'border-left-width': '6px',
-      'border-top-left-radius': '16px',
-    });
+    const linkRow = page.locator('.conditions-period-list.is-rows > .conditions-period').first();
+    expect((await styles(linkRow, ['border-left-width']))['border-left-width']).toBe('0px');
+    await expect(linkRow.locator('.ui-source-tag-hospital')).toHaveCount(1);
 
-    // 같은 기간이 조건 화면에서는 목록 행이고, 출처는 출처 표시가 알린다
+    // 같은 기간이 조건 화면에서도 목록 행이다
     await page.goto('/conditions');
     const row = page.locator('.conditions-period-HOSPITAL').first();
     expect((await styles(row, ['border-left-width']))['border-left-width']).toBe('0px');
@@ -184,9 +182,9 @@ test.describe('③층 조건 화면, 동의와 동의 철회', () => {
       'padding-top': '14px',
     });
 
-    // 병원 연결 화면(/link)의 동의 패널은 ③층 14번 전까지 카드 그대로다
+    // 병원 연결 화면(/link)의 동의 패널도 카드 테두리 없이 흰 바탕과 한 면이다(③층 14번)
     await page.goto('/link');
-    expect((await styles(page.locator('.conditions-consent'), ['border-top-width']))['border-top-width']).toBe('1px');
+    expect((await styles(page.locator('.conditions-consent'), ['border-top-width']))['border-top-width']).toBe('0px');
   });
 
   test('동의 철회: 회색 버튼 → 확인 대화상자(초점 가둠, Escape, 초점 복귀, 취소) → 철회하기(빨간 확인)', async ({ page }) => {
