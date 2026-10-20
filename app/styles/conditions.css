@@ -580,24 +580,27 @@
 }
 
 /* ───────────────────────── 병원 안내 ───────────────────────── */
+/* 확인 수 안내 (SEED Callout): 모서리 10 · 선 없음 · 안쪽 14/16 · 글자는 먹색.
+   상태는 면 색과 앞 아이콘 색으로 보인다(색만으로 구분하지 않는다: 문구와 아이콘이 함께 있다) */
 .conditions-guide-count {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-12);
-  border: 1px solid var(--state-together-line);
+  gap: var(--space-2);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
   background: var(--state-together-bg);
-  color: var(--state-together-ink);
+  color: var(--ink);
 }
 .conditions-guide-count.is-pending {
-  border-color: var(--state-standby-line);
   background: var(--state-standby-bg);
-  color: var(--state-standby-ink);
 }
 .conditions-guide-count .ui-icon {
   flex: none;
-  margin-top: 3px;
+  margin-top: 1px;
+  color: var(--state-together-ink);
+}
+.conditions-guide-count.is-pending .ui-icon {
+  color: var(--state-standby-ink);
 }
 .conditions-guide-count p {
   color: inherit;
@@ -610,13 +613,27 @@
   padding: 0;
   margin-top: var(--space-4);
 }
+/* 항목은 카드 없는 행: 위아래 20px, 항목 사이 1px 선. 병원 원문 상자(.ui-source)의 왼쪽 띠는 그대로 둔다 */
+.conditions-guide-item {
+  padding: var(--space-5) 0;
+}
+.conditions-guide-item + .conditions-guide-item {
+  border-top: 1px solid var(--line);
+}
 .conditions-guide-item .ui-source {
   margin-bottom: var(--space-2);
 }
 .conditions-guide-text {
   white-space: pre-line;
   color: var(--ink);
+  line-height: var(--lh-article);
   overflow-wrap: anywhere;
+}
+/* 병원이 여럿이면 두 번째 지침부터 구역선으로 나눈다 */
+.conditions-guide-plan + .conditions-guide-plan {
+  border-top: 1px solid var(--line-section);
+  padding-top: var(--space-6);
+  margin-top: var(--space-6);
 }
 .conditions-critical-tag {
   display: inline-flex;

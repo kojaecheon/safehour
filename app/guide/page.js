@@ -108,7 +108,8 @@ function PlanGuide({ linked, readOnly, nowMs }) {
       )}
       {failed && (
         <p className="conditions-field-error" role="alert">
-          {t('conditions.errSave')}
+          <Icon name="alert" size={20} />
+          <span>{t('conditions.errSave')}</span>
         </p>
       )}
 
@@ -118,7 +119,7 @@ function PlanGuide({ linked, readOnly, nowMs }) {
           const itemHeadingId = `${headingId}-${instruction.id}`;
           const doneId = `${headingId}-${instruction.id}-done`;
           return (
-            <li key={entry.key} className="card conditions-guide-item">
+            <li key={entry.key} className="conditions-guide-item">
               <div className="conditions-section-head">
                 <h3 id={itemHeadingId}>{t(CATEGORY_KEY[instruction.category] ?? 'guide.issuedBadge')}</h3>
                 {entry.critical && !entry.acknowledged && (

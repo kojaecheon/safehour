@@ -12,7 +12,7 @@
 import ClearSessionButton from '@/components/ClearSessionButton.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import PairText from '@/components/settings/PairText.js';
-import { TopBar } from '@/components/ui/index.js';
+import { Icon, TopBar } from '@/components/ui/index.js';
 import { LEGAL_SECTIONS } from '@/src/i18n/legal.js';
 import { pickText } from '@/src/i18n/index.js';
 
@@ -42,12 +42,15 @@ export default function PrivacyPage() {
       <TopBar title={t('privacy.header')} backHref="/more" />
 
       <main className="page privacy-page">
-        <div className="medical-callout privacy-intro" role="note">
+        <div className="medical-callout has-icon privacy-intro" role="note">
+          <span className="medical-callout-icon" aria-hidden="true">
+            <Icon name="info" size={20} />
+          </span>
           <PairText k={INTRO_KEY} />
         </div>
 
         {LEGAL_SECTIONS.map((section) => (
-          <section className="card privacy-section" key={section.id} id={`legal-${section.id}`} aria-labelledby={`legal-${section.id}-title`}>
+          <section className="privacy-section" key={section.id} id={`legal-${section.id}`} aria-labelledby={`legal-${section.id}-title`}>
             <h2 className="privacy-title" id={`legal-${section.id}-title`}>
               <span lang={safety.primary}>{pickText(section.title, safety.primary)}</span>
               <span className="privacy-title-secondary" lang={safety.secondary}>
@@ -66,14 +69,16 @@ export default function PrivacyPage() {
           </section>
         ))}
 
-        <section className="card privacy-section" aria-labelledby="legal-contact-title">
+        <section className="privacy-section" aria-labelledby="legal-contact-title">
           <h2 className="privacy-title" id="legal-contact-title">
             {t('privacy.contactTitle')}
           </h2>
           <PairText k={CONTACT_KEY} />
         </section>
 
-        <ClearSessionButton />
+        <div className="privacy-clear">
+          <ClearSessionButton />
+        </div>
       </main>
     </>
   );
