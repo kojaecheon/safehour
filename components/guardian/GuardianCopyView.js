@@ -130,7 +130,7 @@ export default function GuardianCopyView({ snapshot, headingRef, notice }) {
           {t('guardian.copyTitle')}
         </h2>
         {asOf && <p className="guardian-asof-time">{t('guardian.asOf', asOf)}</p>}
-        <SafetyNote messageKey={'guardian.notAutoUpdated'} role={null} />
+        <SafetyNote messageKey={'guardian.notAutoUpdated'} icon="info" role={null} />
         {expires && <p className="guardian-meta">{t('guardian.expiresAt', expires)}</p>}
         <p className="guardian-meta">{t('guardian.timesKst')}</p>
         {notice}

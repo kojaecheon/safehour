@@ -124,6 +124,48 @@ test.describe('③층 보호자 링크 만들기', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
   });
 
+  test('360px 日本語 보기 전용: 끝까지 내려도, Tab 으로 PIN 확인 칸에 가도 고정 바에 가리지 않는다', async ({ page, context }) => {
+    await startTrip(page, { hasCompanion: true }, { path: '/settings' });
+    await page.getByRole('radio', { name: '日本語' }).check();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+    await context.clearCookies();
+    await page.setViewportSize({ width: 360, height: 720 });
+    await page.goto('/guardian');
+    const bar = page.locator('.guardian-bar');
+    await expect(bar.locator('.guardian-bar-note')).toBeVisible();
+    // 보기 전용에서도 PIN 칸은 막혀 있지 않다(만들기 버튼만 막힌다)
+    const pin2 = page.locator('form.guardian-form input.guardian-pin').nth(1);
+    await expect(pin2).toBeEnabled();
+
+    // 끝까지 내리면 마지막 PIN 칸 아래에 바와 16px 이상 틈이 남는다
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await expect
+      .poll(async () => {
+        const field = await pin2.boundingBox();
+        return (await bar.boundingBox()).y - (field.y + field.height);
+      })
+      .toBeGreaterThanOrEqual(16);
+
+    // 칸 아래 끝이 바 위 끝보다 20px 아래(바에 반쯤 가린 자리)에 오게 맞추고 초점을 옮기면, scroll-padding 이 칸을 바 위로 끌어올린다.
+    // 맨 위에서 focus() 하면 브라우저가 칸을 화면 가운데로 옮겨 scroll-padding 을 확인하지 못한다
+    await page.evaluate(
+      ({ barTop }) => {
+        const field = document.querySelectorAll('form.guardian-form input.guardian-pin')[1];
+        window.scrollTo(0, window.scrollY + field.getBoundingClientRect().bottom - (barTop + 20));
+      },
+      { barTop: (await bar.boundingBox()).y },
+    );
+    const hidden = await pin2.boundingBox();
+    expect(hidden.y + hidden.height).toBeGreaterThan((await bar.boundingBox()).y);
+    await pin2.focus();
+    await expect
+      .poll(async () => {
+        const field = await pin2.boundingBox();
+        return (await bar.boundingBox()).y - (field.y + field.height);
+      })
+      .toBeGreaterThanOrEqual(0);
+  });
+
   test('보낸 뒤 일정이 바뀌면 다시 보내기 안내는 회색 Callout(코발트 면·띠 없음)', async ({ page }) => {
     await startTrip(page, { hasCompanion: true }, { path: '/guardian' });
     // 깨진 지문 = 무엇을 보냈는지 알 수 없음 → 다시 보내기 안내(components/guardian/share.js isGuardianResendNeeded)
@@ -196,6 +238,7 @@ test.describe('③층 보호자 링크 열기', () => {
     expect(await styles(asOf, ['background-color', 'border-top-width'])).toEqual({ 'background-color': 'rgba(0, 0, 0, 0)', 'border-top-width': '0px' });
     expect((await styles(page.locator('.guardian-asof-time'), ['color']))['color']).toBe('rgb(26, 28, 32)');
     expect((await styles(asOf.locator('.guardian-note'), ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    await expect(asOf.locator('.guardian-note-icon svg')).toHaveCount(1);
 
     const call119 = page.getByRole('link', { name: /119/ });
     const call1330 = page.getByRole('link', { name: /1330/ });

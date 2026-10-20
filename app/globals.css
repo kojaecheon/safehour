@@ -289,7 +289,7 @@ main.page {
      긴급은 내비 칸·긴급 바 안에 있어 떠 있지 않다 */
   padding: var(--space-5) var(--gutter) calc(var(--nav-offset) + var(--gap-screen-bottom));
 }
-/* 하단 고정 바(.sticky-return)가 있는 화면은 바 높이(77~99px)만큼 더 비운다 */
+/* 하단 고정 바(.sticky-return)가 있는 화면은 바 높이(77~99px)만큼 더 비운다. 보호자 화면은 바에 문장이 들어가면 guardian.css가 더 비운다 */
 .app-shell:has(.sticky-return) main.page {
   padding-bottom: calc(var(--nav-offset) + 152px);
 }
@@ -938,7 +938,7 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 .app-shell[data-emergency-bar='on'] .sticky-return {
   padding-bottom: var(--space-3);
 }
-/* 흐름 화면 하단 바(시작·체류 설정·조건 편집기, 보호자 열기는 ③층 13번에서 쓸 예정): 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리).
+/* 흐름 화면 하단 바(시작·체류 설정·조건 편집기, 보호자 만들기·열기(/guardian, /g)): 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리).
    '즉시 복귀' 안전 버튼은 is-flow 없이 늘 고정이다 */
 .sticky-return.is-flow {
   background: var(--bg);
