@@ -4,7 +4,7 @@
 //
 // 가져온 스냅샷(허용 목록 필드만)을 그린다. 로그인 만료·오프라인에서도 그린다(보기 전용 안전 정보).
 //   - 맨 위: '○월 ○일 ○시 기준'(만든 시각, 한국 시각) + 자동으로 바뀌지 않는다는 고지 + 만료 시각
-//   - 긴급 연락 119·1330 (스냅샷의 번호 그대로 전화 걸기 링크)
+//   - 긴급 연락 119·1330 (스냅샷의 번호 그대로 전화 걸기 링크). 회색 채움 버튼이고 119 아이콘만 긴급 빨강이다(하단 긴급 바가 이미 빨강 채움이라 그렇게 한다)
 //   - 날짜별: 동행 필요 안내, 환자 복귀 마감·장소(병원이면 '병원' 라벨만), 보호자 일정(타임라인)
 // 스냅샷에 없는 것(병원 이름·주소, 조건 세부, 마감 이유)은 그릴 수도 없다.
 
@@ -97,7 +97,7 @@ function GuardianDay({ day }) {
     ));
   }
   return (
-    <article className="card guardian-day" aria-labelledby={headingId}>
+    <article className="guardian-day" aria-labelledby={headingId}>
       <h3 id={headingId} className="guardian-day-title">
         {label}
       </h3>
@@ -141,7 +141,7 @@ export default function GuardianCopyView({ snapshot, headingRef, notice }) {
         <ul className="guardian-calls">
           {numbers.map((number) => (
             <li key={number}>
-              <a className="guardian-call" href={`tel:${number}`}>
+              <a className={`btn btn-secondary guardian-call${number === '119' ? ' is-119' : ''}`} href={`tel:${number}`}>
                 <Icon name="phone" size={20} />
                 <span>{t(CALL_KEY[number] ?? 'guardian.call119')}</span>
               </a>

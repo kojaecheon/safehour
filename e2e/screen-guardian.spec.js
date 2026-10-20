@@ -4,7 +4,7 @@
 // --emergency rgb(200, 16, 46), --state-standby-bg rgb(255, 244, 217), 흰 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { startTrip } from './helpers.js';
+import { selfItems, startTrip } from './helpers.js';
 
 const PIN = '246810';
 const CONSENT = '위 내용을 보호자에게 보내는 데 동의해요 (이번 링크에만 적용돼요)';
@@ -155,5 +155,72 @@ test.describe('③층 보호자 링크 만들기', () => {
     const primary = page.locator('main .btn:not(.btn-secondary):not(.btn-quiet):not(.btn-critical)');
     await expect(primary).toHaveCount(1);
     await expect(primary).toHaveText(/링크 복사/);
+  });
+});
+
+test.describe('③층 보호자 링크 열기', () => {
+  async function openOwnLink(page, stayOptions = { hasCompanion: true }) {
+    await startTrip(page, stayOptions, { path: '/guardian' });
+    const link = await createLink(page);
+    await page.goto(link);
+    await expect(page.getByRole('heading', { name: 'PIN 입력' })).toBeVisible();
+  }
+
+  test('PIN 입력: 카드 없음, 열기는 하단 고정 바에서 하단 긴급 바 바로 위에 선다', async ({ page }) => {
+    await openOwnLink(page);
+    await expect(page.locator('main .card')).toHaveCount(0);
+    const bar = page.locator('.guardian-bar.sticky-return.is-flow');
+    await expect(bar.getByRole('button', { name: '열기', exact: true })).toBeVisible();
+    expect(gapBetween(await bar.boundingBox(), await page.locator('.ui-emergency-bar').boundingBox())).toBe(0);
+    // 하단 긴급 바 69px + 고정 바 몫 152px
+    expect((await styles(page.locator('main.guardian-page'), ['padding-bottom']))['padding-bottom']).toBe('221px');
+  });
+
+  test('틀린 PIN 은 경고 아이콘 + 굵은 긴급 빨강 문장(띠 없음)', async ({ page }) => {
+    await openOwnLink(page);
+    await page.getByLabel('환자에게 받은 PIN (숫자 6자리)').fill('000000');
+    await page.getByRole('button', { name: '열기', exact: true }).click();
+    const error = page.getByRole('alert').filter({ hasText: 'PIN이 맞지 않아요' });
+    await expect(error.locator('svg')).toHaveCount(1);
+    await expect.poll(async () => styles(error, ['color', 'border-left-width'])).toEqual({ color: 'rgb(200, 16, 46)', 'border-left-width': '0px' });
+  });
+
+  test('사본: 기준 시각은 먹색, 자동 갱신 안내는 회색 Callout, 119·1330 은 회색 52px 버튼(119 아이콘만 긴급 빨강), 복귀 마감 시각은 먹색', async ({ page }) => {
+    await openOwnLink(page);
+    await page.getByLabel('환자에게 받은 PIN (숫자 6자리)').fill(PIN);
+    await page.getByRole('button', { name: '열기', exact: true }).click();
+    await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+    await expect(page.locator('main .card')).toHaveCount(0);
+
+    const asOf = page.locator('.guardian-asof');
+    expect(await styles(asOf, ['background-color', 'border-top-width'])).toEqual({ 'background-color': 'rgba(0, 0, 0, 0)', 'border-top-width': '0px' });
+    expect((await styles(page.locator('.guardian-asof-time'), ['color']))['color']).toBe('rgb(26, 28, 32)');
+    expect((await styles(asOf.locator('.guardian-note'), ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+
+    const call119 = page.getByRole('link', { name: /119/ });
+    const call1330 = page.getByRole('link', { name: /1330/ });
+    for (const call of [call119, call1330]) {
+      expect(Math.round((await call.boundingBox()).height)).toBe(52);
+      await expect.poll(async () => (await styles(call, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
+    }
+    expect((await styles(call119.locator('svg'), ['color']))['color']).toBe('rgb(200, 16, 46)');
+    expect((await styles(call1330.locator('svg'), ['color']))['color']).toBe('rgb(26, 28, 32)');
+
+    const returnTime = page.locator('.guardian-return-time').first();
+    await expect(returnTime).toBeVisible();
+    expect((await styles(returnTime, ['color']))['color']).toBe('rgb(26, 28, 32)');
+    expect((await styles(page.locator('.guardian-return').first(), ['border-top-left-radius']))['border-top-left-radius']).toBe('10px');
+  });
+
+  test('동행이 필요한 날: 동행 안내는 띠 없는 분홍 Callout, 두 언어가 함께 보인다', async ({ page }) => {
+    await openOwnLink(page, { hasCompanion: true, items: selfItems({ escortRequired: { kind: 'SET', value: true } }) });
+    await page.getByLabel('환자에게 받은 PIN (숫자 6자리)').fill(PIN);
+    await page.getByRole('button', { name: '열기', exact: true }).click();
+    const escort = page.locator('.guardian-escort').first();
+    await expect(escort).toBeVisible();
+    expect(await styles(escort, ['background-color', 'border-left-width', 'border-top-left-radius'])).toEqual({
+      'background-color': 'rgb(255, 233, 240)', 'border-left-width': '0px', 'border-top-left-radius': '10px',
+    });
+    await expect(escort.locator('p')).toHaveCount(2);
   });
 });

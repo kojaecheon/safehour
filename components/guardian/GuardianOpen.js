@@ -17,6 +17,7 @@ import { READ_ONLY_REASON, getStore } from '@/lib/store/index.js';
 import { GUARDIAN_ERROR, GuardianError, isValidPin, unlockSnapshot } from '@/src/guardian/index.js';
 import { parseInstantMs } from '@/src/stay/index.js';
 import { copyIdFor, guardianErrorView } from './errorView.js';
+import { ErrorText, WarningNote } from './Feedback.js';
 import GuardianCopyView, { kstStamp } from './GuardianCopyView.js';
 import {
   guardianLockout,
@@ -120,7 +121,7 @@ function PinForm({ fragment, onOpened }) {
   }
 
   return (
-    <section className="card guardian-pin-card" aria-labelledby="guardian-pin-entry-title">
+    <section className="guardian-section guardian-pin-card" aria-labelledby="guardian-pin-entry-title">
       <h2 id="guardian-pin-entry-title">{t('guardian.pinEntryTitle')}</h2>
       <form onSubmit={onSubmit} noValidate aria-busy={busy}>
         <div className="field">
@@ -141,12 +142,13 @@ function PinForm({ fragment, onOpened }) {
             aria-describedby={shown ? errorId : undefined}
           />
         </div>
-        <p id={errorId} className={shown ? 'guardian-error' : 'guardian-error is-empty'} role="alert">
-          {shown ? t(shown.key, shown.vars) : ''}
-        </p>
-        <Button type="submit" disabled={busy || locked}>
-          {busy ? t('guardian.unlocking') : t('guardian.unlockButton')}
-        </Button>
+        <ErrorText id={errorId}>{shown ? t(shown.key, shown.vars) : null}</ErrorText>
+        {/* 하단 고정 바(설계서 6.1): 열기는 하단 긴급 바 바로 위에 선다. 제출 버튼이라 form 안에 둔다 */}
+        <div className="guardian-bar sticky-return is-flow">
+          <Button type="submit" disabled={busy || locked}>
+            {busy ? t('guardian.unlocking') : t('guardian.unlockButton')}
+          </Button>
+        </div>
       </form>
     </section>
   );
@@ -166,14 +168,10 @@ function LoginNeeded({ fragment }) {
   }
 
   return (
-    <section className="card guardian-login" aria-labelledby="guardian-login-title">
+    <section className="guardian-section guardian-login" aria-labelledby="guardian-login-title">
       <h2 id="guardian-login-title">{t('guardian.loginNeededTitle')}</h2>
       <p>{t('guardian.loginNeededBody')}</p>
-      {holdFailed && (
-        <p className="guardian-warning" role="alert">
-          {t('guardian.holdFailed')}
-        </p>
-      )}
+      {holdFailed && <WarningNote role="alert">{t('guardian.holdFailed')}</WarningNote>}
       <Button href={LOGIN_HREF} onClick={onLogin}>
         {t('guardian.loginButton')}
       </Button>
@@ -259,19 +257,11 @@ export default function GuardianOpen() {
   let incomingPart = null;
   if (showIncoming) {
     if (incoming.invalid) {
-      incomingPart = (
-        <p className="guardian-error guardian-block" role="alert">
-          {t('guardian.errInvalidLink')}
-        </p>
-      );
+      incomingPart = <ErrorText>{t('guardian.errInvalidLink')}</ErrorText>;
     } else if (loggedIn) {
       incomingPart = <PinForm key={fragment} fragment={fragment} onOpened={onOpened} />;
     } else if (offline) {
-      incomingPart = (
-        <p className="guardian-warning guardian-block" role="status">
-          {t('guardian.offlineImport')}
-        </p>
-      );
+      incomingPart = <WarningNote role="status">{t('guardian.offlineImport')}</WarningNote>;
     } else if (!status.sessionChecked) {
       incomingPart = (
         <p className="guardian-meta" role="status">
@@ -298,17 +288,11 @@ export default function GuardianOpen() {
           <GuardianCopyView
             snapshot={current.snapshot}
             headingRef={copyHeadingRef}
-            notice={
-              unsaved ? (
-                <p className="guardian-warning" role="note">
-                  {t('guardian.errSaveFailed')}
-                </p>
-              ) : null
-            }
+            notice={unsaved ? <WarningNote>{t('guardian.errSaveFailed')}</WarningNote> : null}
           />
         )}
         {others.length > 0 && (
-          <section className="card guardian-others" aria-labelledby="guardian-others-title">
+          <section className="guardian-section guardian-others" aria-labelledby="guardian-others-title">
             <h2 id="guardian-others-title">{t('guardian.otherCopies')}</h2>
             <ul className="guardian-other-list">
               {others.map((copy) => {
