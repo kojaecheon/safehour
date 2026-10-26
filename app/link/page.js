@@ -97,6 +97,11 @@ export default function LinkPage() {
   useEffect(() => {
     if (done) doneHeadingRef.current?.focus();
   }, [done]);
+  // 고르기 오류 문장은 라디오 묶음 뒤 흐름 안에 생겨 하단 고정 바·내비 뒤에 깔리기 쉽다. 그려진 뒤 화면 안으로 옮긴다
+  // (전역 scroll-padding-bottom 이 두 바를 피해 준다)
+  useEffect(() => {
+    if (choiceError) document.getElementById('link-choose-error')?.scrollIntoView({ block: 'nearest' });
+  }, [choiceError]);
 
   const consented = hasSensitiveConsent(stay);
   const hospitals = stay?.hospitals ?? [];
@@ -183,6 +188,14 @@ export default function LinkPage() {
   }
 
   const doneState = done ? planState(done.plan, nowMs) : null;
+  // 연결 해제 대화상자가 어느 지침인지 밝힌다: 행 제목과 같은 문구 + 연결 코드(기존 문구 두 개를 이어 붙인다)
+  const disconnectingPlan = disconnecting ? linkedPlans.find((lp) => lp.code === disconnecting) : null;
+  const disconnectingLabel = disconnectingPlan
+    ? [
+        t('link.connected', { issuer: disconnectingPlan.plan?.issuer?.name ?? '' }),
+        t('link.codeValue', { code: disconnectingPlan.code }),
+      ].join(' · ')
+    : undefined;
 
   return (
     <>
@@ -255,12 +268,14 @@ export default function LinkPage() {
                       <div className="radio-group">
                         {hospitals.map((h) => (
                           <label key={h.id} className={choice === h.id ? 'radio-option selected' : 'radio-option'}>
+                            {/* eslint-disable-next-line jsx-a11y/role-supports-aria-props -- 온보딩 라디오 묶음과 같다: aria-invalid 로 오류를 보조기기에 알리고 globals 의 .radio-option:has(input[aria-invalid]) 칸 테두리가 이 값을 읽는다(axe 위반 없음) */}
                             <input
                               type="radio"
                               name="link-hospital"
                               value={h.id}
                               checked={choice === h.id}
                               disabled={readOnly}
+                              aria-invalid={choiceError ? 'true' : undefined}
                               onChange={() => {
                                 setChoice(h.id);
                                 setChoiceError(false);
@@ -273,12 +288,14 @@ export default function LinkPage() {
                           </label>
                         ))}
                         <label className={choice === NEW_HOSPITAL ? 'radio-option selected' : 'radio-option'}>
+                          {/* eslint-disable-next-line jsx-a11y/role-supports-aria-props -- 위 라디오와 같다 */}
                           <input
                             type="radio"
                             name="link-hospital"
                             value={NEW_HOSPITAL}
                             checked={choice === NEW_HOSPITAL}
                             disabled={readOnly}
+                            aria-invalid={choiceError ? 'true' : undefined}
                             onChange={() => {
                               setChoice(NEW_HOSPITAL);
                               setChoiceError(false);
@@ -403,6 +420,7 @@ export default function LinkPage() {
                     {disconnecting && (
                       <AlertDialog
                         title={t('link.disconnectQuestion')}
+                        description={disconnectingLabel}
                         cancelLabel={t('conditions.cancel')}
                         confirmLabel={t('link.disconnectConfirm')}
                         critical

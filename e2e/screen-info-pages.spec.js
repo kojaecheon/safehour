@@ -2,7 +2,7 @@
 // 색: --surface-alt rgb(243, 244, 245), --ink rgb(26, 28, 32), --emergency rgb(200, 16, 46),
 //     --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0)
 import { test, expect } from './fixtures.js';
-import { linkDemoPlan, startTrip } from './helpers.js';
+import { expectNoAxeViolations, linkDemoPlan, startTrip } from './helpers.js';
 
 async function styles(locator, props) {
   return locator.evaluate(
@@ -29,6 +29,9 @@ test.describe('③층 개인정보 고지', () => {
     const sections = main.locator('section.privacy-section');
     expect(gapBetween(await sections.nth(0).boundingBox(), await sections.nth(1).boundingBox())).toBe(32);
     expect((await styles(sections.nth(1), ['border-top-width']))['border-top-width']).toBe('0px');
+    // 내 정보 지우기 버튼은 본문과 같은 왼쪽 선에서 시작한다(공용 .clear-session 의 4px 여백을 쓰지 않는다)
+    const clear = main.locator('.privacy-clear .clear-session');
+    expect(await styles(clear, ['padding-left', 'padding-right'])).toEqual({ 'padding-left': '0px', 'padding-right': '0px' });
   });
 });
 
@@ -88,6 +91,8 @@ test.describe('③층 병원 연결', () => {
     const k = await confirm.boundingBox();
     expect(Math.abs(c.y - k.y)).toBeLessThanOrEqual(1);
     expect(k.width).toBeGreaterThan(c.width * 2);
+    // 데모 버튼을 마우스로 눌러 온 화면이라 프로그램 초점의 코발트 링은 그려지지 않는다(키보드 초점만 :focus-visible)
+    expect((await styles(page.locator('#link-choose-heading'), ['outline-style']))['outline-style']).toBe('none');
   });
 
   test('병원을 고르지 않고 연결하면 경고 아이콘 + 굵은 긴급 빨강 문장', async ({ page }) => {
@@ -96,6 +101,21 @@ test.describe('③층 병원 연결', () => {
     const error = page.getByRole('alert').filter({ hasText: '연결할 병원을 골라 주세요.' });
     await expect(error.locator('svg')).toHaveCount(1);
     expect(await styles(error, ['color', 'font-weight'])).toEqual({ color: 'rgb(200, 16, 46)', 'font-weight': '700' });
+    // 오류 문장이 고정 바·하단 내비 뒤에 깔리지 않는다: 화면 안에 있고 아래 끝이 바 위 끝 이하다
+    await expect(error).toBeInViewport();
+    await expect
+      .poll(async () => {
+        const e = await error.boundingBox();
+        const b = await page.locator('.link-bar').boundingBox();
+        return Math.round(b.y - (e.y + e.height));
+      })
+      .toBeGreaterThanOrEqual(0);
+    // 고르지 않은 라디오는 오류로 알리고(aria-invalid), 칸 테두리는 긴급 빨강이다
+    const radios = page.locator('input[name="link-hospital"]');
+    for (let i = 0; i < (await radios.count()); i += 1) {
+      await expect(radios.nth(i)).toHaveAttribute('aria-invalid', 'true');
+    }
+    await expectNoAxeViolations(page, '/link 병원 고르기 오류');
   });
 
   test('연결 뒤: 주 버튼은 조건 보기 하나, 연결된 지침은 카드 없는 행 + 병원 발행 출처 표시', async ({ page }) => {
@@ -107,6 +127,8 @@ test.describe('③층 병원 연결', () => {
     const row = page.locator('.conditions-period-list.is-rows > .conditions-period').first();
     expect(await styles(row, ['border-left-width', 'background-color'])).toEqual({ 'border-left-width': '0px', 'background-color': 'rgba(0, 0, 0, 0)' });
     await expect(row.locator('.ui-source-tag')).toHaveCount(1);
+    // 마우스로 진행해 온 화면이라 프로그램 초점을 받은 제목에 코발트 링이 없다(키보드 초점만 :focus-visible)
+    expect((await styles(page.locator('#link-done-heading'), ['outline-style']))['outline-style']).toBe('none');
   });
 
   test('연결 해제는 확인 대화상자: 확인 버튼 긴급 빨강, 취소하면 그대로, 확인하면 목록에서 사라진다', async ({ page }) => {
@@ -115,6 +137,9 @@ test.describe('③층 병원 연결', () => {
     await page.getByRole('button', { name: '연결 해제' }).click();
     const dialog = page.getByRole('alertdialog');
     await expect(dialog).toBeVisible();
+    // 어느 지침인지 묻는 말 아래에 밝힌다(행 제목과 같은 문구 + 연결 코드)
+    await expect(dialog).toContainText('DEMO-A');
+    await expect(dialog).toContainText('연결됨');
     const confirm = dialog.getByRole('button', { name: '해제하기' });
     await expect.poll(async () => (await styles(confirm, ['background-color']))['background-color']).toBe('rgb(200, 16, 46)');
     await dialog.getByRole('button', { name: '취소' }).click();
