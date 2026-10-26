@@ -911,6 +911,10 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
     color: HighlightText;
     border-color: CanvasText;
   }
+  /* 전역 초점 링(--accent 코발트)은 시스템 색이 아니라 forced-color-adjust: none 에서는 그대로 쓰인다. 시스템 색으로 바꾼다 */
+  .tabs button[aria-selected='true']:focus-visible {
+    outline-color: CanvasText;
+  }
 }
 
 /* ── 변화 델타 ── */

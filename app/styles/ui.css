@@ -194,6 +194,10 @@
     background: Highlight;
     color: HighlightText;
   }
+  /* 전역 초점 링(--accent 코발트)은 시스템 색이 아니라 forced-color-adjust: none 에서는 그대로 쓰인다. 시스템 색으로 바꾼다 */
+  .ui-bottom-nav a[aria-current='page']:focus-visible {
+    outline-color: CanvasText;
+  }
 }
 
 /* 시안 보드용 미리보기 — 고정하지 않고 제자리에 그린다 */
@@ -475,6 +479,11 @@
     background: Canvas;
     color: CanvasText;
     border-color: CanvasText;
+  }
+  /* 작성자 색이 그대로 쓰이는 요소라 초점 링도 시스템 색으로 적는다. 위의 보통 규칙(--ink)이 그대로 남으면
+     어두운 대비 테마(Canvas 가 검정)에서 링이 Highlight 면과 거의 같은 색이 되어 안 보인다(WCAG 2.4.7) */
+  .ui-date-chip.is-selected:focus-visible {
+    outline-color: CanvasText;
   }
 }
 

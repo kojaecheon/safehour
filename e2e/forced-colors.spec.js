@@ -4,24 +4,39 @@
 // 테두리 없이 면으로만 그린 부품(스위치 트랙, 고른 라디오 원, 고른 칩)은 통째로 사라지거나 고른 상태가 안 보인다.
 // Playwright 의 forcedColors 에뮬레이션을 켜고, 계산된 스타일로 '보이는 경계와 면'을 단언한다.
 //
-// 시스템 색의 실제 rgb 는 브라우저가 정한다. 아래 값은 강제 색상 에뮬레이션(Chromium)에서 읽은 값이다.
-// Playwright 를 올려 값이 달라지면 이 상수만 고친다. Highlight 는 에뮬레이션에서 알파 0.8 로 계산된다.
+// 시스템 색의 실제 rgb 는 브라우저와 운영체제가 정한다(Chromium 에뮬레이션에서 Highlight 는 알파 0.8 로도 나온다).
+// 그래서 rgb 를 상수로 박지 않고, 페이지 안에서 시스템 색 키워드를 탐침 요소로 풀어 읽은 값과 같은지 본다.
 
 import { test, expect } from './fixtures.js';
 import { accountKeyOf, kstDate, startTrip } from './helpers.js';
-
-// 강제 색상 에뮬레이션(Chromium) 값
-const CANVAS = 'rgb(255, 255, 255)';
-const CANVAS_TEXT = 'rgb(0, 0, 0)';
-const HIGHLIGHT = 'rgba(5, 0, 73, 0.8)';
-const HIGHLIGHT_TEXT = 'rgb(255, 255, 255)';
-const GRAY_TEXT = 'rgb(96, 0, 0)';
 
 async function styles(locator, props) {
   return locator.evaluate(
     (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
     props,
   );
+}
+
+/**
+ * 강제 색상이 켜져 있는지 확인하고, 시스템 색 키워드를 이 브라우저가 계산하는 값으로 풀어 돌려준다.
+ * 탐침 요소의 color 로 읽는다(시스템 색 키워드는 강제 색상에서도 작성자 값 그대로 계산된다).
+ */
+async function systemColors(page) {
+  expect(await page.evaluate(() => matchMedia('(forced-colors: active)').matches), '강제 색상이 켜져 있어야 한다').toBe(true);
+  const colors = await page.evaluate(() => {
+    const read = (keyword) => {
+      const probe = document.createElement('i');
+      probe.style.color = keyword;
+      document.body.append(probe);
+      const value = getComputedStyle(probe).color;
+      probe.remove();
+      return value;
+    };
+    return Object.fromEntries(['Canvas', 'CanvasText', 'Highlight', 'HighlightText', 'GrayText'].map((k) => [k, read(k)]));
+  });
+  // 키워드가 풀리지 않아 모두 같은 값이 되면 아래 단언이 아무것도 가르지 못한다
+  expect(new Set(Object.values(colors)).size, `시스템 색이 서로 달라야 한다: ${JSON.stringify(colors)}`).toBeGreaterThanOrEqual(4);
+  return colors;
 }
 
 const BORDER = ['border-top-width', 'border-top-style', 'border-top-color'];
@@ -42,10 +57,20 @@ const edgeWidthOf = (locator) =>
     return Math.max(border, outline);
   });
 
+// 키보드로 초점을 옮겨 온다(Tab 으로 나갔다가 Shift+Tab 으로 돌아와 :focus-visible 이 확실히 켜지게)
+async function focusByKeyboard(page, locator) {
+  await locator.focus();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  await expect(locator).toBeFocused();
+  expect(await locator.evaluate((el) => el.matches(':focus-visible')), '키보드 초점이면 :focus-visible 이다').toBe(true);
+}
+
 test.describe('강제 색상 모드', () => {
   test('스위치: 트랙에 테두리가 있고, 켠 막힘과 끈 막힘이 트랙 면과 알맹이 위치로 갈린다', async ({ page }) => {
     await page.emulateMedia({ forcedColors: 'active' });
     await startTrip(page, {}, { path: '/settings' });
+    const sys = await systemColors(page);
     const sw = page.getByRole('switch', { name: /복귀·복약·병원 일정 알림 받기/ });
     await expect(sw).toBeVisible();
 
@@ -53,9 +78,9 @@ test.describe('강제 색상 모드', () => {
     await expect.poll(() => styles(sw, BORDER)).toEqual({
       'border-top-width': '1px',
       'border-top-style': 'solid',
-      'border-top-color': CANVAS_TEXT,
+      'border-top-color': sys.CanvasText,
     });
-    await expect.poll(() => thumbOf(sw)).toEqual({ background: CANVAS_TEXT, transform: 'none' });
+    await expect.poll(() => thumbOf(sw)).toEqual({ background: sys.CanvasText, transform: 'none' });
 
     // 알림을 켠 채 보기 전용으로 만든다(쿠키를 지우면 서버 세션이 사라진다)
     const key = await accountKeyOf(page);
@@ -76,10 +101,10 @@ test.describe('강제 색상 모드', () => {
     await expect.poll(() => styles(sw, BORDER)).toEqual({
       'border-top-width': '1px',
       'border-top-style': 'solid',
-      'border-top-color': GRAY_TEXT,
+      'border-top-color': sys.GrayText,
     });
-    await expect.poll(async () => (await styles(sw, ['background-color']))['background-color']).toBe(GRAY_TEXT);
-    await expect.poll(() => thumbOf(sw)).toEqual({ background: CANVAS, transform: 'matrix(1, 0, 0, 1, 20, 0)' });
+    await expect.poll(async () => (await styles(sw, ['background-color']))['background-color']).toBe(sys.GrayText);
+    await expect.poll(() => thumbOf(sw)).toEqual({ background: sys.Canvas, transform: 'matrix(1, 0, 0, 1, 20, 0)' });
 
     // 끈 막힘: GrayText 테두리 + 빈 트랙 + 알맹이는 왼쪽
     await setNotifications(false);
@@ -89,41 +114,43 @@ test.describe('강제 색상 모드', () => {
     await expect.poll(() => styles(sw, BORDER)).toEqual({
       'border-top-width': '1px',
       'border-top-style': 'solid',
-      'border-top-color': GRAY_TEXT,
+      'border-top-color': sys.GrayText,
     });
-    await expect.poll(async () => (await styles(sw, ['background-color']))['background-color']).toBe(CANVAS);
-    await expect.poll(() => thumbOf(sw)).toEqual({ background: GRAY_TEXT, transform: 'none' });
+    await expect.poll(async () => (await styles(sw, ['background-color']))['background-color']).toBe(sys.Canvas);
+    await expect.poll(() => thumbOf(sw)).toEqual({ background: sys.GrayText, transform: 'none' });
   });
 
   test('설정 언어 행: 고른 라디오 원은 Highlight 채움과 테두리, 점은 HighlightText 다', async ({ page }) => {
     await page.emulateMedia({ forcedColors: 'active' });
     await startTrip(page, {}, { path: '/settings' });
+    const sys = await systemColors(page);
 
     const korean = page.getByRole('radio', { name: '한국어' });
     await expect(korean).toBeChecked();
     await expect.poll(() => styles(korean, [...BORDER, 'background-color'])).toEqual({
       'border-top-width': '1px',
       'border-top-style': 'solid',
-      'border-top-color': CANVAS_TEXT,
-      'background-color': HIGHLIGHT,
+      'border-top-color': sys.CanvasText,
+      'background-color': sys.Highlight,
     });
     await expect
       .poll(() => korean.evaluate((el) => getComputedStyle(el, '::before').backgroundColor))
-      .toBe(HIGHLIGHT_TEXT);
+      .toBe(sys.HighlightText);
 
     // 고르지 않은 원은 빈 원이다: 같은 테두리에 면은 Canvas
     const english = page.getByRole('radio', { name: 'English' });
     await expect.poll(() => styles(english, [...BORDER, 'background-color'])).toEqual({
       'border-top-width': '1px',
       'border-top-style': 'solid',
-      'border-top-color': CANVAS_TEXT,
-      'background-color': CANVAS,
+      'border-top-color': sys.CanvasText,
+      'background-color': sys.Canvas,
     });
   });
 
-  test('고른 상태 부품: 고른 날짜 칩·Segmented 고른 칸·내비 현재 칸이 테두리와 Highlight 면으로 갈린다', async ({ page }) => {
+  test('고른 상태 부품: 고른 날짜 칩·Segmented 고른 칸·내비 현재 칸이 테두리와 Highlight 면으로 갈리고, 키보드 초점 링은 CanvasText 다', async ({ page }) => {
     await page.emulateMedia({ forcedColors: 'active' });
     await startTrip(page, {}, { path: `/trip/${kstDate(1)}` });
+    const sys = await systemColors(page);
 
     const bgOf = async (locator) => (await styles(locator, ['background-color']))['background-color'];
     const parts = [
@@ -148,8 +175,17 @@ test.describe('강제 색상 모드', () => {
       // 보이는 경계: 테두리나 윤곽선이 1px 이상
       expect(await edgeWidthOf(selected), `${name}: 고른 칸의 경계 두께`).toBeGreaterThanOrEqual(1);
       // 면 색: 고른 칸만 Highlight, 고르지 않은 칸은 Highlight 가 아니다
-      await expect.poll(() => bgOf(selected), `${name}: 고른 칸의 면`).toBe(HIGHLIGHT);
-      expect(await bgOf(plain), `${name}: 고르지 않은 칸의 면`).not.toBe(HIGHLIGHT);
+      await expect.poll(() => bgOf(selected), `${name}: 고른 칸의 면`).toBe(sys.Highlight);
+      expect(await bgOf(plain), `${name}: 고르지 않은 칸의 면`).not.toBe(sys.Highlight);
+    }
+
+    // 고른 칸은 forced-color-adjust: none 이라 작성자 색이 그대로 쓰인다. 초점 링도 시스템 색이어야
+    // 어두운 대비 테마(Canvas 가 검정)에서 링이 면과 같은 색으로 묻히지 않는다(WCAG 2.4.7)
+    for (const { name, selected } of parts) {
+      await focusByKeyboard(page, selected);
+      await expect
+        .poll(() => styles(selected, ['outline-style', 'outline-color']), `${name}: 키보드 초점 링`)
+        .toEqual({ 'outline-style': 'solid', 'outline-color': sys.CanvasText });
     }
 
     // 오늘 칩은 고르지 않은 칩보다 테두리가 굵다(강제 색상에서는 투명 테두리도 보여서 '오늘'이 묻히지 않게)
