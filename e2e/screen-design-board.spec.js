@@ -27,6 +27,24 @@ test.describe('③층 시안 보드 화면 시안', () => {
       const phone = route.startsWith('/trip/') ? page.locator('figure.designBoard-screen').filter({ has: page.locator('code', { hasText: /^\/trip\/\d{4}-\d{2}-\d{2}$/ }) }) : phoneFor(page, route);
       await expect(phone.locator('.is-basement')).toHaveCount(1);
       expect(await phone.locator('.is-basement > .ui-block').count()).toBeGreaterThanOrEqual(2);
+      // 클래스 이름만으로는 CSS 가 빠져도 통과한다. 실제 면 색을 잰다: 회색 바탕(--layer-basement) 위 흰 블록(--layer-default)
+      const basement = await phone.locator('.is-basement').evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(basement).toBe('rgb(243, 244, 245)');
+      const block = await phone.locator('.is-basement > .ui-block').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(block).toBe('rgb(255, 255, 255)');
     });
   }
+
+  // 매일 확인은 규칙 32 의 관문이다. 오늘 시안은 확인을 마친 모습이라, 확인 전 모습은 부품 견본에서 본다
+  test('부품 견본에 매일 확인 카드(확인 전)가 하나 있고 두 답 버튼이 있다', async ({ page }) => {
+    await page.goto('/design-board');
+    const sample = page.locator('#designBoard-c-dailycheck');
+    await expect(sample.getByRole('heading', { name: '매일 확인 카드 (확인 전)', level: 3 })).toBeVisible();
+    await expect(sample.locator('.today-check')).toHaveCount(1);
+    await expect(sample.locator('.today-check-flag')).toContainText('확인 필요');
+    await expect(sample.getByRole('button', { name: '그대로예요' })).toHaveCount(1);
+    await expect(sample.getByRole('button', { name: '바뀌었어요' })).toHaveCount(1);
+    // 보드 전체에서도 하나다: 화면 시안(오늘)은 확인을 마친 모습이라 확인 카드를 그리지 않는다
+    await expect(page.locator('.today-check')).toHaveCount(1);
+  });
 });

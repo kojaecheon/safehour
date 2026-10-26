@@ -14,12 +14,11 @@
 // Next 밖(node)에서도 읽히도록 상대 경로만 쓴다.
 
 import { classifyStay } from '../../src/stay/coverage.js';
-import { overlayTodayGate } from '../../src/stay/todayGate.js';
 import { buildTodayCards } from '../../components/cards/cardModel.js';
 import { buildGuardianSnapshot } from '../../src/guardian/snapshot.js';
 import { translate } from '../../src/i18n/index.js';
 
-/** 시안의 '지금' — 2026-10-05 09:10 (KST). 오늘 매일 확인 전, 첫 외출 전이다 */
+/** 시안의 '지금': 2026-10-05 09:10 (KST). 첫 외출 전이다. 오늘·전체 일정·하루 일정 시안은 매일 확인을 마친 오늘로 그린다(확인 전 모습은 부품 견본의 매일 확인 카드) */
 export const DEMO_TODAY = '2026-10-05';
 export const DEMO_DETAIL_DATE = '2026-10-06';
 export const DEMO_NOW = `${DEMO_TODAY}T09:10:00+09:00`;
@@ -379,17 +378,12 @@ export function buildDemoTrip(lang) {
   };
 
   const tripPlan = { engineVersion: '2.0.0', generatedAt: '2026-10-04T21:00:00+09:00', lang, days, edits: {} };
-  // 오늘 표시값 — 매일 확인 전이라 STANDBY + DAILY_CHECK_PENDING 을 덧씌운다(저장 일정은 그대로, 규칙 32·49)
-  const todayShown = overlayTodayGate(days[DEMO_TODAY], { dailyCheckPending: true });
-  const shownDays = { ...days, [DEMO_TODAY]: todayShown };
 
   return {
     stay,
     byDate,
     tripPlan,
-    shownDays,
     todayStored: days[DEMO_TODAY],
-    todayShown,
     detail: days[DEMO_DETAIL_DATE],
     cards: buildTodayCards({ stay, dayPlan: days[DEMO_TODAY], date: DEMO_TODAY }),
     guardianSnapshot: buildGuardianSnapshot({ stay, tripPlan, now: DEMO_NOW, lang }),

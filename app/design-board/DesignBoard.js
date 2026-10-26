@@ -8,7 +8,7 @@
 // - '화면 시안' 절(AX-321)은 ./ScreenPreviews.js 가 주요 화면 8개를 실제 부품 + 고정 데모 데이터(./screenData.js)로 그린다.
 // - 내비에 노출하지 않는다(BottomNav 에 없음).
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import StateBanner from '@/components/StateBanner.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import {
@@ -40,6 +40,7 @@ import {
   STATE_ICON,
   TopBar,
 } from '@/components/ui/index.js';
+import DailyCheckCard from '@/components/trip/DailyCheckCard.js';
 import { LANGS, LANG_NAMES, translate } from '@/src/i18n/index.js';
 import {
   BROKEN_PHOTO,
@@ -53,6 +54,9 @@ import {
   TYPE_SCALE,
 } from './demoData.js';
 import ScreenPreviews from './ScreenPreviews.js';
+import { buildDemoTrip } from './screenData.js';
+
+const noop = () => {};
 
 // ── 대비 계산 (WCAG 2.1 상대 휘도) ──
 
@@ -200,6 +204,8 @@ function Swatch({ pair, values }) {
 export default function DesignBoard() {
   const { t, lang } = useLang();
   const values = useTokenValues();
+  // 매일 확인 카드 견본의 고정 데모 값. 저장소·서버를 읽지 않는다
+  const demoTrip = useMemo(() => buildDemoTrip(lang), [lang]);
   const [selectedDay, setSelectedDay] = useState('2026-10-02');
   const [uv, setUv] = useState(null);
   const [heat, setHeat] = useState('UNKNOWN');
@@ -435,6 +441,11 @@ export default function DesignBoard() {
               <div className="medical-callout" role="note">
                 {t('designBoard.calloutBody')}
               </div>
+            </Sub>
+
+            {/* 매일 확인은 규칙 32 의 관문이다. 화면 시안의 오늘은 확인을 마친 모습이라, 확인 전 모습은 여기서 본다 */}
+            <Sub id="designBoard-c-dailycheck" title={t('designBoard.cDailyCheck')}>
+              <DailyCheckCard day={demoTrip.todayStored} stay={demoTrip.stay} readOnly={false} onSame={noop} onChanged={noop} />
             </Sub>
 
             <Sub id="designBoard-c-datechip" title={t('designBoard.cDateChip')}>

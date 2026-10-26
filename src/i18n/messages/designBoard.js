@@ -112,6 +112,12 @@ export const messages = {
     ja: 'SafeHourは医療者の判断に代わるものではありません。体調に異変を感じたら、すぐに病院へ連絡してください。',
     zh: 'SafeHour 不能替代医护人员的判断。如感到身体不适，请立即联系医院。',
   },
+  'designBoard.cDailyCheck': {
+    ko: '매일 확인 카드 (확인 전)',
+    en: 'Daily check card (before the check)',
+    ja: '毎日の確認カード（確認前）',
+    zh: '每日确认卡片（确认前）',
+  },
   'designBoard.cDateChip': { ko: '날짜 칩', en: 'Date chips', ja: '日付チップ', zh: '日期标签' },
   'designBoard.cTimeline': { ko: '하루 타임라인 — 지하철 노선도', en: 'Day timeline — metro line map', ja: '1日のタイムライン — 地下鉄路線図', zh: '一日时间线 — 地铁线路图' },
   'designBoard.timelineNote': {

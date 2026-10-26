@@ -8,7 +8,7 @@
 //   - **실제 화면 부품**(components/ui · StateBanner · CourseCard · MapLinks · DayFacts ·
 //     ConsentPanel · PeriodCard · DayConditions · CoverageTag · GuardianCopyView · PairText)과 **실제 표시 모델**
 //     (components/trip/viewModel.js · components/cards/cardModel.js · app/emergency/contacts.js ·
-//     src/guardian buildGuardianSnapshot · src/stay overlayTodayGate)을 쓴다.
+//     src/guardian buildGuardianSnapshot)을 쓴다.
 //   - 화면 페이지 자체는 기기 저장소(useTrip·useStay)를 읽으므로 여기서 부르지 않는다. 페이지가 부품을 늘어놓는
 //     배치만 같은 클래스·같은 문구 키로 옮겨 적었다. 페이지 배치가 바뀌면 이 파일도 같이 고친다.
 //   - 저장소를 읽거나 서버를 부르는 부품은 마크업만 옮겨 적었다(같은 클래스·같은 문구 키):
@@ -17,6 +17,7 @@
 //   - 데이터는 ./screenData.js 의 고정 데모 값뿐이다. 저장소·세션·서버를 부르지 않는다(spec 7장).
 //     오늘·전체 일정·하루 일정은 매일 확인을 마친 오늘로 그린다. 확인 전이면 매일 확인 카드가 첫 화면을 다 차지해
 //     복귀 마감이 틀 아래로 잘린다(실제 화면도 확인 카드는 확인 전에만 맨 위에 선다).
+//     확인 전 모습(매일 확인 카드, 규칙 32의 관문)은 DesignBoard.js 부품 견본의 '매일 확인 카드 (확인 전)'가 보인다.
 //   - 시안 맨 바깥은 실제 화면의 main 과 같은 클래스를 단 div 다(main 랜드마크는 두지 않는다).
 //     회색 바탕 화면은 is-basement + .ui-block 이다(오늘 · 하루 일정 · 조건).
 //   - 시안은 그림이다: 화면 틀 전체를 `inert` 로 둬 누르거나 포커스할 수 없다(전화 걸기·길찾기 링크 포함).
