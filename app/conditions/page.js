@@ -23,6 +23,7 @@ import useStay, { useHydrated, useNowMs } from '@/components/conditions/useStay.
 import { makeSelfPeriodId } from '@/components/conditions/periodFormModel.js';
 import { safeClassifyStay } from '@/components/conditions/summary.js';
 import { STORE_ERROR, getStore } from '@/lib/store/index.js';
+import { useRefocusAfterDialog } from '@/lib/useRefocusAfterDialog.js';
 import { hasSensitiveConsent } from '@/src/stay/stay.js';
 
 const SAVE_ERROR_KEY = {
@@ -52,6 +53,9 @@ export default function ConditionsPage() {
   const editorHeadingRef = useRef(null);
   const periodsHeadingRef = useRef(null);
   const returnFocus = useRef(false);
+  // 기간 삭제를 확인하면 지운 행의 삭제 버튼이 DOM 에서 사라져 AlertDialog 가 돌려줄 초점이 body 로 떨어진다.
+  // 그때만 조건 기간 제목으로 옮긴다(마지막 기간을 지워도 이 제목은 목록 대신 빈 상태 안내와 함께 남는다)
+  const armRefocus = useRefocusAfterDialog(() => [periodsHeadingRef.current]);
 
   const classification = useMemo(() => (stay ? safeClassifyStay(stay) : { byDate: {}, error: false }), [stay]);
   const consented = hasSensitiveConsent(stay);
@@ -91,7 +95,7 @@ export default function ConditionsPage() {
   function remove(period) {
     const result = getStore().writePeriods(getStore().readPeriods().filter((p) => p.id !== period.id));
     setNotice(result.ok ? { key: 'conditions.deleted', error: false } : { key: SAVE_ERROR_KEY[result.code] ?? 'conditions.errSave', error: true });
-    periodsHeadingRef.current?.focus();
+    if (result.ok) armRefocus();
   }
 
   const hasLinkedPlans = (stay?.linkedPlans ?? []).length > 0;

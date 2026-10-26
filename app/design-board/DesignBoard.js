@@ -445,7 +445,14 @@ export default function DesignBoard() {
 
             {/* 매일 확인은 규칙 32 의 관문이다. 화면 시안의 오늘은 확인을 마친 모습이라, 확인 전 모습은 여기서 본다 */}
             <Sub id="designBoard-c-dailycheck" title={t('designBoard.cDailyCheck')}>
-              <DailyCheckCard day={demoTrip.todayStored} stay={demoTrip.stay} readOnly={false} onSame={noop} onChanged={noop} />
+              <DailyCheckCard
+                day={demoTrip.todayStored}
+                stay={demoTrip.stay}
+                readOnly={false}
+                onSame={noop}
+                onChanged={noop}
+                headingLevel={4}
+              />
             </Sub>
 
             <Sub id="designBoard-c-datechip" title={t('designBoard.cDateChip')}>

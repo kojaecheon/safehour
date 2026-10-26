@@ -59,7 +59,11 @@
 .today-check {
   color: var(--ink);
 }
-.today-check h2 {
+/* 제목 단계(h2·h3·h4)가 달라도 모양이 같다: 전역 h2 와 같은 크기·줄 높이·무게를 클래스가 직접 가진다(DailyCheckCard headingLevel) */
+.today-check-title {
+  font-size: var(--text-title-2);
+  line-height: var(--leading-snug);
+  font-weight: var(--weight-bold);
   color: var(--ink);
   margin-bottom: var(--space-2);
 }

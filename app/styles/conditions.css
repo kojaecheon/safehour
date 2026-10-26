@@ -24,8 +24,12 @@
 .conditions-section:not(.ui-block) {
   margin-bottom: var(--space-8);
 }
-.conditions-section > h2:focus-visible,
+/* 프로그램이 초점을 옮긴 제목(편집기 열기·닫기, 삭제 확인 뒤, 병원 연결 목록)은 마우스로 진행해도 받는다.
+   코발트 링은 키보드 초점에만 그린다(.conditions-done h2 · .guardian-result h2 와 같다) */
 .conditions-section h2[tabindex='-1']:focus {
+  outline: none;
+}
+.conditions-section h2[tabindex='-1']:focus-visible {
   outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }

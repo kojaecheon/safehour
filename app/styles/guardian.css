@@ -147,6 +147,11 @@
   border-top: 1px solid var(--line-section);
   padding-top: var(--space-6);
 }
+/* '새 링크 만들기'는 동의 제목으로 스크롤해 초점을 준다. 상단 바가 sticky(56px + 안전 영역)라 제목이 그 밑에 가리지 않게
+   그만큼과 12px 을 띄운다(카드 화면 .cards-section 방식) */
+.guardian-section > h2[tabindex='-1'] {
+  scroll-margin-top: calc(56px + env(safe-area-inset-top) + var(--space-3));
+}
 .guardian-list-title {
   margin-top: var(--space-4);
   margin-bottom: var(--space-2);

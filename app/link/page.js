@@ -30,6 +30,7 @@ import {
 } from '@/components/conditions/linkPlan.js';
 import { STORE_ERROR, getStore } from '@/lib/store/index.js';
 import { fmtDateTime } from '@/lib/format.js';
+import { useRefocusAfterDialog } from '@/lib/useRefocusAfterDialog.js';
 import { normalizeLinkCode } from '@/src/recovery/gateway.js';
 import { hasSensitiveConsent, validateStay } from '@/src/stay/stay.js';
 
@@ -81,6 +82,8 @@ export default function LinkPage() {
   const codeId = useId();
   const chooseHeadingRef = useRef(null);
   const doneHeadingRef = useRef(null);
+  const listHeadingRef = useRef(null);
+  const codeInputRef = useRef(null);
 
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
@@ -88,8 +91,13 @@ export default function LinkPage() {
   const [fetched, setFetched] = useState(null); // { code, plan, fetchedAt }
   const [choice, setChoice] = useState(null);
   const [choiceError, setChoiceError] = useState(false);
+  // 병원을 고르지 않고 누른 횟수: 오류가 이미 떠 있어도 다시 누를 때마다 오류 문장을 화면 안으로 옮기는 효과를 돌린다
+  const [choiceErrorPresses, setChoiceErrorPresses] = useState(0);
   const [done, setDone] = useState(null);
   const [disconnecting, setDisconnecting] = useState(null);
+  // 연결 해제를 확인하면 지운 행의 버튼은 DOM 에서 사라져 AlertDialog 가 돌려줄 초점이 body 로 떨어진다.
+  // 그때만 목록 제목(목록이 비었으면 코드 입력칸, 병원 고르기 중이면 그 제목)으로 옮긴다
+  const armRefocus = useRefocusAfterDialog(() => [listHeadingRef.current, codeInputRef.current, chooseHeadingRef.current]);
 
   useEffect(() => {
     if (fetched) chooseHeadingRef.current?.focus();
@@ -98,10 +106,11 @@ export default function LinkPage() {
     if (done) doneHeadingRef.current?.focus();
   }, [done]);
   // 고르기 오류 문장은 라디오 묶음 뒤 흐름 안에 생겨 하단 고정 바·내비 뒤에 깔리기 쉽다. 그려진 뒤 화면 안으로 옮긴다
-  // (전역 scroll-padding-bottom 이 두 바를 피해 준다)
+  // (전역 scroll-padding-bottom 이 두 바를 피해 준다). 오류 여부(true 그대로)가 아니라 누른 횟수에 묶어,
+  // 사용자가 스크롤해 벗어난 뒤 다시 눌러도 두 번째부터 다시 옮긴다
   useEffect(() => {
-    if (choiceError) document.getElementById('link-choose-error')?.scrollIntoView({ block: 'nearest' });
-  }, [choiceError]);
+    if (choiceErrorPresses > 0) document.getElementById('link-choose-error')?.scrollIntoView({ block: 'nearest' });
+  }, [choiceErrorPresses]);
 
   const consented = hasSensitiveConsent(stay);
   const hospitals = stay?.hospitals ?? [];
@@ -150,6 +159,7 @@ export default function LinkPage() {
     if (!fetched || !stay) return;
     if (!choice) {
       setChoiceError(true);
+      setChoiceErrorPresses((n) => n + 1);
       return;
     }
     const hospital = choice === NEW_HOSPITAL ? { kind: 'NEW' } : { kind: 'EXISTING', id: choice };
@@ -183,7 +193,8 @@ export default function LinkPage() {
 
   function disconnect(linkCode) {
     const result = getStore().removeLinkedPlan(linkCode);
-    if (!result.ok) setErrorKey(SAVE_ERROR_KEY[result.code] ?? 'link.errSave');
+    if (result.ok) armRefocus();
+    else setErrorKey(SAVE_ERROR_KEY[result.code] ?? 'link.errSave');
     setDisconnecting(null);
   }
 
@@ -338,6 +349,7 @@ export default function LinkPage() {
                           <label htmlFor={codeId}>{t('link.codeLabel')}</label>
                           <input
                             id={codeId}
+                            ref={codeInputRef}
                             type="text"
                             value={code}
                             autoCapitalize="characters"
@@ -378,7 +390,9 @@ export default function LinkPage() {
 
                 {linkedPlans.length > 0 && (
                   <section className="conditions-section" aria-labelledby="link-list-heading">
-                    <h2 id="link-list-heading">{t('link.listTitle')}</h2>
+                    <h2 id="link-list-heading" tabIndex={-1} ref={listHeadingRef}>
+                      {t('link.listTitle')}
+                    </h2>
                     <ul className="conditions-period-list is-rows">
                       {linkedPlans.map((lp) => {
                         const state = planState(lp.plan, nowMs);

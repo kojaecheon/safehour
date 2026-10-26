@@ -43,10 +43,12 @@ function Row({ row, hospitals }) {
  * @param {boolean} props.readOnly
  * @param {() => void} props.onSame
  * @param {() => void} props.onChanged
+ * @param {2|3|4} [props.headingLevel] 제목 단계. 오늘 화면은 맨 위 블록이라 2, 시안 보드 견본은 소제목(h3) 아래라 4
  */
-export default function DailyCheckCard({ day, stay, readOnly, onSame, onChanged }) {
+export default function DailyCheckCard({ day, stay, readOnly, onSame, onChanged, headingLevel = 2 }) {
   const { t } = useLang();
   const headingId = useId();
+  const Heading = `h${headingLevel}`;
   const summary = dailyCheckSummary(day?.effective);
   const hospitals = stay?.hospitals ?? [];
 
@@ -55,7 +57,9 @@ export default function DailyCheckCard({ day, stay, readOnly, onSame, onChanged 
       <p className="today-check-flag">
         <Icon name="clockQuestion" size={18} /> {t('today.checkFlag')}
       </p>
-      <h2 id={headingId}>{t('today.checkTitle')}</h2>
+      <Heading id={headingId} className="today-check-title">
+        {t('today.checkTitle')}
+      </Heading>
       <p className="today-check-lead">{t('today.checkLead')}</p>
       {summary.main.length > 0 && (
         <dl className="today-check-list">

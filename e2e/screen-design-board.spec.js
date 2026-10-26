@@ -40,6 +40,8 @@ test.describe('③층 시안 보드 화면 시안', () => {
     await page.goto('/design-board');
     const sample = page.locator('#designBoard-c-dailycheck');
     await expect(sample.getByRole('heading', { name: '매일 확인 카드 (확인 전)', level: 3 })).toBeVisible();
+    // 견본 제목(h3) 아래 카드 제목은 h4 다: h2 로 두면 h3 아래에서 제목 단계가 뒤집힌다
+    await expect(sample.getByRole('heading', { name: '오늘 조건이 그대로인가요?', level: 4 })).toBeVisible();
     await expect(sample.locator('.today-check')).toHaveCount(1);
     await expect(sample.locator('.today-check-flag')).toContainText('확인 필요');
     await expect(sample.getByRole('button', { name: '그대로예요' })).toHaveCount(1);

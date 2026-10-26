@@ -806,6 +806,18 @@
   padding-left: var(--space-3);
   padding-right: var(--space-3);
 }
+/* 바에 문장(보기 전용·저장 실패)이 들어가면 바가 77~99px 보다 커진다(ja 320px 보기 전용 문장은 바가 194px 안팎).
+   문장 네 줄 몫을 더 비워 마지막 입력칸과 초점이 간 칸이 바에 가리지 않게 한다(보호자 화면 .guardian-bar 와 같은 규칙).
+   짧은 화면은 바가 고정되지 않으므로 뺀다. 전역 .app-shell:has(.sticky-return) main.page(0,3,1)와
+   html:has(.sticky-return.is-flow)(0,2,1)보다 구체적이어야 해서 클래스·요소를 모두 적는다 */
+@media (min-height: 481px) {
+  .app-shell:has(.onboarding-actions > p) main.page {
+    padding-bottom: calc(var(--nav-offset) + 152px + 4 * var(--lh-body));
+  }
+  html:has(.onboarding-actions.sticky-return.is-flow > p) {
+    scroll-padding-bottom: calc(184px + 4 * var(--lh-body));
+  }
+}
 .onboarding-readonly {
   display: flex;
   align-items: center;
