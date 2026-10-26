@@ -60,19 +60,23 @@ test.describe('시나리오 11 — /design-board', () => {
     await page.goto('/design-board');
     await expect(page.getByRole('heading', { name: '화면 시안', level: 2 }).first()).toBeVisible();
 
-    // 조건 시안의 편집기 하단 바(.sticky-return)가 고정이면 틀의 transform 안에서 독을 덮고,
-    // 같은 보드의 긴급 견본이 '고정 복귀 버튼 위로 비켜서기' 규칙에 걸려 위로 밀린다
-    const positions = await page
-      .locator('.designBoard-phone .sticky-return')
-      .evaluateAll((els) => els.map((el) => getComputedStyle(el).position));
-    expect.soft(positions.filter((position) => position === 'fixed')).toEqual([]);
+    // 틀 안의 하단 바(하단 긴급 바 등)가 고정이면 틀의 transform 안에서 독 밖으로 나간다.
+    // 시안 안에는 고정 요소가 하나도 없어야 한다(.sticky-return 은 보드 페이지 여백 규칙까지 건드린다)
+    const fixed = await page.locator('.designBoard-phone').evaluateAll((frames) =>
+      frames.flatMap((frame) =>
+        [...frame.querySelectorAll('*')].filter((el) => getComputedStyle(el).position === 'fixed').map((el) => String(el.className)),
+      ),
+    );
+    expect.soft(fixed).toEqual([]);
 
+    // 내비가 없는 시안(/g)의 하단 긴급 바 안 긴급 버튼은 그 틀의 하단 독 안에 있어야 한다.
+    // 내비가 있는 시안은 내비 다섯째 칸이 긴급이라 따로 떠 있는 버튼이 없다
     const result = await page.locator('.designBoard-phone').evaluateAll((frames) => {
       const round = (rect) => ({ top: Math.round(rect.top), bottom: Math.round(rect.bottom) });
       const outside = [];
       let measured = 0;
       frames.forEach((frame, index) => {
-        const sos = frame.querySelector('.designBoard-phone-sos .ui-emergency');
+        const sos = frame.querySelector('.designBoard-phone-dock .ui-emergency');
         const dock = frame.querySelector('.designBoard-phone-dock');
         if (!sos || !dock) return;
         measured += 1;

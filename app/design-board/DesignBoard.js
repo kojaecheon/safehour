@@ -345,7 +345,7 @@ export default function DesignBoard() {
               <ul className="designBoard-spacing" role="list">
                 {SPACING.map((token) => (
                   <li key={token}>
-                    <span className="designBoard-bar" style={{ width: `var(${token})` }} />
+                    <span className="designBoard-spacing-bar" style={{ width: `var(${token})` }} />
                     <code>{token}</code> <code>{values?.[token] || '…'}</code>
                   </li>
                 ))}

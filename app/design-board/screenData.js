@@ -24,6 +24,8 @@ export const DEMO_TODAY = '2026-10-05';
 export const DEMO_DETAIL_DATE = '2026-10-06';
 export const DEMO_NOW = `${DEMO_TODAY}T09:10:00+09:00`;
 export const DEMO_NOW_MIN = 9 * 60 + 10;
+/** 같은 시각의 epoch ms. 화면 부품이 시각을 숫자로 받는 자리에 쓴다 */
+export const DEMO_NOW_MS = Date.parse(DEMO_NOW);
 
 const SET = (value) => ({ kind: 'SET', value });
 const NONE = Object.freeze({ kind: 'NONE' });

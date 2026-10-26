@@ -2,21 +2,32 @@
 
 // 시안 보드 '화면 시안' — 주요 화면 8개의 축소 시안 (AX-321 · spec 7장)
 //
-// 대상: 오늘 · 전체 일정 · 하루 일정 · 조건 입력 · 장소 상세 · 한국어 카드 · 긴급 연락 · 보호자 열기.
+// 대상: 오늘 · 전체 일정 · 하루 일정 · 조건 · 장소 상세 · 한국어 카드 · 긴급 연락 · 보호자 열기.
 //
 // 원칙
-//   - **실제 화면 부품**(components/ui · StateBanner · CourseCard · DailyCheckCard · MapLinks · DayFacts ·
-//     PeriodEditorForm · ConsentPanel · CoverageTag · GuardianCopyView · PairText)과 **실제 표시 모델**
+//   - **실제 화면 부품**(components/ui · StateBanner · CourseCard · MapLinks · DayFacts ·
+//     ConsentPanel · PeriodCard · DayConditions · CoverageTag · GuardianCopyView · PairText)과 **실제 표시 모델**
 //     (components/trip/viewModel.js · components/cards/cardModel.js · app/emergency/contacts.js ·
 //     src/guardian buildGuardianSnapshot · src/stay overlayTodayGate)을 쓴다.
 //   - 화면 페이지 자체는 기기 저장소(useTrip·useStay)를 읽으므로 여기서 부르지 않는다. 페이지가 부품을 늘어놓는
-//     배치만 같은 클래스·같은 문구 키로 옮겨 적었다 — 페이지 배치가 바뀌면 이 파일도 같이 고친다.
+//     배치만 같은 클래스·같은 문구 키로 옮겨 적었다. 페이지 배치가 바뀌면 이 파일도 같이 고친다.
+//   - 저장소를 읽거나 서버를 부르는 부품은 마크업만 옮겨 적었다(같은 클래스·같은 문구 키):
+//     오늘의 Deadline, 하루 일정의 StopActions·타임라인 변환·하루 소개(IntroArea 의 정해진 문장 가지),
+//     조건의 동의 철회(ConsentWithdraw). 원본이 바뀌면 같이 고친다.
 //   - 데이터는 ./screenData.js 의 고정 데모 값뿐이다. 저장소·세션·서버를 부르지 않는다(spec 7장).
+//     오늘·전체 일정·하루 일정은 매일 확인을 마친 오늘로 그린다. 확인 전이면 매일 확인 카드가 첫 화면을 다 차지해
+//     복귀 마감이 틀 아래로 잘린다(실제 화면도 확인 카드는 확인 전에만 맨 위에 선다).
+//   - 시안 맨 바깥은 실제 화면의 main 과 같은 클래스를 단 div 다(main 랜드마크는 두지 않는다).
+//     회색 바탕 화면은 is-basement + .ui-block 이다(오늘 · 하루 일정 · 조건).
 //   - 시안은 그림이다: 화면 틀 전체를 `inert` 로 둬 누르거나 포커스할 수 없다(전화 걸기·길찾기 링크 포함).
 //     무엇을 보여 주는지는 그림 아래 설명(figcaption)이 알린다.
+//   - 화면 틀은 지금 앱의 셸을 따른다(components/ui/AppShell.js). 하단 내비가 있으면 다섯째 칸이 긴급이라
+//     떠 있는 긴급 버튼을 두지 않고, 내비가 없는 화면(/g)은 하단 긴급 바를 둔다.
+//     시안 안에는 .sticky-return 을 두지 않는다(보드 페이지가 아래 여백·초점 스크롤 여백을 더 받게 된다).
 //   - 화면 틀은 360×760 으로 그리고 CSS transform 으로 줄인다. 틀 밖으로 넘치는 아래쪽은 잘린다.
 
-import { useMemo } from 'react';
+import { useId, useMemo } from 'react';
+import Link from 'next/link';
 import CourseCard from '@/components/CourseCard.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import {
@@ -28,6 +39,8 @@ import {
   EmergencyButton,
   Icon,
   KoreanCard,
+  ListGroup,
+  ListItem,
   MealSlot,
   SourceArea,
   StateBanner,
@@ -35,16 +48,19 @@ import {
 } from '@/components/ui/index.js';
 import ConsentPanel from '@/components/conditions/ConsentPanel.js';
 import CoverageTag from '@/components/conditions/CoverageTag.js';
-import PeriodEditorForm from '@/components/conditions/PeriodEditorForm.js';
+import DayConditions from '@/components/conditions/DayConditions.js';
+import PeriodCard from '@/components/conditions/PeriodCard.js';
+import SafetyText from '@/components/conditions/SafetyText.js';
 import GuardianCopyView from '@/components/guardian/GuardianCopyView.js';
 import PairText from '@/components/settings/PairText.js';
-import DailyCheckCard from '@/components/trip/DailyCheckCard.js';
 import { AppliedConditions, ExcludedList } from '@/components/trip/DayFacts.js';
 import MapLinks from '@/components/trip/MapLinks.js';
 import {
   DEADLINE_REASON_KEY,
   deltaSummary,
   formatDate,
+  guardianTabInfo,
+  introRequestFor,
   returnPlaceOf,
   stopBadges,
   timelineEntries,
@@ -52,23 +68,26 @@ import {
   tripDateRows,
 } from '@/components/trip/viewModel.js';
 import { EMERGENCY_LINES, hospitalContacts } from '@/app/emergency/contacts.js';
+import { fmtDateTime } from '@/lib/format.js';
 import { translate } from '@/src/i18n/index.js';
-import { DEMO_DETAIL_DATE, DEMO_NOW_MIN, DEMO_PERIODS, DEMO_TODAY, buildDemoTrip } from './screenData.js';
+import { templates as INTRO_TEMPLATES } from '@/src/i18n/messages/aiIntro.js';
+import { DEMO_DETAIL_DATE, DEMO_NOW_MIN, DEMO_NOW_MS, DEMO_PERIODS, DEMO_TODAY, buildDemoTrip } from './screenData.js';
 
-const noop = () => {};
-
-/** 화면 틀 하나 — 그림(inert) + 설명 */
-function Phone({ name, route, note, nav, emergencyCurrent = false, children }) {
+/** 화면 틀 하나. 그림(inert) + 설명. 틀 아래 독은 셸을 따른다: 내비가 있으면 내비만, 없으면 하단 긴급 바 */
+function Phone({ name, route, note, nav, children }) {
   return (
     <figure className="designBoard-screen">
       <div className="designBoard-phone">
         <div className="designBoard-phone-screen" inert>
           <div className="designBoard-phone-scroll">{children}</div>
           <div className="designBoard-phone-dock">
-            <div className="designBoard-phone-sos">
-              <EmergencyButton preview current={emergencyCurrent} />
-            </div>
-            {nav && <BottomNav pathname={nav} preview />}
+            {nav ? (
+              <BottomNav pathname={nav} preview />
+            ) : (
+              <div className="ui-emergency-bar">
+                <EmergencyButton preview docked />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -113,45 +132,61 @@ function Deadline({ outing, day, stay }) {
 
 function TodayScreen({ demo }) {
   const { t, locale } = useLang();
-  const day = demo.todayShown;
+  const focusId = useId();
+  const day = demo.todayStored;
   const focus = todayFocus(day, DEMO_NOW_MIN);
   return (
     <>
       <TopBar title={t('today.header')} />
-      <div className="page today-page designBoard-phone-page">
-        <DailyCheckCard day={demo.todayStored} stay={demo.stay} readOnly={false} onSame={noop} onChanged={noop} />
-        <p className="today-date">
-          <span>{formatDate(DEMO_TODAY, locale)}</span>
-        </p>
-        <StateBanner state={day.dayState} reasons={day.reasons ?? []} />
-        {focus?.outing && (
-          <section className="today-focus">
-            <h2>{focus.phase === 'OUT' ? t('today.nextOutTitle') : t('today.nextNextTitle')}</h2>
-            <p className="today-focus-depart">{t('today.departAt', { time: focus.outing.departAt })}</p>
-            <Deadline outing={focus.outing} day={day} stay={demo.stay} />
-            {focus.stop && (
-              <div className="today-next-stop">
-                <h3>{t('today.nextStop')}</h3>
-                <CourseCard stop={focus.stop} variant="compact" headingLevel={4} />
-                <MapLinks stop={focus.stop} disabled disabledKey="today.gatedMaps" showNote />
-              </div>
-            )}
-          </section>
-        )}
-        {focus?.nextAppointment && (
-          <p className="today-appointment">
-            <Icon name="hospital" size={18} />{' '}
-            {t('today.appointmentLine', { start: focus.nextAppointment.start, end: focus.nextAppointment.end })}
+      <div className="page today-page is-basement designBoard-phone-page">
+        <div className="ui-block today-status-block">
+          <p className="today-date">
+            <span>{formatDate(DEMO_TODAY, locale)}</span>
           </p>
-        )}
-        <div className="today-links">
-          <Button href={`/trip/${DEMO_TODAY}`} icon="navTrip">
-            {t('today.fullDay')}
-          </Button>
-          <Button href={`/trip/${DEMO_DETAIL_DATE}`} variant="secondary">
-            {t('today.tomorrow')}
-          </Button>
+          <StateBanner state={day.dayState} reasons={day.reasons ?? []} />
         </div>
+
+        {(focus?.outing || focus?.nextAppointment) && (
+          <div className="ui-block today-outing-block">
+            {focus.outing && (
+              <section className="today-focus" aria-labelledby={focusId}>
+                <h2 id={focusId}>{focus.phase === 'OUT' ? t('today.nextOutTitle') : t('today.nextNextTitle')}</h2>
+                <p className="today-focus-depart">{t('today.departAt', { time: focus.outing.departAt })}</p>
+                <Deadline outing={focus.outing} day={day} stay={demo.stay} />
+                {focus.stop && (
+                  <div className="today-next-stop">
+                    <h3>{t('today.nextStop')}</h3>
+                    <CourseCard stop={focus.stop} variant="compact" headingLevel={4} />
+                    <MapLinks stop={focus.stop} showNote />
+                  </div>
+                )}
+              </section>
+            )}
+            {focus.nextAppointment && (
+              <p className="today-appointment">
+                <Icon name="hospital" size={18} />{' '}
+                {t('today.appointmentLine', { start: focus.nextAppointment.start, end: focus.nextAppointment.end })}
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="ui-block today-links-block">
+          <ListGroup>
+            <li>
+              <ListItem title={t('today.fullDay')} leading={<Icon name="navTrip" size={22} />} trailing="chevron" href={`/trip/${DEMO_TODAY}`} />
+            </li>
+            <li>
+              <ListItem title={t('today.tomorrow')} leading={<Icon name="navTrip" size={22} />} trailing="chevron" href={`/trip/${DEMO_DETAIL_DATE}`} />
+            </li>
+          </ListGroup>
+        </div>
+
+        <p className="trip-footer">
+          <Link className="trip-inline-link" href="/privacy">
+            {t('today.privacyLink')}
+          </Link>
+        </p>
       </div>
     </>
   );
@@ -161,7 +196,8 @@ function TodayScreen({ demo }) {
 
 function TripScreen({ demo }) {
   const { t, locale, lang, safety, reasonText } = useLang();
-  const rows = tripDateRows({ stay: demo.stay, days: demo.shownDays, today: DEMO_TODAY });
+  const toolsId = useId();
+  const rows = tripDateRows({ stay: demo.stay, days: demo.tripPlan.days, today: DEMO_TODAY });
   const reasonLang = safety.primary === lang ? undefined : safety.primary;
   return (
     <>
@@ -172,7 +208,7 @@ function TripScreen({ demo }) {
         </p>
         <ol className="trip-days">
           {rows.map((row) => (
-            <li key={row.date} className={row.isPast ? 'trip-day-row is-past' : 'trip-day-row'}>
+            <li key={row.date} data-date={row.date} className={row.isPast ? 'trip-day-row is-past' : 'trip-day-row'}>
               <DateChip
                 date={row.date}
                 state={row.state ?? undefined}
@@ -182,14 +218,16 @@ function TripScreen({ demo }) {
               />
               <div className="trip-day-info">
                 <p className="trip-day-title">
-                  <span>{formatDate(row.date, locale)}</span>
+                  <span aria-hidden="true">{formatDate(row.date, locale)}</span>
                   {row.changed && <span className="trip-changed-tag">{t('trip.changed')}</span>}
                 </p>
                 <p className="trip-day-meta">
-                  {row.state && (
+                  {row.state ? (
                     <span className={`trip-state-text trip-state-${row.state}`} lang={reasonLang}>
                       {t(`state.${row.state}`)}
                     </span>
+                  ) : (
+                    <span>{t('trip.dayPending')}</span>
                   )}
                   {row.coverage && <CoverageTag coverage={row.coverage} />}
                 </p>
@@ -207,9 +245,21 @@ function TripScreen({ demo }) {
                   </ul>
                 )}
               </div>
+              <span className="trip-day-chevron" aria-hidden="true">
+                <Icon name="chevronRight" size={18} />
+              </span>
+              {/* 행 끝 덮개 링크: 실제 화면과 같다. 시안은 inert 라 눌리지 않는다 */}
+              <Link className="trip-day-link" href={`/trip/${row.date}`} tabIndex={-1} aria-hidden="true" />
             </li>
           ))}
         </ol>
+
+        <section className="trip-tools" aria-labelledby={toolsId}>
+          <h2 id={toolsId} className="visually-hidden">
+            {t('trip.toolsTitle')}
+          </h2>
+          <Button variant="secondary">{t('trip.regenerateAll')}</Button>
+        </section>
       </div>
     </>
   );
@@ -217,8 +267,8 @@ function TripScreen({ demo }) {
 
 // ── 3. 하루 일정 (components/trip/DayScreen.js) ──
 
-/** 타임라인 한 줄의 편집 버튼 — DayScreen 의 StopActions 와 같은 배치 */
-function StopActions({ stop }) {
+/** 타임라인 한 줄의 편집 버튼. DayScreen 의 StopActions 와 같은 배치 */
+function StopActions({ stop, slot }) {
   const { t } = useLang();
   return (
     <div className="trip-stop-actions">
@@ -226,18 +276,18 @@ function StopActions({ stop }) {
         {t('trip.actionSwap')}
       </button>
       <button type="button" className="btn btn-secondary btn-small">
-        {stop.isMeal ? t('trip.actionClearMeal') : t('trip.actionDelete')}
+        {stop.isMeal && slot ? t('trip.actionClearMeal') : t('trip.actionDelete')}
       </button>
     </div>
   );
 }
 
-/** timelineEntries(표시 모델) → DayTimeline 항목 — DayScreen 의 toTimeline 과 같은 규칙 */
+/** timelineEntries(표시 모델) → DayTimeline 항목. DayScreen 의 toTimeline 과 같은 규칙 */
 function useTimeline(day, stay, role) {
   const { t } = useLang();
   const card = (entry) => (
-    <CourseCard stop={entry.stop} headingLevel={4}>
-      <StopActions stop={entry.stop} />
+    <CourseCard stop={entry.stop} headingLevel={3}>
+      <StopActions stop={entry.stop} slot={entry.slot} />
     </CourseCard>
   );
   return timelineEntries(day, { role, stay })
@@ -282,76 +332,171 @@ function useTimeline(day, stay, role) {
     .filter(Boolean);
 }
 
+/** 하루 소개. components/trip/IntroArea.js 의 정해진 문장 가지(IntroArea 는 저장소를 읽고 서버에 요청하므로 부르지 않는다) */
+function IntroBlock({ day, stay }) {
+  const { t, lang } = useLang();
+  const labelId = useId();
+  const request = introRequestFor(day, stay, lang);
+  if (!request) return null;
+  const titles = request.stops.map((s) => s.title);
+  const name = titles.length === 1 ? 'one' : titles.length === 2 ? 'two' : 'many';
+  const vars = { place1: titles[0], place2: titles[1], count: String(titles.length) };
+  const text = INTRO_TEMPLATES[name][lang].replace(/\{(place1|place2|count)\}/g, (_, key) => vars[key]);
+  return (
+    <div className="ui-block trip-intro-block">
+      <section className="trip-intro" aria-labelledby={labelId}>
+        <p className="trip-intro-head" id={labelId}>
+          <Icon name="quote" size={18} />
+          <span>{t('trip.introTemplateLabel')}</span>
+        </p>
+        <p className="trip-intro-text">{text}</p>
+      </section>
+    </div>
+  );
+}
+
 function DayDetailScreen({ demo }) {
-  const { t, locale } = useLang();
+  const { t, locale, lang, safety } = useLang();
   const day = demo.detail;
   const stay = demo.stay;
   const delta = deltaSummary(day);
+  const guardian = guardianTabInfo(day, stay);
   const entries = useTimeline(day, stay, 'P');
-  const strip = Object.keys(demo.shownDays).sort();
+  const strip = Object.keys(demo.tripPlan.days).sort();
+  const safetyLang = safety.primary === lang ? undefined : safety.primary;
   return (
     <>
       <TopBar title={formatDate(DEMO_DETAIL_DATE, locale)} backHref="/trip" backLabel={t('trip.backToTrip')} />
-      <div className="page trip-page trip-day designBoard-phone-page">
-        <ul className="ui-date-strip" role="list">
-          {strip.map((d) => (
-            <li key={d}>
-              <DateChip
-                date={d}
-                state={demo.shownDays[d]?.dayState}
-                isToday={d === DEMO_TODAY}
-                selected={d === DEMO_DETAIL_DATE}
-                hasAppointment={(demo.shownDays[d]?.blocks ?? []).some((b) => b?.kind === 'APPOINTMENT')}
-                href={`/trip/${d}`}
-              />
-            </li>
-          ))}
-        </ul>
-        <StateBanner state={day.dayState} reasons={day.reasons ?? []} />
-        {delta?.unseen && (
-          <button type="button" className="trip-changed">
-            <span className="trip-changed-dot" aria-hidden="true" />
-            <span className="trip-changed-text">{t('trip.changedCta')}</span>
-            <Icon name="chevronRight" size={18} />
-          </button>
-        )}
-        <div className="tabs" role="tablist" aria-label={t('trip.tabsLabel')}>
-          <button type="button" role="tab" aria-selected="true">
-            {t('trip.tabPatient')}
-          </button>
-          <button type="button" role="tab" aria-selected="false">
-            {t('trip.tabGuardian')}
-          </button>
+      <div className="page trip-page trip-day is-basement designBoard-phone-page">
+        <div className="ui-block trip-strip">
+          <ul className="ui-date-strip" role="list">
+            {strip.map((d) => (
+              <li key={d}>
+                <DateChip
+                  date={d}
+                  state={demo.tripPlan.days[d]?.dayState}
+                  isToday={d === DEMO_TODAY}
+                  selected={d === DEMO_DETAIL_DATE}
+                  hasAppointment={(demo.tripPlan.days[d]?.blocks ?? []).some((b) => b?.kind === 'APPOINTMENT')}
+                  href={`/trip/${d}`}
+                />
+              </li>
+            ))}
+          </ul>
         </div>
-        <section className="trip-panel">
-          <h2 className="trip-panel-title">{t('trip.timelinePatient')}</h2>
-          <DayTimeline label={t('trip.timelinePatient')} person="patient" entries={entries} />
-        </section>
-        <section className="trip-tools">
-          <Button variant="secondary">{t('trip.regenerate')}</Button>
-        </section>
-        <AppliedConditions day={day} stay={stay} />
-        <ExcludedList day={day} />
+
+        <div className="ui-block trip-status-block">
+          <StateBanner state={day.dayState} reasons={day.reasons ?? []} />
+          {delta?.unseen && (
+            <button type="button" className="trip-changed">
+              <span className="trip-changed-dot" aria-hidden="true" />
+              <span className="trip-changed-text">{t('trip.changedCta')}</span>
+              <Icon name="chevronRight" size={18} />
+            </button>
+          )}
+        </div>
+
+        <div className="ui-block trip-timeline-block">
+          <div className="tabs" role="tablist" aria-label={t('trip.tabsLabel')}>
+            <button type="button" role="tab" aria-selected="true">
+              {t('trip.tabPatient')}
+            </button>
+            <button type="button" role="tab" aria-selected="false">
+              {t('trip.tabGuardian')}
+              {guardian.locked && (
+                <span className="trip-tab-lock">
+                  <Icon name="lock" size={16} />
+                  <span className="visually-hidden">{t('trip.lockedLabel')}</span>
+                </span>
+              )}
+            </button>
+          </div>
+          <section className="trip-panel">
+            <h2 className="trip-panel-title">{t('trip.timelinePatient')}</h2>
+            <DayTimeline label={t('trip.timelinePatient')} person="patient" entries={entries} />
+          </section>
+        </div>
+
+        <IntroBlock day={day} stay={stay} />
+
+        <div className="ui-block trip-tools-block">
+          <section className="trip-tools">
+            <h2 className="visually-hidden">{t('trip.toolsTitle')}</h2>
+            <Button variant="secondary">{t('trip.regenerate')}</Button>
+          </section>
+          <AppliedConditions day={day} stay={stay} />
+          <ExcludedList day={day} />
+          <p className="trip-footer" lang={safetyLang}>
+            {t('trip.footer')}
+          </p>
+        </div>
       </div>
     </>
   );
 }
 
-// ── 4. 조건 입력 (app/conditions/page.js 의 기간 편집 상태) ──
+// ── 4. 조건 (app/conditions/page.js 의 동의한 뒤, 기간 목록을 보는 상태) ──
+
+/** 동의 철회. components/conditions/ConsentWithdraw.js 의 마크업. 원본은 저장소를 읽으므로 부르지 않는다 */
+function ConsentWithdrawBlock({ consent }) {
+  const { t, locale } = useLang();
+  const sensitive = consent?.sensitive;
+  return (
+    <section className="ui-block conditions-withdraw">
+      <h2>{t('conditions.withdrawTitle')}</h2>
+      <p>{t('conditions.consentGranted', { at: fmtDateTime(sensitive?.agreedAt, locale), version: sensitive?.version })}</p>
+      <SafetyText k={'conditions.withdrawEffect'} className="conditions-callout" />
+      <div className="conditions-actions">
+        <Button variant="secondary">{t('conditions.withdrawAction')}</Button>
+      </div>
+    </section>
+  );
+}
 
 function ConditionsScreen({ demo }) {
   const { t } = useLang();
-  const period = demo.stay.periods.find((p) => p.id === DEMO_PERIODS[2].id);
+  const stay = demo.stay;
   return (
     <>
       <TopBar title={t('conditions.header')} />
-      <div className="page conditions-page designBoard-phone-page">
-        <p className="conditions-lead">{t('conditions.lead')}</p>
-        <ConsentPanel consent={demo.stay.consent} readOnly={false} />
-        <section className="conditions-section">
-          <h2>{t('conditions.editorEdit')}</h2>
-          <PeriodEditorForm stay={demo.stay} period={period} periodId={period.id} readOnly={false} onSave={noop} onCancel={noop} />
+      <div className="page conditions-page is-basement designBoard-phone-page">
+        <div className="ui-block">
+          <p className="conditions-lead">{t('conditions.lead')}</p>
+          <ConsentPanel consent={stay.consent} readOnly={false} />
+        </div>
+
+        <section className="ui-block conditions-section">
+          <h2>{t('conditions.periodsTitle')}</h2>
+          <p className="conditions-section-lead">{t('conditions.periodsLead')}</p>
+          <ul className="conditions-period-list is-rows">
+            {DEMO_PERIODS.map((period) => (
+              <PeriodCard key={period.id} period={period} stay={stay} byDate={demo.byDate} nowMs={DEMO_NOW_MS} readOnly={false} />
+            ))}
+          </ul>
+          <div className="conditions-actions">
+            <Button icon="plus">{t('conditions.addPeriod')}</Button>
+          </div>
         </section>
+
+        <div className="ui-block">
+          <ListGroup>
+            <li>
+              <ListItem title={t('conditions.linkHospital')} leading={<Icon name="hospital" size={22} />} trailing="chevron" href="/link" />
+            </li>
+          </ListGroup>
+        </div>
+
+        <DayConditions stay={stay} byDate={demo.byDate} error={false} nowMs={DEMO_NOW_MS} />
+
+        <ConsentWithdrawBlock consent={stay.consent} />
+
+        <div className="ui-block">
+          <ListGroup>
+            <li>
+              <ListItem title={t('conditions.editStay')} trailing="chevron" href="/onboarding" />
+            </li>
+          </ListGroup>
+        </div>
       </div>
     </>
   );
@@ -649,7 +794,6 @@ export default function ScreenPreviews() {
         route="/emergency"
         note={t('designBoard.screenEmergencyNote')}
         nav="/emergency"
-        emergencyCurrent
       >
         <EmergencyScreen demo={demo} />
       </Phone>
