@@ -401,8 +401,10 @@
   padding-bottom: var(--space-2);
 }
 /* 시안 속 하단 바(예: 보호자 열기의 '열기'): 흰 면 + 윗선 1px + 안쪽 12/16 을 흐름 안에 그린다.
-   .sticky-return 은 쓰지 않는다. 고정이 아니라 틀 안에 머문다 */
+   .sticky-return 은 쓰지 않는다. 고정이 아니라 틀 안에 머문다.
+   화면 여백(--gutter) 안에 놓이므로 좌우 음수 여백으로 틀 폭 끝까지 편다(실제 바는 화면 폭 전체다) */
 .designBoard-bar {
+  margin: 0 calc(var(--gutter) * -1);
   background: var(--bg);
   border-top: 1px solid var(--line-strong);
   padding: var(--space-3) var(--gutter);

@@ -48,3 +48,35 @@ test.describe('③층 시안 보드 화면 시안', () => {
     await expect(page.locator('.today-check')).toHaveCount(1);
   });
 });
+
+test.describe('③층 시안 보드 화면 시안 (장소·카드·긴급·보호자)', () => {
+  for (const route of ['/place/[candidateId]', '/cards']) {
+    test(`${route} 시안은 회색 바탕 위 흰 블록이다`, async ({ page }) => {
+      await page.goto('/design-board');
+      const phone = phoneFor(page, route);
+      await expect(phone.locator('.is-basement')).toHaveCount(1);
+      expect(await phone.locator('.is-basement > .ui-block').count()).toBeGreaterThanOrEqual(2);
+      // 클래스 이름만으로는 CSS 가 빠져도 통과한다. 실제 면 색을 잰다: 회색 바탕(--layer-basement) 위 흰 블록(--layer-default)
+      const basement = await phone.locator('.is-basement').evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(basement).toBe('rgb(243, 244, 245)');
+      const block = await phone.locator('.is-basement > .ui-block').first().evaluate((el) => getComputedStyle(el).backgroundColor);
+      expect(block).toBe('rgb(255, 255, 255)');
+    });
+  }
+
+  test('긴급 시안: 119 는 긴급 빨강 채움 버튼, 1330 은 회색 버튼, 지금 CSS 에 없는 옛 클래스가 없다', async ({ page }) => {
+    await page.goto('/design-board');
+    const phone = phoneFor(page, '/emergency');
+    await expect(phone.locator('.emergency-call.btn-critical')).toHaveCount(1);
+    await expect(phone.locator('.emergency-call.btn-secondary')).toHaveCount(1);
+    await expect(phone.locator('.is-urgent, .is-secondary, .emergency-call-icon, .emergency-call-text')).toHaveCount(0);
+  });
+
+  test('보호자 열기 시안: PIN 입력은 카드 없이, 열기는 시안 속 바 안, 하단 긴급 바', async ({ page }) => {
+    await page.goto('/design-board');
+    const phone = phoneFor(page, '/g');
+    await expect(phone.locator('.card')).toHaveCount(0);
+    await expect(phone.locator('.designBoard-bar .btn')).toHaveCount(1);
+    await expect(phone.locator('.ui-emergency-bar')).toHaveCount(1);
+  });
+});

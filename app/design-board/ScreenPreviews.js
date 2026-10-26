@@ -13,13 +13,16 @@
 //     배치만 같은 클래스·같은 문구 키로 옮겨 적었다. 페이지 배치가 바뀌면 이 파일도 같이 고친다.
 //   - 저장소를 읽거나 서버를 부르는 부품은 마크업만 옮겨 적었다(같은 클래스·같은 문구 키):
 //     오늘의 Deadline, 하루 일정의 StopActions·타임라인 변환·하루 소개(IntroArea 의 정해진 문장 가지),
-//     조건의 동의 철회(ConsentWithdraw). 원본이 바뀌면 같이 고친다.
+//     조건의 동의 철회(ConsentWithdraw), 카드의 Section(TodayCards), 긴급의 등록한 병원 행(HospitalList),
+//     보호자 열기의 PIN 입력 구역(PinForm). 원본이 바뀌면 같이 고친다.
 //   - 데이터는 ./screenData.js 의 고정 데모 값뿐이다. 저장소·세션·서버를 부르지 않는다(spec 7장).
 //     오늘·전체 일정·하루 일정은 매일 확인을 마친 오늘로 그린다. 확인 전이면 매일 확인 카드가 첫 화면을 다 차지해
 //     복귀 마감이 틀 아래로 잘린다(실제 화면도 확인 카드는 확인 전에만 맨 위에 선다).
+//     장소 상세(지도 버튼이 열린다)와 한국어 카드('확인 전' 안내가 없다)도 같은 장면이다.
 //     확인 전 모습(매일 확인 카드, 규칙 32의 관문)은 DesignBoard.js 부품 견본의 '매일 확인 카드 (확인 전)'가 보인다.
 //   - 시안 맨 바깥은 실제 화면의 main 과 같은 클래스를 단 div 다(main 랜드마크는 두지 않는다).
-//     회색 바탕 화면은 is-basement + .ui-block 이다(오늘 · 하루 일정 · 조건).
+//     회색 바탕 화면은 is-basement + .ui-block 이다(오늘 · 하루 일정 · 조건 · 장소 상세 · 한국어 카드).
+//     전체 일정 · 긴급 연락 · 보호자 열기는 흰 바탕 한 장이다.
 //   - 시안은 그림이다: 화면 틀 전체를 `inert` 로 둬 누르거나 포커스할 수 없다(전화 걸기·길찾기 링크 포함).
 //     무엇을 보여 주는지는 그림 아래 설명(figcaption)이 알린다.
 //   - 화면 틀은 지금 앱의 셸을 따른다(components/ui/AppShell.js). 하단 내비가 있으면 다섯째 칸이 긴급이라
@@ -503,12 +506,14 @@ function ConditionsScreen({ demo }) {
   );
 }
 
-// ── 5. 장소 상세 (app/place/[candidateId]/page.js — 관광공사 상세를 부르기 전의 일정 속 정보) ──
+// ── 5. 장소 상세 (app/place/[candidateId]/page.js, 매일 확인을 마친 오늘의 점심 장소, 관광공사 상세를 부르기 전의 일정 속 정보) ──
 
 const LEG_KEY = { WALK: 'common.legWalk', TAXI: 'common.legTaxi', TRANSIT: 'common.legTransit' };
 
 function PlaceScreen({ demo }) {
   const { t, lang, locale, safety } = useLang();
+  const mapsId = useId();
+  const orderId = useId();
   const stop = demo.todayStored.outings[0].stops.find((s) => s.isMeal);
   const flags = stopBadges(stop);
   const safetyLang = safety.primary === lang ? undefined : safety.primary;
@@ -516,58 +521,86 @@ function PlaceScreen({ demo }) {
   return (
     <>
       <TopBar title={t('place.header')} backHref={`/trip/${DEMO_TODAY}`} backLabel={t('place.back')} />
-      <div className="page place-page designBoard-phone-page">
-        <CourseCard stop={stop} link={false} variant="feature" headingLevel={2} showTime={false} />
-        <section className="place-block">
-          <h2>{t('place.mapsTitle')}</h2>
-          <MapLinks stop={stop} disabled disabledKey="today.gatedMaps" showNote />
+      <div className="page place-page is-basement designBoard-phone-page">
+        <div className="ui-block place-hero">
+          <CourseCard stop={stop} link={false} variant="feature" headingLevel={2} showTime={false} />
+        </div>
+
+        <section className="ui-block place-block place-maps" aria-labelledby={mapsId}>
+          <h2 id={mapsId}>{t('place.mapsTitle')}</h2>
+          <MapLinks stop={stop} showNote />
         </section>
-        <SourceArea source="estimate" title={t('place.planTitle')} note={t('place.estimateNote')}>
-          <dl className="place-facts">
-            <div>
-              <dt>{t('place.visit')}</dt>
-              <dd>
-                {formatDate(DEMO_TODAY, locale)} · {stop.arriveAt}–{stop.leaveAt} · {t('trip.tabPatient')}
-              </dd>
-            </div>
-            <div>
-              <dt>{t('place.stay')}</dt>
-              <dd>{t('trip.stayMin', { n: stop.stayMin })}</dd>
-            </div>
-            {leg && (
+
+        <div className="ui-block place-plan-block">
+          <SourceArea source="estimate" title={t('place.planTitle')} note={t('place.estimateNote')}>
+            <dl className="place-facts">
               <div>
-                <dt>{t('place.leg')}</dt>
+                <dt>{t('place.visit')}</dt>
                 <dd>
-                  {leg} <Badge kind="estimate" />
+                  {formatDate(DEMO_TODAY, locale)} · {stop.arriveAt}&ndash;{stop.leaveAt} · {t('trip.tabPatient')}
                 </dd>
               </div>
-            )}
-            <div>
-              <dt>{t('place.walk')}</dt>
-              <dd>
-                {t('place.walkValue', { n: stop.walkBurdenMin })} <Badge kind="estimate" />
-              </dd>
-            </div>
-            <div>
-              <dt>{t('place.indoor')}</dt>
-              <dd>{t(stop.indoor === true ? 'trip.indoor' : stop.indoor === false ? 'trip.outdoor' : 'trip.indoorUnknown')}</dd>
-            </div>
-          </dl>
-          {flags.dietEstimated && <p className="place-note">{t('place.dietNote')}</p>}
-        </SourceArea>
+              <div>
+                <dt>{t('place.stay')}</dt>
+                <dd>
+                  {t('trip.stayMin', { n: stop.stayMin })}
+                  {stop.shortened ? ` · ${t('trip.shortened')}` : ''}
+                </dd>
+              </div>
+              {leg && (
+                <div>
+                  <dt>{t('place.leg')}</dt>
+                  <dd>
+                    {leg} <Badge kind="estimate" />
+                  </dd>
+                </div>
+              )}
+              {Number.isFinite(stop.walkBurdenMin) && (
+                <div>
+                  <dt>{t('place.walk')}</dt>
+                  <dd>
+                    {t('place.walkValue', { n: stop.walkBurdenMin })} <Badge kind="estimate" />
+                  </dd>
+                </div>
+              )}
+              <div>
+                <dt>{t('place.indoor')}</dt>
+                <dd>{t(stop.indoor === true ? 'trip.indoor' : stop.indoor === false ? 'trip.outdoor' : 'trip.indoorUnknown')}</dd>
+              </div>
+              {stop.pinned && (
+                <div>
+                  <dt>{t('place.picked')}</dt>
+                  <dd>{t('trip.pinned')}</dd>
+                </div>
+              )}
+            </dl>
+            {flags.badges.includes('hoursUnconfirmed') && <p className="place-note">{t('place.hoursNote')}</p>}
+            {flags.dietEstimated && <p className="place-note">{t('place.dietNote')}</p>}
+          </SourceArea>
+        </div>
+
         {flags.orderCard && (
-          <section className="place-block">
-            <h2>{t('trip.orderCard')}</h2>
+          <section className="ui-block place-block" aria-labelledby={orderId}>
+            <h2 id={orderId}>{t('trip.orderCard')}</h2>
             <p>{t('place.orderCardBody')}</p>
             <Button href="/cards#cards-diet" variant="secondary">
               {t('place.orderCardCta')}
             </Button>
           </section>
         )}
-        <SourceArea source="tourism" title={t('place.koTitle')} lang="ko">
-          <p className="place-ko-name">{stop.ko.title}</p>
-          <p>{stop.ko.address}</p>
-        </SourceArea>
+
+        <div className="ui-block place-source-block">
+          <SourceArea source="tourism" title={t('place.koTitle')} lang="ko">
+            <p className="place-ko-name">{stop.ko.title}</p>
+            {stop.ko.address && <p>{stop.ko.address}</p>}
+            <p>
+              <Link className="trip-inline-link" href="/cards#cards-move" lang={lang}>
+                {t('place.moveCard')}
+              </Link>
+            </p>
+          </SourceArea>
+        </div>
+
         <p className="trip-footer" lang={safetyLang}>
           {t('place.footer')}
         </p>
@@ -576,7 +609,7 @@ function PlaceScreen({ demo }) {
   );
 }
 
-// ── 6. 한국어 카드 (components/cards/TodayCards.js) ──
+// ── 6. 한국어 카드 (components/cards/TodayCards.js, 매일 확인을 마친 오늘이라 '확인 전' 안내가 없다) ──
 
 const DIET_KEY = Object.freeze({
   spicy: 'cards.dietSpicy',
@@ -586,8 +619,21 @@ const DIET_KEY = Object.freeze({
   raw: 'cards.dietRaw',
 });
 
+/** TodayCards 의 Section. 흰 블록 하나가 카드 묶음 하나다(TodayCards 는 기기 저장소를 읽으므로 마크업만 옮겼다) */
+function CardsSection({ id, title, children }) {
+  return (
+    <section className="ui-block cards-section" aria-labelledby={id}>
+      <h2 className="cards-section-title" id={id}>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 function CardsScreen({ demo }) {
   const { t, lang, locale } = useLang();
+  const cardsId = useId();
   const cards = demo.cards;
   const dietKeys = cards.diet.items.map((item) => DIET_KEY[item]);
   const move = cards.moves[0];
@@ -601,20 +647,22 @@ function CardsScreen({ demo }) {
   return (
     <>
       <TopBar title={t('cards.header')} backHref="/more" />
-      <div className="page cards-page designBoard-phone-page">
-        <p className="cards-intro">{t('cards.intro')}</p>
-        <p className="cards-date">{t('cards.todayLabel', { date: formatDate(DEMO_TODAY, locale) })}</p>
-        <div className="cards-jump">
-          <ul role="list">
-            {sections.map(([id, label]) => (
-              <li key={id}>
-                <a href={`/cards#${id}`}>{label}</a>
-              </li>
-            ))}
-          </ul>
+      <div className="page cards-page is-basement designBoard-phone-page">
+        <div className="ui-block cards-top-block">
+          <p className="cards-intro">{t('cards.intro')}</p>
+          <p className="cards-date">{t('cards.todayLabel', { date: formatDate(DEMO_TODAY, locale) })}</p>
+          <div className="cards-jump">
+            <ul role="list">
+              {sections.map(([id, label]) => (
+                <li key={id}>
+                  <a href={`/cards#${id}`}>{label}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
-        <section className="cards-section">
-          <h2 className="cards-section-title">{t('cards.dietTitle')}</h2>
+
+        <CardsSection id={`${cardsId}-diet`} title={t('cards.dietTitle')}>
           <KoreanCard title={t('cards.dietTitle')} korean={dietKeys.map((key) => translate(key, 'ko'))}>
             {lang !== 'ko' && (
               <div className="cards-explain">
@@ -627,15 +675,9 @@ function CardsScreen({ demo }) {
               </div>
             )}
           </KoreanCard>
-        </section>
-        <section className="cards-section">
-          <h2 className="cards-section-title">{t('cards.moveTitle')}</h2>
-          <div className="cards-pending" role="note">
-            <Icon name="stateStandby" size={22} />
-            <div>
-              <PairText k="cards.dailyCheckPending" />
-            </div>
-          </div>
+        </CardsSection>
+
+        <CardsSection id={`${cardsId}-move`} title={t('cards.moveTitle')}>
           {move && (
             <KoreanCard
               title={t('cards.moveArrive', { time: move.arriveAt })}
@@ -643,24 +685,24 @@ function CardsScreen({ demo }) {
               explanation={lang === 'ko' ? undefined : t('cards.moveKo')}
             />
           )}
-        </section>
-        <section className="cards-section">
-          <h2 className="cards-section-title">{t('cards.returnTitle')}</h2>
+        </CardsSection>
+
+        <CardsSection id={`${cardsId}-return`} title={t('cards.returnTitle')}>
           <KoreanCard
             title={t('cards.returnTitle')}
             korean={[translate('cards.returnKo', 'ko'), cards.returnCard?.name, cards.returnCard?.address].filter(Boolean)}
             explanation={lang === 'ko' ? undefined : t('cards.returnKo')}
           />
-        </section>
+        </CardsSection>
+
         {hospital && (
-          <section className="cards-section">
-            <h2 className="cards-section-title">{t('cards.hospitalTitle')}</h2>
+          <CardsSection id={`${cardsId}-hospital`} title={t('cards.hospitalTitle')}>
             <KoreanCard
               title={`${t('cards.hospitalTitle')} · ${t('cards.hospitalToday')}`}
               korean={[translate('cards.hospitalKo', 'ko'), hospital.name, hospital.address].filter(Boolean)}
               explanation={lang === 'ko' ? undefined : t('cards.hospitalKo')}
             />
-          </section>
+          </CardsSection>
         )}
       </div>
     </>
@@ -673,26 +715,33 @@ const LINE_DESC = Object.freeze({ 119: 'emergency.desc119', 1330: 'emergency.des
 
 function EmergencyScreen({ demo }) {
   const { t } = useLang();
+  const base = useId();
   const contacts = hospitalContacts(demo.stay);
   return (
     <>
       <TopBar title={t('emergency.header')} />
       <div className="page emergency-page designBoard-phone-page">
         <div className="emergency-lead" role="note">
+          <span className="emergency-lead-icon" aria-hidden="true">
+            <Icon name="alert" size={20} />
+          </span>
           <PairText k="emergency.lead" />
         </div>
+
         <ul className="emergency-lines" role="list">
           {EMERGENCY_LINES.map((line) => (
             <li key={line.id} className="emergency-line">
-              <a className={line.id === '119' ? 'emergency-call is-urgent' : 'emergency-call'} href={line.href}>
-                <span className="emergency-call-icon">
-                  <Icon name="phone" size={22} strokeWidth={2.4} />
-                </span>
-                <span className="emergency-call-text">
-                  <strong>{t('emergency.callNumber', { number: line.number })}</strong>
-                  <span>{t(LINE_DESC[line.id])}</span>
-                </span>
+              <a
+                className={line.id === '119' ? 'btn btn-critical emergency-call' : 'btn btn-secondary emergency-call'}
+                href={line.href}
+                aria-describedby={`${base}-desc-${line.id}`}
+              >
+                <Icon name="phone" size={22} strokeWidth={2.4} />
+                <span>{t('emergency.callNumber', { number: line.number })}</span>
               </a>
+              <p className="emergency-line-desc" id={`${base}-desc-${line.id}`}>
+                {t(LINE_DESC[line.id])}
+              </p>
               {line.intl && (
                 <p className="emergency-intl">
                   <span>{t('emergency.intlLabel')}</span>
@@ -704,20 +753,18 @@ function EmergencyScreen({ demo }) {
             </li>
           ))}
         </ul>
-        <section className="emergency-section">
-          <h2>{t('emergency.hospitalsTitle')}</h2>
+
+        <section className="emergency-section" aria-labelledby={`${base}-hospitals`}>
+          <h2 id={`${base}-hospitals`}>{t('emergency.hospitalsTitle')}</h2>
+          {/* 등록한 병원 행. 원본(HospitalList)은 기기 저장소를 읽으므로 마크업만 옮겼다 */}
           <ul className="emergency-hospitals" role="list">
             {contacts.map((contact) => (
               <li key={contact.hospitalId} className="emergency-hospital">
                 <p className="emergency-hospital-name">{contact.name}</p>
                 {contact.href ? (
-                  <a className="emergency-call is-secondary" href={contact.href}>
-                    <span className="emergency-call-icon">
-                      <Icon name="phone" size={20} />
-                    </span>
-                    <span className="emergency-call-text">
-                      <strong>{t('emergency.callNumber', { number: contact.phone })}</strong>
-                    </span>
+                  <a className="btn btn-secondary btn-small emergency-hospital-call" href={contact.href}>
+                    <Icon name="phone" size={16} />
+                    <span>{t('emergency.callNumber', { number: contact.phone })}</span>
                   </a>
                 ) : (
                   <p className="emergency-no-phone">{t('emergency.hospitalNoPhone')}</p>
@@ -733,6 +780,35 @@ function EmergencyScreen({ demo }) {
 
 // ── 8. 보호자 열기 (components/guardian/GuardianOpen.js — 새 링크의 PIN 입력 + 이미 가져온 사본) ──
 
+/** PinForm 의 마크업. 원본은 잠금 확인·복호화·기기 저장소를 부르므로 같은 클래스·같은 문구 키만 옮겼다.
+    열기 버튼은 원본이 .sticky-return.is-flow 인 하단 바이고, 시안은 .designBoard-bar 로 틀 안 흐름에 그린다 */
+function GuardianPinSection() {
+  const { t } = useLang();
+  const titleId = useId();
+  const inputId = useId();
+  return (
+    <section className="guardian-section guardian-pin-card" aria-labelledby={titleId}>
+      <h2 id={titleId}>{t('guardian.pinEntryTitle')}</h2>
+      <div className="field">
+        <label htmlFor={inputId}>{t('guardian.pinEntryLabel')}</label>
+        <input
+          id={inputId}
+          type="text"
+          inputMode="numeric"
+          maxLength={6}
+          autoComplete="off"
+          className="guardian-pin"
+          value=""
+          readOnly
+        />
+      </div>
+      <div className="designBoard-bar">
+        <Button>{t('guardian.unlockButton')}</Button>
+      </div>
+    </section>
+  );
+}
+
 function GuardianScreen({ demo }) {
   const { t } = useLang();
   return (
@@ -740,23 +816,7 @@ function GuardianScreen({ demo }) {
       <TopBar title={t('guardian.openTitle')} />
       <div className="page guardian-page designBoard-phone-page">
         <p className="guardian-lead">{t('guardian.openLead')}</p>
-        <section className="card guardian-pin-card">
-          <h2>{t('guardian.pinEntryTitle')}</h2>
-          <div className="field">
-            <label htmlFor="designBoard-demo-pin">{t('guardian.pinEntryLabel')}</label>
-            <input
-              id="designBoard-demo-pin"
-              type="text"
-              inputMode="numeric"
-              maxLength={6}
-              autoComplete="off"
-              className="guardian-pin"
-              value=""
-              readOnly
-            />
-          </div>
-          <Button>{t('guardian.unlockButton')}</Button>
-        </section>
+        <GuardianPinSection />
         <GuardianCopyView snapshot={demo.guardianSnapshot} />
       </div>
     </>
