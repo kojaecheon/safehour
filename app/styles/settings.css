@@ -95,6 +95,22 @@
   border-radius: var(--radius-full);
   background: var(--on-dark);
 }
+/* 강제 색상(Windows 고대비): 면 색이 사라져 고른 원의 채움과 점이 안 보인다. 원은 CanvasText 테두리,
+   고른 원은 Highlight 채움 + HighlightText 점으로 그린다. 행 전체의 안쪽 윤곽선(전역 선택 칸 규칙)은 이 목록에 쓰지 않는다 */
+@media (forced-colors: active) {
+  .settings-radio-rows .radio-option input {
+    border-color: CanvasText;
+  }
+  .settings-radio-rows .radio-option input:checked {
+    background: Highlight;
+  }
+  .settings-radio-rows .radio-option input:checked::before {
+    background: HighlightText;
+  }
+  .settings-radio-rows .radio-option.selected:not(:has(input:focus-visible)) {
+    outline: none;
+  }
+}
 
 .settings-section > h2 {
   margin-bottom: var(--space-3);
