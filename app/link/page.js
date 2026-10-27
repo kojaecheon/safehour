@@ -65,8 +65,8 @@ function PlanSummary({ plan, nowMs }) {
           appointments: plan.appointments?.length ?? 0,
         })}
       </p>
-      {state === 'EXPIRED' && <SafetyText k={'link.expiredNote'} className="conditions-callout" />}
-      {state === 'REVOKED' && <SafetyText k={'link.revokedNote'} className="conditions-callout" />}
+      {state === 'EXPIRED' && <SafetyText k={'link.expiredNote'} className="ui-callout conditions-callout" />}
+      {state === 'REVOKED' && <SafetyText k={'link.revokedNote'} className="ui-callout conditions-callout" />}
     </div>
   );
 }
@@ -255,9 +255,9 @@ export default function LinkPage() {
                     <p>{t('link.donePeriods', { n: done.periods })}</p>
                     <p>{t('link.doneAdded', { n: done.added })}</p>
                     {done.skipped > 0 && <p>{t('link.doneSkipped', { n: done.skipped })}</p>}
-                    {doneState === 'EXPIRED' && <SafetyText k={'link.expiredNote'} className="conditions-callout" />}
-                    {doneState === 'REVOKED' && <SafetyText k={'link.revokedNote'} className="conditions-callout" />}
-                    {done.conflict && <SafetyText k={'link.conflictNote'} className="conditions-callout" />}
+                    {doneState === 'EXPIRED' && <SafetyText k={'link.expiredNote'} className="ui-callout conditions-callout" />}
+                    {doneState === 'REVOKED' && <SafetyText k={'link.revokedNote'} className="ui-callout conditions-callout" />}
+                    {done.conflict && <SafetyText k={'link.conflictNote'} className="ui-callout conditions-callout" />}
                     <div className="conditions-actions">
                       <Button href="/conditions">{t('link.goConditions')}</Button>
                       <Button variant="secondary" href="/guide">
@@ -327,7 +327,7 @@ export default function LinkPage() {
                         <span>{t('link.chooseRequired')}</span>
                       </p>
                     )}
-                    <div className="conditions-actions link-bar sticky-return is-flow">
+                    <div className="conditions-actions ui-bar-split link-bar sticky-return is-flow">
                       <Button variant="secondary" onClick={() => setFetched(null)}>
                         {t('link.cancel')}
                       </Button>

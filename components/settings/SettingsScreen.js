@@ -58,14 +58,17 @@ function LanguageSection({ inert }) {
         <div className="radio-group settings-radio-rows">
           {LANGS.map((code) => (
             <label key={code} className={lang === code ? 'radio-option selected' : 'radio-option'}>
-              <input
-                type="radio"
-                name="settings-lang"
-                value={code}
-                checked={lang === code}
-                onChange={() => setLang(code)}
-              />
-              <span lang={code}>{LANG_NAMES[code]}</span>
+              {/* 원과 이름을 한 묶음으로: 누르면 이 묶음만 조금 줄어든다(목록 행과 같은 눌림) */}
+              <span className="settings-radio-inner">
+                <input
+                  type="radio"
+                  name="settings-lang"
+                  value={code}
+                  checked={lang === code}
+                  onChange={() => setLang(code)}
+                />
+                <span lang={code}>{LANG_NAMES[code]}</span>
+              </span>
             </label>
           ))}
         </div>
@@ -136,8 +139,8 @@ function NotificationSection({ readOnly, showReadOnly, inert }) {
         {message && <p>{t(NOTIFY_MESSAGE[message])}</p>}
       </div>
       {showReadOnly && <p className="settings-text">{t('settings.readOnlyNote')}</p>}
-      <div className="settings-disclosure" role="note">
-        <span className="settings-disclosure-icon" aria-hidden="true">
+      <div className="ui-callout has-icon settings-disclosure" role="note">
+        <span className="ui-callout-icon settings-disclosure-icon" aria-hidden="true">
           <Icon name="info" size={20} />
         </span>
         <PairText k={DISCLOSURE_KEY} />

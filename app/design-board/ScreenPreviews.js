@@ -449,7 +449,7 @@ function ConsentWithdrawBlock({ consent }) {
     <section className="ui-block conditions-withdraw">
       <h2>{t('conditions.withdrawTitle')}</h2>
       <p>{t('conditions.consentGranted', { at: fmtDateTime(sensitive?.agreedAt, locale), version: sensitive?.version })}</p>
-      <SafetyText k={'conditions.withdrawEffect'} className="conditions-callout" />
+      <SafetyText k={'conditions.withdrawEffect'} className="ui-callout conditions-callout" />
       <div className="conditions-actions">
         <Button variant="secondary">{t('conditions.withdrawAction')}</Button>
       </div>
@@ -721,8 +721,8 @@ function EmergencyScreen({ demo }) {
     <>
       <TopBar title={t('emergency.header')} />
       <div className="page emergency-page designBoard-phone-page">
-        <div className="emergency-lead" role="note">
-          <span className="emergency-lead-icon" aria-hidden="true">
+        <div className="ui-callout has-icon emergency-lead" role="note">
+          <span className="ui-callout-icon emergency-lead-icon" aria-hidden="true">
             <Icon name="alert" size={20} />
           </span>
           <PairText k="emergency.lead" />

@@ -536,7 +536,7 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
       </PeriodEditor>
 
       {/* 하단 고정 바(설계서 6.1): 하단 내비 바로 위에 [취소 3][저장 7] */}
-      <div className="conditions-editor-actions sticky-return is-flow">
+      <div className="ui-bar-split conditions-editor-actions sticky-return is-flow">
         <Button variant="secondary" onClick={onCancel}>
           {t('conditions.cancel')}
         </Button>

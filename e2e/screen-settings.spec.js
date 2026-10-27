@@ -60,12 +60,13 @@ test.describe('③층 설정, 회색 바탕과 블록', () => {
       'border-top-color': 'rgb(134, 139, 148)',
       'border-top-width': '1px',
     });
-    // 호버하면 행 전체가 --pressed-transparent 로 눌림 면 색을 낸다(전역 .radio-option 규칙을 가리지 않는다)
+    // 호버하면 눌림 면(::before, 목록 행과 같은 모양)이 --pressed-transparent 를 낸다. 행 자체에는 면을 칠하지 않는다
     const englishRow = rows.filter({ has: english });
     await englishRow.hover();
     await expect
-      .poll(async () => (await styles(englishRow, ['background-color']))['background-color'])
+      .poll(() => englishRow.evaluate((el) => getComputedStyle(el, '::before').backgroundColor))
       .toBe('rgba(0, 0, 0, 0.027)');
+    expect((await styles(englishRow, ['background-color']))['background-color']).toBe('rgba(0, 0, 0, 0)');
   });
 
   test('알림: 스위치(52×32, role=switch)와 띠 없는 안내 Callout(아이콘 · 모서리 10 · 안쪽 14)', async ({ page }) => {

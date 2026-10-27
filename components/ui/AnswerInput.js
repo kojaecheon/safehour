@@ -15,10 +15,53 @@
 // 접근성: fieldset + legend + 표준 라디오(방향키로 이동). 라디오는 칸 전체를 덮는 투명 입력이라
 // 칸 어디를 눌러도 고를 수 있고, 칸마다 48px 이상이다. 선택은 테두리·바탕·체크 아이콘·굵기로 보인다.
 
-import { useId } from 'react';
+import { Fragment, useId } from 'react';
 import { useLang } from '../LanguageProvider.js';
 import Badge from './Badge.js';
 import Icon from './Icon.js';
+
+// 일본어·중국어는 글자마다 줄을 바꿀 수 있어, 좁은 칩(320px 편집기에서 79px)에서 '屋内の/み'·'仅限室/内'처럼
+// 한 글자가 홀로 다음 줄로 꺾인다. 이 두 언어는 낱말 경계(Intl.Segmenter)에만 줄바꿈 자리(<wbr>)를 두고,
+// 낱말 안에서는 바꾸지 않는다(ui.css .ui-answer-text 의 keep-all). 한국어·영어는 지금처럼 그린다.
+const SEGMENTED_LANGS = new Set(['ja', 'zh']);
+// 일본어 분절은 가나 한 글자를 따로 떼기도 한다('わ|から|ない'). 가나 한 글자는 앞 낱말에 붙이고,
+// 맨 앞이면 뒤 낱말에 붙인다('わから|ない', '決|まった|時刻|まで')
+const LONE_KANA = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]$/u;
+
+function wordsOf(text, lang) {
+  const words = [...new Intl.Segmenter(lang, { granularity: 'word' }).segment(text)].map((part) => part.segment);
+  if (lang !== 'ja') return words;
+  const joined = [];
+  for (const word of words) {
+    if (LONE_KANA.test(word) && joined.length > 0) joined[joined.length - 1] += word;
+    else joined.push(word);
+  }
+  if (joined.length > 1 && LONE_KANA.test(joined[0])) joined.splice(0, 2, joined[0] + joined[1]);
+  return joined;
+}
+
+/**
+ * 답 칩 글자 (AnswerInput · ChoiceInput 공용)
+ * @param {object} props
+ * @param {string} props.children
+ */
+export function AnswerText({ children }) {
+  const { lang } = useLang();
+  if (!SEGMENTED_LANGS.has(lang) || typeof children !== 'string' || typeof Intl.Segmenter !== 'function') {
+    return <span className="ui-answer-text">{children}</span>;
+  }
+  const words = wordsOf(children, lang);
+  return (
+    <span className="ui-answer-text">
+      {words.map((word, index) => (
+        <Fragment key={index}>
+          {index > 0 && <wbr />}
+          {word}
+        </Fragment>
+      ))}
+    </span>
+  );
+}
 
 const OPTIONS = [
   { value: 'YES', key: 'common.answerYes' },
@@ -79,7 +122,7 @@ export default function AnswerInput({
               <span className="ui-answer-mark">
                 <Icon name="check" size={16} strokeWidth={2.8} />
               </span>
-              <span>{t(option.key)}</span>
+              <AnswerText>{t(option.key)}</AnswerText>
             </label>
           );
         })}

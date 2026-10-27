@@ -89,7 +89,7 @@ export default function DayConditions({ stay, byDate, error, nowMs }) {
             )}
             {day.warnings?.includes('DEFAULTS_APPLIED') && <p className="conditions-hint">{t('conditions.warnDefaults')}</p>}
             {day.warnings?.includes('MEDICATION_TIMES_MISSING') && (
-              <SafetyText k={'conditions.warnMedicationMissing'} className="conditions-callout" />
+              <SafetyText k={'conditions.warnMedicationMissing'} className="ui-callout conditions-callout" />
             )}
           </div>
         </>

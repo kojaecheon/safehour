@@ -4,7 +4,8 @@
 //
 // 안전 문구는 safetyPair() 의 주 언어로 보인다 — ja·zh 는 검수 스위치가 켜지기 전까지 영어다.
 // 줄마다 lang 속성을 붙여 스크린리더가 맞는 음성으로 읽게 한다. both 면 병기 줄(한국어, ko 면 영어)을 함께 그린다.
-// 모양은 Callout(띠 없는 회색 면, 앞 20px 아이콘 칸)이다. 아이콘이 없는 안내는 CSS(:has)가 문장 칸 하나로 둔다.
+// 모양은 공용 Callout(.ui-callout, 띠 없는 회색 면)이다. 아이콘이 있으면 has-icon 으로 앞 20px 아이콘 칸을 두고,
+// 없으면 문장 칸 하나다.
 
 import { useLang } from '@/components/LanguageProvider.js';
 import Icon from '@/components/ui/Icon.js';
@@ -22,9 +23,9 @@ export default function SafetyNote({ messageKey, vars, both = false, icon, role 
   const { pair } = useLang();
   const text = pair(messageKey, vars);
   return (
-    <div className={`guardian-note ${className}`.trim()} role={role ?? undefined}>
+    <div className={`ui-callout${icon ? ' has-icon' : ''} guardian-note ${className}`.trim()} role={role ?? undefined}>
       {icon && (
-        <span className="guardian-note-icon" aria-hidden="true">
+        <span className="ui-callout-icon guardian-note-icon" aria-hidden="true">
           <Icon name={icon} size={20} />
         </span>
       )}

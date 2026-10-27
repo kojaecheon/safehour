@@ -66,7 +66,7 @@ export default function ConsentPanel({ consent, readOnly, lead }) {
       {lead && <p className="conditions-consent-lead">{lead}</p>}
       {refused ? (
         <>
-          <SafetyText k={'conditions.consentRefused'} className="conditions-callout" />
+          <SafetyText k={'conditions.consentRefused'} className="ui-callout conditions-callout" />
           <div className="conditions-actions">
             <Button variant="secondary" onClick={() => setRefused(false)}>
               {t('conditions.consentReopen')}

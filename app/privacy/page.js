@@ -42,8 +42,8 @@ export default function PrivacyPage() {
       <TopBar title={t('privacy.header')} backHref="/more" />
 
       <main className="page privacy-page">
-        <div className="medical-callout has-icon privacy-intro" role="note">
-          <span className="medical-callout-icon" aria-hidden="true">
+        <div className="ui-callout has-icon medical-callout privacy-intro" role="note">
+          <span className="ui-callout-icon medical-callout-icon" aria-hidden="true">
             <Icon name="info" size={20} />
           </span>
           <PairText k={INTRO_KEY} />

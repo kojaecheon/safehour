@@ -174,8 +174,8 @@ function LoginScreen() {
           </section>
         )}
 
-        <div className="medical-callout has-icon" role="note">
-          <span className="medical-callout-icon" aria-hidden="true">
+        <div className="ui-callout has-icon medical-callout" role="note">
+          <span className="ui-callout-icon medical-callout-icon" aria-hidden="true">
             <Icon name="info" size={20} />
           </span>
           <p>{t('login.notIdentityCheck')}</p>

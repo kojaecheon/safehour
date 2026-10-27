@@ -342,34 +342,10 @@ time,
   margin-bottom: var(--space-3);
 }
 
-/* ── 일반 안내 상자 (SEED Callout · neutral, D08-CMP002) — 왼쪽 띠 없이 옅은 면 · 모서리 10 · 16px(안전 문구) ── */
+/* ── 일반 안내 상자 (SEED Callout · neutral, D08-CMP002): 모양은 ui.css 의 공용 .ui-callout(+ .has-icon, .ui-callout-icon).
+   로그인·개인정보·시안 보드 견본이 쓰는 이 이름에는 아래 여백만 남는다 ── */
 .medical-callout {
-  background: var(--surface-alt);
-  border-radius: var(--radius-10);
-  padding: 14px var(--space-4);
-  font-size: var(--text-body);
-  line-height: var(--lh-body);
-  color: var(--ink);
   margin-bottom: var(--space-4);
-}
-
-/* 아이콘이 붙은 안내 상자 — 앞에 20px 아이콘 칸(상태 배너와 같은 짝), 원판 없이 먹색, 글자와 8px.
-   아이콘 칸 높이 = 첫 줄 높이(22px) — 아이콘이 첫 줄 가운데에 선다 */
-.medical-callout.has-icon {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  gap: var(--space-2);
-}
-.medical-callout-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: var(--lh-body);
-  color: var(--ink);
-}
-/* 전역 p(--ink-soft)가 상자의 먹색을 덮지 않게 — 안내 상자 문장은 안전 문구라 먹색 그대로(상태 배너와 같다) */
-.medical-callout.has-icon > p {
-  color: inherit;
 }
 
 /* ── 상태 배너 (SEED Callout, D08-CMP006) — 색 + 문구 + 아이콘 ──

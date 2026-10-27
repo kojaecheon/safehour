@@ -65,13 +65,15 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-2);
 }
-/* 좁은 폭(지도 구역 340px 이하)에서는 아이콘을 글자 위로 올려 글자 칸을 넓힌다. 네 언어 모두 두 줄 이내 */
+/* 좁은 폭(지도 구역 340px 이하)에서는 아이콘을 글자 위로 올려 글자 칸을 넓힌다. 네 언어 모두 두 줄 이내.
+   두 버튼의 글자 줄 수가 달라도 아이콘 높이가 같게 위에서부터 쌓는다(가운데 정렬이면 한 줄 버튼의 아이콘만 내려간다) */
 .place-maps .trip-maps {
   container-type: inline-size;
 }
 @container (max-width: 340px) {
   .place-maps .trip-map-row > .btn {
     flex-direction: column;
+    justify-content: flex-start;
     gap: var(--space-1);
   }
 }

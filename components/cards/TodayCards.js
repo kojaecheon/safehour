@@ -69,7 +69,7 @@ function Section({ id, title, children }) {
 
 function Note({ children, action }) {
   return (
-    <div className="cards-note">
+    <div className="ui-callout cards-note">
       <p>{children}</p>
       {action}
     </div>

@@ -31,8 +31,8 @@ export default function TripNotice({ as: Tag = 'div', error = false, slot = fals
   }
   const Body = Tag === 'p' ? 'span' : 'div';
   return (
-    <Tag role={role} className={error ? 'trip-notice is-error' : 'trip-notice'}>
-      <span className="trip-notice-icon" aria-hidden="true">
+    <Tag role={role} className={error ? 'ui-callout has-icon trip-notice is-error' : 'ui-callout has-icon trip-notice'}>
+      <span className="ui-callout-icon trip-notice-icon" aria-hidden="true">
         <Icon name={error ? 'alert' : 'info'} size={20} />
       </span>
       <Body className="trip-notice-body">{children}</Body>

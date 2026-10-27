@@ -55,8 +55,8 @@ export default function EmergencyPage() {
     <>
       <TopBar title={t('emergency.header')} />
       <main className="page emergency-page">
-        <div className="emergency-lead" role="note">
-          <span className="emergency-lead-icon" aria-hidden="true">
+        <div className="ui-callout has-icon emergency-lead" role="note">
+          <span className="ui-callout-icon emergency-lead-icon" aria-hidden="true">
             <Icon name="alert" size={20} />
           </span>
           <PairText k={LEAD_KEY} />

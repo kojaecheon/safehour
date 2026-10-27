@@ -67,7 +67,7 @@ export default function PeriodCard({ period, stay, byDate, nowMs, readOnly, onEd
               at: fmtDateTime(period.expiresAt, locale),
             })}
           </p>
-          {hospitalPeriodConflict(period) && <SafetyText k={'link.conflictNote'} className="conditions-callout" />}
+          {hospitalPeriodConflict(period) && <SafetyText k={'link.conflictNote'} className="ui-callout conditions-callout" />}
         </div>
       )}
 

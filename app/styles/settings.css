@@ -41,8 +41,9 @@
   gap: 0;
 }
 .settings-radio-rows .radio-option {
-  flex-direction: row-reverse;
-  justify-content: space-between;
+  position: relative;
+  /* 눌림 면(::before, z-index -1)이 행 안에서만 쌓이게 가둔다 */
+  isolation: isolate;
   align-items: center;
   min-height: var(--tap-min);
   padding: var(--space-3) 0;
@@ -53,14 +54,40 @@
 .settings-radio-rows .radio-option + .radio-option {
   border-top: 1px solid var(--line);
 }
-/* 위의 background: none 이 전역 .radio-option 의 눌림·호버 면을 가리므로 여기서 다시 낸다.
-   행에 옆 안쪽 여백이 없어 흰 면 위 --pressed 가 아니라 바탕 없는 요소의 --pressed-transparent 를 쓴다 */
-.settings-radio-rows .radio-option:active {
+/* 원·이름 묶음: 이름 왼쪽 · 원 오른쪽 */
+.settings-radio-inner {
+  display: flex;
+  flex: 1;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  transition: transform var(--duration-fast) var(--ease-press);
+}
+/* 눌림·호버: 목록 행(.ui-list-item, 설계서 5.5)과 같은 모양. 위의 background: none 이 전역 .radio-option 의 면을 가리고,
+   대신 바탕이 화면 끝에서 6px 안쪽(행 좌우 여백 0 + 화면 여백 16px 이므로 -10px) 모서리 10 면으로 깔린다.
+   바탕 없는 요소의 --pressed-transparent 를 쓴다. 눌렀을 때는 원·이름 묶음만 줄어든다 */
+.settings-radio-rows .radio-option::before {
+  content: '';
+  position: absolute;
+  inset: 0 calc(6px - var(--gutter));
+  border-radius: var(--radius-10);
+  background: transparent;
+  z-index: -1;
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.settings-radio-rows .radio-option:active::before {
   background: var(--pressed-transparent);
 }
 @media (hover: hover) and (pointer: fine) {
-  .settings-radio-rows .radio-option:hover {
+  .settings-radio-rows .radio-option:hover::before {
     background: var(--pressed-transparent);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .settings-radio-rows .radio-option:active .settings-radio-inner {
+    transform: scale(var(--press-scale-wide));
   }
 }
 /* 전역 .radio-option:has(input:focus-visible) 가 모서리를 12 로 만든다. 목록 행 눌림과 같은 10 으로 맞춘다.
@@ -139,24 +166,10 @@
   font-weight: var(--weight-bold);
   color: var(--ink);
 }
-/* 알림 안내 (SEED Callout, 설계서 5.6): 띠 없이 회색 면 · 모서리 10 · 안쪽 14/16, 앞 20px info 아이콘. 두 언어 병기 */
+/* 알림 안내 (SEED Callout, 설계서 5.6): 모양(띠 없는 회색 면 · 모서리 10 · 안쪽 14/16, 앞 20px info 아이콘)은
+   ui.css 의 공용 .ui-callout.has-icon. 여기에는 위 여백만 둔다. 두 언어 병기 */
 .settings-disclosure {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: var(--space-2);
-  align-items: start;
   margin-top: var(--space-4);
-  padding: 14px var(--space-4);
-  border-radius: var(--radius-10);
-  background: var(--surface-alt);
-  line-height: var(--lh-body);
-}
-.settings-disclosure-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: var(--lh-body);
-  color: var(--ink);
 }
 .settings-effects {
   display: grid;

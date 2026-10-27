@@ -7,6 +7,7 @@
 // 부품 모양은 고치지 않고 그대로 빌려 쓴다. '모르겠음' 칸은 없다 — 필수 항목에만 쓴다.
 
 import { useId } from 'react';
+import { AnswerText } from '@/components/ui/AnswerInput.js';
 import Icon from '@/components/ui/Icon.js';
 
 /**
@@ -47,7 +48,7 @@ export default function ChoiceInput({ legend, hint, value = null, options, onCha
               <span className="ui-answer-mark">
                 <Icon name="check" size={16} strokeWidth={2.8} />
               </span>
-              <span>{option.label}</span>
+              <AnswerText>{option.label}</AnswerText>
             </label>
           );
         })}

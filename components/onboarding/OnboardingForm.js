@@ -279,7 +279,7 @@ export default function OnboardingForm() {
 
           {/* 하단 고정 바(설계서 6.1) — 하단 긴급 바 바로 위에 선다. [이전 3][다음 7].
               저장 버튼을 못 누르는 이유(보기 전용·저장 실패)는 버튼 곁에 보이도록 바 안 맨 앞에 둔다 */}
-          <div className="onboarding-actions sticky-return is-flow">
+          <div className="ui-bar-split onboarding-actions sticky-return is-flow">
             {step === LAST_STEP && readOnlyVisible && (
               <p className="onboarding-readonly" id="ob-readonly">
                 <Badge kind="readOnly" />

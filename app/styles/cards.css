@@ -76,19 +76,14 @@
   margin-bottom: var(--space-3);
 }
 
-/* 안내 상자 (SEED Callout, 설계서 5.6): 회색 면 · 모서리 10 · 안쪽 14/16 */
+/* 안내 상자 (SEED Callout, 설계서 5.6): 모양(회색 면 · 모서리 10 · 안쪽 14/16, 16px 먹색)은 ui.css 의 공용 .ui-callout.
+   여기에는 문장·링크를 쌓는 배치와 아래 여백만 둔다. 줄 높이는 화면의 다른 글과 같은 1.5(24px)로 둔다 */
 .cards-note {
   display: grid;
   gap: var(--space-1);
   justify-items: start;
-  padding: 14px var(--space-4);
-  border-radius: var(--radius-10);
-  background: var(--surface-alt);
   margin-bottom: var(--space-3);
-}
-.cards-note p {
-  font-size: var(--text-body);
-  color: var(--ink);
+  line-height: var(--leading-body);
 }
 .cards-link {
   display: inline-flex;

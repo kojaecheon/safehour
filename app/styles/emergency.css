@@ -13,23 +13,12 @@
 
 /* ── /emergency (설계서 6.2 10번): 흰 바탕 한 장. 안내 Callout / 119 / 1330 / 해외 발신 / 등록한 병원 ── */
 
-/* 안내 (SEED Callout, 설계서 5.6): 회색 면 · 모서리 10 · 안쪽 14/16, 앞 20px 경고 아이콘(긴급 빨강). 두 언어 병기 */
+/* 안내 (SEED Callout, 설계서 5.6): 모양(회색 면 · 모서리 10 · 안쪽 14/16, 앞 20px 아이콘 칸)은 ui.css 의 공용 .ui-callout.has-icon.
+   여기에는 아래 여백과 아이콘 색(긴급 빨강)만 둔다. 두 언어 병기 */
 .emergency-lead {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  column-gap: var(--space-2);
-  align-items: start;
-  padding: 14px var(--space-4);
   margin-bottom: var(--space-5);
-  border-radius: var(--radius-10);
-  background: var(--surface-alt);
-  line-height: var(--lh-body);
 }
 .emergency-lead-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 20px;
-  height: var(--lh-body);
   color: var(--emergency);
 }
 .emergency-lead .settings-pair-primary {

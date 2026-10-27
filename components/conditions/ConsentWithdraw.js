@@ -48,7 +48,7 @@ export default function ConsentWithdraw({ headingLevel = 2 }) {
           <p>
             {t('conditions.consentGranted', { at: fmtDateTime(sensitive.agreedAt, locale), version: sensitive.version })}
           </p>
-          <SafetyText k={'conditions.withdrawEffect'} className="conditions-callout" />
+          <SafetyText k={'conditions.withdrawEffect'} className="ui-callout conditions-callout" />
           <div className="conditions-actions">
             <Button
               variant="secondary"

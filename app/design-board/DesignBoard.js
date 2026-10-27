@@ -438,7 +438,7 @@ export default function DesignBoard() {
             </Sub>
 
             <Sub id="designBoard-c-callout" title={t('designBoard.cCallout')}>
-              <div className="medical-callout" role="note">
+              <div className="ui-callout medical-callout" role="note">
                 {t('designBoard.calloutBody')}
               </div>
             </Sub>
