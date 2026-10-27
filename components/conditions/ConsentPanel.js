@@ -32,8 +32,10 @@ export function LegalReviewBadge() {
  * @param {{sensitive: {version: string, agreedAt: string} | null} | undefined} props.consent  stay.consent
  * @param {boolean} props.readOnly
  * @param {string} [props.lead]   동의 문구 앞에 붙는 안내(예: 연결 화면의 '먼저 동의가 필요해요')
+ * @param {React.Ref<HTMLHeadingElement>} [props.headingRef]  주면 제목이 초점을 받을 수 있다(tabIndex -1).
+ *   동의 철회 뒤 철회 블록이 사라지고 이 블록이 나타날 때, 화면이 초점을 이 제목으로 옮기는 데 쓴다
  */
-export default function ConsentPanel({ consent, readOnly, lead }) {
+export default function ConsentPanel({ consent, readOnly, lead, headingRef }) {
   const { t, locale } = useLang();
   const headingId = useId();
   const [refused, setRefused] = useState(false);
@@ -60,7 +62,9 @@ export default function ConsentPanel({ consent, readOnly, lead }) {
   return (
     <section className="card conditions-consent" aria-labelledby={headingId}>
       <div className="conditions-section-head">
-        <h2 id={headingId}>{t('conditions.consentTitle')}</h2>
+        <h2 id={headingId} ref={headingRef} tabIndex={headingRef ? -1 : undefined}>
+          {t('conditions.consentTitle')}
+        </h2>
         <LegalReviewBadge />
       </div>
       {lead && <p className="conditions-consent-lead">{lead}</p>}

@@ -7,16 +7,7 @@
 // --emergency rgb(200, 16, 46) · --support-soft rgb(255, 233, 240) · --line-strong rgb(220, 222, 227).
 
 import { test, expect } from './fixtures.js';
-import { kstDate, loginDemo } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { gapBetween, kstDate, loginDemo, styles } from './helpers.js';
 
 /** '다음'(마지막 단계는 '저장') — 하단 바의 제출 버튼 */
 const submit = (page) => page.locator('.onboarding-actions button[type="submit"]').click();

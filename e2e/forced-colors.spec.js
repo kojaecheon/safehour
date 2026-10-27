@@ -8,14 +8,7 @@
 // 그래서 rgb 를 상수로 박지 않고, 페이지 안에서 시스템 색 키워드를 탐침 요소로 풀어 읽은 값과 같은지 본다.
 
 import { test, expect } from './fixtures.js';
-import { accountKeyOf, kstDate, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
+import { accountKeyOf, kstDate, startTrip, styles } from './helpers.js';
 
 /**
  * 강제 색상이 켜져 있는지 확인하고, 시스템 색 키워드를 이 브라우저가 계산하는 값으로 풀어 돌려준다.

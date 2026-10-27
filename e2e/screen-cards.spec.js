@@ -6,16 +6,7 @@
 // --state-standby-bg rgb(255, 244, 217).
 
 import { test, expect } from './fixtures.js';
-import { loginDemo, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { gapBetween, loginDemo, startTrip, styles } from './helpers.js';
 
 test.describe('③층 한국어 카드, 회색 바탕과 블록', () => {
   test('회색 바탕 위 흰 블록: 첫 블록(칩 줄)이 상단 바 바로 아래, 카드 묶음 네 블록, 블록 사이 8px', async ({ page }) => {

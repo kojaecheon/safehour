@@ -66,7 +66,7 @@ test.describe('프로그램 초점 제목의 링', () => {
 });
 
 test.describe('확인 대화상자 뒤 초점', () => {
-  test('연결 해제 확인 뒤 초점은 body 가 아니다 (조건 화면 기간 삭제도 같다)', async ({ page }) => {
+  test('연결 해제 확인 뒤 초점은 body 가 아니다 (조건 화면 기간 삭제·동의 철회도 같다)', async ({ page }) => {
     await startTrip(page);
     await linkDemoPlan(page, 'A');
     await linkDemoPlan(page, 'B');
@@ -95,6 +95,15 @@ test.describe('확인 대화상자 뒤 초점', () => {
     await expect(page.getByRole('alertdialog')).toHaveCount(0);
     await expect(page.getByText('기간을 삭제했어요.')).toBeVisible();
     await expectFocusLandsOn(page, page.locator('#conditions-periods-heading'), '기간 삭제');
+
+    // 동의 철회: 철회 블록이 통째로 사라지고 동의 요청 블록이 나타난다. 초점은 그 제목으로
+    await page.getByRole('button', { name: '동의 철회' }).click();
+    await page.getByRole('alertdialog', { name: '민감정보 동의 철회' }).getByRole('button', { name: '철회하기' }).click();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    const consentHeading = page.getByRole('heading', { name: '민감정보 처리 동의' });
+    await expect(consentHeading).toBeVisible();
+    await expect(page.getByRole('button', { name: '동의 철회' })).toHaveCount(0);
+    await expectFocusLandsOn(page, consentHeading, '동의 철회');
   });
 });
 

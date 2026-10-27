@@ -24,19 +24,32 @@ import Icon from './Icon.js';
 // 한 글자가 홀로 다음 줄로 꺾인다. 이 두 언어는 낱말 경계(Intl.Segmenter)에만 줄바꿈 자리(<wbr>)를 두고,
 // 낱말 안에서는 바꾸지 않는다(ui.css .ui-answer-text 의 keep-all). 한국어·영어는 지금처럼 그린다.
 const SEGMENTED_LANGS = new Set(['ja', 'zh']);
-// 일본어 분절은 가나 한 글자를 따로 떼기도 한다('わ|から|ない'). 가나 한 글자는 앞 낱말에 붙이고,
-// 맨 앞이면 뒤 낱말에 붙인다('わから|ない', '決|まった|時刻|まで')
-const LONE_KANA = /^[\p{Script=Hiragana}\p{Script=Katakana}ー]$/u;
+// 분절기는 언어마다 한 번만 만든다(칩마다 새로 만들지 않는다)
+const segmenters = new Map();
+function segmenterFor(lang) {
+  let segmenter = segmenters.get(lang);
+  if (!segmenter) {
+    segmenter = new Intl.Segmenter(lang, { granularity: 'word' });
+    segmenters.set(lang, segmenter);
+  }
+  return segmenter;
+}
+// 분절은 한 글자를 따로 떼기도 한다. 일본어는 가나 한 글자('わ|から|ない'), 중국어는 한자 한 글자('不|确定').
+// 한 글자 낱말은 앞 낱말에 붙이고, 맨 앞이면 뒤 낱말에 붙인다('わから|ない', '決|まった|時刻|まで', '不确定')
+const LONE_CHAR = {
+  ja: /^[\p{Script=Hiragana}\p{Script=Katakana}ー]$/u,
+  zh: /^\p{Script=Han}$/u,
+};
 
 function wordsOf(text, lang) {
-  const words = [...new Intl.Segmenter(lang, { granularity: 'word' }).segment(text)].map((part) => part.segment);
-  if (lang !== 'ja') return words;
+  const isLone = LONE_CHAR[lang];
+  const words = [...segmenterFor(lang).segment(text)].map((part) => part.segment);
   const joined = [];
   for (const word of words) {
-    if (LONE_KANA.test(word) && joined.length > 0) joined[joined.length - 1] += word;
+    if (isLone.test(word) && joined.length > 0) joined[joined.length - 1] += word;
     else joined.push(word);
   }
-  if (joined.length > 1 && LONE_KANA.test(joined[0])) joined.splice(0, 2, joined[0] + joined[1]);
+  if (joined.length > 1 && isLone.test(joined[0])) joined.splice(0, 2, joined[0] + joined[1]);
   return joined;
 }
 

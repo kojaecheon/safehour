@@ -1,5 +1,6 @@
 // ③층 시안 보드(/design-board): 화면 시안이 지금 화면과 같은 배치인지 (설계서 6.2 15번)
 import { test, expect } from './fixtures.js';
+import { startTrip } from './helpers.js';
 
 function phoneFor(page, route) {
   return page.locator('figure.designBoard-screen').filter({ has: page.locator('code', { hasText: new RegExp(`^${route.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`) }) });
@@ -34,6 +35,23 @@ test.describe('③층 시안 보드 화면 시안', () => {
       expect(block).toBe('rgb(255, 255, 255)');
     });
   }
+
+  test('보드를 여는 동안 /api/ 요청이 0건이다', async ({ page }) => {
+    // 사용자 데이터가 있는 상태에서 열어도 시안 보드는 서버를 부르지 않는다(고정 데모 값만 쓴다)
+    await startTrip(page);
+    const apiCalls = [];
+    page.on('request', (request) => {
+      const { pathname } = new URL(request.url());
+      if (pathname.startsWith('/api/')) apiCalls.push(`${request.method()} ${pathname}`);
+    });
+    await page.goto('/design-board');
+    await expect(page.getByRole('heading', { name: '디자인 시안 보드', level: 1 })).toBeVisible();
+    // 대비 판정이 끝나야 브라우저 쪽 효과가 다 돌았다는 뜻이다
+    await expect(page.locator('[data-verdict]').first()).toBeVisible();
+    await expect(page.locator('[data-verdict="measuring"]')).toHaveCount(0);
+    await page.waitForLoadState('networkidle');
+    expect(apiCalls).toEqual([]);
+  });
 
   // 매일 확인은 규칙 32 의 관문이다. 오늘 시안은 확인을 마친 모습이라, 확인 전 모습은 부품 견본에서 본다
   test('부품 견본에 매일 확인 카드(확인 전)가 하나 있고 두 답 버튼이 있다', async ({ page }) => {

@@ -8,14 +8,7 @@
 // - 눌림 색은 150ms 전환이 있어 expect.poll 로 기다린다. 재기 전에 포인터를 치워 호버 색이 섞이지 않게 한다.
 
 import { test, expect } from './fixtures.js';
-
-/** 요소의 계산된 스타일 몇 가지를 { 속성: 값 } 으로 */
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
+import { styles } from './helpers.js';
 
 /** 호버가 남지 않게 포인터를 화면 구석으로 */
 async function pointerAway(page) {

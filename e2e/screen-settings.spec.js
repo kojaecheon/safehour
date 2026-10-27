@@ -5,14 +5,7 @@
 // --selected rgb(42, 48, 56), --line-input rgb(134, 139, 148), --emergency rgb(200, 16, 46).
 
 import { test, expect } from './fixtures.js';
-import { accountKeyOf, evidenceShot, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
+import { accountKeyOf, evidenceShot, gapBetween, startTrip, styles } from './helpers.js';
 
 // 스위치 알맹이(::before)의 색과 위치
 const thumbOf = (locator) =>
@@ -20,8 +13,6 @@ const thumbOf = (locator) =>
     const cs = getComputedStyle(el, '::before');
     return { background: cs.backgroundColor, transform: cs.transform };
   });
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
 
 test.describe('③층 설정, 회색 바탕과 블록', () => {
   test('회색 바탕 위 흰 블록 네 개, 첫 블록이 상단 바 바로 아래, 블록 사이 8px, 마지막 블록 아래 틈 0', async ({ page }) => {

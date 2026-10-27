@@ -6,16 +6,7 @@
 // --surface-alt rgb(243, 244, 245) · --accent rgb(10, 92, 255) · --state-together-ink rgb(17, 105, 58).
 
 import { test, expect } from './fixtures.js';
-import { expectNoAxeViolations, loginDemo } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { expectNoAxeViolations, gapBetween, loginDemo, styles } from './helpers.js';
 
 test.describe('③층 로그인 화면 — SEED 배치', () => {
   test('제목·로그인 수단·안내 상자가 SEED 모양이다', async ({ page }) => {
@@ -60,6 +51,8 @@ test.describe('③층 로그인 화면 — SEED 배치', () => {
     expect(gapBetween(g, k)).toBe(12);
     expect(gapBetween(k, d)).toBe(12);
     expect(gapBetween(d, await page.getByText('데모는 시연용입니다', { exact: false }).boundingBox())).toBe(8);
+    // 데모 버튼 폭 = Google 버튼 폭 (전체 폭 버튼 목록)
+    expect(d.width).toBe(g.width);
 
     // 안내 상자 = Callout: 회색 면 · 모서리 10 · 왼쪽 띠 없음, 앞에 20px 먹색 아이콘. 문장은 그대로
     const callout = page.locator('.medical-callout');
@@ -75,11 +68,11 @@ test.describe('③층 로그인 화면 — SEED 배치', () => {
     await expect(callout).toHaveText('로그인은 본인 확인이 아닙니다. 어느 환자의 계획인지는 병원이 발급한 코드로 확인합니다.');
   });
 
-  for (const [code, langName] of [
-    ['ko', '한국어'],
-    ['en', 'English'],
-    ['ja', '日本語'],
-    ['zh', '中文'],
+  for (const [code, langName, providerLabels] of [
+    ['ko', '한국어', ['Google로 계속하기', '카카오로 계속하기']],
+    ['en', 'English', ['Continue with Google', 'Continue with Kakao']],
+    ['ja', '日本語', ['Googleで続ける', 'カカオで続ける']],
+    ['zh', '中文', ['使用 Google 继续', '使用 Kakao 继续']],
   ]) {
     test(`320px ${code} — 공급자 이름이 한 줄로 남고 가로 스크롤이 없다`, async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 720 });
@@ -91,9 +84,11 @@ test.describe('③층 로그인 화면 — SEED 배치', () => {
 
       const disabled = page.locator('.onboarding-login-methods button[aria-disabled="true"]');
       await expect(disabled).toHaveCount(2);
-      for (const button of await disabled.all()) {
+      for (const providerLabel of providerLabels) {
         // 이름은 한 줄(24px). 배지가 옆에 들어가지 않으면 이름 아래로 내려간다
-        const label = await button.locator('span').first().boundingBox();
+        const button = page.getByRole('button', { name: providerLabel });
+        await expect(button).toHaveAttribute('aria-disabled', 'true');
+        const label = await button.getByText(providerLabel, { exact: true }).boundingBox();
         const badge = await button.locator('.badge').boundingBox();
         expect(Math.round(label.height)).toBe(24);
         expect(badge.x).toBeGreaterThanOrEqual(0);

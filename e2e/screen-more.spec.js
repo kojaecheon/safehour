@@ -4,16 +4,7 @@
 // 각 블록은 목록 머리 + 목록 행(앞 아이콘 · 제목 · 설명 · 화살표).
 
 import { test, expect } from './fixtures.js';
-import { startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { gapBetween, startTrip, styles } from './helpers.js';
 
 test.describe('③층 더보기, 목록 묶음 두 개', () => {
   test('회색 바탕 위 흰 블록 두 개: 도구(5행) · 정보(1행), 첫 블록이 상단 바 바로 아래, 블록 사이 8px', async ({ page }) => {
@@ -47,6 +38,34 @@ test.describe('③층 더보기, 목록 묶음 두 개', () => {
     }
     await expect(page.locator('main.more-page a[href="/onboarding?edit=1"]')).toHaveCount(1);
     await expect(page.locator('main.more-page a[href="/settings"]')).toHaveCount(1);
+
+    // 행마다 앞 아이콘(장식, 22px)과 제목, 그 아래 설명이 있다
+    const rows = [
+      ['/cards', '한국어 안내 카드', '식당·택시에서 보여 줄 한국어 문장'],
+      ['/guardian', '보호자 링크', '일정 사본을 PIN으로 잠가 보호자에게 보내요'],
+      ['/conditions', '조건', '본인 체크 기간과 병원 연동'],
+      ['/onboarding?edit=1', '체류 정보 수정', '입국·출국, 숙소, 병원과 병원 일정'],
+      ['/settings', '설정', '언어·알림·동의 철회·내 정보 지우기'],
+      ['/privacy', '개인정보와 면책 안내', '무엇을 받고 어디에 남기는지'],
+    ];
+    for (const [href, title, description] of rows) {
+      const row = page.locator(`main.more-page a[href="${href}"]`);
+      const leading = row.locator('.ui-list-item-leading');
+      await expect(leading, `${title}: 앞 아이콘 칸은 보조기술에 읽히지 않는 장식이다`).toHaveAttribute('aria-hidden', 'true');
+      await expect(leading.locator('svg'), `${title}: 앞 아이콘`).toHaveCount(1);
+      expect((await leading.locator('svg').boundingBox()).width, `${title}: 앞 아이콘 크기`).toBe(22);
+      await expect(row.locator('.ui-list-item-title'), `${title}: 제목`).toHaveText(title);
+      const desc = row.locator('.ui-list-item-desc');
+      await expect(desc, `${title}: 설명`).toHaveText(description);
+      // 설명은 제목 아래, 보조 글자 14/19
+      expect((await desc.boundingBox()).y, `${title}: 설명은 제목 아래`).toBeGreaterThan(
+        (await row.locator('.ui-list-item-title').boundingBox()).y,
+      );
+      expect(await styles(desc, ['font-size', 'line-height']), `${title}: 설명 글자`).toEqual({
+        'font-size': '14px',
+        'line-height': '19px',
+      });
+    }
   });
 
   test('320px English: 더보기에 가로 스크롤이 없다', async ({ page }) => {

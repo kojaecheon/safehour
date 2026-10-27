@@ -5,16 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245), 흰 면 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { findEditableStop, kstDate, startTrip, stopsOf } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { findEditableStop, gapBetween, kstDate, startTrip, stopsOf, styles } from './helpers.js';
 
 /** 장소 상세 주소 (components/CourseCard.js placeHref 와 같다) */
 const placeHrefOf = (stop) =>

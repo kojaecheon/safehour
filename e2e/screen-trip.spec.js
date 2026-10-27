@@ -5,14 +5,7 @@
 // 체류는 e2e 도우미 startTrip 으로 심는다(기본: 어제 입국 → 4일 뒤 출국, 동의 있음).
 
 import { test, expect } from './fixtures.js';
-import { startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
+import { startTrip, styles } from './helpers.js';
 
 test.describe('③층 전체 일정, 날짜 목록 행', () => {
   test('카드 없는 목록 행: 테두리·모서리·면 없음, 행 사이 1px 선, 끝에 화살표, 날짜 칩은 그대로', async ({ page }) => {

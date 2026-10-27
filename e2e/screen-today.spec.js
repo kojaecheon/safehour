@@ -6,16 +6,7 @@
 // --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
 
 import { test, expect } from './fixtures.js';
-import { buildStay, fireDemoEvent, kstDate, linkDemoPlan, openDemoToday, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { buildStay, fireDemoEvent, gapBetween, kstDate, linkDemoPlan, openDemoToday, startTrip, styles } from './helpers.js';
 
 /**
  * 다음 재계획을 실패시킨다: 일정 API 를 503 으로 막고, 다른 탭에서 체류를 바꾼 것처럼 storage 이벤트를 보낸다

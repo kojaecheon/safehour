@@ -5,16 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245).
 
 import { test, expect } from './fixtures.js';
-import { findEditableStop, fireDemoEvent, kstDate, openDemoToday, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { findEditableStop, fireDemoEvent, gapBetween, kstDate, openDemoToday, startTrip, styles } from './helpers.js';
 
 test.describe('③층 하루 일정, 회색 바탕과 블록', () => {
   test('회색 바탕 위 흰 블록: 날짜 칩 줄 / 상태 / 전환·타임라인 / 도구, 블록 사이 8px', async ({ page }) => {

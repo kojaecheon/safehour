@@ -5,14 +5,7 @@
 // --ink rgb(26, 28, 32), 흰 글자 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { HOSPITAL_NAME, HOSPITAL_PHONE, buildStay, loginDemo, seedStay, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
+import { HOSPITAL_NAME, HOSPITAL_PHONE, buildStay, loginDemo, seedStay, startTrip, styles } from './helpers.js';
 
 test.describe('③층 긴급, SEED 배치', () => {
   test('안내 Callout: 왼쪽 띠 없는 회색 면 · 모서리 10 · 안쪽 14, 앞 아이콘, 두 언어 문장', async ({ page }) => {

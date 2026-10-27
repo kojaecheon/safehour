@@ -5,13 +5,7 @@
 // --surface-alt rgb(243, 244, 245).
 
 import { test, expect } from './fixtures.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
+import { styles } from './helpers.js';
 
 test.describe('③층 시작 화면 — SEED 배치', () => {
   test('제목·언어 선택·고지·면책이 SEED 모양이다', async ({ page }) => {

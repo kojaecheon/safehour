@@ -920,6 +920,9 @@
 .ui-answer-text:lang(ja),
 .ui-answer-text:lang(zh) {
   word-break: keep-all;
+  /* overflow-wrap: anywhere 는 두지 않는다. flex 항목(글자 칸)의 최소 폭이 한 글자로 줄어, 체크 표시가 붙은 79px 칩에서
+     'わから'·'不确定' 같은 한 낱말이 'わか/ら'·'不确/定'으로 꺾인다. 지금은 낱말이 칩 안쪽 여백까지 나가도 알약 안에 든다.
+     body 의 overflow-wrap: break-word 는 이미 물려받는다(글자 칸이 최소 폭 밑으로 줄지 않아 칩 안에서는 일어나지 않는다) */
 }
 .ui-answer-mark:lang(ja),
 .ui-answer-mark:lang(zh) {
@@ -1249,6 +1252,7 @@
 /* ───────────────────────── 바탕 층 · 흰 블록 · 목록 (SEED layer · List) ─────────────────────────
  * 구역이 여럿인 화면: main.page 에 is-basement 를 주면 회색 바탕 위에 흰 블록(.ui-block)을 8px 틈으로 쌓는다.
  * 회색 바탕에서는 카드 그림자가 필요 없다 — 이 범위에서 --shadow-card 를 끈다(설계서 4.5). 화면에 켜는 일은 ③층이다. */
+/* 시안 보드(app/styles/designBoard.css)의 .designBoard-phone-page.is-basement 가 이 규칙과 아래 마지막 블록 규칙을 되풀이한다. 값을 바꾸면 같이 고친다 */
 main.page.is-basement {
   background: var(--layer-basement);
   --shadow-card: none;

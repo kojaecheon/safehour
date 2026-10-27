@@ -4,19 +4,10 @@
 // --emergency rgb(200, 16, 46), --state-standby-bg rgb(255, 244, 217), 흰 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { selfItems, startTrip } from './helpers.js';
+import { gapBetween, selfItems, startTrip, styles } from './helpers.js';
 
 const PIN = '246810';
 const CONSENT = '위 내용을 보호자에게 보내는 데 동의해요 (이번 링크에만 적용돼요)';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
 
 async function createLink(page) {
   await page.getByLabel(CONSENT).check();

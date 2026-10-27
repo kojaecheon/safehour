@@ -4,10 +4,11 @@
 //   - 안내 상자(SEED Callout, 설계서 5.6): .ui-callout. 회색 면(--surface-alt rgb(243, 244, 245)) · 모서리 10 · 안쪽 14/16
 //   - 3:7 하단 바(설계서 6.1): .ui-bar-split
 //   - 설정 언어 행의 눌림: 목록 행(ListItem, 설계서 5.5)과 같은 모양
+//   - 답 칩(ja·zh) 글자: 낱말 경계에서만 줄을 바꾸고, 고른 칩의 체크 표시는 줄지 않는다
 // 기능 클래스(.settings-disclosure 등)는 마크업에 그대로 남는다. 다른 spec 의 로케이터가 쓴다.
 
 import { test, expect } from './fixtures.js';
-import { DEMO_PLAN_LABEL, startTrip } from './helpers.js';
+import { DEMO_PLAN_LABEL, startTrip, styles } from './helpers.js';
 
 const CALLOUT_FACE = {
   'background-color': 'rgb(243, 244, 245)',
@@ -15,13 +16,6 @@ const CALLOUT_FACE = {
   'padding-top': '14px',
   'padding-left': '16px',
 };
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
 
 async function expectSharedCallout(callout, where) {
   await expect(callout, `${where}: 안내 상자가 보여야 한다`).toBeVisible();
@@ -87,6 +81,40 @@ test.describe('공용 부품', () => {
     const link = page.locator('.link-bar');
     await expect(link).toHaveClass(split);
     expect(await columns(link)).toEqual({ display: 'grid', 'column-gap': '8px' });
+  });
+
+  test('320px ja·zh 답 칩: 고른 칩의 체크 표시는 16px, 중국어 不确定 은 한 줄', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 780 });
+    for (const [code, langName, addPeriod, unknown] of [
+      ['ja', '日本語', '本人チェックの期間を追加', 'わからない'],
+      ['zh', '中文', '添加本人填写的期间', '不确定'],
+    ]) {
+      await page.goto('/');
+      await page.getByRole('button', { name: langName, exact: true }).click();
+      await expect(page.locator('html')).toHaveAttribute('lang', code);
+      await startTrip(page, {}, { path: '/conditions' });
+      await page.getByRole('button', { name: addPeriod }).click();
+
+      // 모르겠음 칩을 고르면 앞에 체크 표시가 나온다. 칩 안 글자에 밀려 줄지 않는다
+      const radio = page.getByRole('radio', { name: unknown }).first();
+      await radio.check();
+      const chip = radio.locator('xpath=ancestor::label[1]');
+      await expect(chip, `${code}: 고른 칩`).toHaveClass(/is-selected/);
+      const mark = chip.locator('.ui-answer-mark');
+      expect((await mark.boundingBox()).width, `${code}: 체크 표시 폭`).toBe(16);
+
+      if (code === 'zh') {
+        // 不确定 은 낱말 하나라 둘로 꺾이지 않는다: 글자 높이가 한 줄(줄 높이)이다
+        const text = chip.locator('.ui-answer-text');
+        const lineHeight = parseFloat((await styles(text, ['line-height']))['line-height']);
+        const textBox = await text.boundingBox();
+        expect(Math.round(textBox.height), `${code}: ${unknown} 은 한 줄이어야 한다`).toBe(lineHeight);
+        // 글자가 알약 밖으로 나가지 않는다
+        const chipBox = await chip.boundingBox();
+        expect(textBox.x, `${code}: 글자 왼쪽 끝이 칩 안`).toBeGreaterThanOrEqual(chipBox.x);
+        expect(textBox.x + textBox.width, `${code}: 글자 오른쪽 끝이 칩 안`).toBeLessThanOrEqual(chipBox.x + chipBox.width);
+      }
+    }
   });
 
   test('설정 언어 행 눌림은 목록 행과 같다', async ({ page }) => {

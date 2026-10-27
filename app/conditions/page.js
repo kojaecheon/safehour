@@ -52,10 +52,12 @@ export default function ConditionsPage() {
   const [notice, setNotice] = useState(null); // { key, error: boolean }
   const editorHeadingRef = useRef(null);
   const periodsHeadingRef = useRef(null);
+  const consentHeadingRef = useRef(null);
   const returnFocus = useRef(false);
   // 기간 삭제를 확인하면 지운 행의 삭제 버튼이 DOM 에서 사라져 AlertDialog 가 돌려줄 초점이 body 로 떨어진다.
-  // 그때만 조건 기간 제목으로 옮긴다(마지막 기간을 지워도 이 제목은 목록 대신 빈 상태 안내와 함께 남는다)
-  const armRefocus = useRefocusAfterDialog(() => [periodsHeadingRef.current]);
+  // 그때만 조건 기간 제목으로 옮긴다(마지막 기간을 지워도 이 제목은 목록 대신 빈 상태 안내와 함께 남는다).
+  // 동의 철회를 확인하면 철회 블록과 조건 기간 블록이 통째로 사라지고 동의 요청 블록이 나타난다: 그 제목으로 옮긴다
+  const armRefocus = useRefocusAfterDialog(() => [periodsHeadingRef.current, consentHeadingRef.current]);
 
   const classification = useMemo(() => (stay ? safeClassifyStay(stay) : { byDate: {}, error: false }), [stay]);
   const consented = hasSensitiveConsent(stay);
@@ -122,7 +124,7 @@ export default function ConditionsPage() {
             <div className="ui-block">
               <p className="conditions-lead">{t('conditions.lead')}</p>
 
-              <ConsentPanel consent={stay.consent} readOnly={readOnly} />
+              <ConsentPanel consent={stay.consent} readOnly={readOnly} headingRef={consentHeadingRef} />
 
               <div role="status" className={notice?.error ? 'conditions-notice is-error' : 'conditions-notice'}>
                 {notice ? t(notice.key) : ''}
@@ -221,7 +223,7 @@ export default function ConditionsPage() {
               />
             )}
 
-            {consented && !editing && <ConsentWithdraw />}
+            {consented && !editing && <ConsentWithdraw onWithdrawn={armRefocus} />}
 
             {/* 다른 화면으로 가는 이동이라 버튼이 아니라 화살표 목록 행(설계서 5.5).
                 편집 중에는 숨긴다: DOM 에서 하단 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다 */}

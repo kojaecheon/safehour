@@ -7,19 +7,10 @@
 // --accent rgb(10, 92, 255).
 
 import { test, expect } from './fixtures.js';
-import { readRecord, selfItems, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
+import { gapBetween, readRecord, selfItems, startTrip, styles } from './helpers.js';
 
 // 버튼 면 색은 150ms 전환 중에 읽으면 중간값이 나오므로 목표 색에 닿을 때까지 기다린다
 const backgroundOf = (locator) => async () => (await styles(locator, ['background-color']))['background-color'];
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
 
 test.describe('③층 조건 화면, 회색 바탕과 블록', () => {
   test('상단 바 바로 아래부터 흰 블록을 8px 틈으로 쌓고, 화면 끝 여백은 내비 위 56px 안팎', async ({ page }) => {

@@ -325,6 +325,21 @@ export async function expectTouchTargets(page, where, min = 44) {
 }
 
 
+// ── 계산된 모양 재기 ─────────────────────────────────────────────────
+
+/** 요소의 계산된 스타일 몇 가지를 { 속성: 값 } 으로 */
+export async function styles(locator, props) {
+  return locator.evaluate(
+    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
+    props,
+  );
+}
+
+/** 위 상자 아래 끝과 아래 상자 위 끝 사이 틈(px, 반올림). boundingBox() 결과 두 개를 받는다 */
+export function gapBetween(upper, lower) {
+  return Math.round(lower.y - (upper.y + upper.height));
+}
+
 // ── 증빙 화면 캡처 ─────────────────────────────────────────────────
 
 /**

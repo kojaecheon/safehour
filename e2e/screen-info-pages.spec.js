@@ -2,16 +2,7 @@
 // 색: --surface-alt rgb(243, 244, 245), --ink rgb(26, 28, 32), --emergency rgb(200, 16, 46),
 //     --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0)
 import { test, expect } from './fixtures.js';
-import { expectNoAxeViolations, linkDemoPlan, startTrip } from './helpers.js';
-
-async function styles(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((name) => [name, getComputedStyle(el).getPropertyValue(name)])),
-    props,
-  );
-}
-
-const gapBetween = (upper, lower) => Math.round(lower.y - (upper.y + upper.height));
+import { expectNoAxeViolations, gapBetween, linkDemoPlan, startTrip, styles } from './helpers.js';
 
 test.describe('③층 개인정보 고지', () => {
   test('흰 바탕 한 장: 카드 없음, 소개는 info 아이콘 회색 Callout, 고지 글은 16/24, 항목은 띠 없는 점 목록', async ({ page }) => {
