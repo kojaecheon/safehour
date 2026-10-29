@@ -118,6 +118,11 @@
   않으므로 그 부품은 콜백(`ConsentWithdraw`의 `onWithdrawn`)으로 화면에 알리고, 훅은 화면이 가진다.
 - **확인**: `e2e/focus-flows.spec.js`의 '확인 대화상자 뒤 초점'. 새 확인 대화상자를 만들면 확인 뒤
   `document.activeElement`가 body가 아니고 main 안인지 같은 모양으로 단언한다.
+- **함께 걸리는 것(스크롤)**: 대화상자는 열 때 history 한 칸을 쌓고 닫을 때 `history.back()`으로 되돌린다
+  (`lib/useModalSheet.js`). 그 popstate 뒤 브라우저가 스크롤을 대화상자를 연 자리로 되돌린다. 확인한 일로
+  화면이 크게 줄면(동의 철회로 철회 블록이 통째로 사라짐) 초점을 받은 제목이 화면 밖에 남는다. 초점은 맞아도
+  보이지 않는다. 보여야 할 것이 있으면 popstate 뒤 다음 그리기에서 `scrollIntoView`로 데려온다
+  (조건 화면의 철회 완료 문구, `app/conditions/page.js`의 `handleWithdrawn`). 확인은 `toBeInViewport()`로 한다.
 
 ## 가로 flex 줄의 아이콘 칸이 0폭까지 줄어든다
 
@@ -127,7 +132,10 @@
   flex 항목은 기본이 `flex-shrink: 1`이라 글자가 길면 감싼 칸이 0까지 밀려난다. `svg.ui-icon`에 준
   `flex: none`은 svg 자신에게만 걸려, 감싼 칸에는 닿지 않는다.
 - **대응**: 아이콘을 감싼 칸(flex 항목)에 `flex: none`을 준다. 같은 줄에 글자가 있는 새 아이콘 칸은
-  처음부터 준다. 이미 그렇게 한 곳: 앞 아이콘 칸 `.ui-list-item-leading`, 일본어·중국어 답 칩의
-  체크 표시 `.ui-answer-mark:lang(ja)`·`:lang(zh)`.
+  처음부터 준다. 이미 그렇게 한 곳: 앞 아이콘 칸 `.ui-list-item-leading`, 답 칩의
+  체크 표시 `.ui-answer-mark`.
 - **확인**: 가장 좁은 폭(320px)에서 언어별로 아이콘 칸의 `getBoundingClientRect().width`가 정한 크기와
-  같은지 잰다. 한국어·영어 답 칩의 체크 표시는 아직 이 규칙이 없다(`docs/tracking/findings.md` 6번).
+  같은지 잰다. 답 칩의 체크 표시는 이제 모든 언어에서 `.ui-answer-mark { flex: none }`이다(운영자 결정 2026-10-30).
+  넣을 자리가 모자라는 칸은 아이콘을 줄이지 말고 줄을 바꾼다: 답 칩은 `flex-wrap`으로 체크를 글자 위 줄로 올린다.
+  이때 글자 칸에 `min-width: 0`을 주지 않는다. 글자 칸이 낱말 폭 밑으로 줄면 body 의 `overflow-wrap: break-word`가
+  'Allowe/d'처럼 낱말을 꺾는다.
