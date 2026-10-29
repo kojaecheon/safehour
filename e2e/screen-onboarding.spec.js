@@ -4,7 +4,7 @@
 // 입력은 필드 id(ob-…)로 채워 언어와 무관하게 같은 흐름을 탄다.
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --ink rgb(26, 28, 32) · --line-input rgb(134, 139, 148) ·
 // --surface-alt rgb(243, 244, 245) · --selected rgb(42, 48, 56) · --accent rgb(10, 92, 255) ·
-// --emergency rgb(200, 16, 46) · --support-soft rgb(255, 233, 240) · --line-strong rgb(220, 222, 227).
+// --emergency rgb(200, 16, 46) · --surface rgb(255, 255, 255) · --accent-strong rgb(0, 70, 209) · --line-strong rgb(220, 222, 227).
 
 import { test, expect } from './fixtures.js';
 import { gapBetween, kstDate, loginDemo, styles } from './helpers.js';
@@ -463,19 +463,30 @@ test.describe('③층 체류 설정 — 오류 표시', () => {
     expect((await line.locator('svg').boundingBox()).width).toBe(20);
   });
 
-  test('오류 요약 — 안내 상자 모양, 제목 16px 굵게 + 경고 아이콘, 항목 이름은 먹색', async ({ page }) => {
+  // 운영자 결정(2026-10-30): 오류 요약은 조건 화면과 같은 상자 하나(흰 면 + 1px 긴급 빨강 테두리). 분홍 면·분홍 선은 없앤다
+  test('오류 요약: 공용 오류 요약 상자(흰 면 + 1px 긴급 빨강 테두리), 제목 16px 굵게 + 빨간 경고 아이콘, 항목은 코발트 링크', async ({ page }) => {
     await loginDemo(page, '/onboarding');
     await submit(page);
 
     const summary = page.locator('.onboarding-summary');
     await expect(summary).toBeFocused();
+    await expect(summary).toHaveClass(/(^|\s)ui-error-summary(\s|$)/);
     expect(
-      await styles(summary, ['border-top-left-radius', 'padding-top', 'border-top-width', 'background-color']),
+      await styles(summary, [
+        'border-top-left-radius',
+        'padding-top',
+        'border-top-width',
+        'border-top-style',
+        'border-top-color',
+        'background-color',
+      ]),
     ).toEqual({
       'border-top-left-radius': '10px',
       'padding-top': '14px',
       'border-top-width': '1px',
-      'background-color': 'rgb(255, 233, 240)',
+      'border-top-style': 'solid',
+      'border-top-color': 'rgb(200, 16, 46)',
+      'background-color': 'rgb(255, 255, 255)',
     });
     const title = summary.locator('.onboarding-summary-title');
     expect(await styles(title, ['font-size', 'font-weight', 'color'])).toEqual({
@@ -484,6 +495,7 @@ test.describe('③층 체류 설정 — 오류 표시', () => {
       color: 'rgb(26, 28, 32)',
     });
     expect((await title.locator('svg').boundingBox()).width).toBe(20);
-    expect((await styles(summary.locator('a strong').first(), ['color'])).color).toBe('rgb(26, 28, 32)');
+    expect((await styles(title.locator('svg'), ['color'])).color).toBe('rgb(200, 16, 46)');
+    expect((await styles(summary.locator('a strong').first(), ['color'])).color).toBe('rgb(0, 70, 209)');
   });
 });

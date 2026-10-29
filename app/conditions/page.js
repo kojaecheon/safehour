@@ -61,6 +61,25 @@ export default function ConditionsPage() {
   // 동의 철회를 확인하면 철회 블록과 조건 기간 블록이 통째로 사라지고 동의 요청 블록이 나타난다: 그 제목으로 옮긴다
   const armRefocus = useRefocusAfterDialog(() => [periodsHeadingRef.current, consentHeadingRef.current]);
 
+  // 동의 철회가 성공하면 철회 블록이 그 안의 완료 문구와 함께 사라진다(운영자 결정 2026-10-30: 완료 문구를 보여 준다).
+  // 완료 문구는 맨 위 흰 블록의 철회 알림 자리(안내 문단과 동의 제목 사이)에 남긴다: 초점이 가는 동의 제목 바로 위라
+  // 함께 보이고, 늘 있는 role=status 자리라 화면 읽기에도 읽힌다. 다른 화면으로 갔다 오면 사라지는 화면 상태다
+  const [withdrawn, setWithdrawn] = useState(false);
+  const withdrawStatusRef = useRef(null);
+  function handleWithdrawn() {
+    setWithdrawn(true);
+    armRefocus();
+    // 확인 대화상자는 history 한 칸을 되돌리며 닫힌다(lib/useModalSheet). 그 popstate 뒤 브라우저가 스크롤을 대화상자를 연
+    // 자리(철회 블록이 있던 화면 끝)로 되돌려, 완료 문구와 초점이 간 동의 제목이 화면 밖에 남는다.
+    // 되돌림이 끝난 다음 그리기에서 완료 문구를 화면 가운데로 데려온다. popstate 가 없으면(기록을 못 쌓은 대화상자) 1초 뒤 걷는다
+    const reveal = () =>
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => withdrawStatusRef.current?.scrollIntoView({ block: 'center' })),
+      );
+    window.addEventListener('popstate', reveal, { once: true });
+    setTimeout(() => window.removeEventListener('popstate', reveal), 1000);
+  }
+
   const classification = useMemo(() => (stay ? safeClassifyStay(stay) : { byDate: {}, error: false }), [stay]);
   const consented = hasSensitiveConsent(stay);
   const periods = useMemo(() => sortPeriods(stay?.periods ?? []), [stay]);
@@ -127,6 +146,18 @@ export default function ConditionsPage() {
           <>
             <div className="ui-block">
               <p className="conditions-lead">{t('conditions.lead')}</p>
+
+              {/* 다시 동의하면 철회 완료 문구는 맞지 않는다: 동의가 없을 때만 보인다 */}
+              <div role="status" className="conditions-withdraw-status" ref={withdrawStatusRef}>
+                {withdrawn && !consented && (
+                  <p className="ui-callout has-icon conditions-withdraw-done">
+                    <span className="ui-callout-icon" aria-hidden="true">
+                      <Icon name="check" size={20} />
+                    </span>
+                    <span>{t('conditions.withdrawDone')}</span>
+                  </p>
+                )}
+              </div>
 
               <ConsentPanel consent={stay.consent} readOnly={readOnly} headingRef={consentHeadingRef} />
 
@@ -229,7 +260,7 @@ export default function ConditionsPage() {
               />
             )}
 
-            {consented && !editing && <ConsentWithdraw onWithdrawn={armRefocus} />}
+            {consented && !editing && <ConsentWithdraw onWithdrawn={handleWithdrawn} />}
 
             {/* 다른 화면으로 가는 이동이라 버튼이 아니라 화살표 목록 행(설계서 5.5).
                 편집 중에는 숨긴다: DOM 에서 하단 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다 */}

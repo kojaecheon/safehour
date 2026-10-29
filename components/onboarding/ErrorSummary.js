@@ -15,8 +15,8 @@ export default function ErrorSummary({ issues, ref }) {
   const titleId = useId();
   if (issues.length === 0) return null;
   return (
-    <div className="onboarding-summary" role="group" aria-labelledby={titleId} tabIndex={-1} ref={ref}>
-      <p className="onboarding-summary-title" id={titleId}>
+    <div className="ui-error-summary onboarding-summary" role="group" aria-labelledby={titleId} tabIndex={-1} ref={ref}>
+      <p className="ui-error-summary-title onboarding-summary-title" id={titleId}>
         <Icon name="alert" size={20} />
         <span>{t('onboarding.errorsTitle', { n: issues.length })}</span>
       </p>

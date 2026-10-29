@@ -233,8 +233,8 @@ export default function LinkPage() {
             ) : (
               <>
                 {errorKey && (
-                  <div className="conditions-alert" role="alert">
-                    <p className="conditions-alert-title">
+                  <div className="ui-error-summary conditions-alert" role="alert">
+                    <p className="ui-error-summary-title conditions-alert-title">
                       <Icon name="alert" size={20} />
                       <span>{t('link.errLabel')}</span>
                     </p>

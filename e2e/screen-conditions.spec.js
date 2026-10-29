@@ -211,6 +211,50 @@ test.describe('③층 조건 화면, 동의와 동의 철회', () => {
     await expect(page.getByRole('heading', { name: '민감정보 처리 동의' })).toBeVisible();
     expect((await readRecord(page, 'stay')).consent.sensitive).toBeNull();
   });
+
+  test('동의 철회 뒤: 완료 문구가 동의 제목 바로 위 알림 자리에 공용 안내 상자(앞 체크 아이콘)로 보이고, 다시 동의하면 사라진다', async ({ page }) => {
+    const DONE = '동의를 철회했어요. 본인 체크 기간과 병원 지침 사본을 지웠어요.';
+    await startTrip(page, {}, { path: '/conditions' });
+    await page.getByRole('button', { name: '동의 철회', exact: true }).click();
+    await page.getByRole('alertdialog', { name: '민감정보 동의 철회' }).getByRole('button', { name: '철회하기' }).click();
+    await expect(page.getByRole('alertdialog')).toHaveCount(0);
+    const heading = page.getByRole('heading', { name: '민감정보 처리 동의' });
+    await expect(heading).toBeVisible();
+    // 철회 블록은 통째로 사라진다
+    await expect(page.getByRole('button', { name: '동의 철회', exact: true })).toHaveCount(0);
+
+    // 완료 문구는 맨 위 흰 블록(동의 요청 블록)의 알림 자리(role=status)에 보인다. 초점이 가는 동의 제목 바로 위라
+    // 철회한 그 화면에서 함께 보인다(긴 동의 문구 아래로 밀려 화면 밖에 있지 않다)
+    const firstBlock = page.locator('main.conditions-page > .ui-block').first();
+    const status = firstBlock.getByRole('status').filter({ hasText: DONE });
+    await expect(status).toHaveText(DONE);
+    await expect(status).toBeVisible();
+    await expect(status).toBeInViewport();
+    const statusBox = await status.boundingBox();
+    expect(Math.round(statusBox.y + statusBox.height), '완료 문구는 동의 제목 위').toBeLessThanOrEqual(
+      Math.round((await heading.boundingBox()).y),
+    );
+
+    // 모양: 공용 안내 상자(회색 면, 모서리 10, 안쪽 14/16, 먹색 보통 글자) + 앞 20px 아이콘 칸
+    const callout = status.locator('.ui-callout');
+    await expect(callout).toHaveClass(/(^|\s)has-icon(\s|$)/);
+    expect(
+      await styles(callout, ['background-color', 'border-top-left-radius', 'padding-top', 'padding-left', 'color', 'font-weight']),
+    ).toEqual({
+      'background-color': 'rgb(243, 244, 245)',
+      'border-top-left-radius': '10px',
+      'padding-top': '14px',
+      'padding-left': '16px',
+      color: 'rgb(26, 28, 32)',
+      'font-weight': '400',
+    });
+    expect((await callout.locator(':scope > .ui-callout-icon svg').boundingBox()).width).toBe(20);
+
+    // 다시 동의하면 완료 문구는 사라지고 동의 상태 안내만 남는다
+    await page.getByRole('button', { name: '동의합니다' }).click();
+    await expect(page.locator('.conditions-consent-status')).toBeVisible();
+    await expect(page.getByText(DONE)).toHaveCount(0);
+  });
 });
 
 test.describe('③층 조건 화면, 편집기', () => {

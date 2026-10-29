@@ -268,8 +268,8 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
   return (
     <form className="conditions-form" onSubmit={submit} noValidate>
       {errorFields.length > 0 && (
-        <div className="conditions-error-summary" role="alert" tabIndex={-1} ref={summaryRef}>
-          <p className="conditions-error-summary-title">
+        <div className="ui-error-summary conditions-error-summary" role="alert" tabIndex={-1} ref={summaryRef}>
+          <p className="ui-error-summary-title conditions-error-summary-title">
             <Icon name="alert" size={20} />
             <span>{t('conditions.errorSummary')}</span>
           </p>
