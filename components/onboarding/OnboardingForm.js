@@ -287,7 +287,7 @@ export default function OnboardingForm() {
               </p>
             )}
             {saveState.phase === 'error' && (
-              <p className="onboarding-save-error" role="alert">
+              <p className="ui-field-error onboarding-save-error" role="alert">
                 <Icon name="alert" size={20} />
                 <span>{t(saveState.errorKey)}</span>
               </p>

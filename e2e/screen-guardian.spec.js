@@ -4,18 +4,10 @@
 // --emergency rgb(200, 16, 46), --state-standby-bg rgb(255, 244, 217), 흰 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { gapBetween, selfItems, startTrip, styles } from './helpers.js';
+import { createGuardianLink, gapBetween, selfItems, startTrip, styles } from './helpers.js';
 
 const PIN = '246810';
 const CONSENT = '위 내용을 보호자에게 보내는 데 동의해요 (이번 링크에만 적용돼요)';
-
-async function createLink(page) {
-  await page.getByLabel(CONSENT).check();
-  await page.getByLabel('PIN (숫자 6자리)').fill(PIN);
-  await page.getByLabel('PIN 확인 (한 번 더)').fill(PIN);
-  await page.getByRole('button', { name: '링크 만들기' }).click();
-  return page.getByLabel('링크', { exact: true }).inputValue();
-}
 
 test.describe('③층 보호자 링크 만들기', () => {
   test('흰 바탕 한 장: 카드 없음, 담기는 것·담기지 않는 것은 서로 다른 앞 아이콘 목록, 두 안내는 띠 없는 회색 Callout', async ({ page }) => {
@@ -180,7 +172,7 @@ test.describe('③층 보호자 링크 만들기', () => {
 
   test('링크 결과: 카드 없음, 고정 바는 사라지고 링크 복사가 화면의 주 버튼 하나다', async ({ page }) => {
     await startTrip(page, { hasCompanion: true }, { path: '/guardian' });
-    await createLink(page);
+    await createGuardianLink(page, { pin: PIN });
     await expect(page.getByRole('heading', { name: '보호자에게 보낼 링크' })).toBeVisible();
     await expect(page.locator('.sticky-return')).toHaveCount(0);
     await expect(page.locator('main .card')).toHaveCount(0);
@@ -194,7 +186,7 @@ test.describe('③층 보호자 링크 만들기', () => {
 test.describe('③층 보호자 링크 열기', () => {
   async function openOwnLink(page, stayOptions = { hasCompanion: true }) {
     await startTrip(page, stayOptions, { path: '/guardian' });
-    const link = await createLink(page);
+    const link = await createGuardianLink(page, { pin: PIN });
     await page.goto(link);
     await expect(page.getByRole('heading', { name: 'PIN 입력' })).toBeVisible();
   }

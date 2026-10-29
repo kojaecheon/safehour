@@ -1,6 +1,6 @@
 # 디자인 시스템 — 밝은 여행앱
 
-- 기준일: 2026-09-26 (SEED ②층 부품 반영)
+- 기준일: 2026-10-29 (SEED ③층 15화면과 마지막 일괄·최종 검토 수정 묶음 완료 반영)
 - 작업 ID: AX-321 (디자인 시스템과 앱 셸 구현은 AX-304)
 - 연결: spec 7장, `IA_AND_FLOWS.md`, `ITINERARY_RULES.md`, ADR-0007(언어), ADR-0009(보기 전용), ADR-0010(긴급·지도)
 - 정본 코드: 토큰 `app/globals.css`(`:root`), 부품 모양 `app/styles/ui.css`, 부품 `components/ui/`(모음 `components/ui/index.js`),
@@ -21,13 +21,14 @@
 | 원칙 | 코드에서 지키는 방법 |
 | --- | --- |
 | 본문 16px 이상 | `--text-body: 16px`. 14px(`--text-caption`)는 배지·보조 캡션 전용이고 본문에 쓰지 않는다 |
-| 터치 대상 44px 이상 | `--tap-min: 44px`. 버튼 52px(작은 버튼도 44px), 긴급 버튼 48px, 날짜 칩 60×92px, 답 선택 칸 48px 이상 |
+| 터치 대상 44px 이상 | `--tap-min: 44px`. 버튼 52px(작은 버튼도 44px), 긴급 버튼 52px, 날짜 칩 60×92px, 답 선택 칸 44px 이상 |
 | 상태는 색만으로 구분하지 않는다 | 상태·배지·출처·내비 현재 위치 모두 **색 + 문구 + 아이콘(또는 테두리 모양)** 세 겹 |
 | `NO_TOURISM`은 오류 스타일이 아니다 | 쉬는 날의 회청색 + 달 아이콘. 오류 빨강·경고 삼각형 금지. '추천 장소 없음'·빈 상태도 오류 색을 쓰지 않는다 |
 | WCAG 2.1 AA 대비 | 글자 4.5:1, 큰 글자·UI 경계 3:1 이상(2장 표). 병기 줄·보조 글자도 투명도로 흐리게 하지 않는다 |
 | 출처 영역을 시각적으로 나눈다 | 병원 발행 / 본인 체크 / SafeHour 판정·추정 / 관광공사 원문 / AI 소개 — 6장 |
 | 배지 5종 | 추정 / 기본값 적용 / 운영 확인 필요 / 병원 연동 데모 / 보기 전용 — 5장 |
 | '안전합니다'라고 쓰지 않는다 | 조건 통과와 안전은 다르다(spec 9.1). 제목·설명(`app/layout.js` 메타데이터 포함)도 안전을 약속하지 않는다 |
+| 강제 색상 모드(Windows 고대비)에서도 보인다 | 면·그림자로만 그린 부품에 시스템 색 경계를 준다: 스위치 트랙 1px 테두리(막히면 GrayText), 고른 라디오 원·날짜 칩·Segmented·내비 현재 칸은 Highlight 면, 고른 선택지 칸은 윤곽선, 긴급 버튼 2px 테두리, 시트·알림 배너 테두리, 글자 입력칸 초점은 투명 윤곽선이 시스템 색으로, `aria-disabled` 버튼은 GrayText 글자·테두리. 고른 칸의 초점 링은 CanvasText |
 
 ## 2. 토큰
 
@@ -120,7 +121,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | 그림자 | `--shadow-card` SEED s1 — 회색 바탕(`main.page.is-basement`) 안에서는 `none` · `--shadow-float` SEED s3(떠 있는 메뉴) · `--shadow-sheet` 없음(하단 바는 1px 윗선) |
 | 배치 | `--shell-max` 480px(앱 셸 최대 폭) · `--gutter` 16px(좌우 여백) · `--tap-min` 44px · `--nav-height` 64px · `--nav-offset`(하단 내비가 있을 때 고정 요소가 올라서는 높이, 앱 셸이 켠다. 하단 내비 윗선 1px 포함: 높이 64 + 1) |
 | 움직임 | `--ease-out`(시트 애니메이션 등 기존 전환) · `--ease-color`(색 전환) · `--ease-press`(눌림 축소) · `--duration-fast` 150ms · `--duration` 200ms · `--press-scale-wide` 0.976 · `--press-scale-tight` 0.955(눌리면 2px 만큼 줄어든다 — 넓은 큰 버튼·목록 행 / 44px 칸). 눌림은 면 색만 바꾸고(`--pressed*`), 호버는 `(hover: hover) and (pointer: fine)`에서만 눌림과 같은 색. 축소는 `prefers-reduced-motion: no-preference`일 때만 |
-| 포커스 | 모든 요소 `:focus-visible`은 `--focus-width`(2px) 코발트 윤곽선, 바깥 2px 띄움(상단 바 버튼·목록 행은 안쪽 −2px). 카드형 라디오·토글·답 칩은 안쪽 입력이 키보드 초점을 받을 때만(`:has(input:focus-visible)`) 칸 전체에 링. 글자 입력칸은 윤곽선 대신 2px `--line-contrast` 테두리. 버튼(`.btn` 전부)·즉시 복귀·긴급·고른 날짜 칩의 링은 `--ink`. SEED 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지. 오류 표시된 입력칸은 빨간 테두리에 더해 코발트 윤곽선으로 초점을 보인다 |
+| 포커스 | 모든 요소 `:focus-visible`은 `--focus-width`(2px) 코발트 윤곽선, 바깥 2px 띄움(상단 바 버튼·목록 행은 안쪽 −2px). 카드형 라디오·토글·답 칩은 안쪽 입력이 키보드 초점을 받을 때만(`:has(input:focus-visible)`) 칸 전체에 링. 글자 입력칸은 2px `--line-contrast` 테두리(윤곽선은 투명이라 강제 색상 모드에서만 시스템 색으로 보인다). 코발트·짙은 면 위(채운 주 버튼·critical·처리 중 버튼·즉시 복귀·긴급·고른 날짜 칩)의 링은 `--ink`, 옅은 면(보조·조용한·소셜 로그인·비활성 버튼)은 코발트 그대로. SEED 연한 파랑(#5e98fe, 2.9:1)은 하한 미달이라 코발트 유지. 오류 표시된 입력칸은 빨간 테두리에 더해 코발트 윤곽선으로 초점을 보인다 |
 
 **호환 별칭**: 예전 화면이 쓰던 `--brand`·`--brand-hover`·`--brand-ink`·`--font-display`·`--font-body`는 새 토큰을 가리키는 별칭으로 남겼다. 새 코드는 쓰지 않는다.
 
@@ -131,7 +132,7 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 
 | 부품 | 주요 props | 지키는 것 |
 | --- | --- | --- |
-| `Button` | `variant`(`primary`·`secondary`·`quiet`·`critical`), `size`(`normal`·`small`), `block`, `href`, `icon`, `disabled`, `loading`, `type` | SEED Action Button. 큰 CTA 52px·모서리 12·18/24, 작은 44px·모서리 8·16/22. 보조 = 회색 채움, 조용한 = 바탕 없는 글자, critical = 긴급 빨강(되돌릴 수 없는 확인, /emergency의 119 전화. 시작 화면 하단 고지의 지우기 확인만 회색: `ClearSessionButton quietConfirm`). 채운 강조 버튼은 화면당 하나. `loading`은 눌린 색 + 회전 표시(`aria-busy`). `href`면 링크, 비활성 링크는 `aria-disabled` 버튼. 비활성은 투명도가 아니라 회색 면 + `--ink-subtle` 글자 |
+| `Button` | `variant`(`primary`·`secondary`·`quiet`·`critical`), `size`(`normal`·`small`), `block`, `href`, `icon`, `disabled`, `loading`, `type` | SEED Action Button. 큰 CTA 52px·모서리 12·18/24, 작은 44px·모서리 8·16/22. 보조 = 회색 채움, 조용한 = 바탕 없는 글자, critical = 긴급 빨강(되돌릴 수 없는 확인, /emergency의 119 전화. 시작 화면 하단 고지의 지우기 확인만 회색: `ClearSessionButton quietConfirm`). 채운 강조 버튼은 화면당 하나. `loading`은 눌린 색 + 회전 표시(`aria-busy`). `href`면 링크, 비활성 링크는 `aria-disabled` 버튼. 비활성은 투명도가 아니라 회색 면 + `--ink-subtle` 글자. 키보드 초점 링은 주 버튼·critical·처리 중(코발트·빨강 면)에서 먹색, 보조·조용한·소셜 로그인·비활성(옅은 면)에서 코발트(설계서 4.6) |
 | `Badge` | `kind`(5장), `label?` | 14/19·모서리 6·높이 28 안팎. 아이콘 + 면·테두리 모양 + 문구. `label`로 문구만 바꿀 수 있고 뜻이 다른 배지를 만들지 않는다 |
 | `StateBanner` | `state`, `reasons`, `live?` | SEED Callout 모양(모서리 10·안쪽 14·아이콘 20·라벨 16, 1px 상태 선). 상태 라벨 + 아이콘 + 안전 문구 두 언어 병기 + 사유 목록. `live`면 갱신을 `aria-live="polite"`로 알린다 |
 | `DateChip` | `date`, `state?`, `isToday?`, `selected?`, `hasAppointment?`, `href?`·`onClick?` | 60×92px·모서리 12. 고른 날 `--selected` 채움 + 흰 글자, '오늘'은 코발트 2px 테두리 + '오늘' 글자, 나머지 회색 면. 요일·날짜·상태 아이콘·병원 표시. 스크린리더에는 전체 날짜·오늘·상태·병원 일정을 한 문장으로 읽힌다 |
@@ -148,15 +149,16 @@ hex 색·새 글자 크기를 만들지 않는다. 새 토큰이 필요하면 �
 | `AlertDialog` | `title`, `titleLang?`, `description?`, `cancelLabel`, `confirmLabel`, `critical?`, `busy?`, `onConfirm({ requestClose })`, `onClose` | SEED Alert Dialog — 272px·모서리 20, 버튼 둘(취소·확인), 되돌릴 수 없으면 `critical`. 바깥을 눌러도 닫히지 않는다. `role="alertdialog"`, 포커스 가두기·복원·뒤로 가기는 `lib/useModalSheet.js` |
 | `ListItem` · `ListGroup` · `ListHeader` | `title`, `titleLang?`, `description?`, `leading?`, `trailing?`(`'chevron'`·노드), `href?`·`onClick?` / `label?` / `as?`, `id?` | SEED List Item — 위아래 12·좌우 16, 제목 16/22·설명 14/19 `--ink-soft`(한 줄 46·두 줄 67px). 누르면 좌우 6px 안으로 들어온 모서리 10 면. 반복 행 사이 1px 선 16px 들여씀. 행 안에서 따로 누를 것은 3개까지 |
 | 클래스 `.ui-switch` · `.ui-block` · `main.page.is-basement` · `.hint.is-error` | — | 스위치(바로 적용되는 켬/끔, `role="switch"`, `.toggle-row` 라벨 안 — 끔 트랙 `--ink-subtle`. 막힌 스위치(보기 전용)는 끔 = 회색 면 + `--line-input` 테두리 + 회색 알맹이(왼쪽), 켬 = `--ink-subtle` 채움 + 흰 알맹이(오른쪽)로 면 색과 위치가 함께 갈린다), 흰 블록(화면 폭·8px 틈. 마지막 자식인 흰 블록 아래 틈 0, 화면 끝 56px은 main 아래 여백이 맡는다), 회색 바탕 층(`main.page.is-basement`, 그 안에서 카드 그림자 끔), 입력 오류 도움말(긴급 빨강, 입력은 `aria-invalid`) |
-| 클래스 `.ui-callout` · `.has-icon` · `.ui-callout-icon` | 없음 | 공용 안내 상자(SEED Callout · neutral, `ui.css`): 회색 면(`--surface-alt`)·모서리 10·안쪽 14/16·16/22 먹색, 왼쪽 띠 없음, `role="note"`. 상자 바로 아래 `<p>`(`.ui-callout > p`)는 아이콘 여부와 상관없이 모든 안내 상자에서 먹색을 물려받는다(전역 `p`의 옅은 회색이 덮지 않게). `.has-icon`이면 앞에 20px 먹색 아이콘 칸(`.ui-callout-icon`, 첫 줄 가운데, 글자와 8px)을 둔다. 기본 아이콘은 `info`(원 + i). 기능 클래스(`.medical-callout`·`.trip-notice`·`.cards-note`·`.emergency-lead`·`.settings-disclosure`·`.guardian-note`·`.conditions-callout`)는 함께 달고 바깥 여백과 차이(대기 색·분홍 면, 긴급 빨강 아이콘, 긴 글 줄 높이 24)만 맡는다. 회색 바탕 화면에서는 흰 블록 안에 둔다 |
-| 클래스 `.ui-bar-split` | 없음 | 3:7 하단 바(`ui.css`): `minmax(max-content, 3fr) minmax(0, 7fr)`, 사이 8, 보조 버튼 좌우 안쪽 12. 체류 설정(`.onboarding-actions`)·조건 편집기(`.conditions-editor-actions`)·병원 고르기(`.link-bar`)가 `.sticky-return.is-flow`와 함께 단다 |
+| 클래스 `.ui-callout` · `.has-icon` · `.ui-callout-icon` | 없음 | 공용 안내 상자(SEED Callout · neutral, `ui.css`): 회색 면(`--surface-alt`)·모서리 10·안쪽 14/16·16/22 먹색, 왼쪽 띠 없음, `role="note"`. 상자 바로 아래 `<p>`(`.ui-callout > p`)는 아이콘 여부와 상관없이 모든 안내 상자에서 먹색을 물려받는다(전역 `p`의 옅은 회색이 덮지 않게). `.has-icon`이면 앞에 20px 먹색 아이콘 칸(`.ui-callout-icon`, 첫 줄 가운데, 글자와 8px)을 둔다. 기본 아이콘은 `info`(원 + i). 기능 클래스(`.medical-callout`·`.trip-notice`·`.cards-note`·`.emergency-lead`·`.settings-disclosure`·`.guardian-note`·`.conditions-callout`·`.pwa-notify`)는 함께 달고 바깥 여백과 차이(대기 색·분홍 면, 긴급 빨강 아이콘, 긴 글 줄 높이 24)만 맡는다. 회색 바탕 화면에서는 흰 블록 안에 둔다 |
+| 클래스 `.ui-bar-split` | 없음 | 3:7 하단 바(`ui.css`): `minmax(max-content, 3fr) minmax(0, 7fr)`, 사이 8, 보조 버튼 좌우 안쪽 12. 체류 설정(`.onboarding-actions`)·조건 편집기(`.conditions-editor-actions`)·병원 고르기(`.link-bar`)가 `.sticky-return.is-flow`와 함께 단다. 바 바로 아래 `<p>`(못 누르는 이유·저장 실패)는 맨 앞 두 칸 전체 폭 줄(`contain: inline-size`) |
+| 클래스 `.ui-field-error` | 없음 | 공용 오류 줄(`ui.css`, 설계서 5.2): 앞 20px `alert` 아이콘(첫 줄 가운데) + 16/22 굵은 `--emergency`, 왼쪽 띠 없음. 체류 설정(`.onboarding-field-error p`·`.onboarding-save-error`·`.onboarding-search-status.is-error`)·조건(`.conditions-field-error`·`.conditions-save-error`)·보호자(`.guardian-error`)가 기능 클래스와 함께 단다. 기능 클래스는 바깥 여백만 맡는다 |
 | 클래스 `.trip-notice` · 부품 `TripNotice` | `as?`(`div`·`p`), `error?`, `slot?`, `plain?`, `role?` | 일정 화면 공용 알림 상자(SEED Callout, `components/trip/TripNotice.js`). 회색 면 + 앞 20px 먹색 `info` 아이콘 칸(첫 줄 가운데, 글자와 8px), 실패는 대기 색 면 + 1px 대기 선 + `alert` 아이콘(긴급 빨강 아님). 알림 자리(`role="status"`)는 늘 같은 요소로 남고, 비면 높이 0(`.trip-notice-slot:empty`) |
 | 클래스 `.trip-changed` | 없음 | 누르는 안내 상자(SEED Callout · actionable). 회색 면·모서리 10, 앞 먹색 점, 뒤 화살표, 왼쪽 정렬. 누르면 전후 비교 시트를 연다 |
 | 부품 `UpdateFailedNotice` | `readOnly`, `onRetry` | 일정 갱신 실패 알림(/today·/trip·/trip/[날짜] 공용, `components/trip/UpdateFailedNotice.js`). 대기 색 알림 상자(`TripNotice error`) + `alert` 아이콘, 굵은 제목(`.trip-notice-title`), 보기 전용이면 다시 시도 숨김. 회색 바탕 화면에서는 흰 블록 안 |
 | 클래스 `.today-section` | 없음 | 오늘 화면 안내 구역(병원 안내 미확인·보호자 링크·동반 보호자). 테두리 상자 없이 흰 블록 하나가 구역, 회색 버튼, 두 버튼은 3:7(`.today-section-actions`, [나중에][다시 만들기]) |
 | 클래스 `.place-maps` | 없음 | 장소 상세 지도 버튼 [구글][카카오]. 회색 작은 버튼 반반 grid(`.trip-map-row`), 지도 구역(`.trip-maps`)이 340px 이하면 아이콘을 글자 위로(container query). 위에서부터 쌓아 두 버튼의 글자 줄 수가 달라도 아이콘 높이가 같다 |
-| 입력 오류 표시 | — | 입력칸은 공통 규칙(`aria-invalid` → 2px 긴급 빨강, 체크·라디오 제외). 라디오 묶음은 선택지 칸 테두리가 빨강(`.radio-option:has(input[aria-invalid])`). 오류 문장은 20px `alert` 아이콘(원 + 느낌표) + 16/22 굵은 `--emergency`, 왼쪽 띠 없음 — 체류 설정(`.onboarding-field-error`)이 먼저 쓴다 |
-| 클래스 `.sticky-return.is-flow` | 없음 | 흐름 화면 하단 바(시작·체류 설정·조건 편집기·보호자): 불투명 흰 면 + 1px 윗선, 세로 480px 이하에서 고정 해제, `scroll-padding-bottom` 184px. '즉시 복귀' 안전 버튼은 `is-flow` 없이 늘 고정이다. 회색 바탕 화면(`main.page.is-basement`)은 첫 흰 블록이 상단 바 바로 아래에서 시작하고, 모든 화면 끝 여백은 내비 + 56px(하단 고정 바가 있으면 + 152px) |
+| 입력 오류 표시 | 없음 | 입력칸은 공통 규칙(`aria-invalid`면 2px 긴급 빨강, 체크·라디오 제외). 라디오 묶음은 선택지 칸 테두리가 빨강(`.radio-option:has(input[aria-invalid])`). 오류 문장은 공용 오류 줄 `.ui-field-error`(20px `alert` 아이콘(원 + 느낌표) + 16/22 굵은 `--emergency`, 왼쪽 띠 없음). 저장 실패 문장은 저장 버튼 곁, 하단 바 안 맨 앞에 둔다(체류 설정·조건 편집기·보호자) |
+| 클래스 `.sticky-return.is-flow` | 없음 | 흐름 화면 하단 바(시작·체류 설정·조건 편집기·병원 고르기·보호자): 불투명 흰 면 + 1px 윗선, 세로 480px 이하에서 고정 해제, `scroll-padding-bottom` 184px. 바 바로 아래에 문장 `<p>`가 들어가면 공용 규칙(`.sticky-return.is-flow > p`, 세로 481px 이상)이 화면 끝 여백과 `scroll-padding-bottom`을 문장 네 줄 몫(4 × 22px) 더 비운다. 회색 바탕 화면(`main.page.is-basement`)은 첫 흰 블록이 상단 바 바로 아래에서 시작하고, 모든 화면 끝 여백은 내비 + 56px(하단 고정 바가 있으면 + 152px) |
 | `TopBar` | `title`, `titleLang?`, `backHref?`·`onBack?`, `backLabel?`, `as?`, `actions?` | SEED Top Navigation — 높이 56·선 없음, 제목(기본 h1) 18/24 굵게·좁으면 말줄임, 뒤로 가기 44×44·모서리 8, 언어 선택(8장) |
 | `Icon` | `name`, `size?`, `strokeWidth?` | 인라인 SVG 선 아이콘(`ICON_NAMES`). 이름이 `Fill`로 끝나면 채운 모양(하단 내비 현재 칸). 상태 아이콘은 `STATE_ICON` |
 | `BottomNav` · `EmergencyButton` · `ReadOnlyBanner` · `AppShell` | 7장 | 앱 셸 |

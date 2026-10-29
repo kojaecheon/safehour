@@ -9,7 +9,8 @@
 //   - 문구는 notifications 이름공간의 안전 문구다: 주 언어 + 병기 줄(safetyPair). 조건·병원·복약 정보가 없다(규칙 47).
 //   - 닫을 수 있고, 목표 시각이 지나면 스스로 사라진다. 자리(aria-live)는 늘 DOM 에 남아 뜨는 순간 읽어 준다.
 //
-// 스타일: 기능 스타일 파일을 새로 만들지 않고(app/layout.js 등록 규칙) 토큰 변수만 쓰는 인라인 스타일로 그린다.
+// 스타일: 공용 안내 상자(SEED Callout, .ui-callout.has-icon: 앞 20px info 아이콘 칸, 왼쪽 색 띠 없음, 설계서 5.6)를 쓴다.
+//   떠 있는 자리·그림자·닫기 칸은 app/styles/ui.css 의 .pwa-notify-* 규칙이 정한다(기능 스타일 파일은 새로 만들지 않는다).
 
 import Link from 'next/link';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
@@ -32,71 +33,6 @@ function getServerSnapshot() {
   return null;
 }
 
-const SLOT = {
-  position: 'fixed',
-  zIndex: 45,
-  top: 'calc(var(--space-3) + env(safe-area-inset-top))',
-  left: 0,
-  right: 0,
-  display: 'flex',
-  justifyContent: 'center',
-  padding: '0 var(--gutter)',
-  pointerEvents: 'none',
-};
-
-const CARD = {
-  pointerEvents: 'auto',
-  width: '100%',
-  maxWidth: 'calc(var(--shell-max) - 2 * var(--gutter))',
-  display: 'flex',
-  gap: 'var(--space-3)',
-  alignItems: 'flex-start',
-  padding: 'var(--space-3) var(--space-2) var(--space-3) var(--space-4)',
-  background: 'var(--surface)',
-  color: 'var(--ink)',
-  border: '1px solid var(--line-strong)',
-  borderLeft: '4px solid var(--accent)',
-  borderRadius: 'var(--radius-16)',
-  boxShadow: 'var(--shadow-float)',
-};
-
-const ICON = {
-  display: 'inline-grid',
-  placeItems: 'center',
-  flex: 'none',
-  width: '32px',
-  height: '32px',
-  borderRadius: 'var(--radius-full)',
-  background: 'var(--accent-soft)',
-  color: 'var(--accent-strong)',
-};
-
-const TEXT = { minWidth: 0, flex: 1 };
-const TITLE = { display: 'block', fontWeight: 'var(--weight-heavy)', lineHeight: 'var(--leading-snug)' };
-const PRIMARY = { marginTop: 'var(--space-1)', fontSize: 'var(--text-body)', color: 'var(--ink)' };
-const SECONDARY = { fontSize: 'var(--text-body)', color: 'var(--ink-soft)' };
-const LINK = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  minHeight: 'var(--tap-min)',
-  fontWeight: 'var(--weight-bold)',
-  color: 'var(--accent-strong)',
-  textDecoration: 'underline',
-  textUnderlineOffset: '4px',
-};
-const CLOSE = {
-  display: 'inline-grid',
-  placeItems: 'center',
-  flex: 'none',
-  width: 'var(--tap-min)',
-  height: 'var(--tap-min)',
-  border: 0,
-  borderRadius: 'var(--radius-full)',
-  background: 'transparent',
-  color: 'var(--ink-soft)',
-  cursor: 'pointer',
-};
-
 export default function NotificationBanner() {
   const { t, pair } = useLang();
   const item = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -111,25 +47,25 @@ export default function NotificationBanner() {
   const lines = item ? pair(item.key, { time: item.time }) : null;
 
   return (
-    <div className="pwa-notify-slot" style={SLOT} aria-live="assertive" aria-atomic="true">
+    <div className="pwa-notify-slot" aria-live="assertive" aria-atomic="true">
       {item && lines && (
-        <section className="pwa-notify" style={CARD} aria-label={t(NOTIFY_TITLE_KEY)} data-notify-kind={item.kind}>
-          <span style={ICON}>
-            <Icon name="flag" size={18} />
+        <section className="ui-callout has-icon pwa-notify" aria-label={t(NOTIFY_TITLE_KEY)} data-notify-kind={item.kind}>
+          <span className="ui-callout-icon" aria-hidden="true">
+            <Icon name="info" size={20} />
           </span>
-          <div style={TEXT}>
-            <strong style={TITLE}>{t(NOTIFY_TITLE_KEY)}</strong>
-            <p style={PRIMARY} lang={lines.primary.lang}>
+          <div className="pwa-notify-text">
+            <strong className="pwa-notify-title">{t(NOTIFY_TITLE_KEY)}</strong>
+            <p className="pwa-notify-primary" lang={lines.primary.lang}>
               {lines.primary.text}
             </p>
-            <p style={SECONDARY} lang={lines.secondary.lang}>
+            <p className="pwa-notify-secondary" lang={lines.secondary.lang}>
               {lines.secondary.text}
             </p>
-            <Link href="/today" style={LINK} onClick={dismiss}>
+            <Link href="/today" className="pwa-notify-link" onClick={dismiss}>
               {t('notifications.openToday')}
             </Link>
           </div>
-          <button type="button" style={CLOSE} onClick={dismiss} aria-label={t('notifications.dismiss')}>
+          <button type="button" className="pwa-notify-close" onClick={dismiss} aria-label={t('notifications.dismiss')}>
             <Icon name="close" size={20} />
           </button>
         </section>

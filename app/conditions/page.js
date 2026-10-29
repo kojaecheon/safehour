@@ -50,6 +50,8 @@ export default function ConditionsPage() {
   const readOnly = status.readOnly;
   const [editing, setEditing] = useState(null); // null | { period: object|null, id: string }
   const [notice, setNotice] = useState(null); // { key, error: boolean }
+  // 편집기가 열려 있는 동안의 저장 실패 문구 키. 맨 위 안내 자리가 아니라 저장 버튼 곁(편집기 하단 바 안)에 보인다
+  const [saveErrorKey, setSaveErrorKey] = useState(null);
   const editorHeadingRef = useRef(null);
   const periodsHeadingRef = useRef(null);
   const consentHeadingRef = useRef(null);
@@ -73,11 +75,13 @@ export default function ConditionsPage() {
 
   function startNew() {
     setNotice(null);
+    setSaveErrorKey(null);
     setEditing({ period: null, id: makeSelfPeriodId((stay?.periods ?? []).map((p) => p.id)) });
   }
 
   function closeEditor() {
     returnFocus.current = true;
+    setSaveErrorKey(null);
     setEditing(null);
   }
 
@@ -87,7 +91,7 @@ export default function ConditionsPage() {
     const next = exists ? current.map((p) => (p.id === period.id ? period : p)) : [...current, period];
     const result = getStore().writePeriods(next);
     if (!result.ok) {
-      setNotice({ key: SAVE_ERROR_KEY[result.code] ?? 'conditions.errSave', error: true });
+      setSaveErrorKey(SAVE_ERROR_KEY[result.code] ?? 'conditions.errSave');
       return;
     }
     setNotice({ key: 'conditions.saved', error: false });
@@ -143,6 +147,7 @@ export default function ConditionsPage() {
                   readOnly={readOnly}
                   onSave={save}
                   onCancel={closeEditor}
+                  saveErrorKey={saveErrorKey}
                 />
               </section>
             )}
@@ -172,6 +177,7 @@ export default function ConditionsPage() {
                         readOnly={readOnly}
                         onEdit={(p) => {
                           setNotice(null);
+                          setSaveErrorKey(null);
                           setEditing({ period: p, id: p.id });
                         }}
                         onDelete={remove}

@@ -107,7 +107,7 @@ function PlanGuide({ linked, readOnly, nowMs }) {
         </div>
       )}
       {failed && (
-        <p className="conditions-field-error" role="alert">
+        <p className="ui-field-error conditions-field-error" role="alert">
           <Icon name="alert" size={20} />
           <span>{t('conditions.errSave')}</span>
         </p>

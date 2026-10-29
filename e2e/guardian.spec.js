@@ -8,7 +8,7 @@
 // - 스냅샷에는 식이·복약·보행·자외선·열·물·병원 정보가 없다 — 링크를 실제로 풀어 확인한다.
 
 import { test, expect, expectGuardClean, guardContext } from './fixtures.js';
-import { HOSPITAL_NAME, HOSPITAL_PHONE, evidenceShot, readRecord, startTrip } from './helpers.js';
+import { HOSPITAL_NAME, HOSPITAL_PHONE, createGuardianLink, evidenceShot, readRecord, startTrip } from './helpers.js';
 import { decryptSnapshot } from '../src/guardian/index.js';
 
 const PIN = '482915';
@@ -24,22 +24,6 @@ function watchRequests(target, sink) {
   target.on('request', (request) => {
     sink.push(requestText(request));
   });
-}
-
-async function createLink(page) {
-  await page.goto('/guardian');
-  await expect(page.getByRole('heading', { name: '보호자에게 보내는 내용' })).toBeVisible();
-  await expect(page.getByText('병원 이름·주소·전화, 병원 안내문, 병원 일정')).toBeVisible();
-  await page.getByLabel('위 내용을 보호자에게 보내는 데 동의해요 (이번 링크에만 적용돼요)').check();
-  await page.getByLabel('PIN (숫자 6자리)').fill(PIN);
-  await page.getByLabel('PIN 확인 (한 번 더)').fill(PIN);
-  await page.getByRole('button', { name: '링크 만들기' }).click();
-  const field = page.getByLabel('링크', { exact: true });
-  await expect(field).toBeVisible();
-  const link = await field.inputValue();
-  expect(link).toMatch(/\/g#[A-Za-z0-9_-]{40,}$/);
-  await expect(page.getByText('PIN은 링크와 함께 보내지 말고 따로 알려 주세요.')).toBeVisible();
-  return link;
 }
 
 /** 보호자 기기 — 로그인하지 않은 새 컨텍스트 */
@@ -77,7 +61,7 @@ test.describe('시나리오 6 — 보호자 링크', () => {
     const patientRequests = [];
     watchRequests(context, patientRequests);
     await startTrip(page, { hasCompanion: true });
-    const link = await createLink(page);
+    const link = await createGuardianLink(page, { pin: PIN, open: true, verify: true });
     const fragment = link.split('#')[1];
     await evidenceShot(page, '15-guardian-create');
     expect((await readRecord(page, 'stay')).guardianShare?.lastSentAt).toBeTruthy();
@@ -134,7 +118,7 @@ test.describe('시나리오 6 — 보호자 링크', () => {
 
   test('PIN 을 5번 연속 틀리면 그 기기에서 링크가 잠긴다', async ({ page, browser }, testInfo) => {
     await startTrip(page, { hasCompanion: true });
-    const link = await createLink(page);
+    const link = await createGuardianLink(page, { pin: PIN, open: true, verify: true });
     const guardian = await guardianDevice(browser, testInfo);
     try {
       await loginRoundTrip(guardian.page, link);

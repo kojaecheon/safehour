@@ -182,14 +182,14 @@ test.describe('③층 하루 일정, 안전 표시 회귀 가드', () => {
         'border-top-left-radius': '12px',
       });
 
-    // (d) 변경됨 알림이 함께 보이면: 회색 면 · 모서리 10, 문구 칸과 화살표 아이콘 하나
+    // (d) 변경됨 알림: 회색 면 · 모서리 10, 문구 칸과 화살표 아이콘 하나.
+    // 환자 호출은 즉시 복귀를 켜므로(returnNow 거짓 → 참) 늘 보이는 변화다(src/engine/dayDelta.js). 확인 전이라 알림이 남는다
     const changed = page.locator('.trip-changed');
-    if ((await changed.count()) > 0) {
-      await expect
-        .poll(() => styles(changed, ['background-color', 'border-top-left-radius']))
-        .toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-top-left-radius': '10px' });
-      await expect(changed.locator('.trip-changed-text')).toHaveCount(1);
-      await expect(changed.locator('svg')).toHaveCount(1);
-    }
+    await expect(changed).toHaveCount(1);
+    await expect
+      .poll(() => styles(changed, ['background-color', 'border-top-left-radius']))
+      .toEqual({ 'background-color': 'rgb(243, 244, 245)', 'border-top-left-radius': '10px' });
+    await expect(changed.locator('.trip-changed-text')).toHaveCount(1);
+    await expect(changed.locator('svg')).toHaveCount(1);
   });
 });

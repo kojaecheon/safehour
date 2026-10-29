@@ -469,10 +469,6 @@ p.trip-notice > .trip-notice-body {
   font-size: var(--text-body);
   color: var(--ink);
 }
-.trip-intro-note {
-  font-size: var(--text-body);
-  color: var(--ink-soft);
-}
 
 /* ── 데모 사건 패널 — 데모임을 숨기지 않는다 ── */
 .trip-demo {

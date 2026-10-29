@@ -16,7 +16,7 @@ export function ErrorText({ id, children }) {
   const empty = children === null || children === undefined || children === false || children === '';
   if (empty) return <p id={id} className="guardian-error is-empty" role="alert" />;
   return (
-    <p id={id} className="guardian-error" role="alert">
+    <p id={id} className="ui-field-error guardian-error" role="alert">
       <Icon name="alert" size={20} />
       <span>{children}</span>
     </p>

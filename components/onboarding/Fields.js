@@ -26,7 +26,7 @@ export function FieldErrors({ id, issues }) {
       {issues.map((issue) => {
         const { key, vars } = issueMessage(issue);
         return (
-          <p key={`${issue.field}-${issue.code}`}>
+          <p key={`${issue.field}-${issue.code}`} className="ui-field-error">
             <Icon name="alert" size={20} />
             <span>{t(key, vars)}</span>
           </p>

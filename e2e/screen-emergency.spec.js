@@ -113,4 +113,18 @@ test.describe('③층 긴급, SEED 배치', () => {
       .poll(() => styles(call, ['outline-color', 'outline-width']))
       .toEqual({ 'outline-color': 'rgb(26, 28, 32)', 'outline-width': '2px' });
   });
+
+  test('1330 키보드 초점: 회색 보조 버튼은 코발트 링이다(먹색 링은 코발트·빨강·먹색 면에만, 설계서 4.6)', async ({ page }) => {
+    await page.goto('/emergency');
+    const call = page.getByRole('link', { name: '1330 전화 걸기', exact: true });
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press('Tab');
+      if (await call.evaluate((el) => el === document.activeElement)) break;
+    }
+    await expect(call).toBeFocused();
+    expect(await call.evaluate((el) => el.matches(':focus-visible'))).toBe(true);
+    await expect
+      .poll(() => styles(call, ['outline-color', 'outline-width']))
+      .toEqual({ 'outline-color': 'rgb(10, 92, 255)', 'outline-width': '2px' });
+  });
 });

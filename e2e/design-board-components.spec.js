@@ -125,7 +125,8 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
   test('입력·선택 — 입력칸·답 칩·선택 상자·스위치·전환·날짜 칩 (설계서 5.2·5.3)', async ({ page }) => {
     await pointerAway(page);
 
-    // 입력칸: 52px · 모서리 12 · 좌우 16 · 3:1 테두리. 초점은 2px 진한 테두리, 윤곽선 없음. 오류는 빨강
+    // 입력칸: 52px · 모서리 12 · 좌우 16 · 3:1 테두리. 초점은 2px 진한 테두리, 윤곽선은 투명(보통 모드에서는 보이지 않고
+    // 강제 색상 모드에서만 시스템 색으로 보인다, e2e/forced-colors.spec.js). 오류는 빨강
     const input = page.locator('#designBoard-input');
     expect(
       await styles(input, ['min-height', 'border-top-left-radius', 'border-top-color', 'font-size', 'padding-left']),
@@ -138,11 +139,12 @@ test.describe('②층 부품 — 시안 보드에서 잰 모양', () => {
     });
     await input.focus();
     await expect
-      .poll(() => styles(input, ['border-top-color', 'box-shadow', 'outline-style']))
+      .poll(() => styles(input, ['border-top-color', 'box-shadow', 'outline-style', 'outline-color']))
       .toEqual({
         'border-top-color': 'rgb(26, 28, 32)',
         'box-shadow': 'rgb(26, 28, 32) 0px 0px 0px 1px inset',
-        'outline-style': 'none',
+        'outline-style': 'solid',
+        'outline-color': 'rgba(0, 0, 0, 0)',
       });
     const invalid = page.locator('#designBoard-input-error');
     expect((await styles(invalid, ['border-top-color']))['border-top-color']).toBe('rgb(200, 16, 46)');

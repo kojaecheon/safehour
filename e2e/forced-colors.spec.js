@@ -187,4 +187,40 @@ test.describe('강제 색상 모드', () => {
     const plainChip = page.locator('.ui-date-strip a.ui-date-chip:not(.is-selected):not(.is-today)').first();
     expect(await edgeWidthOf(today)).toBeGreaterThan(await edgeWidthOf(plainChip));
   });
+
+  test('글자 입력칸: 키보드 초점이 시스템 색 윤곽선으로 보인다(테두리 색과 안쪽 그림자만으로는 사라진다)', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' });
+    await startTrip(page);
+    await page.goto('/onboarding?edit=1');
+    const sys = await systemColors(page);
+    const date = page.locator('#ob-arrival-date');
+    await expect(date).toBeVisible();
+
+    // 초점 전에는 윤곽선이 없다
+    expect((await styles(date, ['outline-style']))['outline-style']).toBe('none');
+    // 강제 색상은 안쪽 그림자를 지우고 테두리를 시스템 색 하나로 맞춘다: 초점은 윤곽선으로만 남는다.
+    // 투명 윤곽선은 시스템 색으로 바뀐다(Chromium 은 초점 윤곽선을 Highlight 로 그린다)
+    await focusByKeyboard(page, date);
+    await expect.poll(() => styles(date, ['outline-style', 'outline-color'])).toEqual({
+      'outline-style': 'solid',
+      'outline-color': sys.Highlight,
+    });
+  });
+
+  test('링크형 비활성 버튼(aria-disabled): 글자와 테두리가 GrayText 라 켜진 버튼과 갈린다', async ({ page }) => {
+    await page.emulateMedia({ forcedColors: 'active' });
+    await page.goto('/login');
+    const sys = await systemColors(page);
+
+    // 공급자 설정이 없는 소셜 로그인은 링크 대신 aria-disabled 버튼이다(disabled 속성이 없어 브라우저가 GrayText 로 바꾸지 않는다)
+    const disabled = page.locator('.onboarding-login-methods button[aria-disabled="true"]').first();
+    await expect(disabled).toBeVisible();
+    await expect.poll(() => styles(disabled, ['color', 'border-top-color'])).toEqual({
+      color: sys.GrayText,
+      'border-top-color': sys.GrayText,
+    });
+    // 누를 수 있는 데모 로그인은 GrayText 가 아니다
+    const demo = page.getByRole('link', { name: '데모 계정으로 둘러보기' });
+    expect((await styles(demo, ['color'])).color).not.toBe(sys.GrayText);
+  });
 });

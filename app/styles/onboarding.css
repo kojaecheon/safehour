@@ -492,29 +492,10 @@
   color: var(--ink-soft);
 }
 
-/* 오류 문장 (설계서 5.2) — 20px 경고 아이콘 + 16/22 굵은 긴급 빨강, 왼쪽 띠 없음.
-   16px(SEED 14px) — 다음 단계로 못 가는 이유라 본문 하한을 지킨다. 입력칸 테두리는 globals.css 공통 규칙이 그린다.
-   저장 실패·주소 검색 실패 문장도 같은 배치다(상태는 색 + 문구 + 아이콘으로 보인다) — 선택자를 묶는다 */
+/* 오류 문장 (설계서 5.2): 모양(20px 경고 아이콘 + 16/22 굵은 긴급 빨강, 왼쪽 띠 없음)은 ui.css 의 공용 .ui-field-error.
+   필드 오류 줄(<p>)·저장 실패·주소 검색 실패 문장이 함께 단다. 여기에는 바깥 여백만 둔다 */
 .onboarding-field-error {
   margin-top: var(--space-2);
-}
-.onboarding-field-error p,
-.onboarding-save-error,
-.onboarding-search-status.is-error {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-1-5);
-  font-size: var(--text-body);
-  line-height: var(--lh-body);
-  font-weight: var(--weight-bold);
-  color: var(--emergency);
-}
-/* 20px 아이콘을 22px 첫 줄 가운데에 */
-.onboarding-field-error .ui-icon,
-.onboarding-save-error .ui-icon,
-.onboarding-search-status.is-error .ui-icon {
-  flex: none;
-  margin-top: 1px;
 }
 .onboarding-field-error p + p {
   margin-top: var(--space-1);
@@ -583,16 +564,18 @@
 .onboarding-search-row .btn {
   flex: none;
 }
+/* 검색 실패(.is-error)는 공용 오류 줄(.ui-field-error)을 함께 단다: 글자색은 그쪽이 정하므로 옅은 회색은 실패가 아닐 때만 */
 .onboarding-search-status {
   min-height: var(--space-2);
   margin-top: var(--space-2);
   font-size: var(--text-body);
+}
+.onboarding-search-status:not(.is-error) {
   color: var(--ink-soft);
 }
 .onboarding-search-status:empty {
   margin-top: 0;
 }
-/* 검색 실패 배치(아이콘·굵기·색)는 위 오류 문장과 같은 묶인 규칙(.onboarding-field-error p 곁)을 쓴다 */
 .onboarding-results {
   list-style: none;
   display: grid;
@@ -788,25 +771,11 @@
   grid-column: 1 / -1;
 }
 /* 저장 버튼을 못 누르는 이유(보기 전용·저장 실패)는 바 안 맨 앞, 두 칸 전체 폭에 — 버튼 줄은 늘 둘째 줄로 밀린다.
-   바의 grid gap 이 버튼 줄과의 간격을 주므로 문장 자신의 위 여백은 없앤다.
-   contain: inline-size 는 긴 문장의 한 줄 폭이 이전 칸(글자 길이만큼 자라는 칸)을 밀어 바가 넘치지 않게 한다 */
+   전체 폭 줄과 contain: inline-size 는 ui.css 의 공용 .ui-bar-split > p, 문장이 들어간 바만큼 화면 끝을 더 비우는 일은
+   globals.css 의 공용 .sticky-return.is-flow > p 규칙이 한다. 바의 grid gap 이 버튼 줄과의 간격을 주므로 문장 자신의 위 여백만 없앤다 */
 .onboarding-actions > .onboarding-readonly,
 .onboarding-actions > .onboarding-save-error {
-  grid-column: 1 / -1;
   margin-top: 0;
-  contain: inline-size;
-}
-/* 바에 문장(보기 전용·저장 실패)이 들어가면 바가 77~99px 보다 커진다(ja 320px 보기 전용 문장은 바가 194px 안팎).
-   문장 네 줄 몫을 더 비워 마지막 입력칸과 초점이 간 칸이 바에 가리지 않게 한다(보호자 화면 .guardian-bar 와 같은 규칙).
-   짧은 화면은 바가 고정되지 않으므로 뺀다. 전역 .app-shell:has(.sticky-return) main.page(0,3,1)와
-   html:has(.sticky-return.is-flow)(0,2,1)보다 구체적이어야 해서 클래스·요소를 모두 적는다 */
-@media (min-height: 481px) {
-  .app-shell:has(.onboarding-actions > p) main.page {
-    padding-bottom: calc(var(--nav-offset) + 152px + 4 * var(--lh-body));
-  }
-  html:has(.onboarding-actions.sticky-return.is-flow > p) {
-    scroll-padding-bottom: calc(184px + 4 * var(--lh-body));
-  }
 }
 .onboarding-readonly {
   display: flex;
@@ -817,7 +786,7 @@
   font-size: var(--text-body);
   color: var(--ink);
 }
-/* 저장 실패 배치(아이콘·굵기·색)는 위 오류 문장과 같은 묶인 규칙을 쓴다. 바 밖에서 쓰일 때를 대비한 기본 위 여백만 여기 둔다
+/* 저장 실패 모양(아이콘·굵기·색)은 공용 .ui-field-error. 바 밖에서 쓰일 때를 대비한 기본 위 여백만 여기 둔다
    (바 안에서는 .onboarding-actions > .onboarding-save-error 가 0으로 되돌린다) */
 .onboarding-save-error {
   margin-top: var(--space-3);

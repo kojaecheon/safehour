@@ -7,38 +7,20 @@
 // 휴무 사건은 '아직 도착하지 않은 첫 장소'를 닫는다. 오늘 남은 정거장이 없는 시각(늦은 밤)에는 그 사건을 걸 수 없다.
 
 import { test, expect } from './fixtures.js';
-import { acknowledgeGuide, evidenceShot, kstDate, kstMinutes, linkDemoPlan, readRecord, startTrip, stopsOf } from './helpers.js';
+import { evidenceShot, fireDemoEvent, kstDate, kstMinutes, openDemoToday, readRecord, stopsOf } from './helpers.js';
 
 const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
-async function openDemoToday(page) {
-  await startTrip(page);
-  await linkDemoPlan(page, 'A');
-  await acknowledgeGuide(page);
-  const today = kstDate(0);
-  // 연결로 기간이 바뀌었으니 오늘 이후가 다시 판정된다 — 오늘 일정에 병원 발행 출처가 실릴 때까지 기다린다
-  await expect
-    .poll(async () => JSON.stringify((await readRecord(page, 'tripPlan'))?.days?.[today]?.effective ?? {}).includes('HOSPITAL'), {
-      message: '데모 지침 연결 뒤 오늘 재계획',
-    })
-    .toBe(true);
-  await page.goto(`/trip/${today}`);
-  const panel = page.getByRole('region', { name: '변화 시연 (병원 연동 데모)' });
-  await expect(panel).toBeVisible();
+/** 공용 openDemoToday(helpers.js)에 이 파일이 함께 보던 데모 표시 확인과 오늘 날짜를 더한다 */
+async function openDemoTodayWithLabel(page) {
+  const panel = await openDemoToday(page);
   await expect(panel.getByText('병원 연동 데모', { exact: true })).toBeVisible();
-  return { today, panel };
-}
-
-/** 사건 버튼이 눌릴 수 있을 때까지(동기화 중이 아닐 때) 기다렸다가 누른다 */
-async function fire(page, panel, name) {
-  const button = panel.getByRole('button', { name });
-  await expect(button).not.toHaveAttribute('aria-disabled', 'true');
-  await button.click();
+  return { today: kstDate(0), panel };
 }
 
 test.describe('시나리오 3 — 데모 사건', () => {
   test('휴무 사건은 그 장소를 자동으로 대체하고 전후 비교 시트로 보여 준다', async ({ page }) => {
-    const { today, panel } = await openDemoToday(page);
+    const { today, panel } = await openDemoTodayWithLabel(page);
     const before = (await readRecord(page, 'tripPlan')).days[today];
     const now = kstMinutes();
     const next = stopsOf(before)
@@ -46,7 +28,7 @@ test.describe('시나리오 3 — 데모 사건', () => {
       .sort((a, b) => minutesOf(a.arriveAt) - minutesOf(b.arriveAt))[0];
     test.skip(!next, '오늘 남은 정거장이 없는 시각이라 휴무 사건을 걸 수 없다');
 
-    await fire(page, panel, /다음 장소 휴무/);
+    await fireDemoEvent(panel, /다음 장소 휴무/);
     await expect(page.getByText('데모 사건을 반영해 오늘 일정을 다시 판정했어요.')).toBeVisible();
     await expect(panel.getByRole('listitem').filter({ hasText: '장소 휴무' })).toBeVisible();
 
@@ -74,10 +56,10 @@ test.describe('시나리오 3 — 데모 사건', () => {
   });
 
   test('환자 호출은 오늘 남은 일정을 비우고 복귀 시트를 자동으로 연다. 뒤로 가기는 시트만 닫는다. 초기화하면 풀린다', async ({ page }) => {
-    const { today, panel } = await openDemoToday(page);
+    const { today, panel } = await openDemoTodayWithLabel(page);
     const url = page.url();
 
-    await fire(page, panel, /환자 호출/);
+    await fireDemoEvent(panel, /환자 호출/);
     // 복귀 시트 자동 열림 (끌 수 없다 — AX-220)
     const sheet = page.getByRole('dialog', { name: '지금 돌아가세요' });
     await expect(sheet).toBeVisible();
@@ -108,7 +90,7 @@ test.describe('시나리오 3 — 데모 사건', () => {
 
     // 사건 초기화 → 오늘을 다시 판정, 즉시 복귀가 풀린다
     const resetPanel = page.getByRole('region', { name: '변화 시연 (병원 연동 데모)' });
-    await fire(page, resetPanel, '사건 초기화');
+    await fireDemoEvent(resetPanel, '사건 초기화');
     await expect(page.getByText('데모 사건을 지우고 오늘 일정을 다시 판정했어요.')).toBeVisible();
     await expect.poll(async () => (await readRecord(page, 'tripPlan')).days[today].returnNow).toBe(false);
     await expect(page.getByRole('button', { name: '복귀 안내 다시 보기' })).toHaveCount(0);
@@ -116,8 +98,8 @@ test.describe('시나리오 3 — 데모 사건', () => {
   });
 
   test('위험 신호는 오늘을 관광 미추천(NO_TOURISM)으로 만든다 — 오류 스타일이 아니다', async ({ page }) => {
-    const { today, panel } = await openDemoToday(page);
-    await fire(page, panel, /위험 신호 입력/);
+    const { today, panel } = await openDemoTodayWithLabel(page);
+    await fireDemoEvent(panel, /위험 신호 입력/);
     await expect(page.getByText('데모 사건을 반영해 오늘 일정을 다시 판정했어요.')).toBeVisible();
     const stored = (await readRecord(page, 'tripPlan')).days[today];
     expect(stored.dayState).toBe('NO_TOURISM');

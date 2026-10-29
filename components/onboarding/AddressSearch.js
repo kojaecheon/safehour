@@ -173,7 +173,7 @@ export default function AddressSearch({ field, issues, kind, value, onSelect }) 
           {t('onboarding.searchButton')}
         </Button>
       </div>
-      <p id={statusId} role="status" className={search.phase === 'error' ? 'onboarding-search-status is-error' : 'onboarding-search-status'}>
+      <p id={statusId} role="status" className={search.phase === 'error' ? 'ui-field-error onboarding-search-status is-error' : 'onboarding-search-status'}>
         {search.phase === 'error' ? (
           <>
             <Icon name="alert" size={20} />

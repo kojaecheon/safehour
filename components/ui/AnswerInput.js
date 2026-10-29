@@ -13,7 +13,7 @@
 // 그래서 고른 뒤 그 뜻을 한 줄로 바로 보여준다(showMeaning, 기본 켜짐).
 //
 // 접근성: fieldset + legend + 표준 라디오(방향키로 이동). 라디오는 칸 전체를 덮는 투명 입력이라
-// 칸 어디를 눌러도 고를 수 있고, 칸마다 48px 이상이다. 선택은 테두리·바탕·체크 아이콘·굵기로 보인다.
+// 칸 어디를 눌러도 고를 수 있고, 칸마다 44px 이상이다. 선택은 테두리·바탕·체크 아이콘·굵기로 보인다.
 
 import { Fragment, useId } from 'react';
 import { useLang } from '../LanguageProvider.js';

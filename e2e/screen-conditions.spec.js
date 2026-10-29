@@ -287,6 +287,51 @@ test.describe('③층 조건 화면, 편집기', () => {
     ).toBe('rgb(220, 222, 227)');
   });
 
+  test('저장 실패: 이유가 경고 아이콘과 함께 저장 버튼 곁(하단 바 안 맨 앞)에 보이고, 바가 커진 만큼 화면 끝을 더 비운다', async ({ page }) => {
+    await startTrip(page, {}, { path: '/conditions' });
+    await page.getByRole('button', { name: '고치기' }).first().click();
+    await expect(page.locator('#conditions-editor-heading')).toBeVisible();
+    const main = page.locator('main.conditions-page');
+    const paddingOf = async () => parseFloat((await styles(main, ['padding-bottom']))['padding-bottom']);
+    const before = await paddingOf();
+
+    // 기기 저장을 강제로 실패시킨다(환경 결함 주입). .stay 레코드 쓰기만 막아 writePeriods() 가 STORAGE_FAILED 를 돌려주게 한다
+    await page.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function patchedSetItem(key, value) {
+        if (key.endsWith('.stay')) throw new Error('e2e-forced-storage-failure');
+        return original.call(this, key, value);
+      };
+    });
+    const bar = page.locator('.conditions-editor-actions');
+    const save = bar.getByRole('button', { name: '저장', exact: true });
+    await save.click();
+
+    // 편집기는 열린 채이고, 실패 문장은 바 안 맨 앞 <p> 다(맨 위 안내 자리에는 뜨지 않는다)
+    const error = bar.locator(':scope > p');
+    await expect(error).toHaveText('저장하지 못했어요. 다시 시도해 주세요.');
+    await expect(error).toHaveAttribute('role', 'alert');
+    await expect(error).toBeVisible();
+    await expect(error).toBeInViewport();
+    await expect(page.locator('#conditions-editor-heading')).toBeVisible();
+    await expect(page.locator('.conditions-notice')).toHaveText('');
+
+    // 모양은 체류 설정의 저장 실패와 같다: 20px 경고 아이콘 + 16px 굵은 긴급 빨강, 버튼 줄 위
+    expect(await styles(error, ['color', 'font-size', 'font-weight'])).toEqual({
+      color: 'rgb(200, 16, 46)',
+      'font-size': '16px',
+      'font-weight': '700',
+    });
+    await expect(error.locator('svg')).toHaveCount(1);
+    expect((await error.locator('svg').boundingBox()).width).toBe(20);
+    const errorBox = await error.boundingBox();
+    expect(Math.round(errorBox.y + errorBox.height)).toBeLessThanOrEqual(Math.round((await save.boundingBox()).y));
+
+    // 바에 문장이 들어가면 공용 규칙이 문장 네 줄 몫(4 × 22px)을 더 비운다: 전역 :has(.sticky-return) 규칙을 이긴 계산 값
+    await expect.poll(paddingOf).toBe(before + 88);
+    expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom)).toBe('272px');
+  });
+
   test('편집 중에는 체류 정보 고치기 행이 없다: 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다', async ({ page }) => {
     await startTrip(page, { periods: [] }, { path: '/conditions' });
     await expect(page.getByRole('link', { name: '체류 정보 고치기' })).toHaveCount(1);

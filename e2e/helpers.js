@@ -383,7 +383,8 @@ export async function acknowledgeGuide(page) {
 
 /**
  * 데모 사건 패널이 있는 오늘 일정(/trip/오늘)을 연다.
- * 데모 지침 A 를 연결하고 병원 안내를 확인한 뒤, 오늘 일정에 병원 발행 출처가 실리면 연다(e2e/demo-events.spec.js 와 같은 흐름).
+ * 데모 지침 A 를 연결하고 병원 안내를 확인한 뒤, 오늘 일정에 병원 발행 출처가 실리면 연다
+ * (demo-events·screen-day·screen-today spec 이 함께 쓴다).
  * @returns {Promise<import('@playwright/test').Locator>} 데모 사건 패널 region
  */
 export async function openDemoToday(page) {
@@ -407,4 +408,35 @@ export async function fireDemoEvent(panel, name) {
   const button = panel.getByRole('button', { name });
   await expect(button).not.toHaveAttribute('aria-disabled', 'true');
   await button.click();
+}
+
+// ── 보호자 링크 ─────────────────────────────────────────────────
+
+export const GUARDIAN_CONSENT_LABEL = '위 내용을 보호자에게 보내는 데 동의해요 (이번 링크에만 적용돼요)';
+
+/**
+ * 보호자 링크를 만들고 링크 글자를 돌려준다.
+ * @param {import('@playwright/test').Page} page
+ * @param {object} options
+ * @param {string} options.pin 6자리 PIN
+ * @param {boolean} [options.open] /guardian 으로 가서 담기는 내용 안내가 보이는지부터 본다(아니면 이미 연 화면에서 시작한다)
+ * @param {boolean} [options.verify] 만든 뒤 링크 모양(/g#암호문)과 PIN 따로 보내기 안내를 확인한다
+ */
+export async function createGuardianLink(page, { pin, open = false, verify = false }) {
+  if (open) {
+    await page.goto('/guardian');
+    await expect(page.getByRole('heading', { name: '보호자에게 보내는 내용' })).toBeVisible();
+    await expect(page.getByText('병원 이름·주소·전화, 병원 안내문, 병원 일정')).toBeVisible();
+  }
+  await page.getByLabel(GUARDIAN_CONSENT_LABEL).check();
+  await page.getByLabel('PIN (숫자 6자리)').fill(pin);
+  await page.getByLabel('PIN 확인 (한 번 더)').fill(pin);
+  await page.getByRole('button', { name: '링크 만들기' }).click();
+  const field = page.getByLabel('링크', { exact: true });
+  if (!verify) return field.inputValue();
+  await expect(field).toBeVisible();
+  const link = await field.inputValue();
+  expect(link).toMatch(/\/g#[A-Za-z0-9_-]{40,}$/);
+  await expect(page.getByText('PIN은 링크와 함께 보내지 말고 따로 알려 주세요.')).toBeVisible();
+  return link;
 }

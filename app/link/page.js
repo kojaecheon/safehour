@@ -322,7 +322,7 @@ export default function LinkPage() {
                       </div>
                     </fieldset>
                     {choiceError && (
-                      <p className="conditions-field-error" id="link-choose-error" role="alert">
+                      <p className="ui-field-error conditions-field-error" id="link-choose-error" role="alert">
                         <Icon name="alert" size={20} />
                         <span>{t('link.chooseRequired')}</span>
                       </p>

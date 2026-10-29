@@ -86,7 +86,7 @@ export default function ConsentWithdraw({ headingLevel = 2, onWithdrawn }) {
         {result === 'done' && t('conditions.withdrawDone')}
       </div>
       {result === 'failed' && (
-        <p className="conditions-field-error" role="alert">
+        <p className="ui-field-error conditions-field-error" role="alert">
           <Icon name="alert" size={20} />
           <span>{t('conditions.withdrawFailed')}</span>
         </p>

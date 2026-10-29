@@ -10,6 +10,8 @@
 //   - 복약 시각마다 '숙소에서 복용'(기본 예)을 고른다.
 //   - 제한 없음 기간을 켜면 항목을 묻지 않는다.
 // 저장은 validatePeriodForm(도메인 검증) → 부모의 onSave(기간). 오류는 항목마다 붙이고 맨 위에 모아 보여준다.
+// 기기 저장이 실패하면 부모가 saveErrorKey 로 알려 준다. 그 문장은 저장 버튼 곁(하단 바 안 맨 앞)에 보인다(설계서 6.1,
+// 체류 설정·보호자와 같은 자리).
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
@@ -139,8 +141,9 @@ function initialForm(period, stay) {
  * @param {boolean} props.readOnly
  * @param {(period: object) => void} props.onSave
  * @param {() => void} props.onCancel
+ * @param {string|null} [props.saveErrorKey]  기기 저장 실패 문구 키(없으면 null). 하단 바 안 맨 앞에 보인다
  */
-export default function PeriodForm({ stay, period, periodId, readOnly, onSave, onCancel }) {
+export default function PeriodForm({ stay, period, periodId, readOnly, onSave, onCancel, saveErrorKey = null }) {
   const { t } = useLang();
   // 오류 요약의 #링크로도 쓰므로 URL 조각에 안전한 글자만 남긴다
   const base = `pf${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
@@ -200,7 +203,7 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
   function renderError(field) {
     if (!errors[field]) return null;
     return (
-      <p className="conditions-field-error" id={errorId(field)} tabIndex={DATE_FIELDS.includes(field) ? -1 : undefined}>
+      <p className="ui-field-error conditions-field-error" id={errorId(field)} tabIndex={DATE_FIELDS.includes(field) ? -1 : undefined}>
         <Icon name="alert" size={20} />
         <span>{t(errorKey(field, errors[field]))}</span>
       </p>
@@ -535,8 +538,15 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
         )}
       </PeriodEditor>
 
-      {/* 하단 고정 바(설계서 6.1): 하단 내비 바로 위에 [취소 3][저장 7] */}
+      {/* 하단 고정 바(설계서 6.1): 하단 내비 바로 위에 [취소 3][저장 7].
+          저장하지 못한 이유는 버튼 곁에 보이도록 바 안 맨 앞에 둔다(체류 설정 .onboarding-save-error 와 같은 자리·모양) */}
       <div className="ui-bar-split conditions-editor-actions sticky-return is-flow">
+        {saveErrorKey && (
+          <p className="ui-field-error conditions-save-error" role="alert">
+            <Icon name="alert" size={20} />
+            <span>{t(saveErrorKey)}</span>
+          </p>
+        )}
         <Button variant="secondary" onClick={onCancel}>
           {t('conditions.cancel')}
         </Button>

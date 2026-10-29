@@ -1458,18 +1458,107 @@ main.page.is-basement > .ui-block:last-child {
   color: inherit;
 }
 
+/* ───────────────────────── 앱 안 알림 배너 (components/pwa/NotificationBanner.js) ─────────────────────────
+ * 예약한 시각에 화면 위에 떠서 알린다. 모양은 위 공용 안내 상자(.ui-callout.has-icon, 앞 20px info 아이콘 칸)이고
+ * 왼쪽 색 띠를 두지 않는다(설계서 5.6). 다른 안내 상자와 달리 화면 위에 떠 있어 떠 있는 층 그림자(--shadow-float,
+ * 설계서 4.5)로 아래 화면과 가르고, 셋째 칸에 44px 닫기 버튼을 둔다 */
+.pwa-notify-slot {
+  position: fixed;
+  z-index: 45;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--gutter);
+  pointer-events: none;
+}
+.ui-callout.pwa-notify {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+  max-width: calc(var(--shell-max) - 2 * var(--gutter));
+  /* 닫기 버튼(44px)이 오른쪽 끝에 붙어 서게 오른쪽 안쪽 여백만 8 */
+  padding-right: var(--space-2);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+}
+.pwa-notify-title {
+  display: block;
+}
+/* 안전 문구 병기: 주 언어는 먹색, 둘째 줄은 보조 글자색(투명도 없이) */
+.pwa-notify-primary {
+  margin-top: var(--space-1);
+  color: var(--ink);
+}
+.pwa-notify-secondary {
+  color: var(--ink-soft);
+}
+.pwa-notify-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* 닫기: 44px 누르는 칸의 가운데(X)를 제목 첫 줄 가운데에 맞춘다 */
+.pwa-notify-close {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin-top: calc((var(--lh-body) - var(--tap-min)) / 2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+/* 강제 색상(Windows 고대비): 면과 그림자가 사라지면 떠 있는 배너가 아래 화면과 한 덩어리가 된다. 테두리로 윤곽을 그린다 */
+@media (forced-colors: active) {
+  .ui-callout.pwa-notify {
+    border: 1px solid CanvasText;
+  }
+}
+
 /* ───────────────────────── 3:7 하단 바 (설계서 6.1) ─────────────────────────
  * [보조 3][주 7], 사이 8px. 체류 설정(.onboarding-actions)·조건 편집기(.conditions-editor-actions)·
- * 병원 고르기(.link-bar)가 함께 쓴다. 면·윗선·짧은 화면 처리는 globals.css 의 .sticky-return.is-flow.
- * 보조 칸은 3:7 이지만 글자 길이보다 좁아지지 않아(max-content) 긴 글자(ja 'キャンセル')도 한 줄이다.
- * 바 안 전체 폭 문장 줄에는 contain: inline-size 가 필요하다(체류 설정 .onboarding-readonly 참고) */
+ * 병원 고르기(.link-bar)가 함께 쓴다. 면·윗선·짧은 화면 처리와 문장이 들어간 바의 화면 끝 여백은 globals.css 의 .sticky-return.
+ * 보조 칸은 3:7 이지만 글자 길이보다 좁아지지 않아(max-content) 긴 글자(ja 'キャンセル')도 한 줄이다. */
 .ui-bar-split {
   display: grid;
   grid-template-columns: minmax(max-content, 3fr) minmax(0, 7fr);
   gap: var(--space-2);
 }
+/* 바 안 문장(보기 전용·저장 실패 같은 못 누르는 이유)은 맨 앞, 두 칸 전체 폭에 선다. 버튼 줄은 둘째 줄로 밀린다.
+ * contain: inline-size 는 긴 문장의 한 줄 폭이 보조 칸(글자 길이만큼 자라는 칸)을 밀어 바가 넘치지 않게 한다 */
+.ui-bar-split > p {
+  grid-column: 1 / -1;
+  contain: inline-size;
+}
 /* 30% 칸(320px 에서 84px)에도 '上一步'·'取消'(zh)가 한 줄에 들어가게 보조 버튼의 좌우 여백을 12px 로 줄인다 */
 .ui-bar-split > .btn-secondary {
   padding-left: var(--space-3);
   padding-right: var(--space-3);
+}
+
+/* ───────────────────────── 오류 줄 (설계서 5.2) ─────────────────────────
+ * 입력 오류·저장 실패 문장: 앞 20px 경고 아이콘 + 16/22 굵은 긴급 빨강, 왼쪽 띠 없음. 상태는 색 + 문구 + 아이콘으로 보인다.
+ * 16px(SEED 14px)은 다음으로 못 가는 이유라 본문 하한을 지킨다. 입력칸 테두리는 globals.css 공통 규칙이 그린다.
+ * 체류 설정(.onboarding-field-error p·.onboarding-save-error·.onboarding-search-status.is-error)·조건(.conditions-field-error·
+ * .conditions-save-error)·보호자(.guardian-error)가 함께 단다. 기능 클래스에는 바깥 여백만 남긴다 */
+.ui-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-bold);
+  color: var(--emergency);
+}
+/* 20px 아이콘을 22px 첫 줄 가운데에 */
+.ui-field-error .ui-icon {
+  flex: none;
+  margin-top: 1px;
 }

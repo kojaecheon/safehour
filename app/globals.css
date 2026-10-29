@@ -289,7 +289,8 @@ main.page {
      긴급은 내비 칸·긴급 바 안에 있어 떠 있지 않다 */
   padding: var(--space-5) var(--gutter) calc(var(--nav-offset) + var(--gap-screen-bottom));
 }
-/* 하단 고정 바(.sticky-return)가 있는 화면은 바 높이(77~99px)만큼 더 비운다. 보호자 화면은 바에 문장이 들어가면 guardian.css가 더 비운다 */
+/* 하단 고정 바(.sticky-return)가 있는 화면은 바 높이(버튼만 있을 때 77~99px)만큼 더 비운다.
+   바에 문장이 들어가면 아래 '하단 고정 바' 묶음의 공용 규칙(.sticky-return.is-flow > p)이 문장 네 줄 몫을 더 비운다 */
 .app-shell:has(.sticky-return) main.page {
   padding-bottom: calc(var(--nav-offset) + 152px);
 }
@@ -452,10 +453,13 @@ textarea {
     box-shadow var(--duration-fast) var(--ease-color);
 }
 /* 체크 상자·라디오·슬라이더는 글자 입력칸이 아니다 — 아래 세 규칙에서 뺀다 */
+/* 윤곽선은 투명이라 보통 모드에서는 보이지 않는다. 강제 색상 모드(Windows 고대비)는 안쪽 그림자를 지우고 테두리를
+   시스템 색 하나로 맞춰 초점 표시가 사라지는데, 투명 윤곽선은 시스템 색으로 바뀌어 초점이 남는다(WCAG 2.4.7) */
 :is(input, select, textarea):not([type='checkbox'], [type='radio'], [type='range']):focus {
   border-color: var(--line-contrast);
   box-shadow: inset 0 0 0 1px var(--line-contrast);
-  outline: none;
+  outline: 2px solid transparent;
+  outline-offset: -2px;
 }
 :is(input, select, textarea):not([type='checkbox'], [type='radio'], [type='range'])[aria-invalid='true'] {
   border-color: var(--emergency);
@@ -477,11 +481,20 @@ input[readonly] {
   outline: var(--focus-width) solid var(--accent);
   outline-offset: 2px;
 }
-/* 포인트 색 면 위에서는 링을 글자색으로 바꿔 면과 구분한다 */
+/* 포인트 색·짙은 면(주 버튼 코발트, critical 빨강, 즉시 복귀 먹색, 긴급) 위에서는 링을 글자색으로 바꿔 면과 구분한다(설계서 4.6) */
 .btn:focus-visible,
 .btn-return:focus-visible,
 .ui-emergency:focus-visible {
   outline-color: var(--ink);
+}
+/* 옅은 면(회색 보조·바탕 없는 조용한 버튼·흰 구글·노랑 카카오·회색 비활성)은 기본 코발트 링 그대로다.
+   처리 중(aria-busy) 주 버튼은 짙은 코발트 면이라 먹색을 지킨다 */
+.btn-secondary:focus-visible,
+.btn-quiet:focus-visible,
+.btn-google:focus-visible,
+.btn-kakao:focus-visible,
+.btn[aria-disabled='true']:not([aria-busy='true']):focus-visible {
+  outline-color: var(--accent);
 }
 /* 카드형 라디오·토글은 안쪽 입력이 아니라 칸 전체로 초점을 보인다 — 키보드 초점일 때만(:focus-visible).
    안쪽 입력의 링은 지워 두 링이 겹치지 않게 한다 */
@@ -687,6 +700,14 @@ input[readonly] {
   cursor: not-allowed;
   transform: none;
 }
+/* 강제 색상(Windows 고대비): disabled 속성이 있는 버튼은 브라우저가 GrayText 로 바꾸지만, aria-disabled 버튼(비활성 링크·
+   설정 안 된 소셜 로그인)은 켜진 버튼과 같은 색으로 보인다. 글자와 테두리를 GrayText 로 맞춘다 */
+@media (forced-colors: active) {
+  .btn[aria-disabled='true'] {
+    color: GrayText;
+    border-color: GrayText;
+  }
+}
 /* 처리 중 — 눌린 색 + 가운데 회전 표시(18px·선 2px). 글자는 자리를 지키되 보이지 않는다(폭이 흔들리지 않게).
    읽히는 이름은 남는다(opacity 는 접근성 트리에서 지우지 않는다) */
 .btn[aria-busy='true'] {
@@ -716,40 +737,8 @@ input[readonly] {
 .btn-quiet[aria-busy='true'] { background: var(--pressed-transparent); color: var(--ink); }
 .btn-critical[aria-busy='true'] { background: var(--emergency-strong); color: var(--emergency-ink); }
 
-/* ── 추천 카드 (D08-CMP008) ── */
-.course-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-16);
-  padding: var(--space-4);
-  margin-bottom: var(--space-3);
-  box-shadow: var(--shadow-card);
-}
-.course-card .title-row {
-  display: flex;
-  gap: var(--space-2);
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-.course-card h3 { font-size: var(--text-title-3); }
-
-/* 수치 나열 — 추천 카드 밖(장소 상세·오늘의 회복)에서도 쓰인다. */
-.meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-4);
-  font-size: var(--text-body); /* 이동시간·복귀 여유 등 안전 판단 정보 — 본문 최소 16px */
-  color: var(--ink-soft);
-  font-variant-numeric: tabular-nums;
-}
-.course-card .meta {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--line);
-}
-
 /* ── 배지 (SEED Badge) — 14/19 · 모서리 6 · 좌우 8 · 높이 28px 안팎(SEED 11–12px 은 하한으로 올림 — 배지 5종은 안전 정보다).
-   기본형은 옅은 테두리를 지킨다 — kind 없이 맨 .badge 를 쓰는 화면(로그인 미설정 배지·코스 카드)을 위해서다.
+   기본형은 옅은 테두리를 지킨다. kind 없이 맨 .badge 를 쓰는 화면(로그인 미설정 배지)을 위해서다.
    5종(components/ui/Badge.js)은 각자 테두리 색을 정한다(약한 종류는 지운다) ── */
 .badge {
   display: inline-flex;
@@ -764,61 +753,6 @@ input[readonly] {
   color: var(--ink-soft);
   background: var(--surface-alt);
   white-space: nowrap;
-}
-.badge-estimate {
-  border-style: dotted;
-  border-color: var(--ink-soft);
-  color: var(--ink-soft);
-  background: var(--surface-alt);
-}
-.badge-lang {
-  border-color: var(--accent);
-  color: var(--accent-strong);
-  background: var(--accent-soft);
-}
-/* 데모임을 숨기지 않는다 — 실제 연동으로 오인되면 허위 제출이다 (정의 §9-3) */
-.badge-demo {
-  border-color: var(--state-standby-ink);
-  color: var(--ink);
-  background: repeating-linear-gradient(
-    -45deg,
-    var(--badge-demo-stripe-a) 0 6px,
-    var(--badge-demo-stripe-b) 6px 12px
-  );
-}
-.badge-hospital {
-  border-color: var(--source-hospital);
-  color: var(--source-hospital);
-  background: var(--source-hospital-bg);
-}
-
-/* ── 병원 연동 표시 (AX-216 · AX-217 · AX-218) ──
-   출처가 갈래로 나뉜다 — 병원 원문 / SafeHour 판정 / 관광정보. 병원 원문은 실선 띠로 묶는다 (정의 §9-4). */
-.verified-strip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-  padding: var(--space-3) 14px;
-  margin-bottom: var(--space-4);
-  border: 1px solid var(--source-hospital);
-  border-left-width: 4px;
-  background: var(--source-hospital-bg);
-  color: var(--source-hospital);
-  border-radius: var(--radius-12);
-  font-size: var(--text-body);
-  font-weight: var(--weight-bold);
-}
-.verified-strip .verified-mark {
-  font-weight: var(--weight-heavy);
-}
-/* 병원 원문 블록 — SafeHour 문구와 섞이지 않게 묶는다 */
-.hospital-note {
-  border-left: 4px solid var(--source-hospital);
-  background: var(--source-hospital-bg);
-  border-radius: var(--radius-12);
-  padding: 14px var(--space-4);
-  margin-top: var(--space-1);
 }
 
 /* ── 제외 사유 ── */
@@ -916,10 +850,12 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 .delta-shortened { background: var(--state-standby-bg);    color: var(--state-standby-ink); }
 .delta-state     { background: var(--state-split-bg);      color: var(--state-split-ink); }
 
-/* ── 하단 고정 복귀 CTA (D08-CMP012) ── */
+/* ── 하단 고정 바 (설계서 6.1, D08-CMP012) ──
+   흐름 화면 하단 바(시작·체류 설정·조건 편집기·병원 고르기, 보호자 만들기·열기(/guardian, /g)): 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리).
+   마크업은 모두 .sticky-return.is-flow 를 단다. 짧은 화면 풀림·초점 스크롤 여백 규칙은 .is-flow 로 고른다 */
 .sticky-return {
   position: fixed;
-  /* 안전 CTA 는 무엇에도 가리면 안 된다. 시트(50)·하단 내비(30) 아래, 헤더(10) 위.
+  /* 바 안의 주 버튼은 무엇에도 가리면 안 된다. 시트(50)·하단 내비(30) 아래, 헤더(10) 위.
      하단 내비가 있으면 그 위에 선다(--nav-offset). */
   z-index: 20;
   bottom: var(--nav-offset);
@@ -928,7 +864,8 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
   width: 100%;
   max-width: var(--shell-max);
   padding: var(--space-3) var(--gutter) calc(var(--space-3) + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--bg) 72%, rgba(255, 255, 255, 0));
+  background: var(--bg);
+  border-top: 1px solid var(--line-strong);
 }
 .app-shell[data-nav='on'] .sticky-return {
   padding-bottom: var(--space-3);
@@ -937,15 +874,22 @@ details.disclosure[open] > summary::after { content: '▴' / ''; }
 .app-shell[data-emergency-bar='on'] .sticky-return {
   padding-bottom: var(--space-3);
 }
-/* 흐름 화면 하단 바(시작·체류 설정·조건 편집기, 보호자 만들기·열기(/guardian, /g)): 불투명 흰 면 + 1px 윗선(하단 내비와 같은 처리).
-   '즉시 복귀' 안전 버튼은 is-flow 없이 늘 고정이다 */
-.sticky-return.is-flow {
-  background: var(--bg);
-  border-top: 1px solid var(--line-strong);
-}
 /* 두 고정 바(하단 내비·긴급 바 64~69px + 이 바 77~99px)가 키보드 초점이 간 칸을 덮지 않게 */
 html:has(.sticky-return.is-flow) {
   scroll-padding-bottom: 184px;
+}
+/* 바에 문장(보기 전용·저장 실패 같은 못 누르는 이유)이 바로 아래 <p> 로 들어가면 바가 77~99px 보다 커진다
+   (ja 320px 보기 전용 문장은 바가 194px 안팎, 보호자 en 오류 4줄 이상은 195px 안팎).
+   문장 네 줄 몫을 더 비워 마지막 입력칸과 초점이 간 칸이 바에 가리지 않게 한다. 체류 설정·조건 편집기·보호자가 함께 쓴다.
+   짧은 화면은 바가 고정되지 않으므로 뺀다. 위 전역 규칙 .app-shell:has(.sticky-return) main.page(0,3,1)와
+   html:has(.sticky-return.is-flow)(0,2,1)보다 구체적이다: 각각 (0,4,2)·(0,2,2) */
+@media (min-height: 481px) {
+  .app-shell:has(.sticky-return.is-flow > p) main.page {
+    padding-bottom: calc(var(--nav-offset) + 152px + 4 * var(--lh-body));
+  }
+  html:has(.sticky-return.is-flow > p) {
+    scroll-padding-bottom: calc(184px + 4 * var(--lh-body));
+  }
 }
 /* 세로가 짧은 화면(400% 확대 320×256, 가로 휴대폰)에서는 고정을 풀고 흐름 안에 둔다(WCAG 1.4.10).
    긴급 바·하단 내비는 그대로 바닥에 붙는다 */
