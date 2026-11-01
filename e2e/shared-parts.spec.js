@@ -5,7 +5,8 @@
 //   - 3:7 하단 바(설계서 6.1): .ui-bar-split
 //   - 설정 언어 행의 눌림: 목록 행(ListItem, 설계서 5.5)과 같은 모양
 //   - 답 칩(ja·zh) 글자: 낱말 경계에서만 줄을 바꾸고, 고른 칩의 체크 표시는 줄지 않는다
-//   - 답 칩 체크 표시(모든 언어, 운영자 결정 2026-10-30): 16px 그대로, 글자와 한 줄에 들지 않으면 글자 위 줄
+//   - 답 칩 체크 표시(모든 언어, 운영자 결정 2026-10-30): 16px 그대로, 글자와 한 줄에 들지 않으면 글자 위 줄.
+//     고른 칩은 칩 안쪽보다 2px 까지 넓어도 글자 곁에 남는다(운영자 결정 2026-11-02)
 //   - 오류 요약(운영자 결정 2026-10-30): .ui-error-summary. 흰 면 · 1px 긴급 빨강(rgb(200, 16, 46)) 테두리 · 모서리 10 · 안쪽 14/16
 // 기능 클래스(.settings-disclosure 등)는 마크업에 그대로 남는다. 다른 spec 의 로케이터가 쓴다.
 
@@ -177,13 +178,14 @@ test.describe('공용 부품', () => {
       return { markBox, textBox };
     }
 
-    // 360px ko: 칩 안쪽(66px)에 체크 16 + 사이 4 + '모르겠음'(55px)이 한 줄에 들지 않는다
+    // 360px ko: 칩 안쪽(66px, 고른 칩은 2px 여유로 68px)에 체크 16 + 사이 4 + '모르겠음'(55px)이 한 줄에 들지 않는다
     await page.setViewportSize({ width: 360, height: 780 });
     await startTrip(page, {}, { path: '/conditions' });
     await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
     const unknown = page.getByRole('radio', { name: '모르겠음', exact: true }).first();
     await unknown.check();
-    await measure(unknown.locator('xpath=ancestor::label[1]'), '360 ko 모르겠음');
+    const ko = await measure(unknown.locator('xpath=ancestor::label[1]'), '360 ko 모르겠음');
+    expect(ko.markBox.y + ko.markBox.height, '360 ko 모르겠음: 체크는 글자 위 줄').toBeLessThanOrEqual(ko.textBox.y);
 
     // 320px en: 칩 안쪽(53px)에 'Allowed'(62px)만으로도 꽉 찬다. 체크는 글자 위 줄로 올라간다
     await page.setViewportSize({ width: 320, height: 780 });
@@ -196,6 +198,50 @@ test.describe('공용 부품', () => {
     await allowed.check();
     const { markBox, textBox } = await measure(allowed.locator('xpath=ancestor::label[1]'), '320 en Allowed');
     expect(markBox.y + markBox.height, '320 en Allowed: 체크는 글자 위 줄').toBeLessThanOrEqual(textBox.y);
+  });
+
+  test('360px ja いいえ·zh 不确定: 칩 안쪽보다 2px 넓어도 체크는 글자 곁 한 줄이고 줄 높이가 그대로다(운영자 결정 2026-11-02)', async ({ page }) => {
+    // 체크 16 + 사이 4 + 글자 48 = 68px, 칩 안쪽 66px. 고른 칩은 좌우 안쪽 여백에서 1px 씩(모두 2px) 더 쓴다
+    await page.setViewportSize({ width: 360, height: 780 });
+    for (const [code, langName, addPeriod, unknown, answer, rowHeight] of [
+      // ja 행은 고르지 않은 'わからない'(80px)가 두 줄이라 62px 이다. 고르기 전과 같은 높이면 된다
+      ['ja', '日本語', '本人チェックの期間を追加', 'わからない', 'いいえ', null],
+      ['zh', '中文', '添加本人填写的期间', '不确定', '不确定', 44],
+    ]) {
+      await page.goto('/');
+      await page.getByRole('button', { name: langName, exact: true }).click();
+      await expect(page.locator('html')).toHaveAttribute('lang', code);
+      await startTrip(page, {}, { path: '/conditions' });
+      await page.getByRole('button', { name: addPeriod }).click();
+
+      // 세 칸(예/아니오/모르겠음) 묶음의 칩. 첫 예/아니오 묶음(복귀 시각)은 필수라 두 칸이고 칩이 넓다
+      const group = page.locator('.ui-answer').filter({ has: page.getByRole('radio', { name: unknown, exact: true }) }).first();
+      const radio = group.getByRole('radio', { name: answer, exact: true });
+      const chip = radio.locator('xpath=ancestor::label[1]');
+      await expect(chip.locator('xpath=..').locator(':scope > .ui-answer-option')).toHaveCount(3);
+      const heightBefore = (await chip.boundingBox()).height;
+      await radio.check();
+      await expect(chip, `${code}: 고른 칩`).toHaveClass(/is-selected/);
+      const [chipBox, markBox, textBox] = [
+        await chip.boundingBox(),
+        await chip.locator('.ui-answer-mark').boundingBox(),
+        await chip.locator('.ui-answer-text').boundingBox(),
+      ];
+      expect(markBox.width, `${code}: 체크 표시 폭`).toBe(16);
+      // 체크는 글자 곁(같은 줄): 글자 왼쪽에 있고, 세로 가운데가 글자 줄 안이다
+      expect(markBox.x + markBox.width, `${code}: 체크는 글자 왼쪽`).toBeLessThanOrEqual(textBox.x);
+      const markMiddle = markBox.y + markBox.height / 2;
+      expect(markMiddle, `${code}: 체크는 글자와 같은 줄`).toBeGreaterThanOrEqual(textBox.y);
+      expect(markMiddle, `${code}: 체크는 글자와 같은 줄`).toBeLessThanOrEqual(textBox.y + textBox.height);
+      const lineHeight = parseFloat((await styles(chip.locator('.ui-answer-text'), ['line-height']))['line-height']);
+      expect(Math.round(textBox.height), `${code}: 글자는 한 줄`).toBe(lineHeight);
+      // 체크·글자는 칩 테두리 안
+      expect(markBox.x, `${code}: 체크 왼쪽 끝이 칩 안`).toBeGreaterThanOrEqual(chipBox.x);
+      expect(textBox.x + textBox.width, `${code}: 글자 오른쪽 끝이 칩 안`).toBeLessThanOrEqual(chipBox.x + chipBox.width);
+      // 줄 높이는 고르기 전과 같다(체크가 위로 올라가지 않는다)
+      expect(chipBox.height, `${code}: 칩 높이는 고르기 전과 같다`).toBe(heightBefore);
+      if (rowHeight) expect(chipBox.height, `${code}: 칩 높이`).toBe(rowHeight);
+    }
   });
 
   test('설정 언어 행 눌림은 목록 행과 같다', async ({ page }) => {

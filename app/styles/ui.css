@@ -952,6 +952,14 @@
 .ui-answer-option.is-selected .ui-answer-mark {
   display: inline-grid;
 }
+/* 고른 칩의 2px 여유(운영자 결정 2026-11-02): 좌우 안쪽 여백을 1px 씩 줄여, 체크 + 4 + 가장 긴 낱말이 칩 안쪽보다
+   2px 까지 넓어도 체크를 글자 곁 한 줄에 둔다(360px ja いいえ·わからない, zh 不确定·不允许, 320px en Not sure).
+   한 줄에 들던 칩은 묶음이 가운데 정렬이라 자리가 그대로다. 체크 곁에서 글자가 두 줄로 꺾이는 칩('屋内/のみ')은
+   글자 칸이 2px 넓어져 체크만 1px 왼쪽으로 간다(글자 줄은 그대로). 더 넘치는 칩(ko 모르겠음 9.4px, en Allowed)은
+   체크가 글자 위 줄로 올라간다 */
+.ui-answer-option.is-selected {
+  padding-inline: calc(var(--space-3) - 1px);
+}
 /* 체크가 보이는 묶음(고른 칩이 있는 줄)의 반지름은 두 줄 칩 높이(22 × 2 + 8 × 2 + 1 × 2 = 62px)의 반(31px)에서 멈춘다.
    한 줄(44px)·두 줄(62px) 칩은 --radius-full 과 같은 알약 그대로다. 체크가 위로 올라가 세 줄(82px)이 된 좁은 칩과
    같은 줄의 칩만 원 대신 모서리 31 상자가 되어, 아랫줄의 긴 낱말(320px en 'Not allowed' 의 'allowed')이 둥근 테두리에 닿지 않는다 */
