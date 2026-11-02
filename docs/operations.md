@@ -88,12 +88,20 @@ curl -s localhost:3000/api/health
 
 ## 배포
 
-Vercel(서울 리전) 설정이 저장소에 있고, 배포 확인용 스크립트(`npm run verify:deploy`)와
-안전 병합 스크립트(`npm run merge`)가 있다.
+Vercel(서울 리전) 설정이 저장소에 있다. `main`에 병합하면 운영(`https://safehour.vercel.app`)에
+바로 배포되고, 다른 브랜치는 push할 때마다 미리보기 배포가 만들어진다. 미리보기는 Vercel 로그인으로
+막혀 있어 브라우저로 확인한다.
 
-**지금은 배포·병합·원격 반영을 하지 않는다.** 현재 배포 주소로 공모전 심사가 진행 중이며,
-심사와 시상(2026-11-05)이 끝난 뒤 운영자가 병합과 배포 시점을 정한다. 그때까지 `main` 병합,
-운영 배포, 원격 push, 새 검토 요청을 만들지 않는다.
+**병합은 곧 운영 배포다.** 공모전 심사는 끝났고(2026-11-02 미선정 통보) 보류는 풀렸지만,
+병합·운영 배포·원격 push는 매번 운영자 확인 뒤 진행한다.
+
+| 할 일 | 방법 |
+| --- | --- |
+| 병합 | `npm run merge -- <PR번호> --wait`. CI 통과를 확인한 뒤에만 squash 병합한다 |
+| 환경변수 | Vercel 설정의 Environments에서 Production과 Preview에 **따로** 넣는다. `TOUR_API_KEY`, `SAFEHOUR_DATA_ROOT`(`/tmp/safehour`), `SAFEHOUR_SESSION_SECRET`, `SAFEHOUR_ALLOW_DEMO_LOGIN`(`1`)이 두 곳 모두에 있어야 데모 로그인과 일정 만들기가 된다. `SAFEHOUR_BASE_URL`은 소셜 로그인 콜백에만 쓰므로 운영에만 둔다. 세션 비밀값은 환경마다 다른 값을 쓴다 |
+| 환경변수 반영 | 값을 바꾼 뒤 다시 배포해야 반영된다. 미리보기는 해당 배포의 메뉴에서 Redeploy를 고르고 환경이 Preview인지 확인한다 |
+| 배포 확인 | `npm run verify:deploy -- https://safehour.vercel.app`. 헬스·보안 헤더·로그인·일정 API를 본다. 데모 로그인이 켜진 배포본에서는 관광공사 API를 실제로 2회 부른다 |
+| 되돌리기 | Vercel의 Instant Rollback으로 직전 운영 배포로 돌린다 |
 
 ## 데이터 초기화
 
