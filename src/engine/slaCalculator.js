@@ -9,7 +9,7 @@
 // 하루 일정(AX-306)은 같은 식을 외출 단위로 쓴다 (spec 4.7 복귀 계산식):
 //   출발 + 호출·대기 5분 + Σ이동 + Σ체류 + 교통 변동 25%×Σ이동
 //        + 도착 여유 10분 + (RESTRICTED 날의 환자만) 회복기 가산 10분  ≤  마감
-// checkSla 는 이 식의 정거장 1곳 경우다. 식은 checkOutingSla 한곳에만 있다.
+// 식은 checkOutingSla 한곳에만 있다.
 
 import { DEFAULTS } from '../stay/defaults.js';
 
@@ -72,73 +72,6 @@ export function checkOutingSla({
       extraBuffer: extraBufferMin,
     },
   };
-}
-
-/**
- * 복귀 SLA 검증 — 정거장 1곳 외출 (checkOutingSla 의 특수한 경우)
- * @param {object} p
- * @param {Date}   p.now              현재 시각
- * @param {Date}   p.returnBy         병원 복귀 마감 시각
- * @param {number} p.outboundMin      출발지 → 장소 실제 이동시간(분)
- * @param {number} p.inboundMin       장소 → 병원 실제 이동시간(분)
- * @param {number} p.stayMin          체류시간(분)
- * @param {boolean} [p.isPatient]     환자 여정인지 (가산 버퍼 적용)
- * @param {number} [p.extraBufferMin] 추가 버퍼(교통 급증 등)
- */
-export function checkSla({
-  now, returnBy, outboundMin, inboundMin, stayMin,
-  isPatient = false, extraBufferMin = 0,
-}) {
-  const availableMin = Math.floor((returnBy.getTime() - now.getTime()) / 60000);
-  const outing = checkOutingSla({
-    departMin: 0,
-    deadlineMin: availableMin,
-    legsMin: [outboundMin, inboundMin],
-    staysMin: [stayMin],
-    recoveryBuffer: isPatient,
-    extraBufferMin,
-  });
-  const { requiredMin, slackMin } = outing;
-  const { trafficBuffer, recoveryBuffer: patientBuffer } = outing.breakdown;
-
-  // "몇 시까지 출발해야 하는가" — 화면에 반드시 표시할 값
-  const latestDepartureAt = new Date(
-    returnBy.getTime() -
-      (outboundMin + stayMin + inboundMin + trafficBuffer +
-        BUFFER.hospitalArrivalMin + patientBuffer + extraBufferMin) * 60000
-  );
-
-  return {
-    ok: slackMin >= 0,
-    availableMin,
-    requiredMin,
-    slackMin,
-    latestDepartureAt,
-    breakdown: {
-      hailing: BUFFER.hailingMin,
-      outbound: outboundMin,
-      stay: stayMin,
-      inbound: inboundMin,
-      trafficBuffer,
-      hospitalArrival: BUFFER.hospitalArrivalMin,
-      patientBuffer,
-      extraBuffer: extraBufferMin,
-    },
-  };
-}
-
-/**
- * 체류시간을 줄여서라도 SLA를 맞출 수 있는지 탐색 (코스 "축소" 로직)
- * @returns {{ok:boolean, stayMin:number, sla:object}|null}
- */
-export function shrinkToFit(params, minStayMin = DEFAULTS.minStopStayMin) {
-  let stay = params.stayMin;
-  while (stay >= minStayMin) {
-    const sla = checkSla({ ...params, stayMin: stay });
-    if (sla.ok) return { ok: true, stayMin: stay, sla, shrunk: stay < params.stayMin };
-    stay -= 5;
-  }
-  return null;
 }
 
 /** 지구 반경 기반 직선거리 (km) — 후보 생성 전용, 허용 판정에 쓰지 말 것 */

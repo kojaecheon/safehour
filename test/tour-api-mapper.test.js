@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createFallbackEstimator } from "../src/adapters/travelTime.js";
-import { recommend } from "../src/engine/recommend.js";
+import { gateCandidate } from "../src/engine/safetyGate.js";
+import { patientGateCondition, toGateInput } from "../src/engine/stopCandidate.js";
+import { NO_RESTRICTION_LIMITS } from "../src/stay/compose.js";
 import { tourApiResponseHeader } from "../src/tour-api/client.js";
 import {
   canonicalContentType,
@@ -160,6 +161,8 @@ describe("TourAPI → SafeHour 후보 정규화", () => {
     assert.equal(candidate.uvExposed, null);
   });
 
+  // 정규화 결과가 하루 일정 엔진의 후보 게이트에 그대로 들어간다. 엔진(dayPlan.rolePool)과 같은 두 단계
+  // (stopCandidate.toGateInput → safetyGate.gateCandidate)를 거친다.
   it("숙박시설은 관광 활동 후보로 추천하지 않는다", () => {
     const candidate = normalizeTourCandidate({
       korean: {
@@ -171,41 +174,13 @@ describe("TourAPI → SafeHour 후보 정규화", () => {
       now: NOW,
     });
 
-    const result = recommend({
-      condition: {
-        version: "hospital-rule-v1",
-        issuedAt: NOW,
-        issuedBy: "hospital-coordinator",
-        fasting: false,
-        outingAllowed: true,
-        escortRequired: false,
-        avoidUv: false,
-        indoorOnly: false,
-        maxWalkMin: 20,
-        maxTravelMin: 30,
-      },
-      plan: {
-        now: NOW,
-        returnBy: new Date("2026-07-30T12:30:00+09:00"),
-        origin: { lat: 37.5105, lng: 127.0588 },
-        hospital: { lat: 37.5105, lng: 127.0588 },
-      },
-      roles: {
-        hasCompanion: true,
-        companionSeparateAllowed: true,
-        patientResting: false,
-      },
-      candidates: [candidate],
-      travelTime: createFallbackEstimator(),
-    });
+    const gate = gateCandidate(toGateInput(candidate, { date: "2026-07-30" }), patientGateCondition(NO_RESTRICTION_LIMITS));
 
-    assert.equal(result.course.length, 0);
-    assert.ok(
-      result.excluded[0].reasons.includes("NON_TOURISM_ACTIVITY"),
-    );
+    assert.equal(gate.pass, false);
+    assert.ok(gate.reasons.includes("NON_TOURISM_ACTIVITY"));
   });
 
-  it("정규화 후보가 판정 엔진의 입력으로 직접 동작한다", () => {
+  it("정규화 후보가 후보 게이트의 입력으로 직접 동작한다", () => {
     const candidate = normalizeTourCandidate({
       korean: koreanCulture,
       english: englishCulture,
@@ -215,36 +190,11 @@ describe("TourAPI → SafeHour 후보 정규화", () => {
       now: NOW,
     });
 
-    const result = recommend({
-      condition: {
-        version: "hospital-rule-v1",
-        issuedAt: NOW,
-        issuedBy: "hospital-coordinator",
-        fasting: false,
-        outingAllowed: true,
-        escortRequired: false,
-        avoidUv: true,
-        indoorOnly: true,
-        maxWalkMin: 20,
-        maxTravelMin: 30,
-      },
-      plan: {
-        now: NOW,
-        returnBy: new Date("2026-07-30T12:30:00+09:00"),
-        origin: { lat: 37.5105, lng: 127.0588 },
-        hospital: { lat: 37.5105, lng: 127.0588 },
-      },
-      roles: {
-        hasCompanion: true,
-        companionSeparateAllowed: true,
-        patientResting: false,
-      },
-      candidates: [candidate],
-      travelTime: createFallbackEstimator(),
-    });
+    const gate = gateCandidate(
+      toGateInput(candidate, { date: "2026-07-30" }),
+      patientGateCondition({ ...NO_RESTRICTION_LIMITS, outing: "INDOOR_ONLY", avoidUv: true, walkLimitMin: 20 }),
+    );
 
-    assert.equal(result.state, "TOGETHER");
-    assert.equal(result.course[0].id, "kor-100");
-    assert.ok(result.decisions.length > 0);
+    assert.deepEqual(gate, { pass: true, reasons: [] });
   });
 });

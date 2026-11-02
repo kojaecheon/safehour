@@ -297,6 +297,37 @@ describe('의료 시설은 정거장이 되지 않는다 (불변조건)', () => 
   });
 });
 
+describe('숙박시설·혼잡 (기존 게이트)', () => {
+  test('숙박시설은 NON_TOURISM_ACTIVITY 로 제외되고 정거장이 되지 않는다', () => {
+    const hotel = place('801', { title: '테스트 호텔', type: '32', north: 0.9 });
+    const day = plan(restrictedStay(), '2026-10-05', { candidates: [hotel, ...basics()] });
+    assert.ok(!allStops(day).some((x) => x.contentId === '801'));
+    assert.deepEqual(excludedReasons(day, '801'), [REASON.NON_TOURISM_ACTIVITY]);
+  });
+
+  test('혼잡이 높다고 알려진 장소는 CONGESTION_HIGH 로 제외된다', () => {
+    const busy = museum('802', { title: '테스트 박물관', north: 0.8, tags: { congestion: 'high' } });
+    const day = plan(restrictedStay(), '2026-10-05', { candidates: [busy, ...basics()] });
+    assert.ok(!allStops(day).some((x) => x.contentId === '802'));
+    assert.deepEqual(excludedReasons(day, '802'), [REASON.CONGESTION_HIGH]);
+  });
+});
+
+describe('제외 목록에는 빠짐없이 사유가 있다', () => {
+  test('실내 전용 날: 제외된 장소마다 사유가 하나 이상 있다', () => {
+    const park = place('501', { title: '테스트 공원', type: '12', north: 1.0, tags: { indoor: false } });
+    const unknown = place('502', { title: '테스트 광장', type: '12', north: 1.1 });
+    const hotel = place('801', { title: '테스트 호텔', type: '32', north: 0.9 });
+    const day = plan(restrictedStay({ outing: 'INDOOR_ONLY' }), '2026-10-05', {
+      candidates: [...basics(), park, unknown, hotel],
+    });
+    assert.ok(day.excluded.length >= 3);
+    for (const e of day.excluded) {
+      assert.ok(Array.isArray(e.reasons) && e.reasons.length > 0, `${e.candidateId} 에 사유가 없다`);
+    }
+  });
+});
+
 describe('규칙 52 — 식사 칸과 정거장 수', () => {
   test('식사 칸에 카페가 들어가지 않는다', () => {
     const cafes = [cafe('201', { title: '카페 A', north: 0.9 }), cafe('202', { title: '카페 B', north: 1.0, east: 0.3 })];

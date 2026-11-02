@@ -60,7 +60,6 @@ npm run check
 ```bash
 npm run test:tour-api
 npm run analyze:gangnam
-npm run demo:live
 ```
 
 ## 모바일 웹
@@ -91,10 +90,6 @@ npm run dev
 - 현재 GPS는 사용하지 않습니다. 지도 링크는 목적지 이름·좌표만 넘깁니다(ADR-0010)
 - **한국어·영어·일본어·중국어(간체)**를 지원합니다. 일·중 안전 문구는 검수 전까지 영어 + 한국어로 보입니다(ADR-0007)
 - 이 기기의 데이터는 **"이 기기에서 내 정보 지우기"**(설정)로 즉시 지울 수 있고, 출국 7일 후 첫 실행 때 자동으로 지워집니다
-
-`npm run demo:live`는 공모전 때의 단일 외출 엔진(`src/engine/recommend.js`)으로 실데이터 추천 3건을 생성하고,
-1순위 장소 휴무 이벤트 후 해당 장소가 제거되어 다음 후보로 대체되는지를 검증합니다(실API — 키가 있을 때만).
-
 ## E2E
 
 대중형 흐름(spec 12.3)을 360px 기준으로 검증합니다. 외부 API에 의존하지 않습니다 —
@@ -177,4 +172,4 @@ API 인증키는 호출 로그에 기록하지 않습니다. 일별·오퍼레�
 - [구현 방향과 다음 단계](docs/IMPLEMENTATION_DIRECTION.md)
 - [TourAPI 연결 검증](docs/TOUR_API_VALIDATION.md)
 - [강남 고정좌표 데이터 분석](docs/GANGNAM_DATA_ANALYSIS.md)
-- [실데이터 판정·재계산 증빙](docs/LIVE_SCENARIO_EVIDENCE.md)
+- [실데이터 판정·재계산 증빙](docs/LIVE_SCENARIO_EVIDENCE.md) (공모전 당시 기록. 만든 스크립트와 단일 외출 엔진은 2026-11-03 지웠다)

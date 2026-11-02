@@ -1,7 +1,7 @@
-// AX-006 — 상세 조회 부분 실패 시 추천 판정 유지 (D09-QA032, D06-E010, D04-BR012)
+// AX-006: 상세 조회 부분 실패 (D09-QA032, D06-E010, D04-BR012)
 //
 // 계약:
-//   - 상세 API 일부(또는 전부) 실패해도 추천 코스는 유지된다. 상세는 보강일 뿐 판정 근거가 아니다.
+//   - 상세 API 일부(또는 전부) 실패해도 예외를 던지지 않는다. 상세는 보강일 뿐 판정 근거가 아니다.
 //   - 실패는 조용히 삼키지 않고 errors 로 남긴다.
 //   - 확인되지 않은 운영시간을 영업 중으로 단정하지 않는다 (openNow=null 유지).
 //   - 영문 상세가 실패하면 국문으로 폴백하되 어느 원문인지 표기한다.
@@ -17,13 +17,12 @@ process.env.SAFEHOUR_DATA_ROOT = DATA_ROOT;
 process.env.TOUR_API_KEY = 'test-service-key';
 
 let fetchCandidateDetails;
-let enrichRecommendedCourse;
 let TOUR_API_PATHS;
 
 const originalFetch = globalThis.fetch;
 
 before(async () => {
-  ({ fetchCandidateDetails, enrichRecommendedCourse } = await import(
+  ({ fetchCandidateDetails } = await import(
     '../src/tour-api/detail-service.js'
   ));
   ({ TOUR_API_PATHS } = await import('../src/tour-api/config.js'));
@@ -128,56 +127,18 @@ describe('상세 조회 부분 실패 (D09-QA032)', () => {
   });
 });
 
-describe('추천 코스 보강 실패가 판정을 무너뜨리지 않는다 (QA032 핵심)', () => {
-  const course = [
-    { ...CANDIDATE, id: 'a', title: '1순위', patient: { ok: true, stayMin: 40 }, sla: { slackMin: 120 } },
-    { ...CANDIDATE, id: 'b', title: '2순위', patient: { ok: true, stayMin: 35 }, sla: { slackMin: 100 } },
-    { ...CANDIDATE, id: 'c', title: '3순위', patient: { ok: true, stayMin: 30 }, sla: { slackMin: 90 } },
-  ];
-
-  test('상세가 전부 실패해도 코스 길이·순서·판정 필드가 보존된다', async () => {
-    stubFetch({ failFor: ['detail'] });
-
-    const enriched = await enrichRecommendedCourse(course, { limit: 3, useCache: false });
-
-    assert.equal(enriched.length, 3);
-    assert.deepEqual(
-      enriched.map((c) => c.id),
-      ['a', 'b', 'c'],
-      '코스 순서가 바뀌었다',
-    );
-    // 판정 결과(안전 게이트 산출물)는 상세 실패와 무관하게 유지되어야 한다
-    assert.equal(enriched[0].patient.ok, true);
-    assert.equal(enriched[0].sla.slackMin, 120);
-    assert.ok(enriched[0].details.errors.length > 0);
-  });
-
-  test('일부 후보만 실패해도 나머지 후보의 상세는 정상 보강된다', async () => {
-    // 2순위(contentId 가 같으므로 호출 순서로 구분 불가) — 대신 전체 성공 대비를 확인한다
+describe('상세 보강 실패는 실패로 남기고 호출 한도를 넘지 않는다 (QA032)', () => {
+  test('이미지 조회만 실패해도 개요는 살고 이미지는 비어 있다', async () => {
     stubFetch({ failFor: ['detailImage2'] });
 
-    const enriched = await enrichRecommendedCourse(course, { limit: 3, useCache: false });
+    const details = await fetchCandidateDetails(CANDIDATE, { useCache: false });
 
-    assert.equal(enriched.length, 3);
-    for (const candidate of enriched) {
-      assert.ok(candidate.details.overview, '개요 보강이 실패했다');
-      assert.deepEqual(candidate.details.images, [], '실패한 이미지가 채워졌다');
-    }
+    assert.ok(details.overview, '개요 보강이 실패했다');
+    assert.deepEqual(details.images, [], '실패한 이미지가 채워졌다');
+    assert.ok(details.errors.every((e) => e.operation === 'detailImage2'));
   });
 
-  test('limit 를 넘는 후보는 상세 호출 없이 그대로 유지된다', async () => {
-    const state = stubFetch();
-
-    const enriched = await enrichRecommendedCourse(course, { limit: 1, useCache: false });
-
-    assert.equal(enriched.length, 3);
-    assert.ok(enriched[0].details, '상위 후보가 보강되지 않았다');
-    assert.equal(enriched[1].details, undefined, 'limit 밖 후보에 상세를 호출했다');
-    // 상위 1건 × (국문 3 + 영문 3) = 6회
-    assert.equal(state.calls.length, 6);
-  });
-
-  test('호출 한도가 소진돼도 추천 코스는 유지된다', async () => {
+  test('호출 한도가 소진되면 외부 호출 없이 실패를 errors 에 남긴다', async () => {
     const state = stubFetch();
     // 상세 오퍼레이션 카운터를 한도까지 채운다
     const kst = new Intl.DateTimeFormat('en-CA', {
@@ -198,11 +159,9 @@ describe('추천 코스 보강 실패가 판정을 무너뜨리지 않는다 (QA
       'utf8',
     );
 
-    const enriched = await enrichRecommendedCourse(course, { limit: 3, useCache: false });
+    const details = await fetchCandidateDetails(CANDIDATE, { useCache: false });
 
-    assert.equal(enriched.length, 3, '한도 초과가 추천 코스를 삭제했다');
-    assert.equal(enriched[0].patient.ok, true);
     assert.equal(state.calls.length, 0, '한도 초과인데 외부 호출이 나갔다');
-    assert.ok(enriched[0].details.errors.length > 0, '한도 초과가 errors 에 기록되지 않았다');
+    assert.ok(details.errors.length > 0, '한도 초과가 errors 에 기록되지 않았다');
   });
 });

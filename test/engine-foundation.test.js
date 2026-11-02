@@ -1,6 +1,6 @@
 // AX-306 — 하루 일정 엔진의 기반: 대중교통 추정기, 외출 단위 복귀 계산, 후보 게이트 확장
 //
-// 판정 경로를 새로 만들지 않고 기존 함수(checkSla·gateCandidate·추정기)를 넓힌 것을 고정한다.
+// 판정 경로를 새로 만들지 않고 기존 함수(복귀 계산·gateCandidate·추정기)를 넓힌 것을 고정한다.
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
@@ -8,7 +8,7 @@ import { describe, test } from 'node:test';
 import { createFallbackEstimator, createTransitEstimator } from '../src/adapters/travelTime.js';
 import { REASON } from '../src/domain/states.js';
 import { gateCandidate } from '../src/engine/safetyGate.js';
-import { BUFFER, checkOutingSla, checkSla, haversineKm } from '../src/engine/slaCalculator.js';
+import { BUFFER, checkOutingSla, haversineKm } from '../src/engine/slaCalculator.js';
 import { DEFAULTS } from '../src/stay/defaults.js';
 
 const LODGING = { lat: 37.5, lng: 127.03 };
@@ -43,6 +43,12 @@ describe('대중교통 추정기 (spec 4.7 이동수단, 11장)', () => {
   test('같은 입력이면 같은 값 (결정적)', () => {
     const to = north(3.3);
     assert.deepEqual(transit.estimate(LODGING, to), transit.estimate(LODGING, to));
+  });
+
+  test('도보 추정기는 외부 API 없이 동작한다', () => {
+    const r = createFallbackEstimator().estimate(LODGING, north(1.2));
+    assert.ok(r.min > 0);
+    assert.equal(r.source, 'fallback');
   });
 });
 
@@ -87,19 +93,12 @@ describe('외출 단위 복귀 계산 (spec 4.7 복귀 계산식)', () => {
     );
   });
 
-  test('기존 checkSla 는 같은 식의 정거장 1곳 경우다', () => {
-    const now = new Date('2026-07-28T13:00:00+09:00');
-    const returnBy = new Date('2026-07-28T16:00:00+09:00');
-    const single = checkSla({ now, returnBy, outboundMin: 10, inboundMin: 12, stayMin: 30, isPatient: true });
-    const outing = checkOutingSla({
-      departMin: 0,
-      deadlineMin: 180,
-      legsMin: [10, 12],
-      staysMin: [30],
-      recoveryBuffer: true,
-    });
-    assert.equal(single.requiredMin, outing.requiredMin);
-    assert.equal(single.slackMin, outing.slackMin);
+  test('시간이 부족하면 실패로 판정한다 (여유가 음수)', () => {
+    // 필요 5 + 30 + 30 + 8 + 10 + 10 = 93분 > 가진 30분
+    const r = checkOutingSla({ departMin: 780, deadlineMin: 810, legsMin: [15, 15], staysMin: [30], recoveryBuffer: true });
+    assert.equal(r.ok, false);
+    assert.ok(r.slackMin < 0);
+    assert.ok(r.latestDepartMin < 780, '늦어도 출발해야 하는 시각이 이미 지났다');
   });
 });
 
