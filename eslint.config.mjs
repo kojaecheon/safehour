@@ -11,6 +11,7 @@ export default defineConfig([
     '.bkit/**',
     '.cache/**',
     '.claude/**',
+    '.dryforge/**',
     'next-env.d.ts',
   ]),
 ]);

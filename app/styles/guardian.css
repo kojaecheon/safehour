@@ -1,0 +1,346 @@
+/* 기능별 스타일 — guardian (/guardian, /g)
+ *
+ * 미리 만든 빈 파일이다 (AX-304). 이 기능 화면을 만드는 작업(T17 · AX-320)만 이 파일을 고친다.
+ * 등록은 app/layout.js 한곳에서 이미 끝났다 — 새로 import 하지 않는다.
+ *
+ * 규칙
+ *   - 값은 app/globals.css 의 토큰 변수(var(--…))만 쓴다. hex·새 글자 크기를 만들지 않는다.
+ *     새 토큰이 필요하면 추가하지 말고 보고한다(토큰은 AX-304 소유).
+ *   - 부품 모양(components/ui, app/styles/ui.css)은 여기서 덮어쓰지 않는다. 화면 배치만 더한다.
+ *   - 클래스는 `guardian-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
+ *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
+ */
+
+/* ───────────────────────── 공통 ───────────────────────── */
+.guardian-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+.guardian-page > .card {
+  margin-bottom: 0;
+}
+.guardian-lead {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.guardian-meta {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.guardian-hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* 안내 덩이 (SEED Callout · neutral): 모양(회색 면 · 모서리 10 · 안쪽 14/16, 아이콘이면 앞 20px 칸)은 ui.css 의 공용 .ui-callout.
+   색만으로 뜻을 나누지 않는다(문장이 뜻을 말한다). 여기에는 위 여백과 문장 칸만 둔다 */
+.guardian-note {
+  margin-top: var(--space-3);
+}
+.guardian-note-text {
+  min-width: 0;
+}
+.guardian-note-text p {
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.guardian-note-secondary {
+  margin-top: var(--space-1);
+  font-weight: var(--weight-medium);
+}
+/* 띠 대신 굵은 글자로 한 단계 더 눈에 띄게 */
+.guardian-note-strong .guardian-note-text p {
+  font-weight: var(--weight-bold);
+}
+
+/* 입력 오류: 경고 아이콘 + 굵은 긴급 빨강 문장. 모양은 ui.css 의 공용 .ui-field-error(체류 설정·조건과 같다). 여기에는 위 여백만 둔다 */
+.guardian-error {
+  margin-top: var(--space-2);
+}
+.guardian-error.is-empty {
+  margin: 0;
+}
+/* 주의 안내 (SEED Callout · 대기 색, 일정 화면 .trip-notice.is-error 와 같은 모양): 긴 링크, 저장 실패, 연결 없음.
+   대기 색 면 + 1px 대기 선 · 모서리 10 · 안쪽 14/16. 앞 20px 경고 아이콘(먹색) 칸 + 문장 칸. 아이콘이 없으면 문장 칸 하나 */
+.guardian-warning {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
+  margin-top: var(--space-3);
+  padding: 14px var(--space-4);
+  border: 1px solid var(--state-standby-line);
+  border-radius: var(--radius-10);
+  background: var(--state-standby-bg);
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+}
+.guardian-warning:not(:has(> .guardian-warning-icon)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.guardian-warning-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+  color: var(--ink);
+}
+/* 전역 p(--ink-soft)가 상자의 먹색을 덮지 않게 */
+.guardian-warning > p {
+  color: inherit;
+}
+/* 화면 바로 아래에 서는 오류·주의(잘못된 링크, 오프라인)는 간격을 gap 이 맡는다 */
+.guardian-page > .guardian-error,
+.guardian-page > .guardian-warning {
+  margin-top: 0;
+}
+.guardian-pin {
+  font-size: var(--text-title-3);
+  letter-spacing: 0.3em;
+  font-variant-numeric: tabular-nums;
+  max-width: 240px;
+}
+
+/* ───────────────────────── /guardian ───────────────────────── */
+.guardian-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+/* 흰 바탕 한 장: 카드 대신 섹션. 섹션 사이는 구역선 하나(위 24 · 선 · 아래 24) */
+.guardian-section + .guardian-section {
+  border-top: 1px solid var(--line-section);
+  padding-top: var(--space-6);
+}
+/* '새 링크 만들기'는 동의 제목으로 스크롤해 초점을 준다. 상단 바가 sticky(56px + 안전 영역)라 제목이 그 밑에 가리지 않게
+   그만큼과 12px 을 띄운다(카드 화면 .cards-section 방식) */
+.guardian-section > h2[tabindex='-1'] {
+  scroll-margin-top: calc(56px + env(safe-area-inset-top) + var(--space-3));
+}
+.guardian-list-title {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-body);
+}
+/* 앞 아이콘 목록: 담기는 것은 체크, 담기지 않는 것은 X. 점 대신 20px 아이콘 칸(첫 줄 높이 22px) + 문장, 사이 8px */
+.guardian-list {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: 0;
+  list-style: none;
+  color: var(--ink);
+}
+.guardian-list li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+}
+.guardian-list-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+}
+/* 담기지 않는 것은 한 단계 옅은 아이콘(문장은 그대로 먹색) */
+.guardian-list-out .guardian-list-icon {
+  color: var(--ink-soft);
+}
+.guardian-consent {
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--line);
+  border-bottom: none;
+}
+.guardian-consent .label {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+/* 다시 보내기 안내 (SEED Callout · neutral): 코발트 면·띠 없이 회색 면. 안의 안내 문장은 상자 없이 둔다 */
+.guardian-resend {
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
+}
+.guardian-resend h2 {
+  margin-bottom: var(--space-2);
+}
+.guardian-resend .guardian-note {
+  padding: 0;
+  background: none;
+}
+.guardian-resend .guardian-meta {
+  margin: var(--space-3) 0;
+}
+.guardian-sent {
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
+}
+.guardian-link-field {
+  font-family: var(--font-mono);
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+.guardian-actions {
+  display: grid;
+  gap: var(--space-3);
+}
+.guardian-feedback {
+  min-height: 1lh;
+  margin-top: var(--space-3);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+.guardian-pin-reminder {
+  margin-top: var(--space-3);
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+/* 하단 고정 바(.sticky-return.is-flow, 바 면·윗선·짧은 화면 풀림은 globals 몫): 만들 수 없는 이유(실패·보기 전용)가 버튼 위에 선다.
+   contain: inline-size 는 320px 일본어 이유 문장의 한 줄 폭이 바를 밀어 넘치지 않게 한다 */
+.guardian-bar {
+  display: grid;
+  gap: var(--space-2);
+  contain: inline-size;
+}
+.guardian-bar > p {
+  margin: 0;
+}
+/* 고정 바에 이유·오류 문장이 들어가면 바가 77~99px 보다 커진다(ja 3줄 157px, en 오류 4줄 이상 195px 안팎).
+   그만큼 화면 끝을 더 비우는 일은 globals.css 의 공용 .sticky-return.is-flow > p 규칙이 한다 */
+.guardian-result h2:focus,
+.guardian-asof h2:focus {
+  outline: none;
+}
+.guardian-result h2:focus-visible,
+.guardian-asof h2:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+}
+
+/* ───────────────────────── /g ───────────────────────── */
+.guardian-login > p,
+.guardian-login .guardian-warning {
+  margin-bottom: var(--space-4);
+}
+.guardian-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+/* /g 구역 경계: 사이에 .guardian-copy 가 끼어 공통 구역선이 걸리지 않으므로 여기서 같은 선을 긋는다(화면당 많아야 둘) */
+.guardian-section + .guardian-copy,
+.guardian-copy + .guardian-section {
+  border-top: 1px solid var(--line-section);
+  padding-top: var(--space-6);
+}
+/* 기준 시각 머리: 상자 없이 흰 바탕 위에 글자만. 자동 갱신 안내는 공통 회색 Callout 이다 */
+.guardian-asof h2 {
+  margin-bottom: var(--space-1);
+}
+/* '○월 ○일 ○시 기준' — 사본이라는 사실이 가장 먼저 읽히게 크게 */
+.guardian-asof-time {
+  color: var(--ink);
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+}
+.guardian-asof .guardian-meta {
+  margin-top: var(--space-2);
+  color: var(--ink);
+}
+.guardian-emergency h3 {
+  margin-bottom: var(--space-2);
+}
+.guardian-calls {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+/* 119·1330 은 회색 채움 버튼(.btn.btn-secondary 가 면·52px·모서리 12·눌림을 맡는다). 하단 긴급 바가 이미 빨강 채움이라
+   여기서는 119 아이콘만 긴급 빨강으로 둔다. 글자는 앞쪽부터 놓는다 */
+.guardian-call {
+  justify-content: flex-start;
+  gap: var(--space-3);
+  text-align: start;
+}
+.guardian-call .ui-icon {
+  color: var(--ink);
+}
+.guardian-call.is-119 .ui-icon {
+  color: var(--emergency);
+}
+.guardian-day-title {
+  font-size: var(--text-title-2);
+  margin-bottom: var(--space-2);
+}
+.guardian-escort {
+  margin: 0 0 var(--space-3);
+  border: 0;
+  background: var(--support-soft);
+}
+.guardian-subtitle {
+  margin-top: var(--space-4);
+  margin-bottom: var(--space-2);
+  font-size: var(--text-body);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+}
+.guardian-returns {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+.guardian-return {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
+}
+.guardian-return-time {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+}
+.guardian-return-place {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  min-width: 0;
+}
+.guardian-return-icon {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  padding-top: 3px;
+  color: var(--ink-soft);
+}
+.guardian-return-address {
+  display: block;
+  color: var(--ink-soft);
+  font-size: var(--text-body);
+}
+.guardian-others h2 {
+  font-size: var(--text-title-3);
+}
+.guardian-other-list {
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}

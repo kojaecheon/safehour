@@ -1,0 +1,608 @@
+/* 기능별 스타일 — conditions (/conditions, /link, /guide)
+ *
+ * 미리 만든 빈 파일이다 (AX-304). 이 기능 화면을 만드는 작업(T14 · AX-315)만 이 파일을 고친다.
+ * 등록은 app/layout.js 한곳에서 이미 끝났다 — 새로 import 하지 않는다.
+ *
+ * 규칙
+ *   - 값은 app/globals.css 의 토큰 변수(var(--…))만 쓴다. hex·새 글자 크기를 만들지 않는다.
+ *     새 토큰이 필요하면 추가하지 말고 보고한다(토큰은 AX-304 소유).
+ *   - 부품 모양(components/ui, app/styles/ui.css)은 여기서 덮어쓰지 않는다. 화면 배치만 더한다.
+ *   - 클래스는 `conditions-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
+ *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
+ */
+
+/* ───────────────────────── 화면 공통 ───────────────────────── */
+.conditions-lead {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+  margin-bottom: var(--space-5);
+}
+.conditions-section {
+  min-width: 0;
+}
+.conditions-section:not(.ui-block) {
+  margin-bottom: var(--space-8);
+}
+/* 프로그램이 초점을 옮긴 제목(편집기 열기·닫기, 삭제 확인 뒤, 동의 철회 뒤 동의 요청, 병원 연결 목록)은 마우스로 진행해도 받는다.
+   코발트 링은 키보드 초점에만 그린다(.conditions-done h2 · .guardian-result h2 와 같다) */
+.conditions-section h2[tabindex='-1']:focus,
+.conditions-consent h2[tabindex='-1']:focus {
+  outline: none;
+}
+.conditions-section h2[tabindex='-1']:focus-visible,
+.conditions-consent h2[tabindex='-1']:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}
+.conditions-section-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.conditions-section-head > h2,
+.conditions-section-head > h3 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conditions-section-lead {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  margin-bottom: var(--space-4);
+}
+.conditions-link-title {
+  white-space: pre-line;
+}
+.conditions-hint {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  color: var(--ink-soft);
+  margin-top: var(--space-2);
+}
+.conditions-actions {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+.conditions-actions.is-inline {
+  display: flex;
+  flex-wrap: wrap;
+}
+.conditions-actions.is-inline > .btn {
+  flex: 1 1 120px;
+}
+.conditions-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.conditions-plain-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-6);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  background: var(--surface);
+}
+.conditions-state-EXPIRED,
+.conditions-state-REVOKED {
+  border-style: dashed;
+  background: var(--surface-alt);
+}
+.conditions-notice {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--state-together-ink);
+}
+.conditions-notice:not(:empty) {
+  margin-top: var(--space-3);
+}
+.conditions-notice.is-error {
+  color: var(--ink);
+}
+/* 동의 철회 완료 알림 자리(운영자 결정 2026-10-30): 맨 위 흰 블록의 안내 문단과 동의 제목 사이. 철회 블록이 사라진 뒤
+   완료 문구를 공용 안내 상자(.ui-callout, 앞 20px 체크 아이콘)로 남긴다. 비어 있으면 자리를 차지하지 않는다 */
+.conditions-withdraw-status:not(:empty) {
+  margin-bottom: var(--space-5);
+}
+
+/* 안전 문구 병기 — 두 번째 줄도 대비를 낮추지 않는다 */
+.conditions-pair > span {
+  display: block;
+}
+.conditions-pair-primary {
+  color: var(--ink);
+}
+.conditions-pair-secondary {
+  margin-top: var(--space-1);
+  color: var(--ink-soft);
+}
+/* 일반 안내 상자 (SEED Callout · neutral, 설계서 5.6): 모양(왼쪽 띠·테두리 없는 회색 면 · 모서리 10 · 안쪽 14/16)은
+   ui.css 의 공용 .ui-callout. 병원 연결·병원 안내 화면도 같은 상자다. 여기에는 위 여백과 병기 두 줄의 줄 높이 1.5(24px)만 둔다 */
+.conditions-callout {
+  line-height: var(--leading-body);
+  margin-top: var(--space-3);
+}
+
+/* 오류 문장 (설계서 5.2, 체류 설정과 같은 모양): 모양은 ui.css 의 공용 .ui-field-error. 여기에는 위 여백만 둔다.
+   편집기 저장 실패(.conditions-save-error)는 하단 바 안 맨 앞에 서서 위 여백이 없다(바의 grid gap 이 간격을 준다) */
+.conditions-field-error {
+  margin-top: var(--space-2);
+}
+/* 오류 요약·연결 오류: 모양(흰 면 + 1px 긴급 빨강 테두리 · 모서리 10 · 안쪽 14/16, 제목 앞 빨간 경고 아이콘, 코발트 링크 목록)은
+   ui.css 의 공용 .ui-error-summary. 여기에는 아래 여백만 둔다 */
+.conditions-alert,
+.conditions-error-summary {
+  margin-bottom: var(--space-4);
+}
+
+/* ───────────────────────── 동의 ───────────────────────── */
+.conditions-review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border: 1px dashed var(--state-standby-ink);
+  border-radius: var(--radius-6);
+  background: var(--state-standby-bg);
+  color: var(--state-standby-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+.conditions-consent-lead {
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-3);
+}
+.conditions-consent-version {
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+  margin-bottom: var(--space-3);
+}
+.conditions-consent-list {
+  display: grid;
+  gap: var(--space-3);
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+}
+/* 동의 상태 (SEED Callout · 긍정): 초록 면, 글자는 먹색, 체크 아이콘만 초록 20px. 모서리 10 · 안쪽 14/16 */
+.conditions-consent-status {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--state-together-bg);
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-medium);
+}
+.conditions-consent-status .ui-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--state-together-ink);
+}
+/* 동의 패널은 조건 화면의 흰 블록 안에서도, 병원 연결 화면의 흰 바탕 위에서도 카드 모양 없이 놓인다:
+   카드 테두리·그림자·안쪽 여백 없이 바탕과 한 면 */
+.conditions-page .conditions-consent {
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.conditions-withdraw:not(.ui-block) {
+  margin-bottom: var(--space-8);
+}
+
+/* ───────────────────────── 기간 목록 ───────────────────────── */
+.conditions-period-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+}
+.conditions-period {
+  min-width: 0;
+}
+/* 조건 화면의 기간 목록 (SEED 목록 행): 카드 테두리 없이 흰 블록 안의 행, 행 사이 1px 선.
+   출처는 행마다 출처 표시(SourceTag: 문구 + 아이콘 + 실선/파선 테두리)가 알린다.
+   조건 화면과 병원 연결 화면의 목록은 is-rows 행으로 쓴다 */
+.conditions-period-list.is-rows {
+  display: block;
+}
+.conditions-period-list.is-rows > .conditions-period {
+  padding: var(--space-4) 0;
+}
+.conditions-period-list.is-rows > .conditions-period + .conditions-period {
+  border-top: 1px solid var(--line);
+}
+.conditions-period-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.conditions-period-head h3 {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conditions-period-meta p {
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.conditions-period-meta p + p {
+  margin-top: var(--space-1);
+}
+.conditions-period-meta {
+  margin-bottom: var(--space-3);
+}
+.conditions-counts {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.conditions-dates {
+  margin-top: var(--space-2);
+}
+.conditions-dates > summary {
+  min-height: var(--tap-min);
+}
+.conditions-date-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.conditions-date-list > li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+.conditions-date {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.conditions-reasons {
+  flex-basis: 100%;
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.conditions-period-actions {
+  margin-top: var(--space-2);
+}
+
+/* 날짜 분류: 색 + 아이콘 + 문구, 배지 모양(모서리 6). 입력 필요는 오류 색이 아니다 */
+.conditions-coverage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-6);
+  border: 1px solid transparent;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+.conditions-coverage-FREE { background: var(--state-together-bg); color: var(--state-together-ink); border-color: var(--state-together-line); }
+.conditions-coverage-DECLARED_FREE { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); border-style: dashed; }
+.conditions-coverage-RESTRICTED { background: var(--state-standby-bg); color: var(--state-standby-ink); border-color: var(--state-standby-line); }
+.conditions-coverage-REST_DAY { background: var(--state-no-tourism-bg); color: var(--state-no-tourism-ink); border-color: var(--state-no-tourism-line); }
+.conditions-coverage-NEEDS_INPUT { background: var(--surface-alt); color: var(--ink); border-color: var(--line-input); border-style: dashed; }
+
+/* ───────────────────────── 편집기 ───────────────────────── */
+.conditions-form {
+  min-width: 0;
+}
+.conditions-editor-lead {
+  font-size: var(--text-body);
+  line-height: var(--leading-body);
+  margin: var(--space-2) 0 var(--space-3);
+}
+.conditions-toggle {
+  border-bottom: none;
+  margin-bottom: var(--space-3);
+}
+.conditions-toggle > span {
+  min-width: 0;
+}
+.conditions-group-title {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+  margin: var(--space-6) 0 var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.conditions-item {
+  min-width: 0;
+  margin-bottom: var(--space-2);
+}
+.conditions-item:focus {
+  outline: none;
+}
+.conditions-item:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 4px;
+}
+.conditions-item .ui-answer {
+  margin-bottom: 0;
+}
+/* 예를 고른 뒤 따라오는 입력(분·시각·장소·복약 시각): 들여 쓰고 회색 왼쪽 선으로 묶는다(코발트 아님) */
+.conditions-subfield {
+  margin: var(--space-3) 0 var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--line-strong);
+}
+.conditions-subfield .ui-answer {
+  margin-bottom: var(--space-3);
+}
+.conditions-auto-hospital {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-3);
+  overflow-wrap: anywhere;
+}
+.conditions-med-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.conditions-med-row {
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-12);
+}
+.conditions-med-row .field {
+  margin-bottom: var(--space-2);
+}
+/* 편집기 하단 바 [취소 3][저장 7] (설계서 6.1): 3:7 배치는 ui.css 의 공용 .ui-bar-split(.conditions-editor-actions 에 함께 단다) */
+
+/* ───────────────────────── 날짜별 합성 ───────────────────────── */
+.conditions-day-pick {
+  max-width: 320px;
+}
+/* 날짜별 합성 결과 = SafeHour 판정 출처(설계서 5.6): 점선 테두리 + 회색 면 유지, Callout 모양(모서리 10 · 안쪽 14/16) */
+.conditions-day {
+  border: 1px dotted var(--source-estimate);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
+  padding: 14px var(--space-4);
+}
+/* 판정 상자(회색 면) 안의 안내 상자는 흰 면으로 둔다: 같은 회색이면 상자 모양이 사라진다 */
+.conditions-day .conditions-callout {
+  background: var(--surface);
+}
+.conditions-day > p + p {
+  margin-top: var(--space-2);
+}
+.conditions-day-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.conditions-effective {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: 0;
+}
+.conditions-effective-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line-strong);
+}
+.conditions-effective-row dt {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.conditions-effective-row dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.conditions-effective-value {
+  color: var(--ink);
+  font-size: var(--text-body);
+  overflow-wrap: anywhere;
+}
+@media (min-width: 560px) {
+  .conditions-effective-row {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+    align-items: start;
+  }
+}
+
+/* ───────────────────────── 병원 연결 ───────────────────────── */
+.conditions-plan-summary {
+  margin-bottom: var(--space-4);
+}
+.conditions-plan-summary > p {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.conditions-plan-summary > p + p {
+  margin-top: var(--space-1);
+}
+.conditions-plan-summary > .conditions-tags {
+  display: flex;
+  margin-bottom: var(--space-2);
+}
+.conditions-choice-list {
+  border: none;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.conditions-choice-list > legend {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+.conditions-choice-list .radio-option > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.conditions-choice-list .radio-option .sub {
+  font-size: var(--text-body);
+}
+.conditions-done h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--state-together-ink);
+}
+/* 프로그램 초점(연결 뒤 제목으로 옮김)은 마우스로 진행해도 받는다: 코발트 링은 키보드 초점에만(.guardian-result h2 와 같다) */
+.conditions-done h2:focus {
+  outline: none;
+}
+.conditions-done h2:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}
+.conditions-done > p {
+  color: var(--ink);
+  margin-top: var(--space-2);
+}
+.conditions-choose h2:focus {
+  outline: none;
+}
+.conditions-choose h2:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}
+.conditions-demo .conditions-section-head {
+  margin-bottom: var(--space-2);
+}
+/* 카드를 걷어 낸 섹션 사이는 24px 로 띄운다. 코드 입력과 둘러보기 사이에는 구역선 하나.
+   조건 화면의 흰 블록(.ui-block)은 블록 사이 8px 틈을 스스로 갖는다: 여기서 건드리지 않는다 */
+.conditions-page > section + section:not(.ui-block) {
+  margin-top: var(--space-6);
+}
+.link-section + .conditions-demo {
+  border-top: 1px solid var(--line-section);
+  padding-top: var(--space-6);
+}
+/* 병원 고르기 하단 바 [취소 3][이 병원으로 연결 7] (설계서 6.1): 하단 내비 바로 위에 선다(--nav-offset).
+   3:7 배치는 ui.css 의 공용 .ui-bar-split(.link-bar 에 함께 단다) */
+
+/* ───────────────────────── 병원 안내 ───────────────────────── */
+/* 확인 수 안내 (SEED Callout): 모서리 10 · 선 없음 · 안쪽 14/16 · 글자는 먹색.
+   상태는 면 색과 앞 아이콘 색으로 보인다(색만으로 구분하지 않는다: 문구와 아이콘이 함께 있다) */
+.conditions-guide-count {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--state-together-bg);
+  color: var(--ink);
+}
+.conditions-guide-count.is-pending {
+  background: var(--state-standby-bg);
+}
+.conditions-guide-count .ui-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--state-together-ink);
+}
+.conditions-guide-count.is-pending .ui-icon {
+  color: var(--state-standby-ink);
+}
+.conditions-guide-count p {
+  color: inherit;
+}
+.conditions-guide-count-title {
+  font-weight: var(--weight-heavy);
+}
+.conditions-guide-list {
+  list-style: none;
+  padding: 0;
+  margin-top: var(--space-4);
+}
+/* 항목은 카드 없는 행: 위아래 20px, 항목 사이 1px 선. 병원 원문 상자(.ui-source)의 왼쪽 띠는 그대로 둔다 */
+.conditions-guide-item {
+  padding: var(--space-5) 0;
+}
+.conditions-guide-item + .conditions-guide-item {
+  border-top: 1px solid var(--line);
+}
+.conditions-guide-item .ui-source {
+  margin-bottom: var(--space-2);
+}
+.conditions-guide-text {
+  white-space: pre-line;
+  color: var(--ink);
+  line-height: var(--lh-article);
+  overflow-wrap: anywhere;
+}
+/* 병원이 여럿이면 두 번째 지침부터 구역선으로 나눈다. 구역선 위아래 24px.
+   섹션 아래 여백(.conditions-section 32px)이 다음 지침의 위 여백과 겹쳐 위가 32px 이 되지 않게,
+   다음 지침이 있는 섹션은 아래 여백을 24px 로 줄인다 */
+.conditions-guide-plan:has(+ .conditions-guide-plan) {
+  margin-bottom: var(--space-6);
+}
+.conditions-guide-plan + .conditions-guide-plan {
+  border-top: 1px solid var(--line-section);
+  padding-top: var(--space-6);
+}
+.conditions-critical-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--state-standby-ink);
+  border-radius: var(--radius-6);
+  background: var(--state-standby-bg);
+  color: var(--state-standby-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+}
+.conditions-acked {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  color: var(--state-together-ink);
+  font-weight: var(--weight-bold);
+}

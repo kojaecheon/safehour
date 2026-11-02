@@ -1,68 +1,84 @@
 'use client';
 
-// 개인정보·면책 고지 (AX-211 · SIGNOFF_CHECKLIST 2.7 · 4.2)
+// 개인정보·면책 고지 (AX-211 → AX-318 · spec 3.1 · 4.17 · 4.18 · 4.19)
 //
-// 이 화면은 판정 흐름의 일부가 아니다. `/plan` → `/result` → `/place` 계약(ADR-0001)에
-// 영향을 주지 않는 정적 안내 화면이며, 어느 화면에서도 하단 링크로만 진입한다.
+// 정적 안내 화면이다. 판정·일정 흐름에 영향을 주지 않고, 더보기(/more)와 화면 하단 링크로 들어온다.
+// 로그인 만료·오프라인에서도 보여준다(저장소를 읽지 않는다 — 내 정보 지우기 버튼만 저장소를 쓴다).
 //
-// 본문은 `src/i18n/legal.js` 가 소유한다 — 코드에서 확인 가능한 사실만 적는다.
+// 본문은 `src/i18n/legal.js` 가 소유한다 — 코드·명세에서 확인 가능한 사실만 적는다.
+// 고지는 안전 문구다 (spec 4.17 · 규칙 43): 문단마다 주 언어와 병기 언어(한국어, ko 면 영어)를 함께 보여준다.
+// 두 언어는 safetyPair() 가 고른다 — ja·zh 는 검수 스위치가 켜지기 전까지 영어 + 한국어다.
 
-import { useRouter } from 'next/navigation';
-import LanguageToggle from '@/components/LanguageToggle.js';
 import ClearSessionButton from '@/components/ClearSessionButton.js';
 import { useLang } from '@/components/LanguageProvider.js';
+import PairText from '@/components/settings/PairText.js';
+import { Icon, TopBar } from '@/components/ui/index.js';
 import { LEGAL_SECTIONS } from '@/src/i18n/legal.js';
+import { pickText } from '@/src/i18n/index.js';
+
+const INTRO_KEY = 'privacy.intro';
+const CONTACT_KEY = 'privacy.contactBody';
+
+/** 고지 문단 하나 — 주 언어 줄 + 병기 줄 */
+function Pair({ entry, as: Tag = 'p', className }) {
+  const { safety } = useLang();
+  return (
+    <Tag className={className ? `settings-pair ${className}` : 'settings-pair'}>
+      <span className="settings-pair-primary" lang={safety.primary}>
+        {pickText(entry, safety.primary) ?? ''}
+      </span>
+      <span className="settings-pair-secondary" lang={safety.secondary}>
+        {pickText(entry, safety.secondary) ?? ''}
+      </span>
+    </Tag>
+  );
+}
 
 export default function PrivacyPage() {
-  const router = useRouter();
-  const { lang, t } = useLang();
-  const pick = (entry) => entry[lang] ?? entry.ko;
+  const { t, safety } = useLang();
 
   return (
     <>
-      <header className="top-bar">
-        <button
-          type="button"
-          className="back"
-          aria-label={t('common.back')}
-          onClick={() => router.back()}
-        >
-          ‹
-        </button>
-        <h1 className="brand">{t('privacy.header')}</h1>
-        <LanguageToggle />
-      </header>
+      <TopBar title={t('privacy.header')} backHref="/more" />
 
-      <main className="page">
-        <div className="medical-callout" role="note">
-          {t('privacy.intro')}
+      <main className="page privacy-page">
+        <div className="ui-callout has-icon medical-callout privacy-intro" role="note">
+          <span className="ui-callout-icon medical-callout-icon" aria-hidden="true">
+            <Icon name="info" size={20} />
+          </span>
+          <PairText k={INTRO_KEY} />
         </div>
 
         {LEGAL_SECTIONS.map((section) => (
-          <section className="card" key={section.id} aria-labelledby={`legal-${section.id}`}>
-            <h2 id={`legal-${section.id}`}>{pick(section.title)}</h2>
-            {section.lead && <p style={{ marginTop: 8 }}>{pick(section.lead)}</p>}
+          <section className="privacy-section" key={section.id} id={`legal-${section.id}`} aria-labelledby={`legal-${section.id}-title`}>
+            <h2 className="privacy-title" id={`legal-${section.id}-title`}>
+              <span lang={safety.primary}>{pickText(section.title, safety.primary)}</span>
+              <span className="privacy-title-secondary" lang={safety.secondary}>
+                {pickText(section.title, safety.secondary)}
+              </span>
+            </h2>
+            {section.lead && <Pair entry={section.lead} className="privacy-lead" />}
             {section.items && (
-              <ul role="list" style={{ marginTop: 10, paddingLeft: 18, display: 'grid', gap: 6 }}>
+              <ul className="privacy-items" role="list">
                 {section.items.map((item) => (
-                  <li key={item.ko}>{pick(item)}</li>
+                  <Pair key={item.ko} entry={item} as="li" />
                 ))}
               </ul>
             )}
-            {section.note && (
-              <p className="hint" style={{ fontSize: 14, marginTop: 10 }}>
-                {pick(section.note)}
-              </p>
-            )}
+            {section.note && <Pair entry={section.note} className="privacy-note" />}
           </section>
         ))}
 
-        <section className="card" aria-labelledby="legal-contact">
-          <h2 id="legal-contact">{t('privacy.contactTitle')}</h2>
-          <p style={{ marginTop: 8 }}>{t('privacy.contactBody')}</p>
+        <section className="privacy-section" aria-labelledby="legal-contact-title">
+          <h2 className="privacy-title" id="legal-contact-title">
+            {t('privacy.contactTitle')}
+          </h2>
+          <PairText k={CONTACT_KEY} />
         </section>
 
-        <ClearSessionButton />
+        <div className="privacy-clear">
+          <ClearSessionButton />
+        </div>
       </main>
     </>
   );

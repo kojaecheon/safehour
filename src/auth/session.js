@@ -91,6 +91,54 @@ export function readSessionToken(token, secret, nowMs) {
   return { provider: payload.p, subject: payload.s, issuedAt: payload.iat, expiresAt: payload.exp };
 }
 
+// ── 불투명 계정 키 (AX-312 · spec 4.19 · ADR-0009) ─────────────────────
+//
+// 기기 저장소는 계정마다 이름공간(`safehour.v2.<accountKey>.*`)을 나눈다. 그 이름으로
+// 원래 식별자(provider + sub)를 쓰면 기기에 식별자가 남으므로, 서버 비밀값으로 유도한
+// **되돌릴 수 없는 값**을 준다.
+//   - HMAC-SHA256(서명 키, 문맥 + 공급자 + 식별자) → base64url 43자(고정 길이)
+//   - 같은 계정이면 언제나 같은 값이다(발급 시각과 무관). 서버는 이 값을 저장하지 않는다.
+//   - 문맥 문자열과 JSON 배열 구분으로 세션 쿠키 서명(HMAC(키, base64url 페이로드))과
+//     입력이 겹치지 않게 한다 — 계정 키가 쿠키 서명으로 쓰일 수 없다.
+//   - 서명 키를 바꾸면 계정 키도 바뀐다(기기의 이전 이름공간은 보이지 않게 된다).
+
+const ACCOUNT_KEY_CONTEXT = 'safehour/account-key/v1';
+
+/** 서버가 만드는 계정 키 형식 — base64url 43자 (SHA-256) */
+export const ACCOUNT_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * 불투명 계정 키를 만든다.
+ * @param {{provider: string, subject: string}} identity
+ * @param {string} secret 세션 서명 키
+ */
+export function deriveAccountKey(identity, secret) {
+  if (!secret) throw new Error('세션 서명 키가 없습니다.');
+  if (!identity?.provider || !identity?.subject) {
+    throw new Error('계정 키에는 공급자와 식별자가 모두 필요합니다.');
+  }
+  const message = JSON.stringify([ACCOUNT_KEY_CONTEXT, String(identity.provider), String(identity.subject)]);
+  return createHmac('sha256', secret).update(message).digest('base64url');
+}
+
+/**
+ * GET /api/auth/session 이 돌려주는 로그인 정보.
+ * 식별자(subject)는 싣지 않는다 — 화면이 알아야 하는 것은 로그인 여부, 공급자, 만료, 계정 키뿐이다.
+ * @param {{provider: string, subject: string, expiresAt: number} | null} session readSessionToken 결과
+ * @param {string | null} secret
+ */
+export function sessionView(session, secret) {
+  if (!session || !secret) {
+    return { authenticated: false, provider: null, expiresAt: null, accountKey: null };
+  }
+  return {
+    authenticated: true,
+    provider: session.provider,
+    expiresAt: new Date(session.expiresAt * 1000).toISOString(),
+    accountKey: deriveAccountKey(session, secret),
+  };
+}
+
 /** CSRF 방어용 state 와 PKCE code_verifier */
 export function randomToken(bytes = 32) {
   return base64url(randomBytes(bytes));

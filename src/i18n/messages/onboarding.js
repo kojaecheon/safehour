@@ -1,0 +1,666 @@
+// onboarding 이름공간 — 시작(/)·로그인(/login)·체류 설정(/onboarding) (AX-303 · AX-314)
+//
+// 형식과 쓰기 규칙은 ./index.js 머리 주석을 따른다.
+// 기존 키 접두사 `home.`·`login.` 을 그대로 쓴다. 새 키는 `onboarding.` 으로 시작한다.
+// ja·zh: 검수 전 번역 — 사람 검수 필요
+//
+// AX-314 에서 바꾼 것
+//   - 머리글에서 '안심'·'안전' 같은 보증 표현을 뺐다(spec 9.1 — 조건 통과와 안전은 다르다).
+//   - 고지 3종을 새 흐름(본인 체크 재도입·현재 위치 미사용·외출 없는 날)에 맞게 고쳤다.
+//   - 로그인은 '기기 저장을 계정별로 나누는 것'이라는 실제 동작대로 적었다(spec 4.18–4.19).
+
+/** 일반 화면 문구 */
+export const messages = {
+  // ── 시작 화면 (SCR001) ──
+  'home.titleLine1': {
+    ko: '병원 조건 안에서 짜는',
+    en: 'A day-by-day plan for your stay,',
+    ja: '病院の条件の範囲で組む',
+    zh: '在医院条件范围内安排的',
+  },
+  'home.titleLine2': {
+    ko: '회복 중 여행 일정',
+    en: 'kept within hospital instructions',
+    ja: '回復中の旅行日程',
+    zh: '康复期旅行日程',
+  },
+  'home.lead': {
+    ko: '수술·시술 뒤 한국에 머무는 외국인 환자와 보호자를 위해, 병원 일정과 조건·복귀 시각에 맞춰 입국부터 출국까지 날짜별 일정을 만듭니다.',
+    en: 'For international patients staying in Korea after a procedure, and their companions. We build a plan for each day from arrival to departure that fits your hospital appointments, conditions and return times.',
+    ja: '手術・施術のあと韓国に滞在する外国人患者さんと同行者のために、病院の予定と条件・戻り時刻に合わせて、入国から出国まで日ごとの日程を作ります。',
+    zh: '我们为术后在韩国停留的外国患者及陪同者，按照医院预约、条件和返回时间，安排从入境到出境每一天的行程。',
+  },
+  'home.principlesAria': {
+    ko: 'SafeHour의 세 가지 원칙',
+    en: 'Three principles of SafeHour',
+    ja: 'SafeHourの3つの原則',
+    zh: 'SafeHour 的三项原则',
+  },
+  'home.principlesTitle': {
+    ko: '시작 전에 꼭 알아두세요',
+    en: 'Before you start',
+    ja: '始める前に必ずお読みください',
+    zh: '开始前请务必了解',
+  },
+  'home.cta': { ko: '시작하기', en: 'Get started', ja: 'はじめる', zh: '开始使用' },
+  'home.clearedNotice': {
+    ko: '이 기기에서 입력한 조건과 추천 결과를 지웠습니다.',
+    en: 'Your entries and results have been deleted from this device.',
+    ja: 'この端末で入力した条件とおすすめ結果を削除しました。',
+    zh: '已删除在此设备上输入的条件和推荐结果。',
+  },
+  'onboarding.langTitle': {
+    ko: '언어 선택 · Language',
+    en: 'Language · 언어',
+    ja: '言語を選ぶ · Language',
+    zh: '选择语言 · Language',
+  },
+  'onboarding.langHint': {
+    ko: '상태·고지 같은 중요한 안내는 두 언어로 함께 보여 줍니다.',
+    en: 'Important notices, such as status and disclaimers, are shown in two languages.',
+    ja: '状態や告知などの重要なお知らせは、2つの言語で併記します。',
+    zh: '状态、声明等重要提示会以两种语言同时显示。',
+  },
+
+  // ── 로그인 (AX-219 · AX-314) ──
+  'login.header': { ko: '로그인', en: 'Sign in', ja: 'ログイン', zh: '登录' },
+  'login.title': {
+    ko: '체류 일정을 이 기기에\n저장하려면 로그인하세요',
+    en: 'Sign in to keep your\nstay plan on this device',
+    ja: '滞在日程をこの端末に\n保存するにはログインしてください',
+    zh: '请先登录\n以便在此设备上保存行程',
+  },
+  'login.lead': {
+    ko: '로그인은 이 기기에 저장하는 체류 정보를 계정별로 나누는 데만 씁니다. 이름·이메일·프로필은 받지 않습니다.',
+    en: 'Sign-in is used only to keep the stay information saved on this device separate for each account. We do not receive your name, email, or profile.',
+    ja: 'ログインは、この端末に保存する滞在情報をアカウントごとに分けるためだけに使います。名前・メールアドレス・プロフィールは受け取りません。',
+    zh: '登录仅用于按账号区分保存在此设备上的停留信息。我们不会获取您的姓名、电子邮箱或个人资料。',
+  },
+  'login.methodsTitle': { ko: '로그인 방법', en: 'Ways to sign in', ja: 'ログイン方法', zh: '登录方式' },
+  'login.checking': {
+    ko: '로그인 방법을 확인하는 중',
+    en: 'Checking sign-in options',
+    ja: 'ログイン方法を確認しています',
+    zh: '正在确认登录方式',
+  },
+  'login.google': { ko: 'Google로 계속하기', en: 'Continue with Google', ja: 'Googleで続ける', zh: '使用 Google 继续' },
+  'login.kakao': { ko: '카카오로 계속하기', en: 'Continue with Kakao', ja: 'カカオで続ける', zh: '使用 Kakao 继续' },
+  'login.demo': {
+    ko: '데모 계정으로 둘러보기',
+    en: 'Explore with a demo account',
+    ja: 'デモアカウントで見てみる',
+    zh: '使用演示账号体验',
+  },
+  'login.demoNote': {
+    ko: '데모는 시연용입니다. 주소 검색이 연결되지 않은 환경에서는 ‘데모 주소’만 나오고, 실제 병원 정보는 들어 있지 않습니다.',
+    en: 'The demo is for trying out the app. Where address search is not connected, only “demo addresses” appear, and there is no real hospital data.',
+    ja: 'デモは試用のためのものです。住所検索が接続されていない環境では「デモ住所」だけが表示され、実際の病院情報は含まれていません。',
+    zh: '演示仅供试用。在未接通地址搜索的环境中只会显示“演示地址”，其中不含真实的医院信息。',
+  },
+  'login.notConfigured': { ko: '준비 중', en: 'Not available yet', ja: '準備中', zh: '准备中' },
+  'login.hospitalNext': {
+    ko: '로그인 다음에는 입·출국, 숙소, 병원 일정을 입력합니다. 병원 연동 코드는 그 뒤 조건 화면에서 연결할 수 있습니다.',
+    en: 'After signing in, you enter your arrival and departure, lodging and hospital appointments. You can connect a hospital code later on the conditions screen.',
+    ja: 'ログインの次に、入国・出国、宿泊先、病院の予定を入力します。病院連携コードは、その後の条件画面で接続できます。',
+    zh: '登录后，请填写入境与出境、住处和医院预约。医院对接代码可以稍后在条件页面关联。',
+  },
+  'login.notIdentityCheck': {
+    ko: '로그인은 본인 확인이 아닙니다. 어느 환자의 계획인지는 병원이 발급한 코드로 확인합니다.',
+    en: 'Signing in is not identity verification. Which patient a plan belongs to is confirmed by the code your hospital issues.',
+    ja: 'ログインは本人確認ではありません。どの患者さんのプランかは、病院が発行したコードで確認します。',
+    zh: '登录不是身份验证。计划属于哪位患者，由医院签发的代码确认。',
+  },
+  'login.errorLabel': {
+    ko: '로그인하지 못했습니다',
+    en: 'Could not sign in',
+    ja: 'ログインできませんでした',
+    zh: '无法登录',
+  },
+  'login.errCancelled': {
+    ko: '로그인을 취소했습니다. 다시 시도해 주세요.',
+    en: 'Sign-in was cancelled. Please try again.',
+    ja: 'ログインがキャンセルされました。もう一度お試しください。',
+    zh: '登录已取消。请重试。',
+  },
+  'login.errExpired': {
+    ko: '시간이 지나 다시 시작해야 합니다. 다시 시도해 주세요.',
+    en: 'The attempt timed out. Please try again.',
+    ja: '時間が経過したため、最初からやり直す必要があります。もう一度お試しください。',
+    zh: '操作已超时，需要重新开始。请重试。',
+  },
+  'login.errRetry': {
+    ko: '문제가 생겨 로그인을 마치지 못했습니다. 다시 시도해 주세요.',
+    en: 'Something went wrong before sign-in finished. Please try again.',
+    ja: '問題が発生し、ログインを完了できませんでした。もう一度お試しください。',
+    zh: '出现问题，未能完成登录。请重试。',
+  },
+  'login.errNotConfigured': {
+    ko: '이 방식은 아직 연결되지 않았습니다. 다른 방식을 선택해 주세요.',
+    en: 'This method is not connected yet. Please choose another.',
+    ja: 'この方法はまだ連携されていません。別の方法を選んでください。',
+    zh: '此方式尚未接通。请选择其他方式。',
+  },
+  'login.signedIn': { ko: '로그인되어 있습니다', en: 'You are signed in', ja: 'ログインしています', zh: '已登录' },
+  'login.continue': { ko: '계속하기', en: 'Continue', ja: '続ける', zh: '继续' },
+  'login.logout': { ko: '로그아웃', en: 'Sign out', ja: 'ログアウト', zh: '退出登录' },
+
+  // ── 체류 설정 (/onboarding) — 머리·단계 ──
+  'onboarding.header': { ko: '체류 설정', en: 'Set up your stay', ja: '滞在の設定', zh: '设置停留信息' },
+  'onboarding.headerEdit': { ko: '체류 정보 고치기', en: 'Edit your stay', ja: '滞在情報を編集', zh: '编辑停留信息' },
+  'onboarding.loading': { ko: '불러오는 중…', en: 'Loading…', ja: '読み込み中…', zh: '正在加载…' },
+  'onboarding.stepsAria': { ko: '설정 단계', en: 'Setup steps', ja: '設定ステップ', zh: '设置步骤' },
+  'onboarding.stepCounter': {
+    ko: '{n}/{total} 단계',
+    en: 'Step {n} of {total}',
+    ja: 'ステップ {n}/{total}',
+    zh: '第 {n}/{total} 步',
+  },
+  'onboarding.stepDone': { ko: '완료', en: 'done', ja: '完了', zh: '已完成' },
+  'onboarding.stepCurrent': { ko: '현재 단계', en: 'current step', ja: '現在のステップ', zh: '当前步骤' },
+  'onboarding.stepTravel': { ko: '입국·출국', en: 'Arrival & departure', ja: '入国・出国', zh: '入境与出境' },
+  'onboarding.stepLodging': { ko: '숙소', en: 'Lodging', ja: '宿泊先', zh: '住处' },
+  'onboarding.stepHospital': { ko: '병원과 일정', en: 'Hospital & appointments', ja: '病院と予定', zh: '医院与预约' },
+  'onboarding.stepCompanion': { ko: '동반 보호자', en: 'Companion', ja: '同行者', zh: '陪同者' },
+  'onboarding.stepPreferences': { ko: '관심사와 강도', en: 'Interests & pace', ja: '興味とペース', zh: '兴趣与节奏' },
+  'onboarding.stepTravelLead': {
+    ko: '한국에 도착하고 떠나는 날짜·시각·공항을 넣어 주세요. 시각은 한국 시각입니다.',
+    en: 'Enter the date, time and airport for your arrival in and departure from Korea. Times are Korea time.',
+    ja: '韓国に到着する日・出発する日の日付・時刻・空港を入力してください。時刻は韓国時間です。',
+    zh: '请填写抵达和离开韩国的日期、时间和机场。时间为韩国时间。',
+  },
+  'onboarding.stepLodgingLead': {
+    ko: '묵는 곳이 바뀌면 구간을 나눠 넣어 주세요. 체크아웃 날짜의 밤은 다음 숙소에서 묵는 것으로 봅니다.',
+    en: 'If you change places, add each stay as its own segment. The night of a check-out date counts toward the next lodging.',
+    ja: '宿泊先が変わる場合は区間を分けて入力してください。チェックアウト日の夜は次の宿泊先で過ごすものとみなします。',
+    zh: '如更换住处，请分段填写。退房当天的夜晚视为在下一个住处过夜。',
+  },
+  'onboarding.stepHospitalLead': {
+    ko: '병원 이름과 주소를 넣고, 병원 일정을 유형·날짜·시각으로 넣어 주세요.',
+    en: 'Enter each hospital’s name and address, then add your appointments by type, date and time.',
+    ja: '病院の名前と住所を入力し、病院の予定を種類・日付・時刻で入力してください。',
+    zh: '请填写医院名称和地址，再按类型、日期和时间填写医院预约。',
+  },
+  'onboarding.stepCompanionLead': {
+    ko: '보호자 1명이 함께 머무는지 알려 주세요. 나중에 바꿀 수 있고, 바꾸면 일정을 다시 짭니다.',
+    en: 'Tell us whether one companion is staying with you. You can change this later, and the plan will be rebuilt.',
+    ja: '同行者が1名一緒に滞在するかどうかを教えてください。後から変更でき、変更すると日程を組み直します。',
+    zh: '请告诉我们是否有一位陪同者同住。之后可以更改，更改后会重新安排行程。',
+  },
+  'onboarding.stepPreferencesLead': {
+    ko: '일정에 넣을 장소의 종류와 하루에 움직이는 정도를 골라 주세요.',
+    en: 'Choose the kinds of places to include and how much you want to move around each day.',
+    ja: '日程に入れる場所の種類と、1日の移動の多さを選んでください。',
+    zh: '请选择要安排的地点类型，以及每天的活动量。',
+  },
+
+  // ── 1단계: 입국·출국 ──
+  'onboarding.arrival': { ko: '입국', en: 'Arrival', ja: '入国', zh: '入境' },
+  'onboarding.departure': { ko: '출국', en: 'Departure', ja: '出国', zh: '出境' },
+  'onboarding.arrivalDate': { ko: '입국 날짜', en: 'Arrival date', ja: '入国日', zh: '入境日期' },
+  'onboarding.arrivalTime': { ko: '도착 시각', en: 'Landing time', ja: '到着時刻', zh: '抵达时间' },
+  'onboarding.arrivalAirport': { ko: '도착 공항', en: 'Arrival airport', ja: '到着空港', zh: '抵达机场' },
+  'onboarding.departureDate': { ko: '출국 날짜', en: 'Departure date', ja: '出国日', zh: '出境日期' },
+  'onboarding.departureTime': { ko: '출발 시각', en: 'Take-off time', ja: '出発時刻', zh: '起飞时间' },
+  'onboarding.departureAirport': { ko: '출발 공항', en: 'Departure airport', ja: '出発空港', zh: '出发机场' },
+  'onboarding.airportICN': {
+    ko: '인천국제공항 (ICN)',
+    en: 'Incheon International Airport (ICN)',
+    ja: '仁川国際空港（ICN）',
+    zh: '仁川国际机场（ICN）',
+  },
+  'onboarding.airportGMP': {
+    ko: '김포국제공항 (GMP)',
+    en: 'Gimpo International Airport (GMP)',
+    ja: '金浦国際空港（GMP）',
+    zh: '金浦国际机场（GMP）',
+  },
+  'onboarding.travelHint': {
+    ko: '입국일 일정은 도착 {processing} 뒤(입국 수속)부터, 출국일 일정은 출발 {lead} 전 공항 도착에 맞춰 끝나도록 짭니다.',
+    en: 'On arrival day, plans start {processing} after landing (immigration). On departure day, plans end so that you reach the airport {lead} before take-off.',
+    ja: '入国日は到着の{processing}後（入国手続き）から、出国日は出発の{lead}前に空港に着くように日程を組みます。',
+    zh: '入境当天的行程从落地{processing}后（入境手续）开始；出境当天的行程会安排在起飞前{lead}抵达机场。',
+  },
+  'onboarding.nights': { ko: '{n}박 체류', en: '{n}-night stay', ja: '{n}泊の滞在', zh: '停留{n}晚' },
+
+  // ── 2단계: 숙소 ──
+  'onboarding.lodgingItem': { ko: '숙소 {n}', en: 'Lodging {n}', ja: '宿泊先 {n}', zh: '住处 {n}' },
+  'onboarding.lodgingName': { ko: '숙소 이름', en: 'Lodging name', ja: '宿泊先の名前', zh: '住处名称' },
+  'onboarding.nameHint': {
+    ko: '알아보기 쉬운 이름이면 됩니다 (최대 {max}자).',
+    en: 'Any name you will recognise (up to {max} characters).',
+    ja: '分かりやすい名前で大丈夫です（最大{max}文字）。',
+    zh: '填写便于辨认的名称即可（最多{max}个字）。',
+  },
+  'onboarding.nameCount': { ko: '{n}/{max}자', en: '{n}/{max}', ja: '{n}/{max}文字', zh: '{n}/{max}字' },
+  'onboarding.checkIn': { ko: '체크인 날짜', en: 'Check-in date', ja: 'チェックイン日', zh: '入住日期' },
+  'onboarding.checkOut': { ko: '체크아웃 날짜', en: 'Check-out date', ja: 'チェックアウト日', zh: '退房日期' },
+  'onboarding.addLodging': { ko: '숙소 구간 추가', en: 'Add another lodging', ja: '宿泊先を追加', zh: '添加住处' },
+  'onboarding.removeLodging': { ko: '숙소 {n} 삭제', en: 'Remove lodging {n}', ja: '宿泊先 {n} を削除', zh: '删除住处 {n}' },
+  'onboarding.uncoveredNights': {
+    ko: '숙소가 정해지지 않은 밤: {dates}. 그 날짜에는 일정을 만들지 않아요.',
+    en: 'Nights without lodging: {dates}. No plan is made for those dates.',
+    ja: '宿泊先が決まっていない夜：{dates}。その日は日程を作りません。',
+    zh: '尚未确定住处的夜晚：{dates}。这些日期不会安排行程。',
+  },
+
+  // ── 주소 검색 (spec 6장 — 사용자가 입력한 검색어로만) ──
+  'onboarding.addressLabel': { ko: '주소', en: 'Address', ja: '住所', zh: '地址' },
+  'onboarding.addressSearchLabel': {
+    ko: '주소 검색',
+    en: 'Search for the address',
+    ja: '住所を検索',
+    zh: '搜索地址',
+  },
+  'onboarding.addressHintLodging': {
+    ko: '도로명, 건물 이름, 동네 이름으로 찾으세요. 예: 강남대로, 명동',
+    en: 'Search by road name, building name or neighbourhood, e.g. Gangnam-daero, Myeongdong.',
+    ja: '道路名・建物名・地域名で検索してください。例：江南大路、明洞',
+    zh: '请按道路名、建筑名称或街区搜索。例如：江南大路、明洞',
+  },
+  'onboarding.addressHintHospital': {
+    ko: '병원 주소나 건물 이름을 직접 입력해 찾으세요. SafeHour는 병원 목록이나 추천을 보여 주지 않습니다.',
+    en: 'Type the hospital’s address or building name yourself. SafeHour never shows hospital lists or recommendations.',
+    ja: '病院の住所や建物名をご自身で入力して検索してください。SafeHourは病院の一覧やおすすめを表示しません。',
+    zh: '请自行输入医院地址或建筑名称进行搜索。SafeHour 不会显示医院列表或推荐。',
+  },
+  'onboarding.searchButton': { ko: '검색', en: 'Search', ja: '検索', zh: '搜索' },
+  'onboarding.searching': { ko: '찾는 중…', en: 'Searching…', ja: '検索中…', zh: '正在搜索…' },
+  'onboarding.searchResults': {
+    ko: '검색 결과 {n}건 — 맞는 주소를 고르세요.',
+    en: '{n} results — choose the right address.',
+    ja: '検索結果 {n}件 — 該当する住所を選んでください。',
+    zh: '搜索结果 {n} 条 — 请选择正确的地址。',
+  },
+  'onboarding.searchResultsAria': { ko: '주소 검색 결과', en: 'Address results', ja: '住所の検索結果', zh: '地址搜索结果' },
+  'onboarding.searchEmpty': {
+    ko: '맞는 주소가 없어요. 다른 검색어로 찾아보세요.',
+    en: 'No matching address. Try a different search.',
+    ja: '該当する住所がありません。別の言葉で検索してください。',
+    zh: '没有匹配的地址。请换个搜索词试试。',
+  },
+  'onboarding.searchErrLength': {
+    ko: '검색어를 2자 이상 60자 이하로 입력하세요.',
+    en: 'Enter 2 to 60 characters.',
+    ja: '検索語は2〜60文字で入力してください。',
+    zh: '请输入2至60个字的搜索词。',
+  },
+  'onboarding.searchErrChars': {
+    ko: '검색어에 쓸 수 없는 문자가 있어요.',
+    en: 'The search contains characters that cannot be used.',
+    ja: '検索語に使えない文字が含まれています。',
+    zh: '搜索词中含有不能使用的字符。',
+  },
+  'onboarding.searchErrRejected': {
+    ko: '검색어를 조금 더 구체적으로 입력하세요.',
+    en: 'Please make your search a little more specific.',
+    ja: '検索語をもう少し具体的に入力してください。',
+    zh: '请输入更具体的搜索词。',
+  },
+  'onboarding.searchErrAuth': {
+    ko: '주소 검색은 로그인한 뒤에 쓸 수 있어요.',
+    en: 'Address search is available after you sign in.',
+    ja: '住所検索はログイン後に使えます。',
+    zh: '登录后才能使用地址搜索。',
+  },
+  'onboarding.searchErrUnavailable': {
+    ko: '지금은 주소 검색을 쓸 수 없어요. 잠시 후 다시 시도해 주세요.',
+    en: 'Address search is not available right now. Please try again later.',
+    ja: '現在、住所検索を利用できません。しばらくしてからもう一度お試しください。',
+    zh: '目前无法使用地址搜索。请稍后再试。',
+  },
+  'onboarding.searchErrFailed': {
+    ko: '주소 검색에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    en: 'Could not reach address search. Please try again later.',
+    ja: '住所検索に接続できませんでした。しばらくしてからもう一度お試しください。',
+    zh: '无法连接地址搜索。请稍后再试。',
+  },
+  'onboarding.selectedAddress': { ko: '고른 주소', en: 'Chosen address', ja: '選んだ住所', zh: '已选地址' },
+  'onboarding.changeAddress': { ko: '주소 바꾸기', en: 'Change address', ja: '住所を変更', zh: '更换地址' },
+  'onboarding.demoAddress': { ko: '데모 주소', en: 'Demo address', ja: 'デモ住所', zh: '演示地址' },
+  'onboarding.jibun': { ko: '지번 {address}', en: 'Lot address {address}', ja: '地番 {address}', zh: '地号 {address}' },
+
+  // ── 3단계: 병원과 병원 일정 ──
+  'onboarding.hospitalsTitle': { ko: '병원', en: 'Hospitals', ja: '病院', zh: '医院' },
+  'onboarding.hospitalItem': { ko: '병원 {n}', en: 'Hospital {n}', ja: '病院 {n}', zh: '医院 {n}' },
+  'onboarding.hospitalName': { ko: '병원 이름', en: 'Hospital name', ja: '病院名', zh: '医院名称' },
+  'onboarding.hospitalPhone': {
+    ko: '병원 전화 (선택)',
+    en: 'Hospital phone (optional)',
+    ja: '病院の電話番号（任意）',
+    zh: '医院电话（选填）',
+  },
+  'onboarding.hospitalPhoneHint': {
+    ko: '긴급 연락 화면에 병원 이름과 함께 전화 걸기 버튼으로 보여 드립니다.',
+    en: 'It appears as a call button with the hospital name on the emergency screen.',
+    ja: '緊急連絡画面に、病院名と一緒に電話ボタンとして表示します。',
+    zh: '会在紧急联系页面与医院名称一起显示为拨号按钮。',
+  },
+  'onboarding.addHospital': { ko: '병원 추가', en: 'Add a hospital', ja: '病院を追加', zh: '添加医院' },
+  'onboarding.removeHospital': { ko: '병원 {n} 삭제', en: 'Remove hospital {n}', ja: '病院 {n} を削除', zh: '删除医院 {n}' },
+  'onboarding.hospitalLinked': {
+    ko: '병원 연동 중인 병원이라 여기서 지울 수 없어요.',
+    en: 'This hospital is linked, so it cannot be removed here.',
+    ja: '連携中の病院のため、ここでは削除できません。',
+    zh: '此医院正在对接中，无法在此删除。',
+  },
+  'onboarding.hospitalHasAppointments': {
+    ko: '이 병원의 일정을 먼저 지우거나 다른 병원으로 바꾸면 지울 수 있어요.',
+    en: 'To remove this hospital, first delete its appointments or move them to another hospital.',
+    ja: 'この病院の予定を先に削除するか別の病院に変更すると、削除できます。',
+    zh: '请先删除此医院的预约或改到其他医院，才能删除此医院。',
+  },
+  'onboarding.hospitalUsedByPeriods': {
+    ko: '조건 기간이 이 병원을 쓰고 있어 지울 수 없어요.',
+    en: 'A condition period uses this hospital, so it cannot be removed.',
+    ja: '条件期間がこの病院を使っているため、削除できません。',
+    zh: '有条件期间正在使用此医院，因此无法删除。',
+  },
+  'onboarding.appointmentsTitle': {
+    ko: '병원 일정',
+    en: 'Hospital appointments',
+    ja: '病院の予定',
+    zh: '医院预约',
+  },
+  'onboarding.procedureRule': {
+    ko: '수술·시술 일정이 하나 이상 있어야 저장할 수 있어요.',
+    en: 'At least one surgery or procedure appointment is needed to save.',
+    ja: '保存するには、手術・施術の予定が1件以上必要です。',
+    zh: '至少需要一项手术或治疗预约才能保存。',
+  },
+  'onboarding.appointmentItem': { ko: '일정 {n}', en: 'Appointment {n}', ja: '予定 {n}', zh: '预约 {n}' },
+  'onboarding.appointmentHospital': { ko: '병원 고르기', en: 'Hospital', ja: '病院を選ぶ', zh: '选择医院' },
+  'onboarding.chooseHospital': { ko: '병원을 고르세요', en: 'Choose a hospital', ja: '病院を選んでください', zh: '请选择医院' },
+  'onboarding.appointmentType': { ko: '일정 유형', en: 'Appointment type', ja: '予定の種類', zh: '预约类型' },
+  'onboarding.typePROCEDURE': { ko: '수술·시술', en: 'Surgery or procedure', ja: '手術・施術', zh: '手术或治疗' },
+  'onboarding.typePROCEDUREHint': {
+    ko: '가장 이른 수술·시술 날짜부터 수술 후 날짜로 봅니다',
+    en: 'Days from your earliest procedure count as after-procedure days',
+    ja: '最も早い手術・施術の日から術後の日とみなします',
+    zh: '从最早的手术或治疗日期起视为术后日期',
+  },
+  'onboarding.typeVISIT': { ko: '진료', en: 'Consultation', ja: '診察', zh: '门诊' },
+  'onboarding.typeVISITHint': {
+    ko: '재진·경과 확인·실밥 제거 등',
+    en: 'Follow-up, check-up, stitch removal and similar',
+    ja: '再診・経過確認・抜糸など',
+    zh: '复诊、复查、拆线等',
+  },
+  'onboarding.appointmentDate': { ko: '날짜', en: 'Date', ja: '日付', zh: '日期' },
+  'onboarding.appointmentStart': { ko: '시작 시각', en: 'Start time', ja: '開始時刻', zh: '开始时间' },
+  'onboarding.appointmentEnd': {
+    ko: '종료 시각 (선택)',
+    en: 'End time (optional)',
+    ja: '終了時刻（任意）',
+    zh: '结束时间（选填）',
+  },
+  'onboarding.estimatedEnd': {
+    ko: '예상 종료 {time}',
+    en: 'Expected end {time}',
+    ja: '終了予定 {time}',
+    zh: '预计结束 {time}',
+  },
+  'onboarding.estimatedEndNote': {
+    ko: '종료 시각을 비워 두면 시작부터 {duration}으로 봅니다.',
+    en: 'With no end time, we assume {duration} from the start.',
+    ja: '終了時刻が空欄の場合は、開始から{duration}とみなします。',
+    zh: '结束时间留空时，按从开始起{duration}计算。',
+  },
+  'onboarding.addAppointment': { ko: '병원 일정 추가', en: 'Add an appointment', ja: '予定を追加', zh: '添加预约' },
+  'onboarding.removeAppointment': {
+    ko: '일정 {n} 삭제',
+    en: 'Remove appointment {n}',
+    ja: '予定 {n} を削除',
+    zh: '删除预约 {n}',
+  },
+  'onboarding.appointmentFromHospital': {
+    ko: '병원 연동으로 받은 일정이라 여기서 고칠 수 없어요.',
+    en: 'This appointment came from the linked hospital and cannot be changed here.',
+    ja: '病院連携で受け取った予定のため、ここでは変更できません。',
+    zh: '此预约来自医院对接，无法在此修改。',
+  },
+
+  // ── 4단계: 동반 보호자 ──
+  'onboarding.companionLegend': {
+    ko: '동반 보호자가 있나요?',
+    en: 'Is a companion staying with you?',
+    ja: '同行者はいますか？',
+    zh: '是否有陪同者？',
+  },
+  'onboarding.companionYes': {
+    ko: '있음 — 보호자 1명과 함께 머뭅니다',
+    en: 'Yes — one companion is staying with me',
+    ja: 'いる — 同行者1名と一緒に滞在します',
+    zh: '有 — 有一位陪同者与我同住',
+  },
+  'onboarding.companionNo': {
+    ko: '없음 — 혼자 머뭅니다',
+    en: 'No — I am staying on my own',
+    ja: 'いない — 一人で滞在します',
+    zh: '无 — 我独自停留',
+  },
+
+  // ── 5단계: 관심사와 이동 강도 ──
+  'onboarding.interestsLegend': {
+    ko: '관심사 (여러 개 선택, 안 골라도 됨)',
+    en: 'Interests (choose any, or none)',
+    ja: '興味（複数選択可・選ばなくても可）',
+    zh: '兴趣（可多选，也可不选）',
+  },
+  'onboarding.interestSHOPPING': { ko: '쇼핑', en: 'Shopping', ja: 'ショッピング', zh: '购物' },
+  'onboarding.interestKBEAUTY': { ko: 'K-뷰티', en: 'K-beauty', ja: 'Kビューティー', zh: '韩式美妆' },
+  'onboarding.interestPALACE_HISTORY': { ko: '고궁·역사', en: 'Palaces & history', ja: '古宮・歴史', zh: '古宫与历史' },
+  'onboarding.interestCAFE': { ko: '카페', en: 'Cafés', ja: 'カフェ', zh: '咖啡馆' },
+  'onboarding.interestEXHIBITION': { ko: '전시', en: 'Exhibitions', ja: '展示', zh: '展览' },
+  'onboarding.interestFOOD': { ko: '음식', en: 'Food', ja: 'グルメ', zh: '美食' },
+  'onboarding.interestNATURE': { ko: '자연', en: 'Nature', ja: '自然', zh: '大自然' },
+  'onboarding.interestFESTIVAL': { ko: '축제·공연', en: 'Festivals & shows', ja: '祭り・公演', zh: '节庆与演出' },
+  'onboarding.paceLegend': { ko: '이동 강도', en: 'Pace', ja: '移動のペース', zh: '出行节奏' },
+  'onboarding.paceRELAXED': { ko: '느긋하게', en: 'Relaxed', ja: 'ゆったり', zh: '悠闲' },
+  'onboarding.paceNORMAL': { ko: '보통', en: 'Normal', ja: 'ふつう', zh: '普通' },
+  'onboarding.paceHint': {
+    ko: '외출 한 번에 {perOuting}곳, 하루 {perDay}곳까지',
+    en: 'Up to {perOuting} places per outing and {perDay} per day',
+    ja: '外出1回につき{perOuting}か所、1日{perDay}か所まで',
+    zh: '每次外出最多{perOuting}处，每天最多{perDay}处',
+  },
+
+  // ── 이동·저장 ──
+  'onboarding.prev': { ko: '이전', en: 'Back', ja: '前へ', zh: '上一步' },
+  'onboarding.next': { ko: '다음', en: 'Next', ja: '次へ', zh: '下一步' },
+  'onboarding.save': {
+    ko: '저장하고 조건 입력으로',
+    en: 'Save and set conditions',
+    ja: '保存して条件入力へ',
+    zh: '保存并填写条件',
+  },
+  'onboarding.saveEdit': { ko: '변경 저장', en: 'Save changes', ja: '変更を保存', zh: '保存更改' },
+  'onboarding.saved': { ko: '저장했어요. 다음 화면으로 이동합니다.', en: 'Saved. Moving on.', ja: '保存しました。次の画面に移動します。', zh: '已保存，正在前往下一页。' },
+  'onboarding.readOnlySave': {
+    ko: '보기 전용 상태라 저장할 수 없어요. 로그인한 뒤 다시 시도해 주세요.',
+    en: 'You are in view-only mode, so this cannot be saved. Please sign in and try again.',
+    ja: '閲覧のみの状態のため保存できません。ログインしてからもう一度お試しください。',
+    zh: '当前为仅供查看状态，无法保存。请登录后重试。',
+  },
+  'onboarding.saveFailed': {
+    ko: '이 기기에 저장하지 못했어요. 저장 공간을 확인하고 다시 시도해 주세요.',
+    en: 'Could not save on this device. Check the storage space and try again.',
+    ja: 'この端末に保存できませんでした。保存容量を確認して、もう一度お試しください。',
+    zh: '无法保存到此设备。请检查存储空间后重试。',
+  },
+  'onboarding.errorsTitle': {
+    ko: '확인이 필요한 항목 {n}개',
+    en: '{n} items need your attention',
+    ja: '確認が必要な項目 {n}件',
+    zh: '有 {n} 项需要确认',
+  },
+
+  // ── 저장된 체류가 있을 때·없을 때 ──
+  'onboarding.existsTitle': {
+    ko: '이미 저장된 체류가 있어요',
+    en: 'You already have a saved stay',
+    ja: '保存済みの滞在情報があります',
+    zh: '已有保存的停留信息',
+  },
+  'onboarding.existsBody': {
+    ko: '한 계정에는 체류를 하나만 둘 수 있어요. 지금 체류를 고치거나 오늘 일정을 보세요. 새 여행을 시작하려면 설정에서 현재 체류를 지워 주세요.',
+    en: 'Each account keeps one stay at a time. Edit the current stay or see today’s plan. To start a new trip, delete the current stay in Settings.',
+    ja: '1つのアカウントに保存できる滞在は1件だけです。現在の滞在を編集するか、今日の日程をご覧ください。新しい旅行を始めるには、設定で現在の滞在を削除してください。',
+    zh: '每个账号只能保存一份停留信息。您可以编辑当前停留信息或查看今日行程。如要开始新的旅行，请在设置中删除当前停留信息。',
+  },
+  'onboarding.existsToday': { ko: '오늘 일정 보기', en: 'See today’s plan', ja: '今日の日程を見る', zh: '查看今日行程' },
+  'onboarding.editMissingTitle': {
+    ko: '고칠 체류가 없어요',
+    en: 'No saved stay to edit',
+    ja: '編集する滞在情報がありません',
+    zh: '没有可编辑的停留信息',
+  },
+  'onboarding.editMissingBody': {
+    ko: '이 기기에 저장된 체류가 없습니다. 새로 설정해 주세요.',
+    en: 'There is no stay saved on this device. Please set one up.',
+    ja: 'この端末に保存された滞在情報はありません。新しく設定してください。',
+    zh: '此设备上没有保存的停留信息。请重新设置。',
+  },
+  'onboarding.startNew': { ko: '체류 설정 시작', en: 'Set up a stay', ja: '滞在の設定を始める', zh: '开始设置停留信息' },
+
+  // ── 필드 오류 (validateStay 결과 → 필드별 문구 · 규칙 1–3) ──
+  'onboarding.errChoose': { ko: '하나를 골라 주세요.', en: 'Please choose one.', ja: 'いずれかを選んでください。', zh: '请选择一项。' },
+  'onboarding.errDate': { ko: '날짜를 입력해 주세요.', en: 'Please enter a date.', ja: '日付を入力してください。', zh: '请输入日期。' },
+  'onboarding.errTime': { ko: '시각을 입력해 주세요.', en: 'Please enter a time.', ja: '時刻を入力してください。', zh: '请输入时间。' },
+  'onboarding.errName': { ko: '이름을 입력해 주세요.', en: 'Please enter a name.', ja: '名前を入力してください。', zh: '请输入名称。' },
+  'onboarding.errNameTooLong': {
+    ko: '이름은 {max}자까지 쓸 수 있어요.',
+    en: 'Names can be up to {max} characters.',
+    ja: '名前は{max}文字までです。',
+    zh: '名称最多{max}个字。',
+  },
+  'onboarding.errAddress': {
+    ko: '주소를 검색해 결과에서 골라 주세요.',
+    en: 'Search for the address and choose a result.',
+    ja: '住所を検索して、結果から選んでください。',
+    zh: '请搜索地址并从结果中选择。',
+  },
+  'onboarding.errPhone': {
+    ko: '전화번호는 숫자와 +, -, 괄호, 띄어쓰기만 쓸 수 있어요.',
+    en: 'Use only digits, +, -, brackets and spaces.',
+    ja: '電話番号には数字と +、-、括弧、スペースだけを使えます。',
+    zh: '电话号码只能包含数字、+、-、括号和空格。',
+  },
+  'onboarding.errDepartureBeforeArrival': {
+    ko: '출국이 입국보다 빠를 수 없어요. 날짜와 시각을 확인해 주세요.',
+    en: 'Departure cannot be earlier than arrival. Check the dates and times.',
+    ja: '出国が入国より早くなることはできません。日付と時刻を確認してください。',
+    zh: '出境不能早于入境。请检查日期和时间。',
+  },
+  'onboarding.errStayTooLong': {
+    ko: '체류는 최대 {max}박까지 설정할 수 있어요.',
+    en: 'A stay can be at most {max} nights.',
+    ja: '滞在は最大{max}泊まで設定できます。',
+    zh: '停留最多可设置{max}晚。',
+  },
+  'onboarding.errLodgingsEmpty': {
+    ko: '숙소 구간을 하나 이상 넣어 주세요.',
+    en: 'Add at least one lodging.',
+    ja: '宿泊先を1件以上入力してください。',
+    zh: '请至少填写一个住处。',
+  },
+  'onboarding.errLodgingOrder': {
+    ko: '체크아웃 날짜는 체크인 날짜보다 뒤여야 해요.',
+    en: 'The check-out date must be after the check-in date.',
+    ja: 'チェックアウト日はチェックイン日より後にしてください。',
+    zh: '退房日期必须晚于入住日期。',
+  },
+  'onboarding.errLodgingOverlap': {
+    ko: '다른 숙소 구간과 날짜가 겹쳐요. 체크아웃 날짜와 다음 체크인 날짜는 같아도 됩니다.',
+    en: 'These dates overlap another lodging. A check-out date may be the same as the next check-in date.',
+    ja: '他の宿泊先と日付が重なっています。チェックアウト日と次のチェックイン日は同じでも構いません。',
+    zh: '日期与其他住处重叠。退房日期可以与下一个入住日期相同。',
+  },
+  'onboarding.errProcedureRequired': {
+    ko: '수술·시술 일정이 하나 이상 있어야 해요. 수술 후 날짜를 구분하는 기준입니다.',
+    en: 'Add at least one surgery or procedure appointment. It marks which days are after your procedure.',
+    ja: '手術・施術の予定が1件以上必要です。術後の日を区別する基準になります。',
+    zh: '至少需要一项手术或治疗预约。它是区分术后日期的依据。',
+  },
+  'onboarding.errAppointmentHospital': {
+    ko: '이 일정의 병원을 골라 주세요.',
+    en: 'Choose the hospital for this appointment.',
+    ja: 'この予定の病院を選んでください。',
+    zh: '请选择此预约的医院。',
+  },
+  'onboarding.errEndBeforeStart': {
+    ko: '종료 시각은 시작 시각보다 늦어야 해요.',
+    en: 'The end time must be later than the start time.',
+    ja: '終了時刻は開始時刻より後にしてください。',
+    zh: '结束时间必须晚于开始时间。',
+  },
+  'onboarding.errPeriods': {
+    ko: '조건 기간과 맞지 않는 곳이 있어요. 조건 화면에서 확인해 주세요.',
+    en: 'Something no longer matches a condition period. Please check the conditions screen.',
+    ja: '条件期間と合わない箇所があります。条件画面で確認してください。',
+    zh: '有内容与条件期间不符。请在条件页面确认。',
+  },
+  'onboarding.errGeneric': {
+    ko: '이 항목을 확인해 주세요.',
+    en: 'Please check this item.',
+    ja: 'この項目を確認してください。',
+    zh: '请检查此项。',
+  },
+};
+
+/** 안전 문구 — 시작 화면의 고지 3종·의료 면책, 체류 설정의 고지 (선택 언어 + 한국어 병기) */
+export const safety = {
+  'home.p1Title': {
+    ko: '① 의료 판단을 하지 않습니다.',
+    en: '① We make no medical judgements.',
+    ja: '① 医療的な判断は行いません。',
+    zh: '① 我们不做医疗判断。',
+  },
+  'home.p1Body': {
+    ko: '증상·시술 종류·회복 단계를 묻거나 해석하지 않습니다. 병원이 안내한 조건만 따릅니다.',
+    en: 'We do not ask about or interpret symptoms, procedure types or recovery stages. We follow only the conditions your hospital gave you.',
+    ja: '症状・施術の種類・回復段階を尋ねたり解釈したりしません。病院から案内された条件だけに従います。',
+    zh: '我们不询问也不解读症状、治疗类型或恢复阶段，只遵循医院给出的条件。',
+  },
+  'home.p2Title': {
+    ko: '② 현재 위치(GPS)를 쓰지 않습니다.',
+    en: '② We do not use your live location (GPS).',
+    ja: '② 現在地（GPS）は使いません。',
+    zh: '② 我们不使用您的当前位置（GPS）。',
+  },
+  'home.p2Body': {
+    ko: '직접 검색해 고른 숙소·병원 주소만 기준점으로 씁니다.',
+    en: 'We use only the lodging and hospital addresses you search for and choose yourself.',
+    ja: 'ご自身で検索して選んだ宿泊先・病院の住所だけを基準点として使います。',
+    zh: '只以您自己搜索并选择的住处和医院地址作为基准点。',
+  },
+  'home.p3Title': {
+    ko: '③ 조건을 지킬 수 없는 날은 외출을 넣지 않습니다.',
+    en: '③ If the conditions cannot be met, we add no outing that day.',
+    ja: '③ 条件を守れない日は外出を入れません。',
+    zh: '③ 无法满足条件的日子不安排外出。',
+  },
+  'home.p3Body': {
+    ko: '외출이 없는 날도 실패가 아니라 조건에 맞춘 정상 결과입니다.',
+    en: 'A day without outings is not a failure — it is the correct result for your conditions.',
+    ja: '外出のない日も失敗ではなく、条件に合わせた正常な結果です。',
+    zh: '没有外出安排的日子并不是失败，而是符合条件的正常结果。',
+  },
+  'home.footer': {
+    ko: 'SafeHour는 의료진의 판단을 대체하지 않습니다. 몸 상태에 이상이 느껴지면 즉시 병원에 연락하세요. 관광정보 출처: ⓒ한국관광공사',
+    en: 'SafeHour does not replace your medical team. If you feel unwell, contact your hospital immediately. Tourism data: ⓒKorea Tourism Organization',
+    ja: 'SafeHourは医療スタッフの判断に代わるものではありません。体調に異変を感じたら、すぐに病院へ連絡してください。観光情報の出典：ⓒ韓国観光公社',
+    zh: 'SafeHour 不能代替医护人员的判断。如感到身体不适，请立即联系医院。旅游信息来源：ⓒ韩国观光公社',
+  },
+  'onboarding.deletionNotice': {
+    ko: '체류 정보는 이 기기에만 저장되고, 출국 {days}일이 지난 뒤 앱을 처음 열 때 삭제됩니다.',
+    en: 'Your stay information is saved only on this device. It is deleted the first time you open the app after {days} days have passed since departure.',
+    ja: '滞在情報はこの端末にのみ保存され、出国から{days}日が過ぎた後に初めてアプリを開いたときに削除されます。',
+    zh: '停留信息只保存在此设备上，出境{days}天后首次打开应用时会被删除。',
+  },
+  'onboarding.appointmentNotice': {
+    ko: 'SafeHour는 시술 종류나 증상을 묻지 않습니다. 병원 일정은 유형(수술·시술 / 진료)과 시각만 받습니다.',
+    en: 'SafeHour does not ask about procedure types or symptoms. For hospital appointments we only take the type (surgery or procedure / consultation) and the time.',
+    ja: 'SafeHourは施術の種類や症状を尋ねません。病院の予定は種類（手術・施術／診察）と時刻だけを受け付けます。',
+    zh: 'SafeHour 不询问治疗类型或症状。医院预约只填写类型（手术或治疗／门诊）和时间。',
+  },
+};

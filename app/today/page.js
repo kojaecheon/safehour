@@ -1,196 +1,375 @@
 'use client';
 
-// 오늘의 회복 상태 — 새 홈 (AX-217 · 정의 §5)
+// /today — 홈: 오늘 상태·매일 확인·다음 일정·복귀 마감·변경 알림 (AX-317 · spec 3.1 · 4.6 · 4.9 · 4.11 · 4.18)
 //
 // 화면 원칙
-//   - **판정을 새로 만들지 않는다.** `/api/today` 가 연결 게이트 → 기존 안전 게이트를
-//     같은 함수로 호출한다. 홈과 결과 화면이 다른 답을 내면 안 된다 (정의 §9-5).
-//   - **액션은 사라지지 않고 성격이 바뀐다** — 가능이면 외출, 대기면 안내 확인,
-//     불가면 병원 연락 (정의 §5.2).
-//   - 복귀 마감은 복귀시각·복약·다음진료 중 **가장 이른 것**이며 이유를 함께 적는다.
+//   - **판정을 새로 만들지 않는다.** 기기에 저장된 확정 일정을 동기화 모듈(lib/trip useTrip)로만 읽는다.
+//     오늘은 매일 확인·확인하지 않은 병원 중요 안내를 덧씌운 표시용 일정이다 — 저장 일정은 바꾸지 않는다(규칙 49).
+//   - 매일 확인 카드는 맨 위에 고정한다. 확인 전에는 상태가 STANDBY + DAILY_CHECK_PENDING 이고
+//     길찾기·장소 이동과 편집을 막는다(규칙 32).
+//   - 상태·사유는 늘 보인다(안전 문구 병기). 복귀 마감은 마감 이유·예상 귀가와 함께, 두 언어로 보인다.
+//   - '변경됨'은 전후 비교 시트로 연다(닫으면 본 것으로 기록). 즉시 복귀 시트는 앱 셸 옆 TripRuntime 이 자동으로 연다.
+//   - 업데이트 실패·보호자 링크 다시 보내기·동반 보호자 '다시 만들기' 안내를 보인다.
+//   - 로그인 만료·오프라인에서는 보기 전용이다 — 오늘 일정과 복귀 마감은 보이고, 확인·편집은 막는다.
+//   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
+//     '새로 고치는 중' 줄은 따로 블록을 두지 않고 날짜·상태 블록 안 날짜 줄 아래에 둔다(열 때마다 화면이 흔들리지 않게).
 
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import LanguageToggle from '@/components/LanguageToggle.js';
-import FooterLinks from '@/components/FooterLinks.js';
-import StateBanner from '@/components/StateBanner.js';
+import CourseCard from '@/components/CourseCard.js';
+import DeltaSheet from '@/components/DeltaSheet.js';
+import ReturnSheet from '@/components/ReturnSheet.js';
 import { useLang } from '@/components/LanguageProvider.js';
-import { readPlan } from '@/lib/recovery-store.js';
-import { fmtDateTime as formatDateTime, fmtTime as formatTime } from '@/lib/format.js';
-import {
-  effectiveDeadline,
-  nextClockOccurrence,
-  toDecisionPayload,
-  unconfirmedAll,
-} from '@/src/recovery/plan.js';
+import { Badge, Button, EmptyState, Icon, ListGroup, ListItem, StateBanner, TopBar } from '@/components/ui/index.js';
+import DailyCheckCard from '@/components/trip/DailyCheckCard.js';
+import MapLinks from '@/components/trip/MapLinks.js';
+import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
+import TripNotice from '@/components/trip/TripNotice.js';
+import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
+import useKstClock from '@/components/trip/useKstClock.js';
+import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
+import useTrip from '@/lib/trip/useTrip.js';
+import { isStayDate } from '@/src/stay/stay.js';
 
-const DEADLINE_REASON_KEY = {
-  returnBy: 'today.deadlineReturnBy',
-  medication: 'today.deadlineMedication',
-  visit: 'today.deadlineVisit',
-};
+const RETURN_CAUSES = ['PATIENT_RECALLED', 'PLAN_REVOKED', 'PLAN_EXPIRED'];
+
+function nextDate(date) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** 복귀 마감 — 안전 문구 두 줄(주 언어 + 병기) */
+function Deadline({ outing, day, stay }) {
+  const { t, pair } = useLang();
+  const deadline = pair('return.deadline', { time: outing.returnBy });
+  const reasonKey = DEADLINE_REASON_KEY[outing.deadlineReason];
+  const reason = reasonKey ? pair(reasonKey) : null;
+  const planned = outing.plannedReturnAt ? pair('trip.plannedReturn', { time: outing.plannedReturnAt }) : null;
+  const place = returnPlaceOf(outing, day, stay);
+  const placeName = place.name ?? (place.kind === 'HOSPITAL' ? t('trip.placeHospital') : t('trip.placeLodging'));
+  return (
+    <div className="today-deadline">
+      <p className="today-deadline-main" lang={deadline.primary.lang}>
+        <Icon name="flag" size={20} /> {deadline.primary.text}
+      </p>
+      <p className="today-deadline-place">{t('today.returnTo', { place: placeName })}</p>
+      {reason && <p lang={reason.primary.lang}>{reason.primary.text}</p>}
+      {planned && (
+        <p lang={planned.primary.lang}>
+          {planned.primary.text} <span className="today-estimate">({t('common.badgeEstimate')})</span>
+        </p>
+      )}
+      <p className="trip-pair-secondary" lang={deadline.secondary.lang}>
+        {[deadline.secondary.text, reason?.secondary.text, planned?.secondary.text].filter(Boolean).join(' · ')}
+      </p>
+    </div>
+  );
+}
 
 export default function TodayPage() {
   const router = useRouter();
-  const { t, locale } = useLang();
+  const { t, locale, pair } = useLang();
+  const trip = useTrip();
+  const clock = useKstClock();
+  const [sheet, setSheet] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const dateRef = useRef(null);
 
-  const [plan, setPlan] = useState(null);
-  const [today, setToday] = useState(null);
-  const [loaded, setLoaded] = useState(false);
+  const today = trip.todayDate;
+  const stay = trip.stay;
+  const day = trip.today.day;
+  const stored = trip.today.stored;
+  const nowMin = clock && clock.date === today ? clock.minutes : null;
+  const gated = trip.dailyCheckPending || trip.unconfirmedHospitalUpdate;
+  const inStay = today && stay ? isStayDate(stay, today) : false;
+  const tomorrow = today ? nextDate(today) : null;
+  const hasTomorrow = inStay && tomorrow && isStayDate(stay, tomorrow);
 
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      const saved = readPlan();
-      if (cancelled) return;
-      setPlan(saved);
-
-      if (!saved) {
-        setLoaded(true);
-        return;
-      }
-      try {
-        // 채널 A 만 서버로 보낸다 — 병원 안내문(채널 B)은 단말을 떠나지 않는다
-        const res = await fetch('/api/today', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ payload: toDecisionPayload(saved) }),
-        });
-        const data = await res.json();
-        if (!cancelled && data.ok) setToday(data);
-      } catch {
-        // 상태를 못 받으면 아래에서 안내만 보여준다
-      } finally {
-        if (!cancelled) setLoaded(true);
-      }
-    }, 0);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, []);
-
-  const fmtTime = (date) => formatTime(date, locale);
-  const fmtDateTime = (date) => formatDateTime(date, locale);
-
-  if (!loaded) {
-    return (
-      <>
-        <header className="top-bar">
-          <h1 className="brand">{t('today.header')}</h1>
-          <LanguageToggle />
-        </header>
-        <main className="page">
-          <div className="loading-block" role="status">
-            <div className="spinner" aria-hidden="true" />
-            {t('today.loading')}
-          </div>
-        </main>
-      </>
-    );
+  function confirmSame() {
+    const res = trip.confirmDailyCheck();
+    setNotice(res?.ok ? 'today.checkDone' : 'trip.editReadOnly');
+    // 누른 카드가 사라진다 — 포커스를 오늘 날짜 줄로 옮긴다
+    if (res?.ok) window.setTimeout(() => dateRef.current?.focus(), 0);
   }
 
-  if (!plan) {
-    return (
-      <>
-        <header className="top-bar">
-          <h1 className="brand">{t('today.header')}</h1>
-          <LanguageToggle />
-        </header>
-        <main className="page">
-          <div className="state-banner state-STANDBY">
-            <span className="state-label">{t('today.header')}</span>
-            <h2>{t('today.notConnectedTitle')}</h2>
-            <p>{t('today.notConnectedBody')}</p>
-          </div>
-          <button type="button" className="btn" onClick={() => router.push('/link')}>
-            {t('today.notConnectedCta')}
-          </button>
-          <FooterLinks />
-        </main>
-      </>
-    );
+  function changed() {
+    const res = trip.dailyCheckChanged();
+    if (res?.ok) router.push('/conditions');
+    else setNotice('trip.editReadOnly');
   }
 
-  const deadline = effectiveDeadline(plan);
-  const unconfirmed = unconfirmedAll(plan);
-  const nextMed = (plan.constraints.medicationTimes ?? [])
-    .map((clock) => nextClockOccurrence(clock))
-    .filter(Boolean)
-    .sort((a, b) => a - b)[0];
-  const canGoOut = today?.outingAllowed === true;
+  function closeDelta() {
+    setSheet(null);
+    if (today) void trip.markDeltaSeen(today);
+  }
 
-  return (
-    <>
-      <header className="top-bar">
-        <h1 className="brand">{t('today.header')}</h1>
-        <LanguageToggle />
-      </header>
+  const top = <TopBar title={t('today.header')} />;
+  let body;
 
-      <main className="page">
-        {/* 병원 확인 배지 — 상단 고정 */}
-        <div className="verified-strip">
-          <span className="verified-mark" aria-hidden="true">
-            ✓
-          </span>
-          <span>{t('today.verified', { issuer: plan.issuer.name })}</span>
-          {plan.demo && <span className="badge badge-demo">{t('link.demoBadge')}</span>}
+  if (!today) {
+    body = (
+      <div className="ui-block">
+        <p className="today-loading" role="status">
+          {t('today.loading')}
+        </p>
+      </div>
+    );
+  } else if (!stay) {
+    body = (
+      <div className="ui-block">
+        <EmptyState
+          icon="navToday"
+          title={t('today.noStayTitle')}
+          body={t('today.noStayBody')}
+          action={<Button href="/onboarding">{t('today.noStayAction')}</Button>}
+        />
+      </div>
+    );
+  } else if (!trip.tripPlan) {
+    body = (
+      <div className="ui-block">
+        <EmptyState
+          icon="navToday"
+          title={trip.syncing ? t('today.generatingTitle') : t('today.noPlanTitle')}
+          body={trip.syncing ? t('today.generatingBody') : trip.readOnly ? t('today.noPlanReadOnly') : t('today.noPlanBody')}
+          action={
+            !trip.syncing && !trip.readOnly ? (
+              <Button variant="secondary" onClick={() => trip.retry()}>
+                {t('today.retry')}
+              </Button>
+            ) : null
+          }
+        />
+      </div>
+    );
+  } else if (!inStay) {
+    const before = stay.arrival?.date && today < stay.arrival.date;
+    body = (
+      <div className="ui-block">
+        <EmptyState
+          icon="navTrip"
+          title={before ? t('today.beforeTripTitle') : t('today.afterTripTitle')}
+          body={before ? t('today.beforeTripBody', { date: formatDate(stay.arrival.date, locale) }) : t('today.afterTripBody')}
+          action={<Button href="/trip">{t('today.seeTrip')}</Button>}
+        />
+      </div>
+    );
+  } else if (!day) {
+    body = (
+      <div className="ui-block">
+        <EmptyState
+          icon="navToday"
+          title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
+          body={trip.syncing ? t('today.generatingBody') : t('trip.noDayBody')}
+          action={
+            !trip.syncing && !trip.readOnly ? (
+              <Button variant="secondary" onClick={() => trip.retry()}>
+                {t('today.retry')}
+              </Button>
+            ) : null
+          }
+        />
+      </div>
+    );
+  } else {
+    const focus = nowMin === null ? null : todayFocus(day, nowMin);
+    const delta = deltaSummary(day);
+    const fix = needsInputFix(day);
+    const returnTitle = pair('return.title');
+    const outingNow = Boolean(focus && focus.phase !== 'DONE' && focus.outing);
+    const outingDone = focus?.phase === 'DONE';
+    const outingNone = !focus && nowMin !== null && !fix && !stored?.returnNow;
+    const hasOutingBlock = outingNow || outingDone || outingNone || Boolean(focus?.nextAppointment);
+    body = (
+      <>
+        {trip.dailyCheckPending && (
+          <div className="ui-block today-check-block">
+            <DailyCheckCard day={stored} stay={stay} readOnly={trip.readOnly} onSame={confirmSame} onChanged={changed} />
+          </div>
+        )}
+
+        <div className="ui-block today-status-block">
+          <p className="today-date" tabIndex={-1} ref={dateRef}>
+            <span>{formatDate(today, locale)}</span>
+            {/* 연결된 지침이 데모면 늘 밝힌다 — 데모를 실제 연동처럼 보이지 않게 (spec 4.20 · 9.1) */}
+            {isDemoMode(stay) && <Badge kind="demo" label={t('link.demoBadge')} />}
+          </p>
+
+          {/* 새로 고치는 중: 따로 흰 블록을 띄우면 열 때마다 화면이 흔들린다. 상태 블록 안 날짜 줄 바로 아래 한 줄로 둔다 */}
+          {trip.syncing && trip.tripPlan && (
+            <p className="today-syncing" role="status">
+              {t('today.syncing')}
+            </p>
+          )}
+
+          <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
+
+          <TripNotice slot role="status">
+            {notice ? t(notice) : ''}
+          </TripNotice>
+
+          {/* 변경됨 알림 (SEED Callout · actionable, 설계서 5.6): 누르면 전후 비교 시트 */}
+          {delta?.unseen && (
+            <button type="button" className="trip-changed" onClick={() => setSheet('delta')}>
+              <span className="trip-changed-dot" aria-hidden="true" />
+              <span className="trip-changed-text">{t('trip.changedCta')}</span>
+              <Icon name="chevronRight" size={18} />
+            </button>
+          )}
+
+          {stored?.returnNow && !trip.immediateReturn && (
+            <section className="trip-return-banner" aria-labelledby="today-return-h">
+              <h2 id="today-return-h" lang={returnTitle.primary.lang}>
+                {returnTitle.primary.text}
+              </h2>
+              <p className="trip-pair-secondary" lang={returnTitle.secondary.lang}>
+                {returnTitle.secondary.text}
+              </p>
+              <button type="button" className="btn btn-return" onClick={() => setSheet('return')}>
+                {t('return.reopen')}
+              </button>
+            </section>
+          )}
+
+          {fix && (
+            <section className="trip-fix" aria-labelledby="today-fix-h">
+              <h2 id="today-fix-h">{t('today.needsInputTitle')}</h2>
+              <Button href={trip.readOnly ? undefined : fix.href} disabled={trip.readOnly}>
+                {t(fix.key)}
+              </Button>
+            </section>
+          )}
         </div>
 
-        {today && <StateBanner state={today.state} reasons={today.reasons} live />}
-
-        <section className="card" aria-labelledby="today-outing">
-          <h2 id="today-outing">{t('today.outingTitle')}</h2>
-          <p style={{ fontSize: 17, color: 'var(--ink)' }}>
-            <strong>{t('today.deadline', { at: fmtDateTime(deadline.at) })}</strong>
-          </p>
-          <p className="hint">{t(DEADLINE_REASON_KEY[deadline.source])}</p>
-
-          <div className="meta" style={{ marginTop: 14 }}>
-            {nextMed && <span>{t('today.nextMed', { at: fmtTime(nextMed) })}</span>}
-            {plan.constraints.nextVisitAt && (
-              <span>
-                {t('today.nextVisit', { at: fmtDateTime(new Date(plan.constraints.nextVisitAt)) })}
-              </span>
-            )}
-          </div>
-        </section>
-
-        {unconfirmed.length > 0 && (
-          <section className="card" aria-labelledby="today-unconfirmed">
-            <h2 id="today-unconfirmed">{t('today.unconfirmed', { count: unconfirmed.length })}</h2>
-            <button type="button" className="btn btn-secondary" onClick={() => router.push('/guide')}>
-              {t('today.reviewCta')}
-            </button>
+        {trip.unconfirmedHospitalUpdate && (
+          <section className="ui-block today-section" aria-labelledby="today-hospital-h">
+            <h2 id="today-hospital-h">
+              <Icon name="hospital" size={20} /> {t('today.unconfirmedTitle')}
+            </h2>
+            <p>{t('today.unconfirmedBody')}</p>
+            <Button href="/guide" variant="secondary">
+              {t('today.unconfirmedCta')}
+            </Button>
           </section>
         )}
 
-        {/* 단일 액션 — 상태에 따라 성격이 바뀐다 (정의 §5.2) */}
-        {canGoOut ? (
-          <button type="button" className="btn" onClick={() => router.push('/plan')}>
-            {t('today.ctaOuting')}
-          </button>
-        ) : today?.state === 'STANDBY' ? (
-          <button type="button" className="btn" onClick={() => router.push('/guide')}>
-            {t('today.reviewCta')}
-          </button>
-        ) : (
-          <div className="medical-callout" role="note">
-            {t('today.ctaContact')}
+        {hasOutingBlock && (
+          <div className="ui-block today-outing-block">
+            {outingNow && (
+              <section className="today-focus" aria-labelledby="today-focus-h">
+                <h2 id="today-focus-h">{focus.phase === 'OUT' ? t('today.nextOutTitle') : t('today.nextNextTitle')}</h2>
+                <p className="today-focus-depart">{t('today.departAt', { time: focus.outing.departAt })}</p>
+                <Deadline outing={focus.outing} day={day} stay={stay} />
+                {focus.stop && (
+                  <div className="today-next-stop">
+                    <h3>{t('today.nextStop')}</h3>
+                    <CourseCard stop={focus.stop} variant="compact" headingLevel={4} />
+                    <MapLinks stop={focus.stop} disabled={gated || focus.outing.actionable === false} disabledKey={trip.dailyCheckPending ? 'today.gatedMaps' : 'today.gatedHospital'} showNote />
+                  </div>
+                )}
+              </section>
+            )}
+            {outingDone && (
+              <section className="today-outing-empty" aria-labelledby="today-done-h">
+                <h2 id="today-done-h">{t('today.nextDoneTitle')}</h2>
+              </section>
+            )}
+            {outingNone && (
+              <section className="today-outing-empty" aria-labelledby="today-none-h">
+                <h2 id="today-none-h">{t('today.noOutingTitle')}</h2>
+                <p>{t('today.noOutingBody')}</p>
+              </section>
+            )}
+            {focus?.nextAppointment && (
+              <p className="today-appointment">
+                <Icon name="hospital" size={18} /> {t('today.appointmentLine', { start: focus.nextAppointment.start, end: focus.nextAppointment.end })}
+              </p>
+            )}
           </div>
         )}
 
-        <button
-          type="button"
-          className="btn btn-secondary"
-          style={{ marginTop: 10 }}
-          onClick={() => router.push('/guide')}
-        >
-          {t('today.guideCta')}
-        </button>
+        <div className="ui-block today-links-block">
+          <ListGroup>
+            <li>
+              <ListItem title={t('today.fullDay')} leading={<Icon name="navTrip" size={22} />} trailing="chevron" href={`/trip/${today}`} />
+            </li>
+            {hasTomorrow && (
+              <li>
+                <ListItem title={t('today.tomorrow')} leading={<Icon name="navTrip" size={22} />} trailing="chevron" href={`/trip/${tomorrow}`} />
+              </li>
+            )}
+          </ListGroup>
+        </div>
 
-        <FooterLinks />
+        {trip.guardianResendNeeded && (
+          <section className="ui-block today-section" aria-labelledby="today-guardian-h">
+            <h2 id="today-guardian-h">{t('today.guardianResendTitle')}</h2>
+            <p>{t('today.guardianResendBody')}</p>
+            <Button href={trip.readOnly ? undefined : '/guardian'} variant="secondary" disabled={trip.readOnly}>
+              {t('today.guardianResendCta')}
+            </Button>
+          </section>
+        )}
+
+        {trip.companionChangeNeedsRegenerate && (
+          <section className="ui-block today-section" aria-labelledby="today-companion-h">
+            <h2 id="today-companion-h">{t('today.companionTitle')}</h2>
+            <p>{t('today.companionBody')}</p>
+            {/* 닫기 + 행동 (설계서 5.1): [나중에 3][다시 만들기 7]. 보이는 순서와 DOM 순서가 같다 */}
+            <div className="today-section-actions">
+              <Button variant="secondary" onClick={() => trip.dismissCompanionNotice()}>
+                {t('today.companionDismiss')}
+              </Button>
+              <Button variant="secondary" disabled={trip.readOnly || trip.dailyCheckPending} onClick={() => setSheet('regenerate')}>
+                {t('today.companionCta')}
+              </Button>
+            </div>
+            {trip.dailyCheckPending && <p className="trip-map-note">{t('trip.editGated')}</p>}
+          </section>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {top}
+      <main className="page today-page is-basement">
+        {trip.updateFailed && (
+          <div className="ui-block today-sync-block">
+            <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />
+          </div>
+        )}
+        {body}
+        <p className="trip-footer">
+          <Link className="trip-inline-link" href="/privacy">
+            {t('today.privacyLink')}
+          </Link>
+        </p>
       </main>
+      {sheet === 'delta' && day && <DeltaSheet day={day} dateLabel={formatDate(today, locale)} onClose={closeDelta} />}
+      {sheet === 'return' && !trip.immediateReturn && (
+        <ReturnSheet
+          day={stored}
+          stay={stay}
+          cause={(stored?.reasons ?? []).find((r) => RETURN_CAUSES.includes(r)) ?? null}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {sheet === 'regenerate' && (
+        <RegenerateSheet
+          date={null}
+          initialScope="FROM_TODAY"
+          regenerate={(scope) => trip.regenerate(scope)}
+          onDone={(key) => {
+            setNotice(key);
+            trip.dismissCompanionNotice();
+          }}
+          onClose={() => setSheet(null)}
+        />
+      )}
     </>
   );
 }

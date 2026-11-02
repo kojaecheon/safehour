@@ -1,0 +1,439 @@
+/* 기능별 스타일 — designBoard (/design-board)
+ *
+ * AX-304 가 1차(토큰·부품 견본)를 채웠고, '화면 시안' 절은 AX-321 이 이어서 썼다(맨 아래).
+ * 등록은 app/layout.js 한곳에서 이미 끝났다 — 새로 import 하지 않는다.
+ *
+ * 규칙
+ *   - 값은 app/globals.css 의 토큰 변수(var(--…))만 쓴다. 새 토큰이 필요하면 보고한다.
+ *   - 부품 모양(app/styles/ui.css)은 덮어쓰지 않는다. 보드 배치만 정한다.
+ *   - 클래스는 `designBoard-` 로 시작한다.
+ *   - 320–1280px 가로 스크롤 없음.
+ */
+
+/* 보드만 넓은 화면에서 넓게 쓴다 — 다른 화면의 앱 셸은 --shell-max 그대로 */
+.app-shell:has(.designBoard-root) {
+  max-width: 1120px;
+}
+
+/* ── 머리 — 지하철 노선 띠(하루 타임라인의 서명)를 한 줄로 되풀이한다 ── */
+.designBoard-intro {
+  padding: var(--space-4) 0 var(--space-2);
+}
+.designBoard-intro::after {
+  content: '';
+  display: block;
+  height: 20px;
+  margin-top: var(--space-5);
+  background:
+    radial-gradient(circle at 10px 10px, var(--surface) 0 4px, var(--accent) 4.5px 9px, transparent 9.5px) 0 0 / 88px 20px repeat-x,
+    linear-gradient(var(--accent), var(--accent)) 0 7px / 100% 6px no-repeat;
+}
+.designBoard-kicker {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  letter-spacing: 0.08em;
+  color: var(--accent-strong);
+}
+.designBoard-intro-lead {
+  margin: var(--space-2) 0 var(--space-3);
+  max-width: 28ch;
+  font-size: var(--text-title-1);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--ink);
+}
+
+/* ── 절 ── */
+.designBoard-section {
+  margin-top: var(--space-10);
+}
+.designBoard-section > h2 {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-title-1);
+  font-weight: var(--weight-heavy);
+  letter-spacing: var(--tracking-tight);
+}
+.designBoard-lead,
+.designBoard-note {
+  max-width: 70ch;
+  margin-bottom: var(--space-4);
+  color: var(--ink-soft);
+}
+.designBoard-root code {
+  font-family: var(--font-mono);
+  font-size: var(--text-caption);
+}
+
+/* ── 색 견본 ── */
+.designBoard-group {
+  margin-top: var(--space-6);
+}
+.designBoard-group > h3 {
+  margin-bottom: var(--space-3);
+}
+.designBoard-swatches {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-5) var(--space-4);
+}
+.designBoard-swatch {
+  min-width: 0;
+}
+.designBoard-chip {
+  display: flex;
+  align-items: flex-end;
+  height: 88px;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-16);
+}
+/* UI 경계 짝은 글자 대신 굵은 테두리로 보여준다 */
+.designBoard-chip.is-ui {
+  border-width: 3px;
+}
+.designBoard-chip-text {
+  font-size: var(--text-title-2);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+}
+.designBoard-chip-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-heavy);
+}
+.designBoard-tokens,
+.designBoard-hex {
+  margin-top: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.designBoard-hex {
+  margin-top: 2px;
+}
+.designBoard-verdict {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) 6px;
+  margin-top: var(--space-1);
+  color: var(--ink);
+}
+.designBoard-min {
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
+
+/* ── 글자 ── */
+.designBoard-type {
+  list-style: none;
+  display: grid;
+  gap: var(--space-4);
+}
+.designBoard-type > li {
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}
+.designBoard-type-sample {
+  margin-top: var(--space-1);
+  color: var(--ink);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.designBoard-numeric {
+  font-size: var(--text-title-2);
+  font-weight: var(--weight-heavy);
+}
+.designBoard-subhead {
+  margin: var(--space-6) 0 var(--space-3);
+}
+.designBoard-langs {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-3);
+}
+.designBoard-langs > li {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-16);
+  background: var(--surface-alt);
+}
+.designBoard-lang-name {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  color: var(--ink-soft);
+}
+.designBoard-lang-sample {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+
+/* ── 배치 ── */
+.designBoard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+.designBoard-grid.is-two {
+  gap: var(--space-4);
+}
+@media (min-width: 700px) {
+  .designBoard-grid.is-two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 900px) {
+  .designBoard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .designBoard-sub.is-wide {
+    grid-column: 1 / -1;
+  }
+}
+.designBoard-sub {
+  min-width: 0;
+  padding: var(--space-5) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-24);
+  background: var(--surface);
+}
+.designBoard-sub > h3 {
+  margin-bottom: var(--space-3);
+}
+.designBoard-h4 {
+  margin: var(--space-4) 0 var(--space-3);
+  font-size: var(--text-body);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+}
+.designBoard-stack {
+  display: grid;
+  gap: var(--space-3);
+}
+.designBoard-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.designBoard-states {
+  display: grid;
+  gap: 0 var(--space-4);
+}
+@media (min-width: 700px) {
+  .designBoard-states {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.designBoard-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+/* ── 간격·모서리·그림자 ── */
+.designBoard-spacing,
+.designBoard-radii,
+.designBoard-shadows {
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+.designBoard-spacing > li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  color: var(--ink-soft);
+}
+.designBoard-spacing-bar {
+  display: inline-block;
+  flex: none;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.designBoard-radii {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+.designBoard-radii > li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--ink-soft);
+}
+.designBoard-radius-box {
+  width: 72px;
+  height: 72px;
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+}
+.designBoard-shadows > li {
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-16);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+/* ── 유형별 일러스트 ── */
+.designBoard-art {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: var(--space-3);
+}
+.designBoard-art > li {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.designBoard-art svg {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  border-radius: var(--radius-12);
+}
+
+/* ── 화면 시안 (AX-321) ──
+ * 화면 틀은 360×760(기준 폭 360px)으로 그리고 transform 으로 줄인다. 넘치는 아래쪽은 틀이 자른다.
+ * 줄인 폭: 좁은 화면 0.78(281px — 320px 화면의 본문 폭 288px 안), 700px 이상 0.7(252px, 1120px 보드에 4열).
+ * 틀 안은 inert(ScreenPreviews.js)라 누르거나 포커스할 수 없다.
+ * 틀 아래 독은 지금 앱의 셸을 따른다: 하단 내비가 있으면 다섯째 칸이 긴급이라 떠 있는 긴급 버튼을 두지 않고,
+ * 내비가 없는 화면(/g)은 하단 긴급 바를 둔다. 시안은 .sticky-return 을 쓰지 않는다: 보드 페이지 자체가
+ * .app-shell:has(.sticky-return) 규칙에 걸려 아래 여백 152px·초점 스크롤 여백 184px 을 받게 된다. */
+.designBoard-screens {
+  --designBoard-phone-w: 360px;
+  --designBoard-phone-h: 760px;
+  --designBoard-scale: 0.78;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(var(--designBoard-phone-w) * var(--designBoard-scale)), 1fr));
+  gap: var(--space-8) var(--space-6);
+  justify-items: center;
+  align-items: start;
+}
+@media (min-width: 700px) {
+  .designBoard-screens {
+    --designBoard-scale: 0.7;
+  }
+}
+.designBoard-screen {
+  display: grid;
+  gap: var(--space-3);
+  width: calc(var(--designBoard-phone-w) * var(--designBoard-scale));
+  min-width: 0;
+}
+.designBoard-phone {
+  width: 100%;
+  height: calc(var(--designBoard-phone-h) * var(--designBoard-scale));
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-24);
+  background: var(--bg);
+  box-shadow: var(--shadow-card);
+}
+.designBoard-phone-screen {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--designBoard-phone-w);
+  height: var(--designBoard-phone-h);
+  overflow: hidden;
+  background: var(--bg);
+  transform: scale(var(--designBoard-scale));
+  transform-origin: 0 0;
+}
+.designBoard-phone-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  /* 본문 안의 쌓임(배지·날짜 칩 등)이 아래 독의 내비·긴급 바를 덮지 않게 가둔다. 실제 앱은 내비가 z-index 30 이라 덮일 일이 없다 */
+  isolation: isolate;
+}
+.designBoard-phone-scroll > * {
+  flex: none;
+}
+/* main.page 와 같은 여백(아래는 내비 자리만큼). 시안 안에는 main 랜드마크를 두지 않는다.
+   틀 아래까지 바탕이 이어지게 남는 높이를 채운다 */
+.designBoard-phone-page {
+  flex: 1 0 auto;
+  padding: var(--space-5) var(--gutter) calc(var(--nav-height) + var(--space-12));
+}
+/* 회색 바탕 화면: ui.css 의 main.page.is-basement 규칙은 main 요소에만 걸려 시안(div)에 닿지 않는다. 같은 값을 되풀이한다 */
+.designBoard-phone-page.is-basement {
+  background: var(--layer-basement);
+  --shadow-card: none;
+  padding-top: 0;
+}
+.designBoard-phone-page.is-basement > .ui-block:last-child {
+  margin-bottom: 0;
+}
+.designBoard-phone-dock {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+.designBoard-phone .ui-bottom-nav.is-preview {
+  border-width: 1px 0 0;
+  border-radius: 0;
+}
+/* 하단 긴급 바(셸의 .ui-emergency-bar)는 고정을 풀고 독 안에 흐름으로 둔다. 고정이면 틀의 transform 안에서 독 밖으로 나간다.
+   안전 영역 여백은 기기마다 달라 시안에는 싣지 않는다 */
+.designBoard-phone .ui-emergency-bar {
+  position: static;
+  transform: none;
+  width: auto;
+  max-width: none;
+  padding-bottom: var(--space-2);
+}
+/* 시안 속 하단 바(예: 보호자 열기의 '열기'): 흰 면 + 윗선 1px + 안쪽 12/16 을 흐름 안에 그린다.
+   .sticky-return 은 쓰지 않는다. 고정이 아니라 틀 안에 머문다.
+   화면 여백(--gutter) 안에 놓이므로 좌우 음수 여백으로 틀 폭 끝까지 편다(실제 바는 화면 폭 전체다) */
+.designBoard-bar {
+  margin: 0 calc(var(--gutter) * -1);
+  background: var(--bg);
+  border-top: 1px solid var(--line-strong);
+  padding: var(--space-3) var(--gutter);
+}
+.designBoard-screen-caption {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.designBoard-screen-name {
+  font-size: var(--text-title-3);
+  font-weight: var(--weight-heavy);
+  color: var(--ink);
+}
+.designBoard-screen-caption code {
+  justify-self: start;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.designBoard-screen-note {
+  font-size: var(--text-body);
+  line-height: var(--leading-snug);
+  color: var(--ink-soft);
+}
+
+/* 회색 바탕 견본 — 흰 블록(.ui-block)의 음수 여백이 이 틀 안에서 끝나게 좌우 여백을 준다 */
+.designBoard-basement {
+  padding: var(--space-2) var(--gutter) 0;
+  background: var(--layer-basement);
+  border-radius: var(--radius-16);
+  overflow: hidden;
+}

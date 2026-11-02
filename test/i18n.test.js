@@ -1,14 +1,20 @@
-// 다국어 계약 (AX-209)
+// 다국어 계약 (AX-209 · AX-303)
 //
-// 대상 사용자가 외국인 환자이므로 "영문이 비어 있는 화면 문구" 는 결함이다.
+// 대상 사용자가 외국인 환자이므로 "번역이 비어 있는 화면 문구" 는 결함이다.
 // 이 테스트가 사전 누락·자리표시자 불일치·미사용 키를 실패로 고정한다.
+// 4개 언어·안전 문구 병기·이름공간 규칙은 `i18n-languages.test.js` 가 고정한다.
+//
+// AX-303 에서 의도적으로 바꾼 단언: `ja-JP`·`zh-CN` 은 이제 `en` 이 아니라 `ja`·`zh` 다
+// (spec 4.17 · 규칙 44 · ADR-0007 이 ADR-0003 규칙 1 을 개정).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { UI_TEXT, SCHEDULE_FIELD_KEY } from '../src/i18n/dictionary.js';
+import { UI_TEXT } from '../src/i18n/messages/index.js';
+import { SCHEDULE_FIELD_KEY } from '../src/i18n/messages/place.js';
+import { UI_TEXT as LEGACY_UI_TEXT, SCHEDULE_FIELD_KEY as LEGACY_SCHEDULE } from '../src/i18n/dictionary.js';
 import { LEGAL_SECTIONS } from '../src/i18n/legal.js';
 import {
   CLEARABLE_KEYS,
@@ -47,7 +53,8 @@ const KEY_SHAPE = /'([a-z][a-zA-Z0-9]*\.[a-zA-Z0-9_.]+)'/g;
 const DIRECT_CALL = /\b(?:t|translate)\(\s*'([a-zA-Z0-9_.]+)'/g;
 
 function eachSourceFile(fn) {
-  const roots = ['app', 'components', 'src/i18n'];
+  // lib/notify: 기기 알림 문구 키(notifications.*)는 알림 예약·문구 모듈이 쓴다 (AX-319)
+  const roots = ['app', 'components', 'src/i18n', 'lib/notify'];
   const visit = (path) => {
     for (const entry of readdirSync(path)) {
       const full = join(path, entry);
@@ -56,7 +63,8 @@ function eachSourceFile(fn) {
         continue;
       }
       if (!full.endsWith('.js')) continue;
-      // dictionary.js 자체의 키 정의는 "사용" 이 아니다
+      // 이름공간 파일의 키 정의는 "사용" 이 아니다 (dictionary.js 는 호환용 재수출)
+      if (full.startsWith(join('src', 'i18n', 'messages'))) continue;
       if (full.endsWith(join('src', 'i18n', 'dictionary.js'))) continue;
       fn(readFileSync(full, 'utf8'), full);
     }
@@ -86,7 +94,12 @@ function collectDirectCallKeys() {
 const DYNAMIC_PREFIXES = ['state.', 'event.', 'eventPanel.', 'schedule.'];
 
 describe('사전 무결성', () => {
-  test('모든 키가 ko·en 을 모두 가진다', () => {
+  test('기존 import 경로(dictionary.js)가 같은 사전을 가리킨다', () => {
+    assert.equal(LEGACY_UI_TEXT, UI_TEXT);
+    assert.equal(LEGACY_SCHEDULE, SCHEDULE_FIELD_KEY);
+  });
+
+  test('모든 키가 4개 언어를 모두 가진다', () => {
     const missing = [];
     for (const [key, entry] of Object.entries(UI_TEXT)) {
       for (const lang of LANGS) {
@@ -97,13 +110,15 @@ describe('사전 무결성', () => {
     assert.deepEqual(missing, [], `번역 누락: ${missing.join(', ')}`);
   });
 
-  test('ko·en 의 자리표시자 집합이 같다', () => {
+  test('4개 언어의 자리표시자 집합이 같다', () => {
     const mismatched = [];
     for (const [key, entry] of Object.entries(UI_TEXT)) {
       const ko = placeholders(entry.ko);
-      const en = placeholders(entry.en);
-      if (ko.size !== en.size || [...ko].some((name) => !en.has(name))) {
-        mismatched.push(key);
+      for (const lang of LANGS) {
+        const other = placeholders(entry[lang]);
+        if (ko.size !== other.size || [...ko].some((name) => !other.has(name))) {
+          mismatched.push(`${key}.${lang}`);
+        }
       }
     }
     assert.deepEqual(mismatched, [], `자리표시자 불일치: ${mismatched.join(', ')}`);
@@ -139,7 +154,7 @@ describe('사전 무결성', () => {
     // 사유 문구는 도메인이 소유한다 — 여기서는 누락만 확인한다
     for (const code of Object.values(REASON)) {
       assert.ok(REASON_TEXT[code], `${code} 사유 문구 없음`);
-      assert.ok(REASON_TEXT[code].ko && REASON_TEXT[code].en, `${code} 번역 누락`);
+      for (const lang of LANGS) assert.ok(REASON_TEXT[code][lang], `${code}.${lang} 번역 누락`);
     }
   });
 
@@ -166,12 +181,12 @@ describe('사전 무결성', () => {
 });
 
 describe('고지 본문 (AX-211)', () => {
-  /** 섹션의 모든 {ko,en} 쌍을 평평하게 모은다 */
+  /** 섹션의 모든 언어별 문단을 평평하게 모은다 */
   function entriesOf(section) {
     return [section.title, section.lead, section.note, ...(section.items ?? [])].filter(Boolean);
   }
 
-  test('모든 문단이 ko·en 을 모두 가진다', () => {
+  test('모든 문단이 4개 언어를 모두 가진다', () => {
     const missing = [];
     for (const section of LEGAL_SECTIONS) {
       entriesOf(section).forEach((entry, i) => {
@@ -198,7 +213,19 @@ describe('고지 본문 (AX-211)', () => {
   });
 
   test('검증할 수 없는 다짐 표현을 쓰지 않는다', () => {
-    const banned = ['최선을 다', '노력합니다', '안전을 보장', 'guarantee', 'best effort'];
+    const banned = [
+      '최선을 다',
+      '노력합니다',
+      '안전을 보장',
+      'guarantee',
+      'best effort',
+      '保証',
+      '努めます',
+      '最善を尽く',
+      '保证',
+      '尽力',
+      '竭力',
+    ];
     const offenders = [];
     for (const section of LEGAL_SECTIONS) {
       for (const entry of entriesOf(section)) {
@@ -236,13 +263,16 @@ describe('단말 데이터 삭제 목록 (AX-210)', () => {
 });
 
 describe('언어 결정', () => {
-  test('한국어 태그만 ko 로, 나머지는 en 으로 좁힌다', () => {
+  // AX-303: ja·zh 를 en 으로 좁히던 단언을 의도적으로 바꿨다 (spec 규칙 44)
+  test('ko·ja·zh 태그는 각 언어로, 나머지는 en 으로 좁힌다', () => {
     assert.equal(normalizeLang('ko'), 'ko');
     assert.equal(normalizeLang('ko-KR'), 'ko');
     assert.equal(normalizeLang('KO-kr'), 'ko');
     assert.equal(normalizeLang('en-US'), 'en');
-    assert.equal(normalizeLang('ja-JP'), 'en');
-    assert.equal(normalizeLang('zh-CN'), 'en');
+    assert.equal(normalizeLang('ja-JP'), 'ja');
+    assert.equal(normalizeLang('zh-CN'), 'zh');
+    assert.equal(normalizeLang('zh-TW'), 'zh');
+    assert.equal(normalizeLang('fr'), 'en');
   });
 
   test('빈 값·비문자열은 기본 언어로 떨어진다', () => {
@@ -256,13 +286,17 @@ describe('언어 결정', () => {
   test('지원 언어만 통과시킨다', () => {
     assert.equal(isLang('ko'), true);
     assert.equal(isLang('en'), true);
-    assert.equal(isLang('ja'), false);
+    assert.equal(isLang('ja'), true);
+    assert.equal(isLang('zh'), true);
+    assert.equal(isLang('fr'), false);
     assert.equal(isLang(null), false);
   });
 
   test('Intl 로케일이 언어별로 다르다', () => {
     assert.equal(intlLocale('ko'), 'ko-KR');
     assert.equal(intlLocale('en'), 'en-GB');
+    assert.equal(intlLocale('ja'), 'ja-JP');
+    assert.equal(intlLocale('zh'), 'zh-CN');
   });
 });
 
@@ -270,6 +304,9 @@ describe('문구 조회', () => {
   test('언어별로 다른 문구를 돌려준다', () => {
     assert.equal(translate('common.confirm', 'ko'), '확인');
     assert.equal(translate('common.confirm', 'en'), 'OK');
+    assert.equal(translate('common.confirm', 'ja'), UI_TEXT['common.confirm'].ja);
+    assert.equal(translate('common.confirm', 'zh'), UI_TEXT['common.confirm'].zh);
+    assert.notEqual(translate('common.confirm', 'ja'), translate('common.confirm', 'en'));
   });
 
   test('없는 키는 키 자체를 돌려준다 — 조용히 사라지지 않는다', () => {
@@ -277,8 +314,9 @@ describe('문구 조회', () => {
   });
 
   test('자리표시자를 치환한다', () => {
-    assert.equal(translate('card.rank', 'ko', { rank: 2 }), '2순위');
-    assert.equal(translate('card.rank', 'en', { rank: 2 }), 'No. 2');
+    // AX-317: 퇴역한 추천 카드 키(card.rank)를 지워 새 일정 화면 키로 바꿨다
+    assert.equal(translate('trip.stopCount', 'ko', { n: 2 }), '장소 2곳');
+    assert.equal(translate('trip.stopCount', 'en', { n: 2 }), '2 places');
   });
 
   test('값이 없는 자리표시자는 표시자를 남긴다', () => {
@@ -312,6 +350,8 @@ describe('분 단위 라벨', () => {
   test('60분 미만은 분으로 표기한다', () => {
     assert.equal(minutesLabel(20, 'ko'), '20분');
     assert.equal(minutesLabel(20, 'en'), '20 min');
+    assert.equal(minutesLabel(20, 'ja'), '20分');
+    assert.equal(minutesLabel(20, 'zh'), '20分钟');
   });
 
   test('정시는 시간만 표기한다', () => {
@@ -322,6 +362,8 @@ describe('분 단위 라벨', () => {
   test('시간과 분을 함께 표기한다', () => {
     assert.equal(minutesLabel(95, 'ko'), '1시간 35분');
     assert.equal(minutesLabel(95, 'en'), '1 h 35 min');
+    assert.equal(minutesLabel(95, 'ja'), '1時間35分');
+    assert.equal(minutesLabel(95, 'zh'), '1小时35分钟');
   });
 
   test('값이 없으면 확인 불가로 표기한다 — 0 으로 오해하게 두지 않는다', () => {

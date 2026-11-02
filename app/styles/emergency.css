@@ -1,0 +1,89 @@
+/* 기능별 스타일 — emergency (/emergency)
+ *
+ * 미리 만든 빈 파일이다 (AX-304). 이 기능 화면을 만드는 작업(T16a · AX-318)만 이 파일을 고친다.
+ * 등록은 app/layout.js 한곳에서 이미 끝났다 — 새로 import 하지 않는다.
+ *
+ * 규칙
+ *   - 값은 app/globals.css 의 토큰 변수(var(--…))만 쓴다. hex·새 글자 크기를 만들지 않는다.
+ *     새 토큰이 필요하면 추가하지 말고 보고한다(토큰은 AX-304 소유).
+ *   - 부품 모양(components/ui, app/styles/ui.css)은 여기서 덮어쓰지 않는다. 화면 배치만 더한다.
+ *   - 클래스는 `emergency-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
+ *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
+ */
+
+/* ── /emergency (설계서 6.2 10번): 흰 바탕 한 장. 안내 Callout / 119 / 1330 / 해외 발신 / 등록한 병원 ── */
+
+/* 안내 (SEED Callout, 설계서 5.6): 모양(회색 면 · 모서리 10 · 안쪽 14/16, 앞 20px 아이콘 칸)은 ui.css 의 공용 .ui-callout.has-icon.
+   여기에는 아래 여백과 아이콘 색(긴급 빨강)만 둔다. 두 언어 병기 */
+.emergency-lead {
+  margin-bottom: var(--space-5);
+}
+.emergency-lead-icon {
+  color: var(--emergency);
+}
+.emergency-lead .settings-pair-primary {
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+
+/* 전화 줄: 버튼(52px) 아래 설명, 1330 은 그 아래 해외 발신 링크 */
+.emergency-lines {
+  display: grid;
+  gap: var(--space-5);
+  list-style: none;
+  margin-bottom: var(--space-6);
+}
+.emergency-line-desc {
+  margin-top: var(--gap-text);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+.emergency-intl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 var(--space-2);
+  margin-top: var(--gap-component);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.emergency-intl-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* 등록한 병원: 카드 없이 1px 선으로 나눈 행. 이름 + 작은 회색 전화 버튼 */
+.emergency-section h2 {
+  margin-bottom: var(--space-2);
+}
+.emergency-hospitals {
+  list-style: none;
+}
+.emergency-hospital {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+.emergency-hospital + .emergency-hospital {
+  border-top: 1px solid var(--line);
+}
+.emergency-hospital-name {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.emergency-hospital-call {
+  justify-self: start;
+}
+.emergency-no-phone,
+.emergency-empty {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}

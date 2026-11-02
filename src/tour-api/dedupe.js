@@ -40,9 +40,17 @@ function withinSamePlace(a, b) {
   return haversineKm(a, b) * 1000 <= SAME_PLACE_METERS;
 }
 
-function sameName(a, b) {
-  const x = titleKeys(a.title);
-  const y = titleKeys(b.title);
+/**
+ * 비교에 쓸 제목. 언어 무관 모드에서는 국문 원문 제목을 쓴다 —
+ * 표시 언어 제목(일문·중문)에는 한글 키가 없어 언어마다 합쳐지는 결과가 달라진다.
+ */
+function nameOf(candidate, languageNeutral) {
+  return languageNeutral ? candidate.stop?.ko?.title ?? candidate.title : candidate.title;
+}
+
+function sameName(a, b, languageNeutral) {
+  const x = titleKeys(nameOf(a, languageNeutral));
+  const y = titleKeys(nameOf(b, languageNeutral));
   if (x.hangul && y.hangul && x.hangul === y.hangul) return true;
   if (x.latin && y.latin && x.latin === y.latin) return true;
   return false;
@@ -54,25 +62,32 @@ function sameName(a, b) {
  * 대상 사용자가 외국인 환자라 **영문 원문이 있는 쪽**을 우선한다.
  * 그다음은 사진이 있는 쪽, 마지막은 먼저 온 쪽(거리순이므로 더 가깝다).
  */
-function richer(a, b) {
+function richer(a, b, languageNeutral) {
   const score = (c) =>
-    (c.titleLanguage === "en" ? 2 : 0) + (c.attribution?.imageUrl ? 1 : 0);
+    (!languageNeutral && c.titleLanguage === "en" ? 2 : 0) + (c.attribution?.imageUrl ? 1 : 0);
   return score(b) > score(a) ? b : a;
 }
 
 /**
  * 이름과 위치가 같은 후보를 하나로 합친다.
  *
+ * @param {object[]} candidates
+ * @param {{languageNeutral?: boolean}} [options]
+ *   languageNeutral — 표시 언어와 무관하게 같은 후보를 남긴다(spec 4.17, 규칙 27).
+ *   국문 제목으로 비교하고, 남길 쪽은 사진 유무와 순서(거리순)로만 고른다.
+ *   영문 원문 우선(기존 기본 동작)은 영문을 조회했는지에 따라 남는 contentId 가 달라지므로
+ *   언어를 받는 전체 일정 경로에서는 쓰지 않는다.
  * @returns {{candidates: object[], merged: Array<{kept: string, dropped: string, title: string}>}}
  *   `merged` 는 진단용이다 — 무엇이 왜 빠졌는지 설명할 수 있어야 한다.
  */
-export function dedupeSamePlace(candidates) {
+export function dedupeSamePlace(candidates, { languageNeutral = false } = {}) {
   const kept = [];
   const merged = [];
 
   for (const candidate of candidates) {
     const twinIndex = kept.findIndex(
-      (other) => sameName(other, candidate) && withinSamePlace(other, candidate),
+      (other) =>
+        sameName(other, candidate, languageNeutral) && withinSamePlace(other, candidate),
     );
 
     if (twinIndex === -1) {
@@ -80,7 +95,7 @@ export function dedupeSamePlace(candidates) {
       continue;
     }
 
-    const winner = richer(kept[twinIndex], candidate);
+    const winner = richer(kept[twinIndex], candidate, languageNeutral);
     const loser = winner === candidate ? kept[twinIndex] : candidate;
     kept[twinIndex] = winner;
     merged.push({ kept: winner.id, dropped: loser.id, title: winner.title });

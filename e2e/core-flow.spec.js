@@ -1,247 +1,288 @@
-// AX-004 — 핵심 흐름 E2E (D09-AC018, QA033–QA040)
+// 핵심 흐름 (AX-322 · spec 12.3 시나리오 1·2, 3.2 기본 흐름)
 //
-// 검증 대상: 입력 → 판정 결과 → 휴무 이벤트로 대체 → 즉시 복귀 안내가
-// 360px 화면에서 끊김 없이 동작하고, 현재 GPS 를 한 번도 요구하지 않는다.
+//   1. 로그인(데모) → 체류 설정 → 민감정보 동의 → 본인 체크 → 전체 일정 → 오늘  — 화면으로 처음부터 끝까지
+//   2. 매일 확인 전 제한(STANDBY + DAILY_CHECK_PENDING, 길찾기·편집 막힘)과 확인 후 해제 (규칙 32·49)
+//
+// 12.4 에 따라 의도적으로 다시 썼다 — 퇴역한 단일 외출 흐름(/plan·/result)과 '수기 입력 없음' 단언은
+// 본인 체크 재도입(ADR-0005)과 하루 일정 엔진(ADR-0006)으로 뜻을 잃었다.
 
-import { test, expect } from '@playwright/test';
-import { connectPlan, submitPlan, assertNoHorizontalScroll } from './helpers.js';
+import { test, expect } from './fixtures.js';
+import {
+  HOSPITAL_NAME,
+  HOSPITAL_PHONE,
+  LODGING_NAME,
+  evidenceShot,
+  expectNoHorizontalScroll,
+  expectTodayGateBanner,
+  firstDayWithStops,
+  kstDate,
+  readRecord,
+  startTrip,
+  stopsOf,
+  waitForTripPlan,
+} from './helpers.js';
 
-/** 현재 GPS 요청을 감시한다 — 한 번이라도 호출되면 D07-BAN002 위반이다 */
-async function watchGeolocation(page) {
-  await page.addInitScript(() => {
-    window.__gpsCalls = [];
-    const geo = navigator.geolocation;
-    if (!geo) return;
-    for (const method of ['getCurrentPosition', 'watchPosition']) {
-      const original = geo[method]?.bind(geo);
-      if (!original) continue;
-      geo[method] = (...args) => {
-        window.__gpsCalls.push(method);
-        return original(...args);
-      };
-    }
-  });
+/** 본인 체크 한 항목에 답한다 (fieldset legend = 질문) */
+async function answer(page, question, option) {
+  await page.getByRole('group', { name: question, exact: true }).getByRole('radio', { name: option, exact: true }).check();
 }
 
-async function assertNoGpsRequest(page) {
-  const calls = await page.evaluate(() => window.__gpsCalls ?? []);
-  expect(calls, '현재 GPS 를 요청했다 (D07-BAN002 위반)').toEqual([]);
-}
+test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
+  test('로그인 → 체류 설정 → 동의 → 본인 체크 → 전체 일정 → 오늘이 끊기지 않는다', async ({ page }) => {
+    const planBodies = [];
+    page.on('request', (request) => {
+      if (request.url().endsWith('/api/itinerary/plan')) planBodies.push(request.postData() ?? '');
+    });
+    const arrival = kstDate(-1);
+    const departure = kstDate(3);
 
-test.describe('핵심 흐름 (AC018)', () => {
-  test.beforeEach(async ({ page }) => {
-    await watchGeolocation(page);
-  });
-
-  test('입력 → 추천 → 휴무 대체 → 즉시 복귀가 끊기지 않는다', async ({ page }) => {
-    // ── 1. 시작 화면 ──
+    // ── 시작 화면 → 로그인 ──
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await assertNoHorizontalScroll(page, '시작 화면');
+    await expect(page.getByText('① 의료 판단을 하지 않습니다.')).toBeVisible();
+    await expectNoHorizontalScroll(page, '시작 화면');
+    await evidenceShot(page, '01-start');
+    await page.getByRole('link', { name: '시작하기' }).click();
+    await expect(page).toHaveURL(/\/login\?returnTo=%2Fonboarding/);
+    await expect(page.getByText('로그인은 본인 확인이 아닙니다')).toBeVisible();
+    await page.getByRole('link', { name: '데모 계정으로 둘러보기' }).click();
+    await expect(page).toHaveURL(/\/onboarding$/);
 
-    // ── 2. 조건 입력 → 판정 ──
-    await submitPlan(page);
+    // ── 체류 설정 1/5: 입국·출국 ──
+    await expect(page.getByRole('heading', { name: '입국·출국', level: 2 })).toBeVisible();
+    await page.getByLabel('입국 날짜').fill(arrival);
+    await page.getByLabel('도착 시각').fill('09:00');
+    await page.getByRole('group', { name: '도착 공항' }).getByLabel('인천국제공항 (ICN)').check();
+    await page.getByLabel('출국 날짜').fill(departure);
+    await page.getByLabel('출발 시각').fill('20:00');
+    await page.getByRole('group', { name: '출발 공항' }).getByLabel('인천국제공항 (ICN)').check();
+    await expect(page.getByText('4박 체류')).toBeVisible();
+    await page.getByRole('button', { name: '다음' }).click();
 
-    // ── 3. 판정 결과 ──
-    const banner = page.locator('.state-banner').first();
-    await expect(banner).toBeVisible();
-    // 복귀 정보는 모든 결과 화면에 항상 보인다
-    await expect(page.getByText('복귀 마감')).toBeVisible();
-    // 추천은 상위 3개만 노출한다 (엔진은 최대 5개 산출)
-    const cards = page.locator('.course-card');
-    await expect(cards).toHaveCount(3);
-    // 이동시간이 폴백 추정이면 반드시 표시한다 (D06-E011)
-    await expect(page.locator('.badge-estimate').first()).toBeVisible();
-    await assertNoHorizontalScroll(page, '결과 화면');
+    // ── 2/5: 숙소 — 도로명주소 검색(키 없음 → 데모 주소) ──
+    await expect(page.getByRole('heading', { name: '숙소', level: 2 })).toBeVisible();
+    await page.getByLabel('숙소 이름').fill(LODGING_NAME);
+    await page.getByLabel('주소 검색').fill('강남역');
+    await page.getByRole('button', { name: '검색', exact: true }).click();
+    await page.getByRole('button', { name: /데모 숙소 \(강남역 인근\)/ }).click();
+    await expect(page.getByText('고른 주소')).toBeVisible();
+    await expect(page.getByText('데모 주소', { exact: true }).first()).toBeVisible();
+    // 첫 숙소 날짜는 입·출국 날짜로 미리 채워진다
+    await expect(page.getByLabel('체크인 날짜')).toHaveValue(arrival);
+    await expect(page.getByLabel('체크아웃 날짜')).toHaveValue(departure);
+    await evidenceShot(page, '02-onboarding-lodging');
+    await page.getByRole('button', { name: '다음' }).click();
 
-    const firstTitle = await cards.first().locator('h3').innerText();
+    // ── 3/5: 병원과 일정 — 병원 목록·추천 없이 사용자가 검색한 주소만 ──
+    await expect(page.getByRole('heading', { name: '병원과 일정', level: 2 })).toBeVisible();
+    await page.getByLabel('병원 이름').fill(HOSPITAL_NAME);
+    await page.getByLabel('주소 검색').fill('신사동');
+    await page.getByRole('button', { name: '검색', exact: true }).click();
+    await page.getByRole('button', { name: /데모 의원 \(신사동\)/ }).click();
+    await page.getByLabel('병원 전화 (선택)').fill(HOSPITAL_PHONE);
+    await page.getByRole('group', { name: '일정 유형' }).getByLabel(/수술·시술/).check();
+    await page.getByLabel('날짜', { exact: true }).fill(arrival);
+    await page.getByLabel('시작 시각').fill('14:00');
+    await expect(page.getByText('예상 종료 18:00')).toBeVisible();
+    await page.getByRole('button', { name: '다음' }).click();
 
-    // ── 4. 휴무 이벤트 → 재판정 ──
-    await page.getByRole('button', { name: /1순위 장소 휴무/ }).click();
+    // ── 4/5: 동반 보호자 ──
+    await page.getByRole('radio', { name: '없음 — 혼자 머뭅니다' }).check();
+    await page.getByRole('button', { name: '다음' }).click();
 
-    // 재판정 결과는 시트가 뜨기 전에 이미 적용된다 (D07-BAN008)
-    const sheet = page.locator('.sheet');
-    await expect(sheet).toBeVisible();
-    await expect(sheet.getByText('이미 적용했습니다')).toBeVisible();
-    await expect(sheet.getByText('제거')).toBeVisible();
+    // ── 5/5: 관심사와 강도 → 저장 ──
+    await page.getByRole('checkbox', { name: '전시' }).check();
+    await page.getByRole('checkbox', { name: '음식' }).check();
+    await page.getByRole('radio', { name: '보통' }).check();
+    await page.getByRole('button', { name: '저장하고 조건 입력으로' }).click();
+    await expect(page).toHaveURL(/\/conditions$/);
 
-    await sheet.getByRole('button', { name: '확인' }).click();
-    await expect(sheet).not.toBeVisible();
+    // ── 조건: 민감정보 동의가 먼저 ──
+    await expect(page.getByRole('heading', { name: '민감정보 처리 동의' })).toBeVisible();
+    await expect(page.getByText('동의 문구 법무 검토 전')).toBeVisible();
+    await expect(page.getByRole('button', { name: '본인 체크 기간 추가' })).toHaveCount(0);
+    await evidenceShot(page, '03-consent');
+    await page.getByRole('button', { name: '동의합니다' }).click();
+    await expect(page.getByText(/에 동의함 · 문구 버전/).first()).toBeVisible();
 
-    // 휴무 처리된 1순위가 코스에서 빠졌다
-    await expect(cards.first().locator('h3')).not.toHaveText(firstTitle);
-    // 시트를 닫아도 변화 요약이 남는다 (AC010·AC012 증빙)
-    await expect(page.getByText(/마지막 변화: 장소 휴무/)).toBeVisible();
-    await assertNoHorizontalScroll(page, '재판정 후 결과 화면');
+    // ── 본인 체크 기간 — 정해진 항목만(자유 서술 칸 없음) ──
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await expect(page.getByRole('heading', { name: '본인 체크 기간 추가', level: 2 })).toBeVisible();
+    await expect(page.locator('.conditions-form textarea')).toHaveCount(0);
+    await expect(page.getByLabel('시작일')).toHaveValue(arrival); // 수술 후 경계일
+    await page.getByLabel('종료일 (포함)').fill(departure);
+    // 필수 항목은 '모르겠음'을 고를 수 없다 (규칙 6)
+    await expect(page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '모르겠음' })).toHaveCount(0);
+    await expect(
+      page.getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' }).getByRole('radio', { name: '모르겠음' }),
+    ).toHaveCount(0);
+    await answer(page, '외출이 허용되나요?', '허용');
+    await answer(page, '몇 시까지 돌아와야 하는지 병원이 정했나요?', '아니오');
+    await answer(page, '걷는 시간 제한이 있나요?', '모르겠음');
+    await answer(page, '한 번 이동하는 시간 제한이 있나요?', '아니오');
+    await answer(page, '자외선을 피해야 하나요?', '아니오');
+    await answer(page, '사우나·찜질 등 열을 피해야 하나요?', '예');
+    await answer(page, '수영·온천 등 물에 들어가면 안 되나요?', '예');
+    await answer(page, '보호자가 꼭 함께 있어야 하나요?', '아니오');
+    await answer(page, '환자가 쉬는 동안 보호자가 곁을 지켜야 하나요?', '아니오');
+    await answer(page, '식사 제한(금식)이 있나요?', '아니오');
+    await answer(page, '매운 음식을 피해야 하나요?', '예');
+    await answer(page, '술을 피해야 하나요?', '예');
+    await answer(page, '딱딱하거나 질긴 음식을 피해야 하나요?', '아니오');
+    await answer(page, '뜨거운 음식을 피해야 하나요?', '예');
+    await answer(page, '날음식(회 등)을 피해야 하나요?', '아니오');
+    await answer(page, '정해진 복약 시각이 있나요?', '아니오');
+    await expect(page.getByText('가장 엄격한 기본값을 적용해요')).toBeVisible();
+    await evidenceShot(page, '04-self-check');
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page.getByText('기간을 저장했어요.')).toBeVisible();
+    await expect(page.locator('.conditions-period-list')).toContainText('본인 체크');
+    await expect(page.locator('.conditions-period-list')).toContainText('제한일');
 
-    // ── 5. 즉시 복귀 안내 ──
-    await page.getByRole('button', { name: '즉시 복귀 안내' }).click();
-    const returnSheet = page.locator('.sheet');
-    await expect(returnSheet.getByText('지금 복귀하세요')).toBeVisible();
-    await expect(returnSheet.getByText('복귀 마감')).toBeVisible();
-    await returnSheet.getByRole('button', { name: '확인' }).click();
-
-    // ── 6. 전 구간에서 현재 GPS 를 요구하지 않았다 ──
-    await assertNoGpsRequest(page);
-  });
-
-  test('환자 호출은 모든 추천을 무효화하고 즉시 복귀로 전환한다', async ({ page }) => {
-    await submitPlan(page);
-    await expect(page.locator('.course-card').first()).toBeVisible();
-
-    await page.getByRole('button', { name: /환자 호출/ }).click();
-
-    // 상태 배너가 미추천으로 바뀌고 코스가 사라진다
-    await expect(page.locator('.state-banner').first()).toContainText('관광을 권하지 않습니다');
-    await expect(page.locator('.course-card')).toHaveCount(0);
-
-    // 즉시 복귀 안내가 자동으로 뜬다
-    await expect(page.getByText('지금 복귀하세요')).toBeVisible();
-
-    await assertNoGpsRequest(page);
-  });
-
-  test('차단 판정에서는 장소 상세로 우회할 수 없다 (ADR-0001)', async ({ page }) => {
-    await submitPlan(page);
-
-    // 상세 진입 경로를 먼저 확보한다
-    const detailLink = page.getByRole('link', { name: /추천 근거와 원문 보기/ }).first();
-    const href = await detailLink.getAttribute('href');
-    expect(href).toMatch(/^\/place\//);
-
-    // 환자 호출로 차단 상태를 만든 뒤 상세 URL 로 직접 진입한다
-    await page.getByRole('button', { name: /환자 호출/ }).click();
-    await expect(page.getByText('지금 복귀하세요')).toBeVisible();
-
-    await page.goto(href);
-    await expect(page.getByText('지금은 관광을 권하지 않습니다')).toBeVisible();
-    // 관광 원문이 노출되면 안 된다
-    await expect(page.getByText('관광정보 원문')).toHaveCount(0);
-  });
-});
-
-// D03-NAV004(입력 유지)는 AX-221 로 대상이 사라졌다 — 조건이 사용자 입력이
-// 아니라 병원 발행값이므로 뒤로가기로 잃을 입력이 없다. 대신 지켜야 할 것은
-// **사용자가 병원 조건을 고칠 수 없다** 는 것이다.
-test.describe('병원 조건은 읽기 전용 (AX-221)', () => {
-  test('조건을 고치는 입력 수단이 화면에 없다', async ({ page }) => {
-    await connectPlan(page);
-    await page.goto('/plan');
-    await expect(page.getByRole('heading', { name: '병원이 정한 조건' })).toBeVisible();
-
-    // 예전 수기 입력 필드가 하나라도 남아 있으면 "병원이 정한 조건" 이 거짓이 된다
-    for (const id of ['#anchor-label', '#max-walk', '#max-travel', '#issued-at', '#return-by']) {
-      await expect(page.locator(id), `${id} 가 아직 편집 가능하다`).toHaveCount(0);
+    // ── 전체 일정 — 체류 전체를 한 번 만들어 기기에 저장한다 ──
+    //   체류를 저장한 순간 한 번(조건 전 — 경계일부터 NEEDS_INPUT), 기간을 저장한 뒤 오늘 이후를 다시 만든다.
+    //   지난 날짜(어제)는 재계획하지 않는다 (spec 4.9 재계획 규칙 2 · 규칙 30).
+    await waitForTripPlan(page, { minDays: 5 });
+    const coverages = async () => {
+      const days = (await readRecord(page, 'tripPlan')).days;
+      return [-1, 0, 1, 2, 3].map((n) => days[kstDate(n)]?.coverage).join(',');
+    };
+    await expect
+      .poll(coverages, { message: '본인 체크 기간 저장 뒤 재계획' })
+      .toBe('NEEDS_INPUT,RESTRICTED,RESTRICTED,RESTRICTED,RESTRICTED');
+    const tripPlan = await readRecord(page, 'tripPlan');
+    expect(Object.keys(tripPlan.days).sort()).toEqual([kstDate(-1), kstDate(0), kstDate(1), kstDate(2), kstDate(3)]);
+    expect(tripPlan.days[kstDate(-1)].reasons).toContain('SENSITIVE_CONSENT_REQUIRED');
+    for (const day of Object.values(tripPlan.days).filter((d) => d.date >= kstDate(0))) {
+      expect(day.coverage, `${day.date} 분류`).toBe('RESTRICTED');
+      expect(day.warnings, `${day.date} 기본값 적용 경고`).toContain('DEFAULTS_APPLIED');
+      for (const outing of day.outings) {
+        expect(outing.walkTotalMin, '모르겠음 → 외출 1회 보행 15분 이하 (규칙 7)').toBeLessThanOrEqual(15);
+        expect(outing.plannedReturnAt <= outing.returnBy, '예상 귀가 ≤ 복귀 마감 (규칙 13-2)').toBe(true);
+      }
+      // 열·물·주점·매운 단서 장소는 들어가지 않는다 (규칙 21·22·25)
+      for (const stop of stopsOf(day)) {
+        expect(stop.title).not.toMatch(/찜질|스파|수영장|호프|와인바|이자카야|떡볶이|찌개|의원|호텔/);
+      }
     }
-    await expect(page.locator('input[name="outing"]')).toHaveCount(0);
-  });
+    expect(firstDayWithStops(tripPlan), '정거장이 있는 날이 하나 이상 있어야 한다').toBeTruthy();
 
-  /**
-   * 열 노출·수중 활동은 병원이 발행하지만 판정 엔진에 전달되지 않는다.
-   * 판정에 쓰이는 조건과 같은 배지로 섞으면 SafeHour 가 이 조건으로 추천을 거른다고
-   * 오해하게 된다 — 사용자는 수중 활동 금지인데 거르지 않은 장소를 믿고 갈 수 있다.
-   * 로직은 동결 중이라 화면에서 분리하고, 직접 확인하라고 알린다.
-   */
-  test('판정에 쓰지 않는 조건은 병원 조건과 분리해 참고로만 보여준다', async ({ page }) => {
-    await connectPlan(page);
-    await page.goto('/plan');
-
-    const hospitalBadges = page.locator('.badge-hospital');
-    await expect(hospitalBadges.first()).toBeVisible();
-    await expect(hospitalBadges.filter({ hasText: '열 노출 회피' })).toHaveCount(0);
-    await expect(hospitalBadges.filter({ hasText: '수중 활동 금지' })).toHaveCount(0);
-
-    const reference = page.locator('.reference-conditions');
-    await expect(reference.getByRole('heading', { name: '참고 조건 — 추천 판정에는 쓰지 않음' })).toBeVisible();
-    await expect(reference.getByText('열 노출 회피')).toBeVisible();
-    await expect(reference.getByText('수중 활동 금지')).toBeVisible();
-    await expect(reference.getByText(/직접 확인하세요/)).toBeVisible();
-  });
-
-  test('결과에서 돌아와도 병원 조건이 그대로다', async ({ page }) => {
-    await watchGeolocation(page);
-    await submitPlan(page);
-
-    await page.getByRole('button', { name: '조건 입력으로 돌아가기' }).click();
-    await page.waitForURL('**/plan');
-
-    await expect(page.getByText('보행 20분 이내')).toBeVisible();
-    await expect(page.getByText('편도 이동 30분 이내')).toBeVisible();
-    await assertNoGpsRequest(page);
-  });
-});
-
-test.describe('안전 게이트 (QA033–QA040)', () => {
-  test('병원이 외출을 제한하면 관광을 추천하지 않는다', async ({ page }) => {
-    await watchGeolocation(page);
-    await submitPlan(page, { outingAllowed: false });
-
-    await expect(page.locator('.state-banner').first()).toContainText('관광을 권하지 않습니다');
-    await expect(page.getByText('병원이 외출을 제한했습니다')).toBeVisible();
-    await expect(page.locator('.course-card')).toHaveCount(0);
-    await assertNoGpsRequest(page);
-  });
-
-  test('지침을 연결하지 않으면 판정 자체를 하지 않는다', async ({ page }) => {
-    await page.goto('/plan');
-
-    await expect(page.getByText('병원 지침을 먼저 연결하세요')).toBeVisible();
-    await expect(page.getByRole('button', { name: '안전 판정으로 추천 받기' })).toHaveCount(0);
-    await expect(page).toHaveURL(/\/plan/);
-  });
-});
-
-/**
- * 하단 고정 복귀 CTA 는 회복기 환자가 "지금 돌아가야 한다" 를 눌러야 하는 버튼이다.
- * 무엇에도 가려서는 안 된다.
- *
- * 실제 있었던 결함: `.sticky-return` 이 `position: fixed` 인데 z-index 가 없었다.
- * 탭 순서 때문에 DOM 상 main 앞쪽에 두는데, 뒤따르는 카드 제목이 골드 규칙선 때문에
- * `position: relative` 라 DOM 순서상 이 바 위에 그려졌다. 카드 제목이 고정 바와
- * 겹치는 스크롤 위치에서 제목이 클릭을 가로채 버튼이 눌리지 않았다. CI 에서만 났다.
- *
- * 스크롤 운에 기대면 이 결함을 놓친다. 그래서 카드 제목을 **하나씩 고정 바 위치로
- * 끌어와** 겹침을 강제로 만든 뒤, 그 지점의 최상위 요소가 버튼인지 확인한다.
- */
-test.describe('즉시 복귀 버튼은 가려지지 않는다', () => {
-  test('카드 제목이 고정 바와 겹쳐도 버튼이 최상위다', async ({ page }) => {
-    await submitPlan(page);
-    await expect(page.locator('.course-card').first()).toBeVisible();
-
-    const button = page.getByRole('button', { name: '즉시 복귀 안내' });
-    await expect(button).toBeVisible();
-
-    const headings = page.locator('.card > h2, .card > h3');
-    const count = await headings.count();
-    expect(count, '겹칠 후보 제목이 없으면 이 검사는 의미가 없다').toBeGreaterThan(0);
-
-    for (let i = 0; i < count; i++) {
-      // 제목을 고정 바가 있는 높이로 끌어와 겹침을 만든다
-      await headings.nth(i).evaluate((heading) => {
-        const bar = document.querySelector('.sticky-return');
-        const barTop = bar.getBoundingClientRect().top;
-        const headingTop = heading.getBoundingClientRect().top + window.scrollY;
-        window.scrollTo(0, Math.max(0, headingTop - barTop));
-      });
-
-      const covering = await button.evaluate((el) => {
-        const r = el.getBoundingClientRect();
-        return [
-          [r.left + r.width / 2, r.top + r.height / 2],
-          [r.left + 6, r.top + 6],
-          [r.right - 6, r.bottom - 6],
-        ]
-          .map(([x, y]) => document.elementFromPoint(x, y))
-          .filter((hit) => hit !== el && !el.contains(hit))
-          .map((hit) => `${hit?.tagName}#${hit?.id || ''}.${hit?.className || ''}`);
-      });
-
-      const label = await headings.nth(i).innerText();
-      expect(covering, `"${label}" 과 겹칠 때 버튼이 가려졌다`).toEqual([]);
+    // 일정 요청에는 PlanStay 허용 목록만 실린다 — 숙소·병원 이름·전화는 서버로 가지 않는다 (규칙 54)
+    expect(planBodies.length).toBeGreaterThan(0);
+    for (const body of planBodies) {
+      expect(body).not.toContain(HOSPITAL_NAME);
+      expect(body).not.toContain(HOSPITAL_PHONE);
+      expect(body).not.toContain(LODGING_NAME);
     }
 
-    // 가려짐 검사와 실제 클릭 가능성은 다른 실패 모드다 — 둘 다 본다
-    await button.click();
-    await expect(page.locator('.sheet').getByText('지금 복귀하세요')).toBeVisible();
+    await page.getByRole('link', { name: '일정', exact: true }).click();
+    await expect(page).toHaveURL(/\/trip$/);
+    await expect(page.getByRole('heading', { name: '전체 일정' })).toBeVisible();
+    await expect(page.locator('.trip-page')).toContainText('동행 가능');
+    await expectNoHorizontalScroll(page, '전체 일정');
+    await evidenceShot(page, '05-trip');
+
+    // ── 오늘 ──
+    await page.getByRole('link', { name: '오늘', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.getByRole('heading', { name: '오늘 조건이 그대로인가요?' })).toBeVisible();
+    await expect(page.locator('.state-banner')).toBeVisible();
+    await expectNoHorizontalScroll(page, '오늘');
+    await evidenceShot(page, '06-today');
+  });
+
+  test('필수 항목을 비우면 본인 체크 기간이 저장되지 않는다 (규칙 6)', async ({ page }) => {
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    const summary = page.getByRole('alert').filter({ hasText: '저장하지 못했어요' });
+    await expect(summary).toBeVisible();
+    await expect(summary).toContainText('외출');
+    expect((await readRecord(page, 'stay')).periods).toEqual([]);
+  });
+});
+
+test.describe('시나리오 2 — 매일 확인 전 제한과 확인 후 해제', () => {
+  test('확인 전에는 STANDBY + DAILY_CHECK_PENDING 이고 길찾기·편집이 막힌다. 확인하면 풀린다', async ({ page }) => {
+    const { tripPlan } = await startTrip(page, {}, { confirmToday: false });
+    const today = kstDate(0);
+    const storedBefore = tripPlan.days[today];
+    const todayStops = stopsOf(storedBefore);
+
+    // ── 확인 전 (오늘 화면) ──
+    await expect(page.getByRole('heading', { name: '오늘 조건이 그대로인가요?' })).toBeVisible();
+    await expect(page.getByText('확인 필요').first()).toBeVisible();
+    const banner = await expectTodayGateBanner(page, storedBefore, '오늘 조건이 그대로인지 먼저 확인해 주세요');
+    // 안전 문구는 두 언어로 (ko → ko + en)
+    await expect(banner.locator('.state-secondary')).toHaveAttribute('lang', 'en');
+    await evidenceShot(page, '07-daily-check-pending');
+
+    // 저장된 확정 일정은 바꾸지 않는다 — 덧씌우기는 표시 때만 (규칙 49)
+    const stored = (await readRecord(page, 'tripPlan')).days[today];
+    expect(stored.dayState).toBe(storedBefore.dayState);
+    expect(stored.reasons ?? []).not.toContain('DAILY_CHECK_PENDING');
+
+    if (todayStops.length > 0) {
+      // 길찾기 비활성 — 링크가 아니라 꺼진 버튼이다
+      await page.goto(`/place/${todayStops[0].candidateId}`);
+      await expect(page.getByRole('button', { name: /구글 지도로 열기/ })).toBeDisabled();
+      await expect(page.getByRole('button', { name: /카카오맵으로 열기/ })).toBeDisabled();
+      await expect(page.getByRole('link', { name: /구글 지도로 열기/ })).toHaveCount(0);
+      await expect(page.getByText('매일 확인을 마치면 길찾기를 쓸 수 있어요.')).toBeVisible();
+    } else {
+      test.info().annotations.push({ type: 'note', description: '오늘 남은 정거장이 없어 장소 상세 길찾기 확인을 건너뜀' });
+    }
+
+    // 하루 일정: 편집 막힘
+    await page.goto(`/trip/${today}`);
+    await expect(page.getByText('오늘은 매일 확인 전이라 길찾기와 일정 바꾸기를 멈췄어요.')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^바꾸기/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '이 날짜 다시 만들기' })).toBeDisabled();
+    await expect(page.getByText('매일 확인을 마치면 오늘 일정을 바꿀 수 있어요.')).toBeVisible();
+    // 미래 날짜는 매일 확인 대상이 아니다 — 내일은 편집할 수 있다
+    await page.goto(`/trip/${kstDate(1)}`);
+    await expect(page.getByRole('button', { name: '이 날짜 다시 만들기' })).toBeEnabled();
+
+    // ── '그대로예요' ──
+    await page.goto('/today');
+    await page.getByRole('button', { name: '그대로예요' }).click();
+    await expect(page.getByText('오늘 확인을 마쳤어요. 자정까지 유지돼요.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: '오늘 조건이 그대로인가요?' })).toHaveCount(0);
+    await expect(banner).toHaveClass(new RegExp(`state-${storedBefore.dayState}`));
+    await expect(banner).not.toContainText('오늘 조건이 그대로인지 먼저 확인해 주세요');
+    expect((await readRecord(page, 'prefs')).dailyCheck[today]).toBe('CONFIRMED');
+    await evidenceShot(page, '08-daily-check-done');
+
+    if (todayStops.length > 0) {
+      await page.goto(`/place/${todayStops[0].candidateId}`);
+      await expect(page.getByRole('link', { name: /구글 지도로 열기/ })).toBeVisible();
+      await expect(page.getByRole('link', { name: /카카오맵으로 열기/ })).toBeVisible();
+    }
+    await page.goto(`/trip/${today}`);
+    await expect(page.getByText('오늘은 매일 확인 전이라 길찾기와 일정 바꾸기를 멈췄어요.')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '이 날짜 다시 만들기' })).toBeEnabled();
+    // 새로 고쳐도 자정까지 유지된다
+    await page.reload();
+    await expect(page.getByRole('button', { name: '이 날짜 다시 만들기' })).toBeEnabled();
+  });
+
+  test("'바뀌었어요'는 조건 편집으로 가고, 저장하면 재계획 뒤 확인 완료가 된다", async ({ page }) => {
+    await startTrip(page, {}, { confirmToday: false });
+    const today = kstDate(0);
+    await page.getByRole('button', { name: '바뀌었어요' }).click();
+    await expect(page).toHaveURL(/\/conditions$/);
+
+    // 기간을 고친다 — 뜨거운 음식 제한을 푼다
+    await page.getByRole('button', { name: '고치기' }).first().click();
+    await answer(page, '뜨거운 음식을 피해야 하나요?', '아니오');
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page.getByText('기간을 저장했어요.')).toBeVisible();
+
+    await expect
+      .poll(async () => (await readRecord(page, 'prefs'))?.dailyCheck?.[today], { message: '재계획 뒤 확인 완료가 되어야 한다' })
+      .toBe('CONFIRMED');
+    await page.goto('/today');
+    await expect(page.locator('.state-banner')).not.toContainText('오늘 조건이 그대로인지 먼저 확인해 주세요');
+    await expect(page.getByRole('heading', { name: '오늘 조건이 그대로인가요?' })).toHaveCount(0);
   });
 });

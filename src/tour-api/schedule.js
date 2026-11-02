@@ -14,10 +14,16 @@
 // 그래서 다음 둘만 읽는다.
 //
 //   1. 행사 기간 (eventstartdate·eventenddate) — `YYYYMMDD` 구조화 필드라 해석 여지가 없다
-//   2. 정기 휴무 요일 ("매주 월요일 휴무") — 오늘 요일과 정확히 맞을 때만
+//   2. 정기 휴무 요일 ("매주 월요일 휴무") — 판정 날짜의 요일과 정확히 맞을 때만
 //
 // 어느 쪽도 확실하지 않으면 `closed: false` 를 돌려준다. 이것은 "열려 있다" 가
 // **아니라** "닫혔다는 근거가 없다" 는 뜻이다. 호출부는 이때 openNow 를 null 로 둔다.
+//
+// 판정 날짜는 두 가지로 받는다 (AX-305, spec 4.8 휴무 게이트).
+//   - readClosure(schedule, now)            — 지금 시각의 KST 날짜 (기존 '오늘' 판정)
+//   - readClosureOnDate(schedule, "YYYY-MM-DD") — 일정 날짜. 체류 전체 일정은 목록을 한 번 받아
+//                                             여러 날짜를 판정하므로 임의 날짜가 필요하다.
+// 두 경로는 같은 판정 함수를 쓴다. 같은 달력 날짜면 결과가 같다.
 
 const KST_OFFSET_MS = 9 * 3600_000;
 
@@ -62,6 +68,28 @@ function kstParts(now) {
   };
 }
 
+/**
+ * 일정 날짜(KST 달력 날짜)의 요일과 YYYYMMDD. 시각으로 바꾸지 않고 달력 계산만 한다 —
+ * Date 로 바꾸면 실행 시간대에 따라 전날이 될 수 있다.
+ * 형식이 틀리거나 없는 날짜는 RangeError — 조용히 오늘로 바꾸지 않는다.
+ */
+function calendarParts(date) {
+  const text = typeof date === "string" ? date.trim() : "";
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text) ?? /^(\d{4})(\d{2})(\d{2})$/.exec(text);
+  if (!match) throw new RangeError("일정 날짜는 YYYY-MM-DD 형식이어야 합니다.");
+
+  const [, y, m, d] = match;
+  const utc = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
+  if (
+    utc.getUTCFullYear() !== Number(y) ||
+    utc.getUTCMonth() !== Number(m) - 1 ||
+    utc.getUTCDate() !== Number(d)
+  ) {
+    throw new RangeError("존재하지 않는 날짜입니다.");
+  }
+  return { weekday: utc.getUTCDay(), yyyymmdd: `${y}${m}${d}` };
+}
+
 function isYyyymmdd(value) {
   return /^\d{8}$/.test(String(value ?? "").trim());
 }
@@ -88,7 +116,7 @@ function readEventWindow(schedule, today) {
 }
 
 /**
- * "매주 월요일 휴무" 같은 정기 휴무. 오늘 요일과 맞을 때만 닫힘으로 읽는다.
+ * "매주 월요일 휴무" 같은 정기 휴무. 판정 날짜의 요일과 맞을 때만 닫힘으로 읽는다.
  * `연중무휴` 가 있으면 아예 보지 않는다.
  */
 function readWeeklyClosure(schedule, weekday) {
@@ -128,11 +156,39 @@ function readWeeklyClosure(schedule, weekday) {
  *   `closed: false` 는 "열려 있다" 가 아니라 **"닫혔다는 근거가 없다"** 는 뜻이다.
  */
 export function readClosure(schedule, now = new Date()) {
+  return judgeClosure(schedule, () => kstParts(now));
+}
+
+/**
+ * 일정 날짜 기준으로 닫힘 근거를 읽는다 (spec 4.8 휴무 게이트, 규칙 26).
+ *
+ * @param {object} schedule  detailIntro2 의 운영·휴무 필드 모음
+ * @param {string} date      일정 날짜 `YYYY-MM-DD` (또는 `YYYYMMDD`), KST 달력 날짜
+ * @returns {{closed: boolean, reason: string, evidence?: {field: string, text: string}}}
+ *   `closed: false` 는 "열려 있다" 가 아니라 **"닫혔다는 근거가 없다"** 는 뜻이다.
+ * @throws {RangeError} 날짜 형식이 틀리거나 존재하지 않는 날짜
+ */
+export function readClosureOnDate(schedule, date) {
+  const parts = calendarParts(date);
+  return judgeClosure(schedule, () => parts);
+}
+
+/**
+ * 후보에 실린 국문 운영 원문(`sourceMetadata.schedule`)으로 일정 날짜의 닫힘을 판정한다.
+ * 원문을 조회하지 않은 후보는 SCHEDULE_NOT_PROVIDED 다 — 닫힘도 열림도 아니다.
+ */
+export function closureOnDate(candidate, date) {
+  return readClosureOnDate(candidate?.sourceMetadata?.schedule ?? null, date);
+}
+
+function judgeClosure(schedule, datePartsOf) {
   if (!schedule || typeof schedule !== "object" || Object.keys(schedule).length === 0) {
+    // 날짜 형식 검사는 원문 유무와 상관없이 한다 — 잘못된 날짜를 조용히 넘기지 않는다.
+    datePartsOf();
     return { closed: false, reason: "SCHEDULE_NOT_PROVIDED" };
   }
 
-  const { weekday, yyyymmdd } = kstParts(now);
+  const { weekday, yyyymmdd } = datePartsOf();
 
   const event = readEventWindow(schedule, yyyymmdd);
   if (event) return event;

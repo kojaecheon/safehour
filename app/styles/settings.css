@@ -1,0 +1,230 @@
+/* 기능별 스타일 — settings (/settings, /more)
+ *
+ * 미리 만든 빈 파일이다 (AX-304). 이 기능 화면을 만드는 작업(T16a · AX-318)만 이 파일을 고친다.
+ * 등록은 app/layout.js 한곳에서 이미 끝났다 — 새로 import 하지 않는다.
+ *
+ * 규칙
+ *   - 값은 app/globals.css 의 토큰 변수(var(--…))만 쓴다. hex·새 글자 크기를 만들지 않는다.
+ *     새 토큰이 필요하면 추가하지 말고 보고한다(토큰은 AX-304 소유).
+ *   - 부품 모양(components/ui, app/styles/ui.css)은 여기서 덮어쓰지 않는다. 화면 배치만 더한다.
+ *   - 클래스는 `settings-` 로 시작해 다른 기능 파일과 겹치지 않게 한다.
+ *   - 본문 16px 이상, 터치 대상 44px 이상, 상태는 색만으로 구분하지 않는다, 320–1280px 가로 스크롤 없음.
+ */
+
+/* ── 안전 문구 병기 (components/settings/PairText.js · /cards · /emergency · /privacy 도 쓴다) ── */
+.settings-pair-primary,
+.settings-pair-secondary {
+  display: block;
+  font-size: var(--text-body);
+}
+.settings-pair-primary {
+  color: var(--ink);
+}
+/* 병기 줄은 보조 색이지만 투명도를 낮추지 않는다(--ink-soft 6.62:1) */
+.settings-pair-secondary {
+  color: var(--ink-soft);
+  margin-top: var(--space-1);
+}
+
+/* ── /more (설계서 6.2 11번): 회색 바탕 위 흰 블록 두 개(도구 · 정보), 목록 행(components/ui ListItem) ── */
+.more-page.is-basement > nav > .ui-block:last-child {
+  margin-bottom: 0;
+}
+
+/* ── /settings (AX-318) ── */
+
+/* 설정 (설계서 6.2 12번): 회색 바탕 위 흰 블록. 언어 Radio 행(설계서 5.3) · 알림 Switch 행 + 안내 Callout */
+
+/* 언어 Radio 행 in List: 선으로 나눈 행, 이름 왼쪽 · 원 오른쪽, 원 24px · 1px 테두리, 고르면 --selected 채움 + 흰 점 10px.
+   행 전체가 누름 자리. 다른 화면의 카드형 라디오(.radio-option)는 그대로 둔다 */
+.settings-radio-rows {
+  gap: 0;
+}
+.settings-radio-rows .radio-option {
+  position: relative;
+  /* 눌림 면(::before, z-index -1)이 행 안에서만 쌓이게 가둔다 */
+  isolation: isolate;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-3) 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.settings-radio-rows .radio-option + .radio-option {
+  border-top: 1px solid var(--line);
+}
+/* 원·이름 묶음: 이름 왼쪽 · 원 오른쪽 */
+.settings-radio-inner {
+  display: flex;
+  flex: 1;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  transition: transform var(--duration-fast) var(--ease-press);
+}
+/* 눌림·호버: 목록 행(.ui-list-item, 설계서 5.5)과 같은 모양. 위의 background: none 이 전역 .radio-option 의 면을 가리고,
+   대신 바탕이 화면 끝에서 6px 안쪽(행 좌우 여백 0 + 화면 여백 16px 이므로 -10px) 모서리 10 면으로 깔린다.
+   바탕 없는 요소의 --pressed-transparent 를 쓴다. 눌렀을 때는 원·이름 묶음만 줄어든다 */
+.settings-radio-rows .radio-option::before {
+  content: '';
+  position: absolute;
+  inset: 0 calc(6px - var(--gutter));
+  border-radius: var(--radius-10);
+  background: transparent;
+  z-index: -1;
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.settings-radio-rows .radio-option:active::before {
+  background: var(--pressed-transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .settings-radio-rows .radio-option:hover::before {
+    background: var(--pressed-transparent);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .settings-radio-rows .radio-option:active .settings-radio-inner {
+    transform: scale(var(--press-scale-wide));
+  }
+}
+/* 전역 .radio-option:has(input:focus-visible) 가 모서리를 12 로 만든다. 목록 행 눌림과 같은 10 으로 맞춘다.
+   선택자 가중치가 더 커서 이긴다. 초점 링 자체는 그대로 보인다 */
+.settings-radio-rows .radio-option:has(input:focus-visible) {
+  border-radius: var(--radius-10);
+}
+.settings-radio-rows .radio-option.selected {
+  box-shadow: none;
+  font-weight: var(--weight-bold);
+}
+.settings-radio-rows .radio-option input {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+.settings-radio-rows .radio-option input:checked {
+  border-color: var(--selected);
+  background: var(--selected);
+}
+.settings-radio-rows .radio-option input:checked::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--on-dark);
+}
+/* 강제 색상(Windows 고대비): 면 색이 사라져 고른 원의 채움과 점이 안 보인다. 원은 CanvasText 테두리,
+   고른 원은 Highlight 채움 + HighlightText 점으로 그린다. 행 전체의 안쪽 윤곽선(전역 선택 칸 규칙)은 이 목록에 쓰지 않는다 */
+@media (forced-colors: active) {
+  .settings-radio-rows .radio-option input {
+    border-color: CanvasText;
+  }
+  .settings-radio-rows .radio-option input:checked {
+    background: Highlight;
+  }
+  .settings-radio-rows .radio-option input:checked::before {
+    background: HighlightText;
+  }
+  .settings-radio-rows .radio-option.selected:not(:has(input:focus-visible)) {
+    outline: none;
+  }
+}
+
+.settings-section > h2 {
+  margin-bottom: var(--space-3);
+}
+.settings-fieldset {
+  border: none;
+  min-width: 0;
+}
+.settings-text {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  margin: var(--space-3) 0;
+}
+.settings-toggle .label {
+  display: grid;
+  gap: var(--space-1);
+}
+.settings-toggle-hint {
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  color: var(--ink-soft);
+}
+.settings-status p {
+  margin-top: var(--space-3);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+/* 알림 안내 (SEED Callout, 설계서 5.6): 모양(띠 없는 회색 면 · 모서리 10 · 안쪽 14/16, 앞 20px info 아이콘)은
+   ui.css 의 공용 .ui-callout.has-icon. 여기에는 위 여백만 둔다. 두 언어 병기 */
+.settings-disclosure {
+  margin-top: var(--space-4);
+}
+.settings-effects {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+  margin-top: var(--space-4);
+}
+.settings-effects > li {
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--line-strong);
+}
+.settings-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* ── 이 기기에서 내 정보 지우기 (components/ClearSessionButton.js) ── */
+.settings-clear-note {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  margin-top: var(--space-2);
+}
+.settings-clear-question {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.settings-clear-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.settings-clear-actions > .btn {
+  flex: 1 1 120px;
+}
+.settings-clear-result p {
+  margin: var(--space-2) 0;
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.settings-clear.clear-session {
+  padding: 0;
+}
+
+/* 화면 하단 고지 링크 (components/FooterLinks.js) */
+.settings-footer-links {
+  padding: 0 var(--space-1);
+}
+.settings-footer-link {
+  display: inline-flex;
+  align-items: center;
+}

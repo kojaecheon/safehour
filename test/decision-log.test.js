@@ -1,68 +1,27 @@
-// AX-008 — 판정 결과 운영 로그 (ADR-0002 선택지 B, D07 4절 감사 증적)
+// AX-308 — 판정 운영 로그 (ADR-0002 확장 · spec 4.21 · 규칙 35)
 //
-// 계약:
-//   - 판정·kill switch·실패 세 경로 모두 로그 한 줄을 남긴다
-//   - 로그에 나가는 사유 코드는 닫힌 enum(REASON)을 통과한 값뿐이다
-//   - 개인정보를 잔뜩 담은 요청을 넣어도 그 값이 로그에 하나도 나타나지 않는다
-//   - 로그가 실패해도 판정 응답은 정상이다
+// 계약
+//   - 일정 생성·재계획·교체 후보 조회 한 번마다 로그 한 줄
+//   - 남기는 것: 엔진 버전, 요청 날짜 수, 상태별 날짜 수, 사유 코드 집합, 출처 종류별 개수(SELF/HOSPITAL/기본값), 언어
+//     (+ 줄을 구분하는 evt·route·outcome, 실패 분류 코드, 처리 시간)
+//   - 남기지 않는 것: 좌표, 날짜, 장소 이름, 주소, 조건 값, 계정 키, 병원 정보
+//   - 사유 코드는 닫힌 enum 을 통과한 값뿐이다. 로그가 실패해도 응답은 정상이다
 //
-// 마지막 항목이 이 파일의 핵심이다. 필드를 늘릴 때 이 테스트가 먼저 막는다.
+// 마지막 항목들이 이 파일의 핵심이다. 필드를 늘릴 때 이 테스트가 먼저 막는다.
 
-import { describe, test, beforeEach, afterEach, before, after } from 'node:test';
+import { describe, test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
-const DATA_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'safehour-decision-log-'));
-process.env.SAFEHOUR_DATA_ROOT = DATA_ROOT;
-process.env.TOUR_API_KEY = 'test-service-key';
+import { OUTCOME, buildDecisionLogEntry, logDecision } from '../lib/server/decision-log.js';
+import { createItineraryHandlers } from '../lib/server/itinerary-service.js';
+import { REASON } from '../src/domain/states.js';
+import { ITINERARY_ENGINE_VERSION } from '../src/engine/tripPlan.js';
+import { SET } from './stay-fixtures.js';
+import { at, body, fakeEnrich, fakeForecast, fakeLoader, period, planStay, postJson } from './itinerary-fixtures.js';
 
-let recommendPost;
-let recalculatePost;
-let buildDecisionLogEntry;
-let conditionAgeBucket;
-let OUTCOME;
-let logDecision;
-let REASON;
-let TOUR_API_PATHS;
-
-const ORIGINAL_KILL = process.env.SAFEHOUR_KILL_RECOMMENDATION;
-const originalFetch = globalThis.fetch;
 const originalWrite = process.stdout.write;
-
-before(async () => {
-  // env 설정 후에 모듈을 읽어야 임시 데이터 루트가 반영된다
-  ({ POST: recommendPost } = await import('../app/api/recommend/route.js'));
-  ({ POST: recalculatePost } = await import('../app/api/recalculate/route.js'));
-  ({ buildDecisionLogEntry, conditionAgeBucket, OUTCOME, logDecision } = await import(
-    '../lib/server/decision-log.js'
-  ));
-  ({ REASON } = await import('../src/domain/states.js'));
-  ({ TOUR_API_PATHS } = await import('../src/tour-api/config.js'));
-});
-
-after(() => {
-  globalThis.fetch = originalFetch;
-  process.stdout.write = originalWrite;
-  fs.rmSync(DATA_ROOT, { recursive: true, force: true });
-});
-
-beforeEach(() => {
-  delete process.env.SAFEHOUR_KILL_RECOMMENDATION;
-  // 추천 경로는 캐시를 쓰므로(운영과 동일), 비우지 않으면 앞 테스트가 채운 캐시가
-  // 다음 테스트의 외부 호출을 대신해 실패 경로를 탈 수 없다
-  for (const dir of [TOUR_API_PATHS.logs, TOUR_API_PATHS.cache]) {
-    fs.rmSync(dir, { recursive: true, force: true });
-    fs.mkdirSync(dir, { recursive: true });
-  }
-});
-
 afterEach(() => {
   process.stdout.write = originalWrite;
-  globalThis.fetch = originalFetch;
-  if (ORIGINAL_KILL === undefined) delete process.env.SAFEHOUR_KILL_RECOMMENDATION;
-  else process.env.SAFEHOUR_KILL_RECOMMENDATION = ORIGINAL_KILL;
 });
 
 /** stdout 을 가로채 판정 로그 줄만 모은다 */
@@ -71,9 +30,7 @@ function captureDecisionLogs() {
   process.stdout.write = (chunk, ...rest) => {
     const text = typeof chunk === 'string' ? chunk : String(chunk);
     if (text.includes('"evt":"decision"')) {
-      for (const line of text.split('\n')) {
-        if (line.trim()) lines.push(line.trim());
-      }
+      for (const line of text.split('\n')) if (line.trim()) lines.push(line.trim());
       return true;
     }
     return originalWrite.call(process.stdout, chunk, ...rest);
@@ -81,361 +38,249 @@ function captureDecisionLogs() {
   return lines;
 }
 
-function jsonRequest(url, body) {
-  return new Request(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: typeof body === 'string' ? body : JSON.stringify(body),
+describe('로그 조립 — 허용 목록', () => {
+  const days = {
+    '2026-10-02': {
+      date: '2026-10-02',
+      dayState: 'TOGETHER',
+      reasons: [REASON.WEATHER_BLOCKED, '홍길동 때문에'],
+      effective: {
+        outing: { value: 'ALLOWED', provenance: [{ periodId: 'P1', source: 'SELF', defaulted: false }] },
+        walkLimit: { value: { kind: 'SET', value: 15 }, provenance: [{ periodId: 'P1', source: 'SELF', defaulted: true }] },
+        avoidUv: { value: { kind: 'SET', value: true }, provenance: [{ periodId: 'H-9', source: 'HOSPITAL', defaulted: false }] },
+      },
+      outings: [{ stops: [{ title: '국립중앙박물관', address: '서울 용산구', lat: 37.5238, lng: 126.9804 }] }],
+      lodgingId: 'L1',
+    },
+    '2026-10-03': { date: '2026-10-03', dayState: 'NO_TOURISM', reasons: [REASON.OUTING_FORBIDDEN], effective: {} },
+    '2026-10-04': { date: '2026-10-04', dayState: 'STANDBY', reasons: [REASON.NO_CANDIDATE, REASON.WEATHER_BLOCKED] },
+  };
+
+  test('정해진 필드만 담는다', () => {
+    const entry = buildDecisionLogEntry({
+      route: 'itinerary.plan',
+      outcome: OUTCOME.DECIDED,
+      days,
+      requestedDateCount: 3,
+      lang: 'ja',
+      elapsedMs: 12.4,
+    });
+    assert.deepEqual(entry, {
+      evt: 'decision',
+      route: 'itinerary.plan',
+      outcome: 'DECIDED',
+      engine: ITINERARY_ENGINE_VERSION,
+      lang: 'ja',
+      dateCount: 3,
+      dayStates: { NO_TOURISM: 1, STANDBY: 1, SPLIT_NEARBY: 0, TOGETHER: 1 },
+      reasons: [REASON.NO_CANDIDATE, REASON.OUTING_FORBIDDEN, REASON.WEATHER_BLOCKED],
+      provenance: { SELF: 1, HOSPITAL: 1, DEFAULTED: 1 },
+      ms: 12,
+    });
   });
+
+  test('날짜·장소·좌표·자유 문자열은 들어가지 않는다', () => {
+    const text = JSON.stringify(buildDecisionLogEntry({ route: 'itinerary.plan', outcome: OUTCOME.DECIDED, days, requestedDateCount: 3, lang: 'en' }));
+    for (const marker of ['2026-10-0', '국립중앙박물관', '서울 용산구', '37.5238', '126.9804', '홍길동', 'P1', 'H-9', 'L1']) {
+      assert.equal(text.includes(marker), false, `${marker} 가 로그에 있다`);
+    }
+  });
+
+  test('모르는 언어·경로·결과는 닫힌 값으로 접힌다', () => {
+    const entry = buildDecisionLogEntry({ route: '/api/x?lat=37.1', outcome: 'WHATEVER', lang: '홍길동', requestedDateCount: -2 });
+    assert.equal(entry.route, 'itinerary.plan');
+    assert.equal(entry.outcome, 'DECIDED');
+    assert.equal(entry.lang, 'unknown');
+    assert.equal(entry.dateCount, 0);
+  });
+
+  test('우리 오류 코드만 남고 외부 오류 원문은 남지 않는다', () => {
+    const ours = buildDecisionLogEntry({ route: 'itinerary.plan', outcome: OUTCOME.FAILED, errorCode: 'SAFEHOUR_EXTERNAL_API' });
+    assert.equal(ours.errorCode, 'SAFEHOUR_EXTERNAL_API');
+    const foreign = buildDecisionLogEntry({
+      route: 'itinerary.plan',
+      outcome: OUTCOME.FAILED,
+      errorCode: 'fetch failed https://apis.data.go.kr/x?serviceKey=secret',
+    });
+    assert.equal('errorCode' in foreign, false);
+  });
+
+  test('일정 목록은 배열이어도 된다(교체 후보는 그날 하루)', () => {
+    const entry = buildDecisionLogEntry({
+      route: 'itinerary.alternatives',
+      outcome: OUTCOME.DECIDED,
+      days: [days['2026-10-02']],
+      requestedDateCount: 1,
+      lang: 'en',
+    });
+    assert.equal(entry.route, 'itinerary.alternatives');
+    assert.deepEqual(entry.dayStates, { NO_TOURISM: 0, STANDBY: 0, SPLIT_NEARBY: 0, TOGETHER: 1 });
+  });
+});
+
+describe('로그 실패가 응답을 막지 않는다', () => {
+  test('stdout 이 터져도 예외가 새어나오지 않는다', () => {
+    process.stdout.write = () => {
+      throw new Error('EPIPE');
+    };
+    assert.doesNotThrow(() => logDecision({ route: 'itinerary.plan', outcome: OUTCOME.DECIDED, days: {} }));
+  });
+
+  test('조립할 수 없는 입력이 와도 예외를 던지지 않는다', () => {
+    assert.doesNotThrow(() => logDecision({}));
+    assert.doesNotThrow(() => logDecision({ days: 'not-an-object' }));
+    assert.doesNotThrow(() => logDecision(null));
+  });
+});
+
+// ── 라우트 통합: 개인정보를 잔뜩 담은 요청 (규칙 35) ───────────────────────────
+const ACCOUNT_KEY = 'Zx9_accountKeyLike_0123456789abcdefghijklmnopq'; // 43자 base64url 모양
+const MARKERS = {
+  lodgingLat: '37.4979123',
+  lodgingLng: '127.0276456',
+  gpsLat: '37.1111111',
+  lodgingName: '홍길동 게스트하우스',
+  address: '서울특별시 강남구 가상대로 123',
+  hospitalName: '가상 미래 성형외과',
+  phone: '010-1234-5678',
+  code: 'DEMO-LINK-XY',
+  instruction: '붓기가 빠질 때까지 사우나 금지',
+  walkValue: '187.25', // 조건 값(보행 한도) — 처리 시간(ms, 정수)과 겹치지 않는 값
+  date: '2026-10-0', // 날짜 접두사
+  accountKey: ACCOUNT_KEY,
+};
+
+function piiLadenBody() {
+  const s = planStay({
+    periods: [
+      period({ walkLimit: SET(187.25), diet: { spicy: SET(true) } }, { startDate: '2026-10-04', endDate: '2026-10-10' }),
+    ],
+  });
+  return {
+    lang: 'ja',
+    accountKey: ACCOUNT_KEY,
+    currentLocation: { lat: Number(MARKERS.gpsLat), lng: 127.2 },
+    now: '2026-10-02T10:00:00+09:00',
+    stay: {
+      ...s,
+      accountKey: ACCOUNT_KEY,
+      lodgings: s.lodgings.map((l) => ({
+        ...l,
+        lat: Number(MARKERS.lodgingLat),
+        lng: Number(MARKERS.lodgingLng),
+        name: MARKERS.lodgingName,
+        address: { roadAddress: MARKERS.address, lat: Number(MARKERS.lodgingLat), lng: Number(MARKERS.lodgingLng), source: 'JUSO' },
+      })),
+      hospitals: s.hospitals.map((h) => ({ ...h, name: MARKERS.hospitalName, phone: MARKERS.phone })),
+      linkedPlans: [{ code: MARKERS.code, plan: { instructions: [{ id: 'i', text: MARKERS.instruction }] } }],
+    },
+  };
 }
 
-// ── 개인정보를 최대한 담은 요청 ──────────────────────────────────────────
-// 아래 값들이 로그에 단 하나도 나타나지 않아야 한다. 실제 서비스는 이름·연락처를
-// 받지 않지만, "받게 되더라도 로그로 새지 않는다"를 고정하려고 일부러 섞는다.
-const PII_MARKERS = [
-  '37.4979', // 좌표 (강남역)
-  '127.0276',
-  '홍길동', // 이름
-  '010-1234-5678', // 연락처
-  'M1234567', // 여권번호
-  '쌍꺼풀 절개', // 시술명
-  '눈 주위가 붓고 열감이 있음', // 증상 원문
-  'test-service-key', // 인증키
-  '강남 스타 성형외과', // 병원명
-  // 아래 셋은 공공 관광데이터라 그 자체는 개인정보가 아니다. 다만 같은 줄의
-  // 사유 코드(금식·외출제한 등)와 붙으면 "어느 지역의 누가 어떤 제약을
-  // 받았는지"로 좁혀지므로, D02-EVT005 에 따라 로그에 넣지 않는다.
-  '봉은사 명상 프로그램', // 후보 장소 이름
-  '서울특별시 강남구 봉은사로 531', // 후보 주소
-  '127.0590', // 후보 좌표
-];
-
-function piiLadenBody(overrides = {}) {
-  const issuedAt = new Date(Date.now() - 30 * 60_000).toISOString();
-  return {
-    origin: { kind: 'USER_SELECTED_FIXED', lat: 37.4979, lng: 127.0276 },
-    returnBy: new Date(Date.now() + 4 * 3_600_000).toISOString(),
-    roles: { hasCompanion: true, companionSeparateAllowed: true, patientResting: false },
-    condition: {
-      version: 'v1',
-      issuedAt,
-      outingAllowed: true,
-      fasting: false,
-      indoorOnly: false,
-      escortRequired: false,
-      maxWalkMinutes: 20,
-      maxTravelMinutes: 20,
-      // 스키마에 없는 값이지만, 클라이언트가 실수로 붙여 보낼 수 있다
-      patientName: '홍길동',
-      patientPhone: '010-1234-5678',
-      passportNo: 'M1234567',
-      procedure: '쌍꺼풀 절개',
-      symptomNote: '눈 주위가 붓고 열감이 있음',
-      hospitalName: '강남 스타 성형외과',
-    },
+function handlers(overrides = {}) {
+  const loader = fakeLoader();
+  const enrich = fakeEnrich();
+  const forecast = fakeForecast((d) => d === '2026-10-03');
+  return createItineraryHandlers({
+    clock: () => new Date(at('2026-10-02', '08:00')),
+    loadCandidates: loader.load,
+    enrichIntros: enrich.enrich,
+    fetchForecast: forecast.fetchForecast,
+    env: { KMA_API_KEY: 'kma-secret-key' },
+    killSwitch: () => false,
     ...overrides,
-  };
-}
-
-/**
- * 외부 호출 없이 후보 조회가 성공하도록 TourAPI 응답을 흉내낸다.
- *
- * 후보를 **실제로 채워서** 돌려준다. 빈 목록으로 스텁하면 course·excluded 가
- * 비어 있어, 장소 이름·주소가 로그로 새는 경로를 테스트가 아예 밟지 못한다.
- * (allowlist 를 무력화하는 뮤테이션을 심었을 때 이 테스트만 통과해 발견했다.)
- */
-function tourItem(contentid, title, extra = {}) {
-  return {
-    contentid: String(contentid),
-    title,
-    mapx: '127.0590',
-    mapy: '37.5110',
-    contenttypeid: '12',
-    addr1: '서울특별시 강남구 봉은사로 531',
-    ...extra,
-  };
-}
-
-function tourBody(items) {
-  return JSON.stringify({
-    response: {
-      header: { resultCode: '0000', resultMsg: 'OK' },
-      body: { items: { item: items }, totalCount: items.length },
-    },
   });
 }
 
-function stubTourApi() {
-  globalThis.fetch = async (url) => {
-    const href = String(url);
-    if (href.includes('getUltraSrtNcst')) {
-      return new Response(JSON.stringify({ response: { header: { resultCode: '00' }, body: { items: { item: [] } } } }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-    // 국문 목록에만 후보를 싣는다 — 영문·무장애는 폴백 경로를 그대로 태운다
-    const items = href.includes('KorService2')
-      ? [tourItem(1, '봉은사 명상 프로그램'), tourItem(2, '코엑스 아쿠아리움')]
-      : [];
-    return new Response(tourBody(items), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  };
+function assertClean(line) {
+  for (const [name, marker] of Object.entries(MARKERS)) {
+    assert.equal(line.includes(marker), false, `${name}(${marker}) 가 로그로 샜다: ${line}`);
+  }
+  assert.equal(line.includes('kma-secret-key'), false);
 }
 
-describe('로그 조립 — allowlist (ADR-0002)', () => {
-  test('엔진이 반환한 알 수 없는 필드는 로그에 실리지 않는다', () => {
-    const entry = buildDecisionLogEntry({
-      route: 'recommend',
-      outcome: OUTCOME.DECIDED,
-      decision: {
-        state: 'TOGETHER',
-        reasons: [REASON.FASTING_REQUIRED],
-        course: [{ id: 'c1', title: '국립중앙박물관' }],
-        excluded: [{ id: 'c2', title: '한강공원', reasons: [REASON.CLOSED] }],
-        // 엔진이 나중에 이런 것을 반환해도 로그가 따라 커지면 안 된다
-        debugOrigin: { lat: 37.4979, lng: 127.0276 },
-        rawCondition: { patientName: '홍길동' },
-      },
-    });
-
-    const serialized = JSON.stringify(entry);
-    assert.equal(serialized.includes('홍길동'), false, '엔진의 새 필드가 로그로 샜다');
-    assert.equal(serialized.includes('37.4979'), false, '좌표가 로그로 샜다');
-    assert.equal(serialized.includes('국립중앙박물관'), false, '추천 장소 이름이 로그로 샜다');
-    assert.equal(serialized.includes('한강공원'), false, '제외 장소 이름이 로그로 샜다');
-    assert.equal(entry.courseCount, 1);
-    assert.equal(entry.excludedCount, 1);
-    assert.deepEqual(entry.excludedReasons, [REASON.CLOSED]);
-  });
-
-  test('닫힌 enum 밖의 사유 코드는 버린다', () => {
-    const entry = buildDecisionLogEntry({
-      route: 'recommend',
-      outcome: OUTCOME.DECIDED,
-      decision: {
-        state: 'NO_TOURISM',
-        reasons: [REASON.OUTING_FORBIDDEN, '환자 이름 홍길동 때문에 제외', 42, null],
-        course: [],
-        excluded: [],
-      },
-    });
-
-    assert.deepEqual(entry.reasons, [REASON.OUTING_FORBIDDEN], '자유 문자열이 로그에 남았다');
-  });
-
-  test('제외 사유는 중복 없이 정렬되어 모인다', () => {
-    const entry = buildDecisionLogEntry({
-      route: 'recommend',
-      outcome: OUTCOME.DECIDED,
-      decision: {
-        state: 'STANDBY',
-        reasons: [],
-        course: [],
-        excluded: [
-          { id: 'a', reasons: [REASON.CLOSED, REASON.SLA_INSUFFICIENT] },
-          { id: 'b', reasons: [REASON.CLOSED] },
-        ],
-      },
-    });
-
-    assert.deepEqual(entry.excludedReasons, [REASON.CLOSED, REASON.SLA_INSUFFICIENT]);
-  });
-
-  test('우리 오류코드만 남고 외부 오류 원문은 남지 않는다', () => {
-    const withOurs = buildDecisionLogEntry({
-      route: 'recommend',
-      outcome: OUTCOME.FAILED,
-      errorCode: 'SAFEHOUR_EXTERNAL_API',
-    });
-    assert.equal(withOurs.errorCode, 'SAFEHOUR_EXTERNAL_API');
-
-    const withForeign = buildDecisionLogEntry({
-      route: 'recommend',
-      outcome: OUTCOME.FAILED,
-      errorCode: 'fetch failed https://apis.data.go.kr/...?serviceKey=test-service-key',
-    });
-    assert.equal('errorCode' in withForeign, false, '외부 오류 원문이 로그에 남았다');
-  });
-
-  test('알 수 없는 트리거는 UNKNOWN 으로 접힌다', () => {
-    const entry = buildDecisionLogEntry({
-      route: 'recalculate',
-      outcome: OUTCOME.DECIDED,
-      trigger: '홍길동이 취소함',
-    });
-    assert.equal(entry.trigger, 'UNKNOWN');
-  });
-
-  test('판정 규칙 버전이 항상 붙는다', () => {
-    const entry = buildDecisionLogEntry({ route: 'recommend', outcome: OUTCOME.DECIDED });
-    assert.match(entry.engine, /^\d+\.\d+\.\d+$/);
-  });
-});
-
-describe('조건 신선도 — 발행시각 원값을 남기지 않는다', () => {
-  const now = new Date('2026-08-11T12:00:00Z');
-
-  test('경과 시간에 따라 구간으로 접힌다', () => {
-    const cases = [
-      ['2026-08-11T11:30:00Z', 'FRESH'],
-      ['2026-08-11T08:00:00Z', 'RECENT'],
-      ['2026-08-11T00:00:00Z', 'AGING'],
-      ['2026-08-09T12:00:00Z', 'STALE'],
-      ['2026-08-11T13:00:00Z', 'FUTURE'],
-    ];
-    for (const [issuedAt, expected] of cases) {
-      assert.equal(conditionAgeBucket(issuedAt, now), expected, `${issuedAt} 구간이 어긋난다`);
-    }
-  });
-
-  test('잘못된 시각은 UNKNOWN 이며 예외를 던지지 않는다', () => {
-    assert.equal(conditionAgeBucket(undefined, now), 'UNKNOWN');
-    assert.equal(conditionAgeBucket('어제쯤', now), 'UNKNOWN');
-    assert.equal(conditionAgeBucket(null, now), 'UNKNOWN');
-  });
-
-  test('로그에 issuedAt 원값이 들어가지 않는다', () => {
-    const issuedAt = '2026-08-11T11:30:00Z';
-    const entry = buildDecisionLogEntry({
-      route: 'recommend',
-      outcome: OUTCOME.DECIDED,
-      conditionIssuedAt: issuedAt,
-      now,
-    });
-    assert.equal(JSON.stringify(entry).includes('11:30'), false, '발행시각 원값이 로그에 남았다');
-    assert.equal(entry.conditionAge, 'FRESH');
-  });
-});
-
-describe('라우트 통합 — 개인정보 0건 (D07-POL008)', () => {
-  test('추천 요청의 개인정보가 로그에 하나도 나타나지 않는다', async () => {
-    stubTourApi();
+describe('라우트 통합 — 개인정보 0건 (규칙 35)', () => {
+  test('일정 생성 요청의 좌표·날짜·이름·주소·조건 값·계정 키가 로그에 없다', async () => {
     const lines = captureDecisionLogs();
-
-    const res = await recommendPost(jsonRequest('http://test/api/recommend', piiLadenBody()));
+    const res = await handlers().plan(postJson('/api/itinerary/plan', piiLadenBody()));
     process.stdout.write = originalWrite;
 
     assert.equal(res.status, 200);
     assert.equal(lines.length, 1, '판정 로그가 정확히 한 줄이 아니다');
-
-    const logged = lines[0];
-    for (const marker of PII_MARKERS) {
-      assert.equal(logged.includes(marker), false, `개인정보가 로그로 샜다: ${marker}`);
-    }
-
-    const entry = JSON.parse(logged);
-    assert.equal(entry.evt, 'decision');
-    assert.equal(entry.route, 'recommend');
+    assertClean(lines[0]);
+    const entry = JSON.parse(lines[0]);
+    assert.deepEqual(Object.keys(entry).sort(), ['dateCount', 'dayStates', 'engine', 'evt', 'lang', 'ms', 'outcome', 'provenance', 'reasons', 'route']);
+    assert.equal(entry.route, 'itinerary.plan');
     assert.equal(entry.outcome, 'DECIDED');
-    assert.equal(entry.conditionAge, 'FRESH');
-    assert.equal(typeof entry.state, 'string');
-    assert.equal(Number.isFinite(entry.ms), true);
-    assert.equal('session' in entry, false, 'session 식별자가 로그에 있다');
-    assert.equal('origin' in entry, false, '기준점이 로그에 있다');
+    assert.equal(entry.lang, 'ja');
+    assert.equal(entry.dateCount, 10);
+    assert.equal(Object.values(entry.dayStates).reduce((a, b) => a + b, 0), 10);
+    assert.ok(entry.provenance.SELF > 0);
+    assert.ok(entry.reasons.every((r) => Object.values(REASON).includes(r)));
   });
 
-  test('재계산 요청도 개인정보를 남기지 않고 변화량만 남긴다', async () => {
-    stubTourApi();
-    const recRes = await recommendPost(jsonRequest('http://test/api/recommend', piiLadenBody()));
-    const { recalcPayload } = await recRes.json();
+  test('교체 후보 요청도 한 줄이고 개인정보가 없다', async () => {
+    const h = handlers();
+    const planned = await body(await h.plan(postJson('/api/itinerary/plan', piiLadenBody())));
+    const day = Object.values(planned.days).find((d) => d.date >= '2026-10-03' && d.outings.length > 0);
+    const outing = day.outings[0];
 
     const lines = captureDecisionLogs();
-    const res = await recalculatePost(
-      jsonRequest('http://test/api/recalculate', {
-        recalcPayload,
-        event: { type: 'CLOSURE', closedIds: ['c1'] },
+    const res = await h.alternatives(
+      postJson('/api/itinerary/alternatives', {
+        ...piiLadenBody(),
+        date: day.date,
+        outingId: outing.id,
+        stopId: outing.stops.at(-1).id,
+        day,
       }),
     );
     process.stdout.write = originalWrite;
 
     assert.equal(res.status, 200);
     assert.equal(lines.length, 1);
-
-    const logged = lines[0];
-    for (const marker of PII_MARKERS) {
-      assert.equal(logged.includes(marker), false, `개인정보가 재계산 로그로 샜다: ${marker}`);
-    }
-
-    const entry = JSON.parse(logged);
-    assert.equal(entry.route, 'recalculate');
-    assert.equal(entry.trigger, 'CLOSURE');
-    assert.equal(typeof entry.visibleChange, 'boolean');
-    assert.equal(Number.isFinite(entry.removedCount), true);
+    assertClean(lines[0]);
+    const entry = JSON.parse(lines[0]);
+    assert.equal(entry.route, 'itinerary.alternatives');
+    assert.equal(entry.dateCount, 1);
   });
 
-  test('kill switch 로 중단된 요청도 감사 증적을 남긴다', async () => {
-    process.env.SAFEHOUR_KILL_RECOMMENDATION = '1';
+  test('중단 스위치로 멈춘 요청도 감사 증적을 남긴다', async () => {
     const lines = captureDecisionLogs();
-
-    const res = await recommendPost(jsonRequest('http://test/api/recommend', piiLadenBody()));
+    const res = await handlers({ killSwitch: () => true }).plan(postJson('/api/itinerary/plan', piiLadenBody()));
     process.stdout.write = originalWrite;
 
     assert.equal(res.status, 200);
-    assert.equal(lines.length, 1, 'kill switch 경로가 로그를 남기지 않았다');
-
+    assert.equal(lines.length, 1);
+    assertClean(lines[0]);
     const entry = JSON.parse(lines[0]);
     assert.equal(entry.outcome, 'PAUSED');
     assert.deepEqual(entry.reasons, [REASON.SERVICE_PAUSED]);
-    for (const marker of PII_MARKERS) {
-      assert.equal(lines[0].includes(marker), false, `개인정보가 kill switch 로그로 샜다: ${marker}`);
-    }
+    assert.equal(entry.dayStates.NO_TOURISM, 10);
   });
 
-  test('외부 API 실패도 안전한 미추천으로 기록된다', async () => {
-    globalThis.fetch = async () => {
-      throw new Error('fetch failed https://apis.data.go.kr/x?serviceKey=test-service-key');
-    };
+  test('외부 API 실패도 한 줄이고 오류 원문·키가 없다', async () => {
     const lines = captureDecisionLogs();
-
-    const res = await recommendPost(jsonRequest('http://test/api/recommend', piiLadenBody()));
+    const res = await handlers({
+      loadCandidates: async () => {
+        throw new Error('fetch failed https://apis.data.go.kr/x?serviceKey=kma-secret-key&mapX=127.0276456');
+      },
+    }).plan(postJson('/api/itinerary/plan', piiLadenBody()));
     process.stdout.write = originalWrite;
 
     assert.equal(res.status, 502);
     assert.equal(lines.length, 1);
-
+    assertClean(lines[0]);
     const entry = JSON.parse(lines[0]);
     assert.equal(entry.outcome, 'FAILED');
     assert.equal(entry.errorCode, 'SAFEHOUR_EXTERNAL_API');
-    assert.equal(lines[0].includes('serviceKey'), false, '인증키 파라미터가 로그로 샜다');
-    assert.equal(lines[0].includes('test-service-key'), false, '인증키 값이 로그로 샜다');
   });
 
   test('입력 검증 실패는 판정 로그를 남기지 않는다', async () => {
     const lines = captureDecisionLogs();
-    const res = await recommendPost(jsonRequest('http://test/api/recommend', { origin: null }));
+    const res = await handlers().plan(postJson('/api/itinerary/plan', { lang: 'en', stay: null }));
     process.stdout.write = originalWrite;
-
     assert.equal(res.status, 400);
-    assert.equal(lines.length, 0, '판정하지 않은 요청이 판정 로그를 남겼다');
-  });
-
-  test('객체가 아닌 본문은 500 이 아니라 400 으로 막힌다', async () => {
-    for (const raw of ['null', '"hello"', '42']) {
-      const rec = await recommendPost(jsonRequest('http://test/api/recommend', raw));
-      assert.equal(rec.status, 400, `추천: ${raw} 가 400 이 아니다`);
-      assert.equal((await rec.json()).errorCode, 'SAFEHOUR_BAD_REQUEST');
-
-      const recalc = await recalculatePost(jsonRequest('http://test/api/recalculate', raw));
-      assert.equal(recalc.status, 400, `재계산: ${raw} 가 400 이 아니다`);
-    }
-  });
-});
-
-describe('로그 실패가 판정을 막지 않는다', () => {
-  test('stdout 이 터져도 예외가 새어나오지 않는다', () => {
-    process.stdout.write = () => {
-      throw new Error('EPIPE');
-    };
-    assert.doesNotThrow(() =>
-      logDecision({ route: 'recommend', outcome: OUTCOME.DECIDED, decision: { state: 'TOGETHER' } }),
-    );
-  });
-
-  test('조립할 수 없는 입력이 와도 예외를 던지지 않는다', () => {
-    assert.doesNotThrow(() => logDecision({}));
-    assert.doesNotThrow(() => logDecision({ route: 'recommend', decision: 'not-an-object' }));
+    assert.equal(lines.length, 0);
   });
 });

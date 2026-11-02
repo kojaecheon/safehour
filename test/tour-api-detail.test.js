@@ -90,3 +90,49 @@ describe("TourAPI 상세 응답 정규화", () => {
     assert.equal(detail.openNowReason, "SCHEDULE_NOT_PROVIDED");
   });
 });
+
+describe("TourAPI 상세 응답 정규화 — 선택 언어 (AX-308 · spec 4.8)", () => {
+  const locale = (overview, addr1, url) => ({
+    common: overview === undefined ? null : { overview, addr1 },
+    intro: {},
+    images: url ? [{ originimgurl: url, cpyrhtDivCd: "Type1" }] : [],
+    errors: [],
+  });
+
+  it("zh 는 중문 → 영문 → 국문 순으로 필드마다 고른다", () => {
+    const detail = normalizeCandidateDetails({
+      lang: "zh",
+      korean: locale("국문 개요", "서울", "https://example.test/ko.jpg"),
+      english: locale("English overview", "Seoul", null),
+      chineseSimplified: locale("中文概要", "首尔", null),
+    });
+    assert.equal(detail.overview, "中文概要");
+    assert.equal(detail.overviewLanguage, "zh");
+    assert.equal(detail.address, "首尔");
+    // 중문·영문 이미지가 없으면 국문 이미지
+    assert.equal(detail.images[0].url, "https://example.test/ko.jpg");
+    assert.deepEqual(detail.sources, ["TourAPI:KorService2", "TourAPI:EngService2", "TourAPI:ChsService2"]);
+    assert.equal(detail.original.chineseSimplified.common.overview, "中文概要");
+  });
+
+  it("ja 개요가 비어 있으면 다음 언어의 개요를 쓰고 그 언어를 표기한다", () => {
+    const detail = normalizeCandidateDetails({
+      lang: "ja",
+      korean: locale("국문 개요", "서울"),
+      japanese: locale("", "ソウル"),
+    });
+    assert.equal(detail.overview, "국문 개요");
+    assert.equal(detail.overviewLanguage, "ko");
+    assert.equal(detail.address, "ソウル");
+  });
+
+  it("ko 는 영문 원문이 있어도 국문을 쓴다", () => {
+    const detail = normalizeCandidateDetails({
+      lang: "ko",
+      korean: locale("국문 개요", "서울"),
+      english: locale("English overview", "Seoul"),
+    });
+    assert.equal(detail.overview, "국문 개요");
+    assert.equal(detail.overviewLanguage, "ko");
+  });
+});

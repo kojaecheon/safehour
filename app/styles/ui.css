@@ -1,0 +1,1633 @@
+/* 기본 부품과 앱 셸 스타일 (AX-304 · spec 7장)
+ *
+ * 소유: 디자인 시스템 작업(AX-304). 기능 화면 작업은 이 파일을 고치지 않고 자기 기능 파일
+ * (app/styles/<기능>.css)에서 배치만 더한다. 부품 모양을 바꿔야 하면 보고한다.
+ *
+ * 규칙
+ *   - 값은 app/globals.css 의 토큰 변수만 쓴다(hex·새 글자 크기 금지).
+ *   - 클래스는 `ui-` 로 시작한다. 기존 화면과 함께 쓰는 `.btn`·`.badge`·`.state-banner`·`.sheet`·`.top-bar`
+ *     는 globals.css 에 있다.
+ *   - 터치 대상 44px 이상, 상태는 색 + 문구 + 아이콘, 선택은 테두리·굵기·아이콘을 함께 바꾼다.
+ */
+
+/* ───────────────────────── 앱 셸 ───────────────────────── */
+
+/* 보기 전용 배너 자리 — 비어 있어도 DOM 에 남겨 상태 변화를 읽어 준다(role=status) */
+/* 보기 전용 배너 (SEED Page Banner) — 화면 폭 맨 위, 화면당 하나, 위아래 10 · 좌우 16, 16px(안전 문구) */
+.ui-readonly {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+  padding: 10px var(--gutter);
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--line-strong);
+}
+.ui-readonly-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: var(--radius-full);
+  background: var(--badge-readonly-bg);
+  color: var(--on-dark);
+}
+.ui-readonly-text {
+  min-width: 0;
+  flex: 1;
+}
+.ui-readonly-title {
+  display: block;
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-body);
+}
+.ui-readonly-body {
+  margin-top: var(--space-1);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.ui-readonly.is-preview {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-16);
+}
+.ui-readonly-login {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* 긴급 연락 — 큰 CTA 모양(52px · 모서리 12 · 18px 굵게, 그림자 없음 — 설계서 5.1).
+   하단 긴급 바·시작 화면 하단 바 안(is-docked)과 시안 보드(is-preview)에 놓인다. 자리 규칙은 아래에 따로 있다 */
+.ui-emergency {
+  position: fixed;
+  z-index: 40;
+  right: max(var(--gutter), calc(50% - var(--shell-max) / 2 + var(--gutter)));
+  bottom: calc(var(--nav-offset) + var(--space-3));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-12);
+  background: var(--emergency);
+  color: var(--emergency-ink);
+  font-size: var(--text-button-large);
+  line-height: var(--lh-title-3);
+  font-weight: var(--weight-bold);
+  white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.ui-emergency:active {
+  background: var(--emergency-strong);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-emergency:hover { background: var(--emergency-strong); }
+}
+/* 강제 색상(Windows 고대비): 빨간 면이 사라지면 글자만 남아 버튼으로 안 보인다. 안전 버튼이라 2px 테두리로 윤곽을 그린다 */
+@media (forced-colors: active) {
+  .ui-emergency {
+    border: 2px solid currentColor;
+  }
+}
+.app-shell[data-nav='off'] .ui-emergency:not(.is-docked) {
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+}
+/* 고정 복귀 버튼이 있는 화면에서는 그 위로 비켜 선다 — 두 안전 버튼이 겹치지 않게.
+   바 **안에** 들어간 긴급(is-docked)은 비켜설 필요가 없다 — 자리를 건드리면 바 밖으로 밀려 나간다. */
+/* 시안 보드 견본(is-preview)도 제자리에 그리므로 비켜서지 않는다: 보드의 화면 시안에 하단 바가 있어도 견본이 위로 밀리지 않게 */
+.app-shell:has(.sticky-return) .ui-emergency:not(.is-docked):not(.is-preview) {
+  bottom: calc(var(--nav-offset) + 88px);
+}
+.app-shell[data-nav='off']:has(.sticky-return) .ui-emergency:not(.is-docked):not(.is-preview) {
+  bottom: calc(88px + env(safe-area-inset-bottom));
+}
+/* 하단 내비 4개 — 오늘 · 일정 · 조건 · 더보기 */
+/* 하단 긴급 바 — 내비가 없는 화면(로그인 전 흐름·보호자 열기)에서 긴급을 바닥에 붙인다.
+   내비와 같은 자리·같은 처리(면 + 윗선)라 화면을 오갈 때 긴급의 위치가 흔들리지 않는다. */
+.ui-emergency-bar {
+  position: fixed;
+  z-index: 30;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  max-width: var(--shell-max);
+  padding: var(--space-2) var(--gutter) calc(var(--space-2) + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-sheet);
+}
+
+.ui-bottom-nav {
+  position: fixed;
+  z-index: 30;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: var(--shell-max);
+  background: var(--layer-default);
+  border-top: 1px solid var(--line-strong);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.ui-bottom-nav ul {
+  display: grid;
+  /* 5칸 — 오늘·일정·조건·더보기·긴급. 320px 에서 칸당 64px 이라 문구가 짧아야 한다(common.navEmergency) */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  list-style: none;
+  height: var(--nav-height);
+}
+/* 칸 (SEED Bottom Navigation) — 선 아이콘 24px + 보조 글자 500.
+   현재 칸은 채운 아이콘 + 진한 글자 700 — 모양·굵기·색이 함께 바뀐다(색 단독 금지). aria-current 로 스크린리더에도 알린다 */
+.ui-bottom-nav a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-0-5);
+  height: 100%;
+  min-height: var(--tap-min);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--lh-caption);
+  color: var(--ink-soft);
+  text-align: center;
+  transition: transform var(--duration-fast) var(--ease-press);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-bottom-nav a:active { transform: scale(var(--press-scale-tight)); }
+}
+.ui-bottom-nav a[aria-current='page'] {
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+/* 긴급 칸 — 긴급 빨강 아이콘 + 글자로 다른 칸과 가른다(흰 바탕 5.88:1). 판정 상태 색과 섞이지 않는다 */
+.ui-bottom-nav a.is-emergency {
+  color: var(--emergency);
+}
+.ui-bottom-nav a.is-emergency[aria-current='page'] {
+  color: var(--emergency-strong);
+}
+.ui-nav-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+}
+/* 강제 색상(Windows 고대비): 현재 칸은 채운 아이콘 + 굵은 글자만 남는다. Highlight 면 + HighlightText 글자에 위쪽 3px 띠를 더한다
+   (띠만큼 아래 안쪽 여백을 늘려 아이콘·글자 자리는 다른 칸과 같다). 긴급 칸의 현재 규칙이 더 구체적이라 함께 적는다.
+   글자 뒤 Canvas 받침이 면 위 글자를 덮으므로 현재 칸만 forced-color-adjust: none 으로 빠진다(날짜 칩과 같은 이유) */
+@media (forced-colors: active) {
+  .ui-bottom-nav a[aria-current='page'],
+  .ui-bottom-nav a.is-emergency[aria-current='page'] {
+    forced-color-adjust: none;
+    border-top: 3px solid CanvasText;
+    padding-bottom: 3px;
+    background: Highlight;
+    color: HighlightText;
+  }
+  /* 전역 초점 링(--accent 코발트)은 시스템 색이 아니라 forced-color-adjust: none 에서는 그대로 쓰인다. 시스템 색으로 바꾼다 */
+  .ui-bottom-nav a[aria-current='page']:focus-visible {
+    outline-color: CanvasText;
+  }
+}
+
+/* 시안 보드용 미리보기 — 고정하지 않고 제자리에 그린다 */
+/* 고정을 풀고 흐름 안에 놓는 변형 — 시안 보드 견본(is-preview)과
+   시작 화면 하단 바 안(is-docked)에서 쓴다. 떠 있으면 본문을 덮기 때문이다.
+   고정 복귀 버튼 위로 비켜서는 위의 두 규칙은 `:not(.is-docked):not(.is-preview)` 로 이 둘을 이미 빼므로,
+   여기서는 기본 자리 지정(고정·inset·transform)만 끈다. */
+.ui-bottom-nav.is-preview,
+.ui-emergency.is-preview,
+.app-shell .ui-emergency.is-docked {
+  position: relative;
+  inset: auto;
+  transform: none;
+}
+.ui-bottom-nav.is-preview {
+  z-index: auto;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-16);
+  overflow: hidden;
+  box-shadow: none;
+  padding-bottom: 0;
+}
+.ui-emergency.is-preview {
+  z-index: auto;
+}
+
+/* ───────────────────────── 배지 5종 ───────────────────────── */
+/* 모양이 서로 다르다: 회색 면(추정) · 분홍 면(기본값) · 점선 테두리 흰 면(운영 확인) · 띠 무늬(데모) · 짙은 면 굵게(보기 전용).
+   아이콘도 다섯 가지가 다르다(Badge.js) — 색만으로 구분하지 않는다 */
+.ui-badge-estimate {
+  border-color: transparent;
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+}
+.ui-badge-defaulted {
+  border-color: transparent;
+  background: var(--support-soft);
+  color: var(--support-ink);
+}
+.ui-badge-hoursUnconfirmed {
+  border-style: dotted;
+  border-color: var(--line-input);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+.ui-badge-demo {
+  border-color: var(--state-standby-ink);
+  color: var(--ink);
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--badge-demo-stripe-a) 0 6px,
+    var(--badge-demo-stripe-b) 6px 12px
+  );
+}
+.ui-badge-readOnly {
+  border-color: var(--badge-readonly-bg);
+  background: var(--badge-readonly-bg);
+  color: var(--on-dark);
+  font-weight: var(--weight-bold);
+}
+
+/* ───────────────────────── 출처 영역 ───────────────────────── */
+/* 다섯 출처는 머리글 문구 + 아이콘 + 테두리 모양으로 나뉜다. 한 영역에 두 출처를 섞지 않는다. */
+.ui-source {
+  border-radius: var(--radius-10);
+  padding: var(--space-3) 14px 14px;
+  margin-bottom: var(--space-3);
+  background: var(--surface);
+}
+.ui-source-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  line-height: var(--leading-snug);
+  margin-bottom: 6px;
+}
+.ui-source-title {
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.ui-source-body {
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.ui-source-body p {
+  color: inherit;
+}
+.ui-source-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
+.ui-source-hospital {
+  background: var(--source-hospital-bg);
+  border: 1px solid var(--source-hospital);
+  border-left-width: 6px;
+}
+.ui-source-hospital .ui-source-head { color: var(--source-hospital); }
+.ui-source-self {
+  border: 2px dashed var(--source-self);
+}
+.ui-source-self .ui-source-head { color: var(--source-self); }
+.ui-source-estimate {
+  background: var(--surface-alt);
+  border: 2px dotted var(--source-estimate);
+}
+.ui-source-estimate .ui-source-head { color: var(--source-estimate); }
+.ui-source-tourism {
+  border: 1px solid var(--line-strong);
+  border-left: 6px double var(--source-tourism);
+}
+.ui-source-tourism .ui-source-head { color: var(--source-tourism); }
+/* AI 소개 — 말풍선 모서리. 판정 근거가 아니라 소개 문장임을 모양으로도 드러낸다 */
+.ui-source-ai {
+  background: var(--source-ai-bg);
+  border: 1px solid var(--support);
+  border-bottom-left-radius: var(--space-1);
+}
+.ui-source-ai .ui-source-head { color: var(--source-ai); }
+
+/* 항목 옆 작은 출처 표시 (spec 4.5: '병원 발행' / '본인 체크' / '기본값 적용') */
+.ui-source-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-6);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  line-height: var(--lh-caption);
+  white-space: nowrap;
+  background: var(--surface);
+}
+.ui-source-tag-hospital { border: 1px solid var(--source-hospital); color: var(--source-hospital); background: var(--source-hospital-bg); }
+.ui-source-tag-self { border: 1px dashed var(--source-self); color: var(--source-self); }
+.ui-source-tag-estimate { border: 1px dotted var(--source-estimate); color: var(--source-estimate); background: var(--surface-alt); }
+.ui-source-tag-tourism { border: 1px solid var(--line-input); color: var(--source-tourism); }
+.ui-source-tag-ai { border: 1px solid var(--support); color: var(--source-ai); background: var(--source-ai-bg); }
+
+/* ───────────────────────── 날짜 칩 ───────────────────────── */
+.ui-date-strip {
+  display: flex;
+  gap: var(--space-2);
+  list-style: none;
+  overflow-x: auto;
+  padding: var(--space-1) var(--space-1) var(--space-2);
+  scroll-snap-type: x proximity;
+}
+.ui-date-strip > li {
+  scroll-snap-align: start;
+  flex: none;
+}
+/* 날짜 칩 (SEED Chip Tabs 방식) — 모서리 12 · 60×92. 고른 날 = 진한 회색 채움 + 흰 글자, 나머지 = 회색 면.
+   오늘 = 코발트 2px 테두리 + '오늘' 글자(허용된 코발트 쓰임). 상태 아이콘은 흰 원판 위 상태 색이라 어느 면에서도 산다 */
+.ui-date-chip {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-0-5);
+  min-width: 60px;
+  min-height: 92px;
+  padding: var(--space-2) 6px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-12);
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-color),
+    transform var(--duration-fast) var(--ease-press);
+}
+.ui-date-chip:active { background: var(--pressed-weak); }
+@media (hover: hover) and (pointer: fine) {
+  .ui-date-chip:hover { background: var(--pressed-weak); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-date-chip:active { transform: scale(var(--press-scale-tight)); }
+}
+.ui-date-week {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--ink-soft);
+  line-height: var(--lh-caption);
+}
+.ui-date-day {
+  font-size: var(--text-title-2);
+  font-weight: var(--weight-bold);
+  line-height: var(--lh-title-2);
+  font-variant-numeric: tabular-nums;
+}
+/* 상태·병원 표시 원판 둘은 4px 겹쳐 칩 폭 60px 안에 든다(원판 안쪽 여백이 4px 라 아이콘끼리는 겹치지 않는다) */
+.ui-date-marks {
+  display: inline-flex;
+  align-items: center;
+  margin-top: var(--space-0-5);
+}
+.ui-date-marks > * + * {
+  margin-left: calc(var(--space-1) * -1);
+}
+/* 상태 아이콘은 흰 원판 위 상태 색 — 고른 칩(진한 면)에서도 상태 색이 살아 있다 */
+.ui-date-state {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 1px solid currentColor;
+}
+.ui-date-state-TOGETHER { color: var(--state-together-ink); }
+.ui-date-state-SPLIT_NEARBY { color: var(--state-split-ink); }
+.ui-date-state-STANDBY { color: var(--state-standby-ink); }
+.ui-date-state-NO_TOURISM { color: var(--state-no-tourism-ink); }
+.ui-date-appt {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--source-hospital);
+  border: 1px solid currentColor;
+}
+/* 오늘: '오늘' 글자 + 코발트 2px 테두리 */
+.ui-date-chip.is-today {
+  border-color: var(--accent);
+}
+.ui-date-chip.is-today .ui-date-week {
+  color: var(--accent-strong);
+  font-weight: var(--weight-bold);
+}
+/* 선택: 진한 회색 채움 + 흰 글자(13.31:1). 고른 칩은 눌러도 색을 바꾸지 않는다. 짙은 면이라 초점 링은 먹색 */
+.ui-date-chip.is-selected,
+.ui-date-chip.is-selected:active {
+  background: var(--selected);
+  color: var(--on-dark);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-date-chip.is-selected:hover { background: var(--selected); }
+}
+.ui-date-chip.is-selected .ui-date-week {
+  color: var(--on-dark);
+}
+.ui-date-chip.is-selected:focus-visible {
+  outline-color: var(--ink);
+}
+/* 강제 색상(Windows 고대비): 면 색이 사라지고 투명 테두리가 보이게 된다. 모든 칩이 같은 2px 테두리를 가지면
+   오늘(2px 테두리)이 묻히므로, 보통 칩은 1px 로 줄이고(안쪽 여백을 1px 늘려 칩 크기는 그대로) 오늘만 2px 로 둔다.
+   고른 칩은 Highlight 면 + HighlightText 글자. Chromium 은 강제 색상에서 글자 뒤에 Canvas 색 받침을 깔아
+   면 위 글자를 덮으므로, 고른 칩만 forced-color-adjust: none 으로 빠지고 시스템 색을 직접 적는다(자손의 색도 함께 적는다) */
+@media (forced-colors: active) {
+  .ui-date-chip {
+    border-width: 1px;
+    padding: calc(var(--space-2) + 1px) 7px;
+  }
+  .ui-date-chip.is-today {
+    border-width: 2px;
+    padding: var(--space-2) 6px;
+  }
+  .ui-date-chip.is-selected,
+  .ui-date-chip.is-selected:active,
+  .ui-date-chip.is-selected:hover {
+    forced-color-adjust: none;
+    background: Highlight;
+    color: HighlightText;
+    border-color: CanvasText;
+  }
+  .ui-date-chip.is-selected .ui-date-week {
+    color: HighlightText;
+  }
+  .ui-date-chip.is-selected .ui-date-state,
+  .ui-date-chip.is-selected .ui-date-appt {
+    background: Canvas;
+    color: CanvasText;
+    border-color: CanvasText;
+  }
+  /* 작성자 색이 그대로 쓰이는 요소라 초점 링도 시스템 색으로 적는다. 위의 보통 규칙(--ink)이 그대로 남으면
+     어두운 대비 테마(Canvas 가 검정)에서 링이 Highlight 면과 거의 같은 색이 되어 안 보인다(WCAG 2.4.7) */
+  .ui-date-chip.is-selected:focus-visible {
+    outline-color: CanvasText;
+  }
+}
+
+/* ─────────────────── 하루 타임라인 — 지하철 노선도 ───────────────────
+ * 외출은 굵은 노선, 정거장은 역 표시, 복귀 마감은 종착역이다.
+ * 외출 밖(숙소 휴식·병원 일정)은 노선에서 내려와 점선으로 이어진다. */
+.ui-timeline {
+  list-style: none;
+  --tl-line: var(--accent);
+  --tl-marker-top: 22px;
+}
+.ui-timeline-guardian {
+  --tl-line: var(--state-split-ink);
+}
+.ui-tl-item {
+  display: grid;
+  grid-template-columns: 56px 32px minmax(0, 1fr);
+  column-gap: var(--space-2);
+}
+.ui-tl-time {
+  padding-top: 11px;
+  text-align: right;
+  white-space: nowrap;
+  font-size: var(--text-body);
+  font-weight: var(--weight-heavy);
+  line-height: 1.3;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ui-tl-end {
+  display: block;
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+  color: var(--ink-soft);
+}
+.ui-tl-rail {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+.ui-tl-rail::before,
+.ui-tl-rail::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 6px;
+  transform: translateX(-50%);
+}
+.ui-tl-rail::before { top: 0; height: var(--tl-marker-top); }
+.ui-tl-rail::after { top: var(--tl-marker-top); bottom: 0; }
+.ui-tl-in-on .ui-tl-rail::before,
+.ui-tl-out-on .ui-tl-rail::after {
+  background: var(--tl-line);
+}
+.ui-tl-in-off .ui-tl-rail::before,
+.ui-tl-out-off .ui-tl-rail::after {
+  width: 2px;
+  background: repeating-linear-gradient(to bottom, var(--line-input) 0 5px, transparent 5px 10px);
+}
+.ui-tl-item:first-child .ui-tl-rail::before,
+.ui-tl-item:last-child .ui-tl-rail::after {
+  display: none;
+}
+/* 강제 색상(Windows 고대비): 노선은 배경색과 줄무늬라 사라진다. 외출 중 구간은 CanvasText 로 채운 굵은 선,
+   외출 밖 구간은 점선으로 다시 그린다(굵기와 모양으로 가른다) */
+@media (forced-colors: active) {
+  .ui-tl-in-on .ui-tl-rail::before,
+  .ui-tl-out-on .ui-tl-rail::after {
+    background: CanvasText;
+  }
+  .ui-tl-in-off .ui-tl-rail::before,
+  .ui-tl-out-off .ui-tl-rail::after {
+    width: 0;
+    background: none;
+    border-left: 2px dashed CanvasText;
+  }
+}
+.ui-tl-marker {
+  position: relative;
+  z-index: 1;
+  margin-top: 6px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  border: 4px solid var(--tl-line);
+  color: var(--ink);
+}
+/* 역(정거장): 속이 빈 굵은 고리 */
+.ui-tl-stop .ui-tl-marker {
+  width: 24px;
+  height: 24px;
+  margin-top: 10px;
+  border-width: 6px;
+}
+.ui-tl-meal .ui-tl-marker { border-width: 4px; }
+/* 종착역(복귀 마감): 노선 색 사각 면 + 깃발 */
+.ui-tl-return .ui-tl-marker {
+  border-radius: var(--radius-8);
+  background: var(--tl-line);
+  color: var(--accent-ink);
+}
+/* 노선 밖 고정 블록: 먹색 사각(병원) · 흰 원(복약·휴식) */
+.ui-tl-appointment .ui-tl-marker {
+  border-radius: var(--radius-8);
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--on-dark);
+}
+.ui-tl-medication .ui-tl-marker,
+.ui-tl-rest .ui-tl-marker {
+  border: 2px solid var(--line-input);
+  color: var(--ink-soft);
+}
+.ui-tl-body {
+  min-width: 0;
+  padding: 10px 0 var(--space-5);
+}
+.ui-tl-leg {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ui-tl-kind {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  color: var(--ink-soft);
+  line-height: 1.3;
+}
+.ui-tl-title {
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-snug);
+}
+.ui-tl-stop .ui-tl-title,
+.ui-tl-meal .ui-tl-title {
+  font-size: var(--text-title-3);
+}
+.ui-tl-note {
+  margin-top: 2px;
+  font-size: var(--text-body);
+}
+.ui-tl-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.ui-tl-content {
+  margin-top: var(--space-2);
+}
+/* 복귀 마감 — 역 이름판처럼 크게: 시각이 가장 먼저 읽힌다 */
+.ui-tl-return .ui-tl-time {
+  color: var(--accent-strong);
+  font-size: var(--text-title-3);
+}
+.ui-timeline-guardian .ui-tl-return .ui-tl-time {
+  color: var(--state-split-ink);
+}
+.ui-tl-return .ui-tl-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: var(--tl-line);
+  color: var(--accent-ink);
+  font-size: var(--text-caption);
+}
+
+/* ───────────────────────── 장소 카드 ───────────────────────── */
+/* 장소 카드 — 누르는 대상이라 카드로 둔다(SEED: 모서리 16 · 그림자 없음 · 1px 카드 테두리). 그림은 카드 가장자리에 붙는다 */
+.ui-place {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-16);
+  overflow: hidden;
+}
+.ui-place-media {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--surface-alt);
+}
+.ui-place-media > img,
+.ui-place-media > .ui-place-art {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ui-place-pill {
+  position: absolute;
+  top: var(--space-3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-bold);
+  line-height: 1.4;
+  box-shadow: var(--shadow-card);
+}
+.ui-place-cat { left: var(--space-3); }
+.ui-place-time {
+  right: var(--space-3);
+  font-variant-numeric: tabular-nums;
+}
+.ui-place-body {
+  padding: var(--space-2) var(--space-4) var(--space-4);
+}
+.ui-place-title {
+  font-size: var(--text-title-3);
+  line-height: var(--leading-snug);
+  color: var(--ink);
+}
+.ui-place-title > a,
+.ui-place-title > span {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+}
+/* 카드 전체를 누를 수 있게 제목 링크를 카드 크기로 넓힌다. 안의 다른 버튼은 그 위에 선다 */
+.ui-place-title > a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.ui-place-title > a:focus-visible {
+  outline: none;
+}
+.ui-place:has(.ui-place-title > a:focus-visible) {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}
+.ui-place-body > :not(.ui-place-title) {
+  position: relative;
+  z-index: 1;
+}
+.ui-place-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  list-style: none;
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.ui-place-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+.ui-place-credit {
+  margin-top: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
+.ui-place-extra {
+  margin-top: var(--space-3);
+}
+/* 작은 카드 — 하루 타임라인 안: 왼쪽 정사각 사진 + 오른쪽 글.
+   놓인 자리가 좁으면(320px 화면의 타임라인 안) 사진을 위로 올려 세로로 쌓는다 */
+.ui-place-frame {
+  container-type: inline-size;
+}
+.ui-place.is-compact {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  border-radius: var(--radius-16);
+}
+.ui-place.is-compact .ui-place-media {
+  aspect-ratio: auto;
+  min-height: 96px;
+  height: 100%;
+}
+.ui-place.is-compact .ui-place-pill {
+  top: auto;
+  bottom: var(--space-2);
+  left: var(--space-2);
+  right: auto;
+  max-width: calc(100% - var(--space-4));
+  padding: 2px var(--space-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ui-place.is-compact .ui-place-time { display: none; }
+.ui-place.is-compact .ui-place-body {
+  padding: var(--space-1) var(--space-3) var(--space-3);
+}
+.ui-place.is-compact .ui-place-title {
+  font-size: var(--text-body);
+}
+@container (max-width: 250px) {
+  .ui-place.is-compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ui-place.is-compact .ui-place-media {
+    aspect-ratio: 16 / 9;
+    min-height: 0;
+  }
+}
+
+/* ───────────────────────── 식사 칸 ───────────────────────── */
+.ui-meal {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-16);
+  padding: var(--space-3) 14px;
+  background: var(--surface);
+}
+.ui-meal-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  color: var(--ink);
+  font-weight: var(--weight-heavy);
+}
+.ui-meal-time {
+  font-weight: var(--weight-medium);
+  color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+/* 빈 식사 칸은 오류가 아니다 — 점선 칸 + 중립 회색 + 사유 문구 */
+.ui-meal.is-empty {
+  border-style: dashed;
+  border-color: var(--line-input);
+  background: var(--surface-alt);
+}
+.ui-meal-status {
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+.ui-meal-reasons {
+  margin-top: var(--space-1);
+  padding-left: var(--space-5);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* ─────────────────── 예 / 아니오 / 모르겠음 ─────────────────── */
+.ui-answer {
+  border: none;
+  margin-bottom: var(--space-5);
+  min-width: 0;
+}
+.ui-answer > legend {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  line-height: var(--leading-snug);
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+.ui-answer-hint {
+  margin: calc(var(--space-1) * -1) 0 var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--ink-soft);
+}
+.ui-answer-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
+  gap: var(--space-2);
+}
+/* 답 칩 (SEED Chip · outlineWeak) — 44px 알약 · 16px(SEED 14px 을 하한으로 올림).
+   테두리는 선택지 경계라 3:1 이상(--line-input — SEED 의 옅은 선은 1.35:1, 설계서 4.7) */
+.ui-answer-option {
+  position: relative;
+  display: flex;
+  /* 고른 칩의 체크 표시(16px)와 글자가 한 줄에 들지 않으면 체크가 글자 위 줄로 올라간다(운영자 결정 2026-10-30).
+     두 줄이 돼도 묶음째 칩 가운데에 선다(align-content). 체크가 없는 칩은 글자 하나뿐이라 지금과 같다 */
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  gap: var(--space-1);
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-input);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: var(--lh-body);
+  text-align: center;
+  cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-color),
+    transform var(--duration-fast) var(--ease-press);
+}
+/* 라디오는 칸 전체를 덮는 투명 입력 — 키보드(방향키)·스크린리더는 표준 라디오로 다룬다 */
+.ui-answer-option input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.ui-answer-option:active { background: var(--pressed); }
+@media (hover: hover) and (pointer: fine) {
+  .ui-answer-option:hover { background: var(--pressed); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-answer-option:active { transform: scale(var(--press-scale-tight)); }
+}
+/* 키보드 초점일 때만 칩 전체에 링 — 안쪽 입력은 칩을 덮는 투명 오버레이라 자체 링을 지워 이중 링을 막는다 */
+.ui-answer-option:has(input:focus-visible) {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}
+.ui-answer-option input:focus-visible {
+  outline: none;
+}
+/* 체크 표시: 고른 칩에서만 글자 앞에 나온다. 모든 언어에서 16px 그대로다(전역 svg max-width 100% 에 밀려 줄지 않는다) */
+.ui-answer-mark {
+  display: none;
+  flex: none;
+  pointer-events: none;
+}
+/* 글자 칸: 줄 나눔은 가장 긴 낱말 폭으로 정한다(flex-basis 0, 최소 폭은 낱말 폭 그대로). 체크 + 사이 4 + 가장 긴 낱말이
+   칩 안쪽에 들면 체크 곁에서 낱말 단위로 줄을 바꾸고('屋内/のみ'), 안 들면 체크가 글자 위 줄로 올라간다(320px en 'Allowed').
+   글자 칸은 글자 길이(max-content)까지만 늘어 체크와 붙어 선다.
+   min-width: 0 은 두지 않는다. 글자 칸이 낱말 폭 밑으로 줄면 body 의 overflow-wrap: break-word 가 'Allowe/d' 처럼 낱말을 꺾는다 */
+.ui-answer-text {
+  flex: 1 1 0;
+  max-width: max-content;
+}
+/* 한국어·일본어·중국어 칩 글자는 낱말 단위로만 줄을 바꾼다. 한국어는 전역 :lang(ko) 규칙과 같고, 칩 줄 나눔이 기대는 값이라
+   여기에도 둔다. 일본어·중국어의 줄바꿈 자리는 AnswerText 의 <wbr>다. 320px 칩(79px)에서 '屋内/のみ'·'仅限/室内'처럼 나뉘고
+   한 글자가 홀로 꺾이지 않는다 */
+.ui-answer-text:lang(ko),
+.ui-answer-text:lang(ja),
+.ui-answer-text:lang(zh) {
+  word-break: keep-all;
+  /* overflow-wrap: anywhere 는 두지 않는다. 글자 칸의 최소 폭이 한 글자로 줄어 'わから'·'不确定' 같은 한 낱말이
+     'わか/ら'·'不确/定'으로 꺾인다 */
+}
+/* 선택: 진한 테두리 + 회색 면 + 체크 아이콘 + 굵은 글자 (색 단독 금지). 고른 칩은 눌러도 색을 바꾸지 않는다 */
+.ui-answer-option.is-selected,
+.ui-answer-option.is-selected:active {
+  border-color: var(--line-contrast);
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-weight: var(--weight-bold);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-answer-option.is-selected:hover { background: var(--surface-alt); }
+}
+.ui-answer-option.is-selected .ui-answer-mark {
+  display: inline-grid;
+}
+/* 고른 칩의 2px 여유(운영자 결정 2026-11-02): 좌우 안쪽 여백을 1px 씩 줄여, 체크 + 4 + 가장 긴 낱말이 칩 안쪽보다
+   2px 까지 넓어도 체크를 글자 곁 한 줄에 둔다(360px ja いいえ·わからない, zh 不确定·不允许, 320px en Not sure).
+   한 줄에 들던 칩은 묶음이 가운데 정렬이라 자리가 그대로다. 체크 곁에서 글자가 두 줄로 꺾이는 칩('屋内/のみ')은
+   글자 칸이 2px 넓어져 체크만 1px 왼쪽으로 간다(글자 줄은 그대로). 더 넘치는 칩(ko 모르겠음 9.4px, en Allowed)은
+   체크가 글자 위 줄로 올라간다 */
+.ui-answer-option.is-selected {
+  padding-inline: calc(var(--space-3) - 1px);
+}
+/* 체크가 보이는 묶음(고른 칩이 있는 줄)의 반지름은 두 줄 칩 높이(22 × 2 + 8 × 2 + 1 × 2 = 62px)의 반(31px)에서 멈춘다.
+   한 줄(44px)·두 줄(62px) 칩은 --radius-full 과 같은 알약 그대로다. 체크가 위로 올라가 세 줄(82px)이 된 좁은 칩과
+   같은 줄의 칩만 원 대신 모서리 31 상자가 되어, 아랫줄의 긴 낱말(320px en 'Not allowed' 의 'allowed')이 둥근 테두리에 닿지 않는다 */
+.ui-answer-options:has(> .is-selected) > .ui-answer-option {
+  border-radius: calc(var(--lh-body) + var(--space-2) + 1px);
+}
+.ui-answer:disabled .ui-answer-option {
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+  border-color: var(--line-strong);
+  cursor: not-allowed;
+  transform: none;
+}
+/* 병원이 정한 값(비활성)도 무엇을 골랐는지는 또렷해야 한다 — 3:1 테두리 + 진한 글자 + 체크 */
+.ui-answer:disabled .ui-answer-option.is-selected {
+  border-color: var(--line-input);
+  color: var(--ink);
+}
+.ui-answer-explain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: var(--space-2);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+
+/* ───────────────────────── 스위치 (SEED Switch) ─────────────────────────
+ * 바로 적용되는 켬/끔 설정에만 쓴다(동의는 체크 상자). <input type="checkbox" role="switch" class="ui-switch">
+ * 를 .toggle-row 라벨 안에 둔다 — 라벨 줄 전체(52px)가 누르는 대상이라 트랙이 32px 여도 44px 하한을 지킨다.
+ * 트랙 52×32 · 알맹이 26. 끔 트랙은 --ink-subtle(흰 바탕 3.42:1 — SEED #b0b3ba 는 2.1:1 이라 하한으로 올림).
+ * 켬은 --selected 채움 + 알맹이가 오른쪽으로 — 색과 위치가 함께 바뀐다. 눌러도 색을 바꾸지 않는다. */
+.ui-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: none;
+  width: 52px;
+  height: 32px;
+  margin: 0;
+  border-radius: var(--radius-full);
+  background: var(--ink-subtle);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.ui-switch::before {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--on-dark);
+  transition: transform var(--duration) var(--ease-press);
+}
+.ui-switch:checked {
+  background: var(--selected);
+}
+.ui-switch:checked::before {
+  transform: translateX(20px);
+}
+/* 막힌 스위치(보기 전용 등): 켬·끔이 함께 읽혀야 한다. 끔 = 회색 면 + 3:1 테두리 + 회색 알맹이(왼쪽),
+   켬 = --ink-subtle 채움(흰 바탕 3.42:1) + 흰 알맹이(오른쪽). 면 색과 위치가 함께 바뀐다 */
+.ui-switch:disabled {
+  background: var(--surface-alt);
+  box-shadow: inset 0 0 0 1px var(--line-input);
+  cursor: not-allowed;
+}
+.ui-switch:disabled::before {
+  background: var(--ink-subtle);
+}
+.ui-switch:disabled:checked {
+  background: var(--ink-subtle);
+  box-shadow: none;
+}
+.ui-switch:disabled:checked::before {
+  background: var(--on-dark);
+}
+/* 강제 색상(Windows 고대비): 면 색과 그림자가 사라져 테두리 없는 트랙과 알맹이가 통째로 안 보인다.
+   트랙에 1px 테두리를 두고(알맹이 자리는 그만큼 안쪽으로), 켬·끔·막힘을 시스템 색으로 가른다.
+   켬 = Highlight 면 + HighlightText 알맹이, 끔 = 빈 트랙 + CanvasText 알맹이.
+   막힘 = GrayText 테두리. 막힌 켬은 GrayText 로 채운 트랙 + 오른쪽 알맹이, 막힌 끔은 빈 트랙 + 왼쪽 알맹이 */
+@media (forced-colors: active) {
+  .ui-switch {
+    border: 1px solid CanvasText;
+  }
+  .ui-switch::before {
+    top: 2px;
+    left: 2px;
+    background: CanvasText;
+  }
+  .ui-switch:checked {
+    background: Highlight;
+  }
+  .ui-switch:checked::before {
+    background: HighlightText;
+  }
+  .ui-switch:disabled {
+    border-color: GrayText;
+  }
+  .ui-switch:disabled::before {
+    background: GrayText;
+  }
+  .ui-switch:disabled:checked {
+    background: GrayText;
+  }
+  .ui-switch:disabled:checked::before {
+    background: Canvas;
+  }
+}
+
+/* ───────────────────────── 조건 기간 편집기 틀 ───────────────────────── */
+.ui-period {
+  border-radius: var(--radius-24);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  background: var(--surface);
+}
+.ui-period-SELF {
+  border: 2px dashed var(--source-self);
+}
+.ui-period-HOSPITAL {
+  border: 1px solid var(--source-hospital);
+  border-left-width: 6px;
+  background: var(--source-hospital-bg);
+}
+.ui-period-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.ui-period-head h3 {
+  margin: 0;
+}
+.ui-period-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.ui-period-dates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0 var(--space-3);
+}
+.ui-period-items {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
+}
+.ui-period-items:empty {
+  display: none;
+}
+.ui-period-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.ui-period-actions > .btn {
+  flex: 1 1 140px;
+}
+
+/* ───────────────────────── 시트 머리 (SEED Bottom Sheet) ─────────────────────────
+ * 손잡이 36×4 는 닫을 수 있는 시트에만(Sheet.js). 즉시 복귀처럼 확인을 꼭 받는 시트에는 손잡이·닫기가 없다.
+ * 제목 22/30 굵게, 머리 아래 선 없음. 닫기는 28px 원이 보이고 누르는 곳은 44px */
+.ui-sheet-grabber {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--line-strong);
+}
+.ui-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.ui-sheet-head h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding-top: var(--space-2);
+  font-size: var(--text-title-sheet);
+  line-height: var(--lh-title-sheet);
+  font-weight: var(--weight-bold);
+}
+.ui-sheet-close {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  flex: none;
+  margin: 0 calc(var(--space-2) * -1) 0 0;
+  border: none;
+  background: none;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ui-sheet-close::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-alt);
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.ui-sheet-close:active::before {
+  background: var(--pressed-weak);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-sheet-close:hover::before { background: var(--pressed-weak); }
+}
+.ui-sheet-close > .ui-icon {
+  position: relative;
+}
+.ui-sheet-foot {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+/* ───────────────────────── 빈 상태 (SEED Result Section) ─────────────────────────
+ * 바탕 없이 가운데 — 그림 → 제목 → 설명 → 버튼. 오류가 아니므로 빨강·경고를 쓰지 않고, 코발트도 쓰지 않는다 */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-1-5);
+  padding: var(--space-8) var(--space-4);
+}
+.ui-empty-art {
+  display: inline-grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--surface-alt);
+  color: var(--ink-soft);
+}
+.ui-empty-title {
+  font-size: var(--text-title-3);
+  line-height: var(--lh-title-3);
+  color: var(--ink);
+  margin: 0;
+}
+.ui-empty-action {
+  margin-top: var(--space-3);
+  width: 100%;
+  max-width: 320px;
+}
+
+/* ───────────────────────── 한국어 안내 카드 ───────────────────────── */
+.ui-kcard {
+  border-radius: var(--radius-24);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+/* 윗띠 — 보조색(벚꽃) 면. 사용자 언어로 '보여 주세요'를 적는다 */
+.ui-kcard-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  padding: 10px var(--space-4);
+  background: var(--support-soft);
+  color: var(--support-ink);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+}
+.ui-kcard-title {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-heavy);
+  color: var(--support-ink);
+  margin: 0;
+}
+.ui-kcard-korean {
+  padding: var(--space-5) var(--space-4) var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-korean-card);
+  font-weight: var(--weight-heavy);
+  line-height: 1.35;
+  word-break: keep-all;
+}
+.ui-kcard-korean p {
+  color: inherit;
+}
+.ui-kcard-korean p + p {
+  margin-top: var(--space-3);
+}
+.ui-kcard-explain {
+  padding: 0 var(--space-4) var(--space-4);
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+.ui-kcard-extra {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+/* ───────────────────────── 바탕 층 · 흰 블록 · 목록 (SEED layer · List) ─────────────────────────
+ * 구역이 여럿인 화면: main.page 에 is-basement 를 주면 회색 바탕 위에 흰 블록(.ui-block)을 8px 틈으로 쌓는다.
+ * 회색 바탕에서는 카드 그림자가 필요 없다 — 이 범위에서 --shadow-card 를 끈다(설계서 4.5). 화면에 켜는 일은 ③층이다. */
+/* 시안 보드(app/styles/designBoard.css)의 .designBoard-phone-page.is-basement 가 이 규칙과 아래 마지막 블록 규칙을 되풀이한다. 값을 바꾸면 같이 고친다 */
+main.page.is-basement {
+  background: var(--layer-basement);
+  --shadow-card: none;
+  /* 첫 흰 블록이 상단 바 바로 아래에서 시작한다. 상단 바와 첫 블록이 한 흰 면으로 이어진다 */
+  padding-top: 0;
+}
+.ui-block {
+  margin: 0 calc(var(--gutter) * -1) var(--gap-section);
+  padding: var(--space-5) var(--gutter);
+  background: var(--layer-default);
+}
+.ui-block > :last-child {
+  margin-bottom: 0;
+}
+/* 회색 화면의 마지막 흰 블록 아래에는 8px 틈을 두지 않는다: 화면 끝 여백은 main 의 아래 안쪽 여백(56px + 하단 내비)이 맡는다(설계서 6.1).
+   마지막 자식이 맺음 글인 화면은 블록과 맺음 글 사이 8px 이 그대로다 */
+main.page.is-basement > .ui-block:last-child {
+  margin-bottom: 0;
+}
+/* 목록 행을 담은 블록은 행이 좌우 여백을 스스로 갖는다 */
+.ui-block:has(> .ui-list) {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.ui-list {
+  list-style: none;
+}
+/* 반복 행 사이 1px 선 — 좌우 16px 들여씀(장식) */
+.ui-list > li + li::before {
+  content: '';
+  display: block;
+  height: 1px;
+  margin: 0 var(--gutter);
+  background: var(--line);
+}
+.ui-list-header {
+  margin: 0;
+  padding: var(--space-2) var(--gutter);
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.ui-list-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: var(--space-3) var(--gutter);
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  text-align: left;
+}
+.ui-list-item.is-interactive {
+  cursor: pointer;
+}
+/* 눌림 — 바탕이 좌우 6px 안으로 들어온 모서리 10 면. 내용만 줄어든다 */
+.ui-list-item.is-interactive::before {
+  content: '';
+  position: absolute;
+  inset: 0 6px;
+  border-radius: var(--radius-10);
+  background: transparent;
+  transition: background-color var(--duration-fast) var(--ease-color);
+}
+.ui-list-item.is-interactive:active::before {
+  background: var(--pressed-transparent);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ui-list-item.is-interactive:hover::before { background: var(--pressed-transparent); }
+}
+.ui-list-item.is-interactive:focus-visible {
+  outline-offset: -2px;
+}
+.ui-list-item-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 22px;
+  transition: transform var(--duration-fast) var(--ease-press);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-list-item.is-interactive:active .ui-list-item-inner { transform: scale(var(--press-scale-wide)); }
+}
+.ui-list-item-leading {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  color: var(--ink);
+}
+.ui-list-item-text {
+  display: grid;
+  gap: var(--space-0-5);
+  flex: 1;
+  min-width: 0;
+}
+.ui-list-item-title {
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-regular);
+  color: var(--ink);
+}
+.ui-list-item-desc {
+  font-size: var(--text-caption);
+  line-height: var(--lh-caption);
+  color: var(--ink-soft);
+}
+.ui-list-item-trailing {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--ink-soft);
+}
+/* 화살표는 아이콘이라 --ink-subtle(흰 바탕 3.42:1) — 글자에는 쓰지 않는다 */
+.ui-list-item-trailing > .ui-icon {
+  color: var(--ink-subtle);
+}
+
+/* ───────────────────────── 확인 대화상자 (SEED Alert Dialog) ─────────────────────────
+ * 가운데 272px · 모서리 20 · 제목 20/27 굵게 · 설명 16/22 보조 글자 · 버튼 둘 반반. 시트(50)보다 위(60) */
+.ui-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+  background: var(--overlay);
+}
+.ui-dialog {
+  width: 100%;
+  max-width: 272px;
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-radius: var(--radius-20);
+  background: var(--layer-floating);
+}
+.ui-dialog-title {
+  margin: 0;
+  font-size: var(--text-title-2);
+  line-height: var(--lh-title-2);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+}
+.ui-dialog-desc {
+  margin-top: var(--space-1-5);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--ink-soft);
+}
+.ui-dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+.ui-dialog-actions > .btn {
+  width: 100%;
+}
+/* 강제 색상(Windows 고대비): 면 색이 사라지면 대화상자가 뒤 화면과 한 덩어리로 보인다. 테두리로 윤곽을 그린다 */
+@media (forced-colors: active) {
+  .ui-dialog {
+    border: 2px solid CanvasText;
+  }
+}
+
+/* ───────────────────────── 안내 상자 (SEED Callout · neutral, 설계서 5.6) ─────────────────────────
+ * 왼쪽 띠·테두리 없는 회색 면(--surface-alt) · 모서리 10 · 안쪽 14/16 · 16/22 먹색.
+ * 로그인·개인정보(.medical-callout), 일정 알림(.trip-notice), 카드(.cards-note), 긴급(.emergency-lead),
+ * 설정 알림(.settings-disclosure), 보호자(.guardian-note), 조건·병원 연결(.conditions-callout)이 함께 쓴다.
+ * 기능 클래스에는 바깥 여백과 차이(대기 색·분홍 면, 긴급 빨강 아이콘, 긴 글의 줄 높이 24)만 남긴다.
+ * 회색 바탕 화면에서는 흰 블록(.ui-block) 안에 둔다(회색 위 회색 방지) */
+.ui-callout {
+  padding: 14px var(--space-4);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--ink);
+}
+/* 아이콘이 붙은 안내 상자: 앞 20px 아이콘 칸 + 본문 칸, 사이 8px.
+   아이콘 칸 높이 = 첫 줄 높이(22px): 아이콘이 첫 줄 가운데에 선다. 원판 없이 먹색 */
+.ui-callout.has-icon {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
+}
+.ui-callout-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: var(--lh-body);
+  color: var(--ink);
+}
+/* 전역 p(--ink-soft)가 상자의 먹색을 덮지 않게: 안내 상자 문장은 안전 문구라 먹색 그대로(상태 배너와 같다) */
+.ui-callout > p {
+  color: inherit;
+}
+
+/* ───────────────────────── 앱 안 알림 배너 (components/pwa/NotificationBanner.js) ─────────────────────────
+ * 예약한 시각에 화면 위에 떠서 알린다. 모양은 위 공용 안내 상자(.ui-callout.has-icon, 앞 20px info 아이콘 칸)이고
+ * 왼쪽 색 띠를 두지 않는다(설계서 5.6). 다른 안내 상자와 달리 화면 위에 떠 있어 떠 있는 층 그림자(--shadow-float,
+ * 설계서 4.5)로 아래 화면과 가르고, 셋째 칸에 44px 닫기 버튼을 둔다 */
+.pwa-notify-slot {
+  position: fixed;
+  z-index: 45;
+  top: calc(var(--space-3) + env(safe-area-inset-top));
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--gutter);
+  pointer-events: none;
+}
+.ui-callout.pwa-notify {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+  max-width: calc(var(--shell-max) - 2 * var(--gutter));
+  /* 닫기 버튼(44px)이 오른쪽 끝에 붙어 서게 오른쪽 안쪽 여백만 8 */
+  padding-right: var(--space-2);
+  box-shadow: var(--shadow-float);
+  pointer-events: auto;
+}
+.pwa-notify-title {
+  display: block;
+}
+/* 안전 문구 병기: 주 언어는 먹색, 둘째 줄은 보조 글자색(투명도 없이) */
+.pwa-notify-primary {
+  margin-top: var(--space-1);
+  color: var(--ink);
+}
+.pwa-notify-secondary {
+  color: var(--ink-soft);
+}
+.pwa-notify-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: var(--weight-bold);
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* 닫기: 44px 누르는 칸의 가운데(X)를 제목 첫 줄 가운데에 맞춘다 */
+.pwa-notify-close {
+  display: inline-grid;
+  place-items: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  margin-top: calc((var(--lh-body) - var(--tap-min)) / 2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+/* 강제 색상(Windows 고대비): 면과 그림자가 사라지면 떠 있는 배너가 아래 화면과 한 덩어리가 된다. 테두리로 윤곽을 그린다 */
+@media (forced-colors: active) {
+  .ui-callout.pwa-notify {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* ───────────────────────── 3:7 하단 바 (설계서 6.1) ─────────────────────────
+ * [보조 3][주 7], 사이 8px. 체류 설정(.onboarding-actions)·조건 편집기(.conditions-editor-actions)·
+ * 병원 고르기(.link-bar)가 함께 쓴다. 면·윗선·짧은 화면 처리와 문장이 들어간 바의 화면 끝 여백은 globals.css 의 .sticky-return.
+ * 보조 칸은 3:7 이지만 글자 길이보다 좁아지지 않아(max-content) 긴 글자(ja 'キャンセル')도 한 줄이다. */
+.ui-bar-split {
+  display: grid;
+  grid-template-columns: minmax(max-content, 3fr) minmax(0, 7fr);
+  gap: var(--space-2);
+}
+/* 바 안 문장(보기 전용·저장 실패 같은 못 누르는 이유)은 맨 앞, 두 칸 전체 폭에 선다. 버튼 줄은 둘째 줄로 밀린다.
+ * contain: inline-size 는 긴 문장의 한 줄 폭이 보조 칸(글자 길이만큼 자라는 칸)을 밀어 바가 넘치지 않게 한다 */
+.ui-bar-split > p {
+  grid-column: 1 / -1;
+  contain: inline-size;
+}
+/* 30% 칸(320px 에서 84px)에도 '上一步'·'取消'(zh)가 한 줄에 들어가게 보조 버튼의 좌우 여백을 12px 로 줄인다 */
+.ui-bar-split > .btn-secondary {
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+}
+
+/* ───────────────────────── 오류 줄 (설계서 5.2) ─────────────────────────
+ * 입력 오류·저장 실패 문장: 앞 20px 경고 아이콘 + 16/22 굵은 긴급 빨강, 왼쪽 띠 없음. 상태는 색 + 문구 + 아이콘으로 보인다.
+ * 16px(SEED 14px)은 다음으로 못 가는 이유라 본문 하한을 지킨다. 입력칸 테두리는 globals.css 공통 규칙이 그린다.
+ * 체류 설정(.onboarding-field-error p·.onboarding-save-error·.onboarding-search-status.is-error)·조건(.conditions-field-error·
+ * .conditions-save-error)·보호자(.guardian-error)가 함께 단다. 기능 클래스에는 바깥 여백만 남긴다 */
+.ui-field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  font-weight: var(--weight-bold);
+  color: var(--emergency);
+}
+/* 20px 아이콘을 22px 첫 줄 가운데에 */
+.ui-field-error .ui-icon {
+  flex: none;
+  margin-top: 1px;
+}
+
+/* ───────────────────────── 오류 요약 (설계서 5.2·5.6, 운영자 결정 2026-10-30) ─────────────────────────
+ * '다음'·'저장'에서 확인이 필요한 항목을 모은 상자와 병원 연결 오류 상자. 모양은 하나다:
+ * 흰 면 + 1px 긴급 빨강 테두리 · 모서리 10 · 안쪽 14/16. 제목은 먹색 굵게, 앞 20px 경고 아이콘만 빨강.
+ * 항목은 글머리표 목록이고, 누르면 그 입력칸으로 가는 44px 코발트 밑줄 링크다.
+ * 체류 설정(.onboarding-summary)·조건 편집기(.conditions-error-summary)·병원 연결(.conditions-alert)이 기능 클래스와 함께 단다.
+ * 기능 클래스에는 바깥 여백과 항목 차이(체류 설정 항목은 이름·이유 두 줄)만 남긴다 */
+.ui-error-summary {
+  border: 1px solid var(--emergency);
+  border-radius: var(--radius-10);
+  background: var(--surface);
+  padding: 14px var(--space-4);
+}
+.ui-error-summary p,
+.ui-error-summary li {
+  color: var(--ink);
+}
+.ui-error-summary-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1-5);
+  font-weight: var(--weight-bold);
+  color: var(--ink);
+  margin-bottom: var(--space-1);
+}
+.ui-error-summary-title .ui-icon {
+  flex: none;
+  margin-top: 1px;
+  color: var(--emergency);
+}
+.ui-error-summary ul {
+  padding-left: var(--space-5);
+}
+.ui-error-summary a {
+  display: inline-block;
+  min-height: var(--tap-min);
+  padding: var(--space-2) 0;
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+/* 링크 안 굵은 항목 이름(체류 설정)도 링크 색이다. 전역 strong 의 먹색이 덮지 않게 */
+.ui-error-summary a strong {
+  color: inherit;
+}
