@@ -144,7 +144,22 @@ export const REASON = {
   DIET_RESTRICTED: 'DIET_RESTRICTED',
   /** 식이 판단에 쓸 메뉴 단서가 없는 식당 */
   MENU_UNKNOWN: 'MENU_UNKNOWN',
+
+  // ── 복귀 마감이 지난 외출 (설계서 2026-11-06 overdue-return 4.3) ──
+  /** 외출 중 다시 계산한 결과 그 외출이 복귀 마감을 맞출 수 없다(여유 음수) */
+  OUTING_OVERDUE: 'OUTING_OVERDUE',
 };
+
+/**
+ * 오늘 returnNow(즉시 복귀)를 켜는 원인. 날짜 사유에서 즉시 복귀 원인을 찾는 곳(기기 변환, 동기화, 화면)이
+ * 모두 이 목록을 쓴다. 원인 판정은 엔진(tripPlan.js returnNowCauses) 한곳에서만 한다.
+ */
+export const RETURN_NOW_CAUSES = Object.freeze([
+  REASON.PATIENT_RECALLED,
+  REASON.PLAN_REVOKED,
+  REASON.PLAN_EXPIRED,
+  REASON.OUTING_OVERDUE,
+]);
 
 /**
  * 사유 문구 — 안전 문구다. 화면은 src/i18n 의 safetyPair() 규칙으로 보여준다 (spec 4.17).
@@ -363,5 +378,13 @@ export const REASON_TEXT = {
     en: 'Excluded — no menu information to check against your dietary conditions',
     ja: '食事の条件を判断するためのメニュー情報がないため除外しました',
     zh: '没有可用于判断饮食条件的菜单信息，已排除',
+  },
+
+  // 복귀 마감이 지난 외출 (설계서 2026-11-06 overdue-return 5절)
+  [REASON.OUTING_OVERDUE]: {
+    ko: '일정이 바뀌어 지금 외출이 복귀 마감을 맞출 수 없습니다',
+    en: 'A change means this outing can no longer make its return time',
+    ja: '予定が変わり、今の外出は帰着期限に間に合いません',
+    zh: '日程变更，本次外出已无法按时返回',
   },
 };

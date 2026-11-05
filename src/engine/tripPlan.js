@@ -51,6 +51,7 @@ const LIFTABLE_CAUSES = Object.freeze([
   REASON.RISK_SIGNAL,
   REASON.PLAN_REVOKED,
   REASON.PLAN_EXPIRED,
+  REASON.OUTING_OVERDUE,
   REASON.APPOINTMENT_DELAYED,
   REASON.CLOSED,
   REASON.WEATHER_BLOCKED,
@@ -127,12 +128,38 @@ function planLostDuringOuting(prevDay, stay, date, nowMin) {
 }
 
 /**
+ * 외출 중 재계획으로 이미 늦은 환자 외출 (설계서 2026-11-06 overdue-return 4.3, 경우 2).
+ * 이전 오늘 일정(prevDay)의 환자 외출 중 이미 출발했고
+ *   - 지금 외출 중(planLostDuringOuting 과 같은 기준: 출발 <= 지금 < occupancyEnd)이거나
+ *   - 이전 일정이 이 원인(OUTING_OVERDUE)으로 즉시 복귀 중이고 그 외출의 여유가 음수였던
+ * 외출을 고른다. 그중 다시 계산한 하루(day)에 같은 id 로 남아 있고 여유가 음수인 첫 외출의 id 를 돌려준다.
+ * 같은 외출인지는 출발 시각까지 본다: 외출 id 는 출발 순서로 다시 매겨지고, 이미 출발한 외출의 출발 시각은 바뀌지 않는다.
+ * 여유가 음수라는 것은 남은 정거장을 줄이고도 마감을 맞출 수 없다는 뜻이다(dayContext.js overdueSafe).
+ * 시간이 그냥 흘러서는 켜지지 않는다: 외출 중이면 마감 전이고, 입력이 같으면 여유도 같다.
+ * @param {{prevDay: object|null, day: object|null, nowMin: number}} args
+ * @returns {string|null}
+ */
+export function overdueOutingId({ prevDay, day, nowMin }) {
+  if (!prevDay || !day || !Number.isFinite(nowMin)) return null;
+  const held = prevDay.returnNow === true && (prevDay.reasons ?? []).includes(REASON.OUTING_OVERDUE);
+  const watched = (prevDay.outings ?? []).filter(
+    (o) => toMinutes(o.departAt) <= nowMin && (nowMin < occupancyEnd(o) || (held && o.slackMin < 0)),
+  );
+  for (const o of watched) {
+    const now = (day.outings ?? []).find((x) => x.id === o.id && x.departAt === o.departAt);
+    if (now && now.slackMin < 0) return o.id;
+  }
+  return null;
+}
+
+/**
  * 오늘 returnNow 의 원인 (spec 4.9, 규칙 13·55).
  * - 환자 호출 사건이 오늘 사건 목록에 있다 → PATIENT_RECALLED (사건 초기화로 목록에서 빠지면 풀린다)
  * - 이전에 철회·만료로 켜졌다 → 유효한 지침이 다시 오늘을 덮기 전까지 유지
  * - 외출 중 철회·만료가 지금 감지됐다
+ * - 외출 중이던 환자 외출이 다시 계산한 하루(probeDay)에서 여유가 음수다 → OUTING_OVERDUE (경우 2, overdueOutingId)
  */
-function returnNowCauses({ fold, prevDay, stay, date, nowMin }) {
+function returnNowCauses({ fold, prevDay, stay, date, nowMin, probeDay = null }) {
   const causes = [];
   if (fold.patientRecalled) causes.push(REASON.PATIENT_RECALLED);
   if (prevDay?.returnNow === true && !hospitalPlanCoversDate(stay, date)) {
@@ -140,6 +167,7 @@ function returnNowCauses({ fold, prevDay, stay, date, nowMin }) {
   }
   const lost = planLostDuringOuting(prevDay, stay, date, nowMin);
   if (lost) causes.push(lost);
+  if (probeDay && overdueOutingId({ prevDay, day: probeDay, nowMin })) causes.push(REASON.OUTING_OVERDUE);
   return uniq(causes);
 }
 
@@ -217,7 +245,8 @@ function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons,
       ...(adopt ? fresh.mealSlots.filter((m) => keptStopIds.has(m.stopId)) : []),
       ...planned.mealSlots,
     ],
-    blocks: [...(prevDay?.blocks ?? []), ...planned.blocks],
+    // 되살린 외출이 병원에서 끝나면 그 병원 일정 블록은 fresh 에 있다(hospitalTargetId 가 복귀 마감과 같은 시작으로 찾는다)
+    blocks: [...(prevDay?.blocks ?? []), ...(adopt ? fresh.blocks : []), ...planned.blocks],
   };
   const repaired = repairDay({ context, dayRef, outings: [...keptP, ...futureP], guardianOutings: [...keptG, ...futureG], nowMin, emptyReasons, log });
   return { ...repaired, planned };
@@ -331,10 +360,7 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
   if (!isToday && !prevDay) return fresh;
 
   const context = buildDayContext({ stay: shifted, date, ...common });
-  const causes = isToday ? returnNowCauses({ fold, prevDay, stay, date, nowMin }) : [];
-  const emptyReasons = isToday ? [...(fold.riskSignal ? [REASON.RISK_SIGNAL] : []), ...causes] : [];
   const appointmentMoved = isToday && fold.appointmentDeltaMin !== 0 && context.apptEvents.length > 0;
-  const eventReasons = [...emptyReasons, ...(appointmentMoved ? [REASON.APPOINTMENT_DELAYED] : [])];
 
   // 원인 표시: 사건·예보가 계속되는 동안 그 원인이 일정을 바꿨으면 날짜 사유에 남긴다 — 원인이 풀린 것을 알아채는 데 쓴다
   const markerActive = {
@@ -344,23 +370,6 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
   };
   const markersFor = (lg) =>
     Object.keys(markerActive).filter((r) => markerActive[r] && (lg.reasons.has(r) || (prevDay?.reasons ?? []).includes(r)));
-  const buildDay = (isStructural, result, lg) => {
-    let d = assembleDay({
-      context,
-      fresh,
-      date,
-      repaired: result,
-      source: isStructural ? result.planned : prevDay,
-      structural: isStructural,
-      nowMin,
-      emptyReasons,
-      log: lg,
-    });
-    if (isToday && emptyReasons.length > 0) d = { ...d, dayState: STATE.NO_TOURISM };
-    d = { ...d, reasons: uniq([...eventReasons, ...markersFor(lg), ...d.reasons]) };
-    if (isToday) d = { ...d, returnNow: causes.length > 0 };
-    return d;
-  };
   const carry = (from) => {
     const to = newRepairLog();
     from.reasons.forEach((r) => to.reasons.add(r));
@@ -369,41 +378,73 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
     return to;
   };
 
-  // 최소 변경: 확정 일정이 있으면 고친다. 고칠 것이 없으면(외출이 없음) 새로 만든다(오늘은 지금 이후)
-  let log = newRepairLog();
-  let structural = forceFresh || !prevDay || needsFresh(prevDay, fresh);
-  let repaired = null;
-  if (!structural) {
-    repaired = repairDay({
-      context,
-      dayRef: prevDay,
-      outings: prevDay.outings,
-      guardianOutings: prevDay.guardianOutings,
-      nowMin,
-      emptyReasons,
-      log,
-    });
-    if (emptyReasons.length === 0 && needsFresh(repaired, fresh)) {
-      // 고친 결과 외출이 하나도 남지 않았다 — 새로 만든다(같은 입력이면 다음 재계획도 같은 결과)
-      log = carry(log);
-      structural = true;
-    }
-  }
-  if (structural) repaired = planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log });
-  let day = buildDay(structural, repaired, log);
+  /** 즉시 복귀 원인(causes)으로 하루를 만든다 */
+  const attempt = (causes) => {
+    const emptyReasons = isToday ? [...(fold.riskSignal ? [REASON.RISK_SIGNAL] : []), ...causes] : [];
+    const eventReasons = [...emptyReasons, ...(appointmentMoved ? [REASON.APPOINTMENT_DELAYED] : [])];
+    const buildDay = (isStructural, result, lg) => {
+      let d = assembleDay({
+        context,
+        fresh,
+        date,
+        repaired: result,
+        source: isStructural ? result.planned : prevDay,
+        structural: isStructural,
+        nowMin,
+        emptyReasons,
+        log: lg,
+      });
+      if (isToday && emptyReasons.length > 0) d = { ...d, dayState: STATE.NO_TOURISM };
+      d = { ...d, reasons: uniq([...eventReasons, ...markersFor(lg), ...d.reasons]) };
+      if (isToday) d = { ...d, returnNow: causes.length > 0 };
+      return d;
+    };
 
-  // 원인이 풀렸다(사건 초기화, 유효한 지침이 다시 덮음, 예보가 풀림) — 그 원인으로 비우거나 줄인 남은 시간을
-  // 지금 이후로 다시 짠다. 이미 출발한 외출과 도착한 정거장은 그대로다(spec 4.9 returnNow 해제·사건 초기화)
-  let lifted = [];
-  if (!structural && prevDay && emptyReasons.length === 0) {
-    lifted = LIFTABLE_CAUSES.filter((r) => (prevDay.reasons ?? []).includes(r) && !day.reasons.includes(r));
-    if (lifted.length > 0) {
-      log = carry(log);
-      structural = true;
-      repaired = planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log, adopt: true });
-      day = buildDay(true, repaired, log);
+    // 최소 변경: 확정 일정이 있으면 고친다. 고칠 것이 없으면(외출이 없음) 새로 만든다(오늘은 지금 이후)
+    let log = newRepairLog();
+    let structural = forceFresh || !prevDay || needsFresh(prevDay, fresh);
+    let repaired = null;
+    if (!structural) {
+      repaired = repairDay({
+        context,
+        dayRef: prevDay,
+        outings: prevDay.outings,
+        guardianOutings: prevDay.guardianOutings,
+        nowMin,
+        emptyReasons,
+        log,
+      });
+      if (emptyReasons.length === 0 && needsFresh(repaired, fresh)) {
+        // 고친 결과 외출이 하나도 남지 않았다. 새로 만든다(같은 입력이면 다음 재계획도 같은 결과)
+        log = carry(log);
+        structural = true;
+      }
     }
+    if (structural) repaired = planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log });
+    const day = buildDay(structural, repaired, log);
+
+    // 원인이 풀렸다(사건 초기화, 유효한 지침이 다시 덮음, 예보가 풀림). 그 원인으로 비우거나 줄인 남은 시간을
+    // 지금 이후로 다시 짠다. 이미 출발한 외출과 도착한 정거장은 그대로다(spec 4.9 returnNow 해제·사건 초기화)
+    const lifted =
+      !structural && prevDay && emptyReasons.length === 0
+        ? LIFTABLE_CAUSES.filter((r) => (prevDay.reasons ?? []).includes(r) && !day.reasons.includes(r))
+        : [];
+    if (lifted.length === 0) return { emptyReasons, eventReasons, lifted, log, day };
+    const liftLog = carry(log);
+    const relaid = planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log: liftLog, adopt: true });
+    return { emptyReasons, eventReasons, lifted, log: liftLog, day: buildDay(true, relaid, liftLog) };
+  };
+
+  let pass = attempt(isToday ? returnNowCauses({ fold, prevDay, stay, date, nowMin }) : []);
+  if (isToday && prevDay) {
+    // 경우 2: 다시 계산한 하루(probeDay)에서 외출 중이던 외출이 이미 늦었으면 그 원인으로 한 번 더 만든다.
+    // probeDay 는 해제 흐름까지 거친 결과다. 이미 늦은 외출은 마감이 그때 시각으로 당겨져 있어(overdueSafe) 다음
+    // 재계획에서 '돌아온 외출'로 고정된다. 해제 흐름(adopt)이 원인 없는 하루에서 그 외출을 되살려야 되돌린 변경이 보인다
+    const causes = returnNowCauses({ fold, prevDay, stay, date, nowMin, probeDay: pass.day });
+    if (causes.includes(REASON.OUTING_OVERDUE)) pass = attempt(causes);
   }
+  const { emptyReasons, eventReasons, lifted, log } = pass;
+  let { day } = pass;
   if (!prevDay) return day;
 
   const delta = computeDayDelta(prevDay, day, {

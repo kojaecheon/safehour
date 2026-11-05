@@ -30,9 +30,8 @@ import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
 import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
+import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
 import { isStayDate } from '@/src/stay/stay.js';
-
-const RETURN_CAUSES = ['PATIENT_RECALLED', 'PLAN_REVOKED', 'PLAN_EXPIRED'];
 
 function nextDate(date) {
   const d = new Date(`${date}T00:00:00Z`);
@@ -354,7 +353,7 @@ export default function TodayPage() {
         <ReturnSheet
           day={stored}
           stay={stay}
-          cause={(stored?.reasons ?? []).find((r) => RETURN_CAUSES.includes(r)) ?? null}
+          cause={(stored?.reasons ?? []).find((r) => RETURN_NOW_CAUSES.includes(r)) ?? null}
           onClose={() => setSheet(null)}
         />
       )}
