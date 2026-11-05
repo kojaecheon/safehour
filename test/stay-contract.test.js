@@ -43,7 +43,7 @@ describe('spec 5.2 새 사유 코드', () => {
   });
 
   test('기존 사유 코드는 그대로다', () => {
-    for (const code of ['MEDICATION_WINDOW', 'PLAN_UNCONFIRMED_UPDATE', 'STALE_HOSPITAL_CONDITION', 'SERVICE_PAUSED']) {
+    for (const code of ['MEDICATION_WINDOW', 'PLAN_UNCONFIRMED_UPDATE', 'SERVICE_PAUSED']) {
       assert.equal(REASON[code], code);
     }
   });

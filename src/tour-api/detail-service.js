@@ -291,24 +291,6 @@ export async function fetchCandidateDetails(candidate, { useCache = true, lang }
   return normalizeCandidateDetails({ ...locales, lang: SERVICE_LANG[selected ?? "korean"] });
 }
 
-/**
- * 호출량 절약을 위해 판정이 끝난 상위 추천에만 상세 API를 연결한다.
- */
-export async function enrichRecommendedCourse(
-  course,
-  { limit = 3, useCache = true } = {},
-) {
-  const selected = course.slice(0, Math.max(0, Number(limit) || 0));
-  const enriched = await Promise.all(
-    selected.map(async (candidate) => ({
-      ...candidate,
-      details: await fetchCandidateDetails(candidate, { useCache }),
-    })),
-  );
-
-  return [...enriched, ...course.slice(selected.length)];
-}
-
 /** 국문 소개정보를 이미 실은 후보인가 — 다시 부르지 않는다 */
 function hasIntro(candidate) {
   const metadata = candidate?.sourceMetadata ?? {};

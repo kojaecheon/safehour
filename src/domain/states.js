@@ -89,8 +89,6 @@ export const STATE_MESSAGE = {
 
 /** 상태 전이 사유 코드 — 사용자에게 "왜 바뀌었는지" 설명하기 위함 */
 export const REASON = {
-  NO_HOSPITAL_CONDITION: 'NO_HOSPITAL_CONDITION',
-  STALE_HOSPITAL_CONDITION: 'STALE_HOSPITAL_CONDITION',
   CONFLICTING_CONDITION: 'CONFLICTING_CONDITION',
   RISK_SIGNAL: 'RISK_SIGNAL',
   FASTING_REQUIRED: 'FASTING_REQUIRED',
@@ -154,18 +152,6 @@ export const REASON = {
  * ja·zh: 검수 전 번역 — 사람 검수 필요 (검수 스위치가 켜지기 전까지 화면에는 영어로 대체된다)
  */
 export const REASON_TEXT = {
-  [REASON.NO_HOSPITAL_CONDITION]: {
-    ko: '병원 주의조건이 입력되지 않았습니다',
-    en: 'Hospital conditions not provided',
-    ja: '病院の注意条件が入力されていません',
-    zh: '尚未输入医院注意条件',
-  },
-  [REASON.STALE_HOSPITAL_CONDITION]: {
-    ko: '병원 주의조건이 최신이 아닙니다',
-    en: 'Hospital conditions are outdated',
-    ja: '病院の注意条件が最新ではありません',
-    zh: '医院注意条件不是最新的',
-  },
   [REASON.CONFLICTING_CONDITION]: {
     ko: '병원 조건이 서로 상충합니다',
     en: 'Hospital conditions conflict',

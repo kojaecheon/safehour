@@ -47,7 +47,6 @@ npm ci
 | --- | --- |
 | `npm run test:tour-api` | 관광공사 |
 | `npm run analyze:gangnam` | 관광공사 |
-| `npm run demo:live` | 관광공사 |
 | `npm run ai:eval` | Gemini (키가 있을 때만) |
 
 `npm run usage:snapshot`은 외부를 부르지 않고 쌓인 호출 기록을 모은다. 다만 결과를
