@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deliverToDevice } from '../lib/notify/device.js';
+import { deliverToDevice, notificationOpenUrl } from '../lib/notify/device.js';
 import { planNotifications } from '../lib/notify/schedule.js';
 import { attachSessionUpkeep, createSessionUpkeep } from '../components/pwa/sessionUpkeep.js';
 import { registerServiceWorker } from '../components/pwa/registerServiceWorker.js';
@@ -106,6 +106,24 @@ describe('기기 알림 한 장 (deliverToDevice)', () => {
     assert.deepEqual(Object.keys(options).sort(), ['body', 'data', 'icon', 'lang', 'tag']);
     assert.deepEqual(options.data, { url: '/today' });
     assert.equal(options.tag, ITEMS[0].id);
+  });
+
+  test('보호자 알림은 /g 로, 그 밖은 /today 로 연다', async () => {
+    assert.equal(notificationOpenUrl({ kind: 'COMPANION_RETURN_PASSED' }), '/g');
+    for (const kind of ['RETURN', 'RETURN_PASSED', 'LEAVE', 'AT_LODGING', 'AWAY', undefined]) {
+      assert.equal(notificationOpenUrl({ kind }), '/today');
+    }
+    assert.equal(notificationOpenUrl(null), '/today');
+    const reg = fakeRegistration();
+    const { FakeNotification } = fakeNotification();
+    const guardian = {
+      id: `${DATE}:COMPANION_RETURN_PASSED:15:30:0`,
+      kind: 'COMPANION_RETURN_PASSED',
+      key: 'notifications.companionReturnPassed',
+      time: '15:30',
+    };
+    await deliverToDevice(guardian, { store: fakeStore(), nav: fakeNav({ registration: reg }), NotificationImpl: FakeNotification });
+    assert.deepEqual(reg.shown[0].options.data, { url: '/g' });
   });
 
   test('서비스 워커가 없으면 생성자로 낸다', async () => {

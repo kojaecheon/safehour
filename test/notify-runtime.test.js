@@ -107,6 +107,9 @@ function setup({ plans = { [DATE]: plan(DATE) }, session = true } = {}) {
 
 afterEach(() => notifier?.stop());
 
+// 마감 지남(RETURN_PASSED)은 Task 3 이 따로 다룬다. 이 파일의 기존 단언은 60·30분 전 알림을 본다
+const returnItems = (items) => items.filter((i) => i.kind === NOTIFY_KIND.RETURN);
+
 describe('예약 만들기와 저장', () => {
   beforeEach(() => setup());
 
@@ -114,7 +117,7 @@ describe('예약 만들기와 저장', () => {
     notifier.start();
     const items = notifier.getItems();
     assert.deepEqual(
-      items.map((i) => i.at),
+      returnItems(items).map((i) => i.at),
       [iso('17:00'), iso('17:30')],
     );
     assert.deepEqual(store.readNotificationSchedule(), items);
@@ -144,7 +147,7 @@ describe('예약 만들기와 저장', () => {
     notifier.start();
     store.writeTripPlan({ engineVersion: 't', generatedAt: iso('06:00'), lang: 'ko', days: { [DATE]: plan(DATE, { returnBy: '19:00', departAt: '16:00' }) } });
     assert.deepEqual(
-      notifier.getItems().map((i) => i.at),
+      returnItems(notifier.getItems()).map((i) => i.at),
       [iso('18:00'), iso('18:30')],
     );
     assert.deepEqual(store.readNotificationSchedule(), notifier.getItems());
@@ -204,8 +207,8 @@ describe('알림 내기', () => {
     notifier.start();
     clock = kst('18:05');
     notifier.tick();
-    assert.deepEqual(delivered, []);
-    assert.equal(notifier.getBanner(), null);
+    assert.deepEqual(returnItems(delivered), []);
+    assert.notEqual(notifier.getBanner()?.kind, NOTIFY_KIND.RETURN);
   });
 
   test('배너는 닫을 수 있고, 목표 시각이 지나면 스스로 사라진다', () => {
@@ -221,7 +224,7 @@ describe('알림 내기', () => {
     assert.equal(notifier.getBanner()?.at, iso('17:30'));
     clock = kst('18:00');
     notifier.tick();
-    assert.equal(notifier.getBanner(), null);
+    assert.notEqual(notifier.getBanner()?.kind, NOTIFY_KIND.RETURN);
   });
 
   test('기기 알림이 실패해도 배너와 다음 예약은 계속된다', () => {
@@ -246,7 +249,7 @@ describe('알림 내기', () => {
     store.setOnline(false);
     assert.equal(store.getStatus().readOnly, true);
     notifier.start();
-    assert.equal(notifier.getItems().length, 2);
+    assert.equal(returnItems(notifier.getItems()).length, 2);
     clock = kst('17:30');
     notifier.tick();
     assert.equal(delivered.length, 1);
@@ -258,7 +261,7 @@ describe('알림 내기', () => {
     clock = kst('00:05', NEXT);
     notifier.tick();
     assert.deepEqual(
-      notifier.getItems().map((i) => i.at),
+      notifier.getItems().filter((i) => i.kind !== NOTIFY_KIND.RETURN_PASSED).map((i) => i.at),
       [iso('08:50', NEXT), iso('17:00', NEXT), iso('17:30', NEXT)],
     );
     clock = kst('08:50', NEXT);
@@ -272,7 +275,7 @@ describe('알림 내기', () => {
     assert.equal(timers.pending.size, 0);
     store.writeTripPlan({ engineVersion: 't', generatedAt: iso('06:00'), lang: 'ko', days: { [DATE]: plan(DATE, { returnBy: '20:00', departAt: '16:00' }) } });
     assert.deepEqual(
-      notifier.getItems().map((i) => i.at),
+      returnItems(notifier.getItems()).map((i) => i.at),
       [iso('17:00'), iso('17:30')],
       '멈춘 뒤에는 다시 만들지 않는다',
     );

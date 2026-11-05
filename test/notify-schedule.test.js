@@ -11,7 +11,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { NOTIFY_ITEM_FIELDS, NOTIFY_KIND, NOTIFY_TEXT_KEY, planNotifications } from '../lib/notify/schedule.js';
+import { LATE_NOTIFY_KINDS, NOTIFY_ITEM_FIELDS, NOTIFY_KIND, NOTIFY_TEXT_KEY, planNotifications } from '../lib/notify/schedule.js';
 import { NOTIFY_TITLE_KEY, notificationText } from '../lib/notify/text.js';
 import { DEFAULTS } from '../src/stay/defaults.js';
 import { LANGS, translate } from '../src/i18n/index.js';
@@ -119,7 +119,7 @@ describe('시점은 조정 가능한 기본값 한곳(DEFAULTS.notifications)에
       leads: { ...DEFAULTS.notifications, returnBeforeMin: [45] },
     });
     assert.deepEqual(
-      items.map((i) => i.at),
+      byKind(items, NOTIFY_KIND.RETURN).map((i) => i.at),
       [iso('17:15')],
     );
   });
@@ -129,7 +129,7 @@ describe('외출 복귀 마감 — 60분 전, 30분 전', () => {
   test('숙소로 돌아오는 외출: 17:00 과 17:30 에 "18:00까지 숙소로" 알림', () => {
     const items = planNotifications(dayPlan({ outings: [outing()] }), { nowMs: EARLY });
     assert.deepEqual(
-      items.map((i) => [i.kind, i.at, i.time, i.key]),
+      byKind(items, NOTIFY_KIND.RETURN).map((i) => [i.kind, i.at, i.time, i.key]),
       [
         [NOTIFY_KIND.RETURN, iso('17:00'), '18:00', NOTIFY_TEXT_KEY.RETURN_LODGING],
         [NOTIFY_KIND.RETURN, iso('17:30'), '18:00', NOTIFY_TEXT_KEY.RETURN_LODGING],
@@ -141,7 +141,7 @@ describe('외출 복귀 마감 — 60분 전, 30분 전', () => {
     const plan = dayPlan({
       outings: [outing({ returnBy: '14:00', departAt: '11:00', returnPlace: 'HOSPITAL', deadlineReason: 'RETURN_TIME' })],
     });
-    const items = planNotifications(plan, { nowMs: EARLY });
+    const items = byKind(planNotifications(plan, { nowMs: EARLY }), NOTIFY_KIND.RETURN);
     assert.equal(items.length, 2);
     for (const item of items) {
       assert.equal(item.key, NOTIFY_TEXT_KEY.RETURN_OTHER);
@@ -153,7 +153,7 @@ describe('외출 복귀 마감 — 60분 전, 30분 전', () => {
     const plan = dayPlan({ outings: [outing({ departAt: '17:10', returnBy: '18:00' })] });
     const items = planNotifications(plan, { nowMs: EARLY });
     assert.deepEqual(
-      items.map((i) => i.at),
+      byKind(items, NOTIFY_KIND.RETURN).map((i) => i.at),
       [iso('17:30')],
     );
   });
@@ -174,7 +174,7 @@ describe('외출 복귀 마감 — 60분 전, 30분 전', () => {
     });
     const items = planNotifications(plan, { nowMs: EARLY });
     assert.deepEqual(
-      items.map((i) => i.at),
+      byKind(items, NOTIFY_KIND.RETURN).map((i) => i.at),
       [iso('11:00'), iso('11:30'), iso('17:00'), iso('17:30')],
     );
   });
@@ -308,7 +308,7 @@ describe('중복 제거와 지난 시각', () => {
     });
     const items = planNotifications(plan, { nowMs: kst('17:10') });
     assert.deepEqual(
-      items.map((i) => i.at),
+      items.filter((i) => i.kind !== NOTIFY_KIND.RETURN_PASSED).map((i) => i.at),
       [iso('17:30'), iso('19:50')],
     );
   });
@@ -317,7 +317,7 @@ describe('중복 제거와 지난 시각', () => {
     const plan = dayPlan({ outings: [outing()] });
     const items = planNotifications(plan, { nowMs: kst('17:30') });
     assert.deepEqual(
-      items.map((i) => i.at),
+      byKind(items, NOTIFY_KIND.RETURN).map((i) => i.at),
       [iso('17:30')],
     );
   });
@@ -338,6 +338,78 @@ describe('중복 제거와 지난 시각', () => {
   });
 });
 
+describe('복귀 마감이 지남 (설계서 4.1·4.2)', () => {
+  test('환자 외출마다 returnBy 시각에 RETURN_PASSED 하나, expiresAt 은 +60분', () => {
+    const items = planNotifications(dayPlan({ outings: [outing()] }), { nowMs: EARLY });
+    assert.deepEqual(
+      byKind(items, NOTIFY_KIND.RETURN_PASSED).map(({ at, expiresAt, time, key }) => ({ at, expiresAt, time, key })),
+      [{ at: iso('18:00'), expiresAt: iso('19:00'), time: '18:00', key: NOTIFY_TEXT_KEY.RETURN_PASSED }],
+    );
+  });
+
+  test('시점 기본값: returnPassedGraceMin 60', () => {
+    assert.equal(DEFAULTS.notifications.returnPassedGraceMin, 60);
+  });
+
+  test('마감 뒤 60분 안이면 지난 시각이어도 남고, 60분이 지나면 없다', () => {
+    const plan = dayPlan({ outings: [outing()] });
+    assert.equal(byKind(planNotifications(plan, { nowMs: kst('18:59') }), NOTIFY_KIND.RETURN_PASSED).length, 1);
+    assert.equal(byKind(planNotifications(plan, { nowMs: kst('19:00') }), NOTIFY_KIND.RETURN_PASSED).length, 0);
+    assert.equal(byKind(planNotifications(plan, { nowMs: kst('18:59') }), NOTIFY_KIND.RETURN).length, 0);
+  });
+
+  test('LATE_NOTIFY_KINDS 는 동결된 두 종류', () => {
+    assert.deepEqual([...LATE_NOTIFY_KINDS], [NOTIFY_KIND.RETURN_PASSED, NOTIFY_KIND.COMPANION_RETURN_PASSED]);
+    assert.ok(Object.isFrozen(LATE_NOTIFY_KINDS));
+  });
+
+  test('보호자: companionDay 의 오늘 by 마다 COMPANION_RETURN_PASSED', () => {
+    const items = planNotifications(null, {
+      nowMs: EARLY,
+      companionDay: { date: DATE, patientReturn: [{ by: '15:30' }, { by: '19:00' }] },
+    });
+    assert.equal(items.length, 2);
+    for (const item of items) {
+      assert.equal(item.kind, NOTIFY_KIND.COMPANION_RETURN_PASSED);
+      assert.equal(item.key, NOTIFY_TEXT_KEY.COMPANION_RETURN_PASSED);
+      assert.deepEqual(Object.keys(item).sort(), [...NOTIFY_ITEM_FIELDS].sort());
+    }
+    assert.deepEqual(
+      items.map((i) => i.id),
+      [`${DATE}:COMPANION_RETURN_PASSED:15:30:0`, `${DATE}:COMPANION_RETURN_PASSED:19:00:0`],
+    );
+    assert.equal(items[0].expiresAt, iso('16:30'));
+  });
+
+  test('깨진 by 는 건너뛴다', () => {
+    const items = planNotifications(null, {
+      nowMs: EARLY,
+      companionDay: { date: DATE, patientReturn: [{ by: null }, { by: '25:00' }, { by: '' }, { by: '9:00' }, { by: '10:00' }, null] },
+    });
+    assert.deepEqual(items.map((i) => i.time), ['10:00']);
+    assert.deepEqual(planNotifications(null, { nowMs: EARLY, companionDay: { date: 'x', patientReturn: 'no' } }), []);
+  });
+
+  test('같은 시각이면 RETURN_PASSED > COMPANION_RETURN_PASSED > RETURN', () => {
+    const companionDay = { date: DATE, patientReturn: [{ by: '18:00' }] };
+    const other = outing({ id: 'o2', departAt: '10:00', returnBy: '18:30' });
+    const both = planNotifications(dayPlan({ outings: [outing(), other] }), { nowMs: EARLY, companionDay });
+    assert.deepEqual(both.filter((i) => i.at === iso('18:00')).map((i) => i.kind), [NOTIFY_KIND.RETURN_PASSED]);
+    const noOwn = planNotifications(dayPlan({ outings: [other] }), { nowMs: EARLY, companionDay });
+    assert.deepEqual(noOwn.filter((i) => i.at === iso('18:00')).map((i) => i.kind), [NOTIFY_KIND.COMPANION_RETURN_PASSED]);
+  });
+
+  test('KST 기준 날짜: companionDay.date 로 계산한다', () => {
+    const date = '2026-09-21';
+    const [item] = planNotifications(null, {
+      nowMs: EARLY,
+      companionDay: { date, patientReturn: [{ by: '00:30' }] },
+    });
+    assert.equal(item.at, iso('00:30', date));
+    assert.equal(item.id, `${date}:COMPANION_RETURN_PASSED:00:30:0`);
+  });
+});
+
 describe('입력이 없거나 깨졌을 때', () => {
   test('일정이 없으면 빈 목록', () => {
     for (const value of [null, undefined, {}, { date: 'nope' }]) {
@@ -353,7 +425,7 @@ describe('입력이 없거나 깨졌을 때', () => {
     });
     const items = planNotifications(plan, { nowMs: EARLY });
     assert.deepEqual(
-      items.map((i) => i.at),
+      byKind(items, NOTIFY_KIND.RETURN).map((i) => i.at),
       [iso('11:00'), iso('11:30')],
     );
   });
@@ -404,15 +476,18 @@ describe('규칙 47 — 알림 문구에 조건·병원·복약 정보가 없다
     ],
   });
 
+  const companionDay = { date: DATE, patientReturn: [{ by: '14:00' }] };
+  const plansOf = () => planNotifications(fullPlan, { nowMs: EARLY, companionDay });
+
   test('모든 종류의 알림이 만들어진다 (아래 검사가 빈 목록을 통과하지 않게)', () => {
-    const kinds = new Set(planNotifications(fullPlan, { nowMs: EARLY }).map((i) => i.kind));
+    const kinds = new Set(plansOf().map((i) => i.kind));
     assert.deepEqual([...kinds].sort(), Object.values(NOTIFY_KIND).sort());
-    const keys = new Set(planNotifications(fullPlan, { nowMs: EARLY }).map((i) => i.key));
+    const keys = new Set(plansOf().map((i) => i.key));
     assert.deepEqual([...keys].sort(), Object.values(NOTIFY_TEXT_KEY).sort());
   });
 
   test('예약 항목에는 허용 목록 필드만 있고, 일정의 문자열(장소·주소·병원 일정 id·숙소 id)이 없다', () => {
-    const items = planNotifications(fullPlan, { nowMs: EARLY });
+    const items = plansOf();
     assert.deepEqual([...NOTIFY_ITEM_FIELDS].sort(), ['at', 'expiresAt', 'id', 'key', 'kind', 'time']);
     for (const item of items) {
       assert.deepEqual(Object.keys(item).sort(), [...NOTIFY_ITEM_FIELDS].sort());
@@ -425,7 +500,7 @@ describe('규칙 47 — 알림 문구에 조건·병원·복약 정보가 없다
   });
 
   test('모든 언어 · 검수 스위치 켜짐/꺼짐에서 제목과 본문에 금지어가 없고 시각만 들어간다', () => {
-    const items = planNotifications(fullPlan, { nowMs: EARLY });
+    const items = plansOf();
     for (const item of items) {
       for (const lang of LANGS) {
         for (const reviewed of [

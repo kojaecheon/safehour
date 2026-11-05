@@ -17,6 +17,7 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
 import Icon from '@/components/ui/Icon.js';
 import { getNotifier } from '@/lib/notify/client.js';
+import { notificationOpenUrl } from '@/lib/notify/device.js';
 import { NOTIFY_TITLE_KEY } from '@/lib/notify/text.js';
 
 const NO_SUBSCRIPTION = () => {};
@@ -44,6 +45,7 @@ export default function NotificationBanner() {
 
   const dismiss = useCallback(() => getNotifier()?.dismiss(), []);
 
+  const openUrl = notificationOpenUrl(item);
   const lines = item ? pair(item.key, { time: item.time }) : null;
 
   return (
@@ -61,8 +63,8 @@ export default function NotificationBanner() {
             <p className="pwa-notify-secondary" lang={lines.secondary.lang}>
               {lines.secondary.text}
             </p>
-            <Link href="/today" className="pwa-notify-link" onClick={dismiss}>
-              {t('notifications.openToday')}
+            <Link href={openUrl} className="pwa-notify-link" onClick={dismiss}>
+              {t(openUrl === '/g' ? 'notifications.openGuardianCopy' : 'notifications.openToday')}
             </Link>
           </div>
           <button type="button" className="pwa-notify-close" onClick={dismiss} aria-label={t('notifications.dismiss')}>
