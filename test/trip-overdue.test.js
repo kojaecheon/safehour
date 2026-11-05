@@ -41,7 +41,7 @@ const patientStopsAfter = (day, hhmm) => day.outings.flatMap((o) => o.stops).fil
 const stopsAfter = (day, hhmm) => stopsOf(day).filter((s) => mins(s.arriveAt) > mins(hhmm));
 const count = (list, x) => list.filter((y) => y === x).length;
 
-describe('경우 2 — 외출 중 재계획으로 이미 늦으면 즉시 복귀 (OUTING_OVERDUE)', () => {
+describe('경우 2: 외출 중 재계획으로 이미 늦으면 즉시 복귀 (OUTING_OVERDUE)', () => {
   // 오늘 15:00 병원 일정 (trip-replan.test.js 'APPOINTMENT' 테스트의 withVisit)
   const withVisit = tripStay({}, {
     pace: 'NORMAL',
