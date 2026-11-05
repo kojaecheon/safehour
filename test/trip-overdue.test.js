@@ -128,6 +128,90 @@ describe('경우 2: 외출 중 재계획으로 이미 늦으면 즉시 복귀 (O
     assert.equal(count(day.reasons, REASON.OUTING_OVERDUE), 1);
     assert.equal(count(day.reasons, REASON.PATIENT_RECALLED), 1);
   });
+
+  // 해제는 저장된 외출을 지금 입력으로 다시 확인해 정한다. 즉시 복귀한 외출은 마감이 '지금'으로 당겨져
+  // 저장되므로, 새로 짠 하루에 똑같은 외출이 있어야만 풀리는 방식이면 아래 두 경우에 풀리지 않는다.
+  describe('되돌리면 풀린다: 앞선 사건이 있던 하루 (병원 복귀 외출)', () => {
+    const surge = { type: 'TRAFFIC_SURGE', extraMin: 20 };
+    const SURGE_AT = '13:00';
+    const before = replanToday(withVisit, base, { now: at(TODAY, SURGE_AT), events: [surge] });
+    const hosp = before.outings.find((o) => o.returnPlace === 'HOSPITAL');
+    assert.ok(hosp && mins(SURGE_AT) < mins(hosp.departAt), '교통 지연은 그 외출 출발 전에 들어온다');
+    const at2 = plus(hosp.stops[0].arriveAt, 1);
+    const appt = { type: 'APPOINTMENT', deltaMin: -(mins('15:00') - mins(at2) + 30) };
+    const held = replanToday(withVisit, withToday(base, before), { now: at(TODAY, at2), events: [surge, appt] });
+
+    test('전제: 교통 지연 뒤 외출 중 병원 일정이 앞당겨지면 켜진다', () => {
+      assert.equal(held.returnNow, true);
+      assert.ok(held.reasons.includes(REASON.OUTING_OVERDUE));
+      assert.ok(held.outings.find((o) => o.id === hosp.id).slackMin < 0);
+    });
+
+    test('사건을 모두 초기화하면 그 자리와 10분 뒤 모두 풀린다', () => {
+      for (const t of [at2, plus(at2, 10)]) {
+        const day = replanToday(withVisit, withToday(base, held), { now: at(TODAY, t), events: [] });
+        assert.equal(day.returnNow, false, t);
+        assert.ok(!day.reasons.includes(REASON.OUTING_OVERDUE), t);
+        assert.notEqual(day.dayState, STATE.NO_TOURISM, t);
+      }
+    });
+
+    test('병원 일정만 되돌려도 풀린다', () => {
+      const day = replanToday(withVisit, withToday(base, held), { now: at(TODAY, at2), events: [surge] });
+      assert.equal(day.returnNow, false);
+      assert.ok(!day.reasons.includes(REASON.OUTING_OVERDUE));
+    });
+
+    test('바뀐 일정이 그대로면 원래 마감이 지나도 유지한다', () => {
+      for (const t of [plus(at2, 42), plus(hosp.returnBy, 90)]) {
+        const day = replanToday(withVisit, withToday(base, held), { now: at(TODAY, t), events: [surge, appt] });
+        assert.equal(day.returnNow, true, t);
+        assert.ok(day.reasons.includes(REASON.OUTING_OVERDUE), t);
+        assert.equal(stopsAfter(day, t).length, 0, t);
+      }
+    });
+  });
+
+  describe('되돌리면 풀린다: 외출 끝(occupancyEnd)이 지난 뒤 (숙소 복귀 외출)', () => {
+    // 아침에 첫 외출의 첫 정거장이 휴무로 빠져 출발이 늦어진 하루
+    const first = base.days[TODAY].outings[0].stops[0].contentId;
+    const closure = { type: 'CLOSURE', closedIds: [first] };
+    const before = replanToday(withVisit, base, { now: EARLY, events: [closure] });
+    const lodging = before.outings[0];
+    assert.equal(lodging.returnPlace, 'LODGING');
+    const at2 = plus(lodging.stops[0].arriveAt, 1);
+    // 병원 일정을 그 외출 출발 전으로 당긴다
+    const appt = { type: 'APPOINTMENT', deltaMin: -240 };
+    assert.ok(mins('15:00') - 240 < mins(lodging.departAt));
+    const held = replanToday(withVisit, withToday(base, before), { now: at(TODAY, at2), events: [closure, appt] });
+    const kept = held.outings.find((o) => o.id === lodging.id);
+
+    test('전제: 외출 중 병원 일정이 출발 전으로 당겨지면 켜진다', () => {
+      assert.equal(held.returnNow, true);
+      assert.ok(held.reasons.includes(REASON.OUTING_OVERDUE));
+      assert.ok(kept && kept.slackMin < 0);
+    });
+
+    test('외출 끝이 지난 뒤 사건을 모두, 또는 병원 일정만 되돌려도 풀린다', () => {
+      for (const t of [fromMinutes(occupancyEnd(kept) + 5), plus(lodging.stops[0].leaveAt, 45)]) {
+        assert.ok(mins(t) > occupancyEnd(kept), t);
+        for (const evs of [[], [closure]]) {
+          const day = replanToday(withVisit, withToday(base, held), { now: at(TODAY, t), events: evs });
+          assert.equal(day.returnNow, false, `${t} ${evs.length}`);
+          assert.ok(!day.reasons.includes(REASON.OUTING_OVERDUE), `${t} ${evs.length}`);
+          assert.ok(patientStopsAfter(day, t).length > 0, `${t} ${evs.length} 지금 뒤를 다시 짠다`);
+        }
+      }
+    });
+
+    test('바뀐 일정이 그대로면 외출 끝이 지나도 유지한다', () => {
+      for (const t of [fromMinutes(occupancyEnd(kept) + 5), '16:00']) {
+        const day = replanToday(withVisit, withToday(base, held), { now: at(TODAY, t), events: [closure, appt] });
+        assert.equal(day.returnNow, true, t);
+        assert.ok(day.reasons.includes(REASON.OUTING_OVERDUE), t);
+      }
+    });
+  });
 });
 
 test('RETURN_NOW_CAUSES 와 사유 문구', () => {
