@@ -90,8 +90,6 @@ export const DEFAULTS = deepFreeze({
     appointmentBeforeMin: 15,
     /** 복귀 마감이 지난 알림을 마감 뒤 몇 분까지 늦게라도 내는가 (알림 시점 값, 안전 판정 기준이 아니다) */
     returnPassedGraceMin: 60,
-    /** 복귀 마감이 지난 알림을 마감 뒤 몇 분까지 늦게라도 내는가 (표시·알림 시점 값, 안전 판정 기준이 아니다) */
-    returnPassedGraceMin: 60,
   },
 
   stay: {
