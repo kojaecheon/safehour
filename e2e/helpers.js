@@ -22,7 +22,7 @@ export function kstDate(offsetDays = 0, nowMs = nowWithClock()) {
   return new Date(nowMs + KST_OFFSET_MS + offsetDays * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** 지금 KST 분(0–1439). nowMs 기본값은 시계 이동(setClock)을 반영한 지금이다 */
+/** 지금 KST 분(0~1439). nowMs 기본값은 시계 이동(setClock)을 반영한 지금이다 */
 export function kstMinutes(nowMs = nowWithClock()) {
   const d = new Date(nowMs + KST_OFFSET_MS);
   return d.getUTCHours() * 60 + d.getUTCMinutes();
@@ -81,6 +81,12 @@ function touchSeedCache(atMs) {
 }
 
 async function applyShift(shiftMs) {
+  // 같은 날 안에서만 옮긴다: 옮긴 지금의 KST 날짜가 실제 오늘과 다르면 세션 쿠키·체류 날짜·시드 일정 가정이 깨진다
+  const realToday = kstDate(0, Date.now());
+  const shiftedDay = kstDate(0, Date.now() + shiftMs);
+  if (shiftedDay !== realToday) {
+    throw new Error(`시계는 실제 오늘(KST ${realToday}) 안에서만 옮길 수 있다 (옮긴 날짜: ${shiftedDay})`);
+  }
   // 캐시 시각을 먼저 옮긴다: 옮기기 전 서버가 미래 시각 파일을 보면 '방금 씀'(나이 0)으로 읽어 안전하다
   touchSeedCache(Date.now() + shiftMs);
   writeServerOffset(shiftMs);
@@ -96,13 +102,22 @@ function kstToMs(kst) {
 }
 
 /**
- * 서버와 브라우저의 '지금'을 KST 로 정한 시각에 맞춘다. 가장 먼저(page.goto 보다 앞서) 부른다.
- * 시계는 멈추지 않고 그 시각부터 실제 속도로 흐른다.
+ * 서버와 브라우저의 '지금'을 KST 로 정한 시각에 맞춘다.
+ *
+ * - 시계는 멈추지 않는다. 정한 시각은 '옮긴 출발점'이고 그때부터 양쪽 모두 실제 속도로 흐른다.
+ *   그러니 '복귀 마감 1분 전'으로 맞추면 60초가 안 돼 저절로 넘어간다. 여유를 2~3분 두거나 advanceClock 으로 보낸다.
+ * - 브라우저는 서버보다 약 400ms 늦게 따라온다(서버 shim 이 250ms 간격으로 파일을 읽는다). 초 단위 경계 단언에는 여유를 둔다.
+ * - 가장 먼저, page.goto·startTrip 보다 앞서 부른다(이미 이동한 페이지에서 처음 부르면 오류).
+ * - 같은 KST 날짜 안(실제 오늘)에서만 옮긴다. 다른 날짜면 오류.
+ * - page.clock 이 심기면 앱의 타이머는 가짜 시계 위에서 돈다. 실제 대기 대신 advanceClock 을 쓴다.
  * @param {import('@playwright/test').Page} page
- * @param {{kst: string}} when 'YYYY-MM-DDTHH:MM' (한국 시각). 같은 날 안에서 옮긴다: `${kstDate(0)}T10:00`
+ * @param {{kst: string}} when 'YYYY-MM-DDTHH:MM' (한국 시각): `${kstDate(0)}T10:00`
  */
 export async function setClock(page, { kst }) {
   const target = kstToMs(kst);
+  if (!clockInstalled.has(page) && page.url() !== 'about:blank') {
+    throw new Error(`setClock 은 page.goto·startTrip 보다 먼저 불러야 한다 (현재 주소: ${page.url()})`);
+  }
   await applyShift(target - Date.now());
   if (clockInstalled.has(page)) await page.clock.setSystemTime(target);
   else {
@@ -112,8 +127,8 @@ export async function setClock(page, { kst }) {
 }
 
 /**
- * 서버와 브라우저의 시계를 ms 만큼 함께 앞으로 보낸다. 브라우저는 page.clock.fastForward 로 가며
- * 밀린 타이머가 한 번씩 돈다. 사이마다 타이머를 모두 돌려야 하면 { run: true } (page.clock.runFor).
+ * 서버와 브라우저의 시계를 ms 만큼 함께 앞으로 보낸다. 기본은 page.clock.fastForward 라 밀린 타이머가 한 번만 돈다.
+ * 앱의 분 단위 틱이 매번 돌아야 하면 { run: true } (page.clock.runFor, 긴 구간은 느리다). 같은 KST 날짜를 넘으면 오류.
  * @param {import('@playwright/test').Page} page
  * @param {number} ms
  * @param {{run?: boolean}} [options]
