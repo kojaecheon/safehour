@@ -5,7 +5,8 @@
 //   added     들어온 곳        after 에만 있는 정거장 (대체로 짝지어진 것은 빼고)
 //   replaced  대체된 곳        같은 역할·같은 종류(식사/일반)이고 시간이 겹치거나 같은 외출인 빠진 곳→들어온 곳
 //   shortened 줄어든 곳        양쪽에 있고 체류가 줄어든 정거장
-//   cancelledOutings           정거장이 모두 빠진(대체도 없는) before 외출
+//   cancelledOutings           정거장이 모두 빠진(대체도 없는) before 외출. 같은 외출(같은 id·출발 시각)이 after 에
+//                              정거장 0개로 남아 있으면(이미 출발한 외출, dayRepair.js) 취소가 아니다: 빠진 곳·새 마감으로 보인다
 //   newDeadlines               마감(returnBy·복귀 장소)이 바뀌었거나 새로 생긴 외출, 또는 복귀 여유가 음수가 된 외출
 //   stateChanged / before / after, reasons, hasVisibleChange, seen=false
 // 정거장 id 는 `${date}:${role}:${contentId}` 로 결정적이므로 같은 장소는 같은 id 다.
@@ -137,8 +138,16 @@ export function computeDayDelta(before, after, { reasons = [], requiredStopIds =
   ];
 
   const goneSet = new Set(goneEntries.map((e) => e.stop.id));
+  const stillOut = (role, outing) =>
+    afterOutings.some((a) => a.role === role && a.outing.id === outing.id && a.outing.departAt === outing.departAt);
   const cancelledOutings = beforeOutings
-    .filter(({ outing }) => outing.stops.length > 0 && outing.stops.every((s) => goneSet.has(s.id)) && outing.stops.some((s) => removedSet.has(s.id)))
+    .filter(
+      ({ role, outing }) =>
+        outing.stops.length > 0 &&
+        outing.stops.every((s) => goneSet.has(s.id)) &&
+        outing.stops.some((s) => removedSet.has(s.id)) &&
+        !stillOut(role, outing),
+    )
     .map(({ outing }) => outing.id);
 
   // 새 마감: after 외출마다 짝이 되는 before 외출(같은 정거장·대체 짝, 없으면 같은 id)과 비교한다

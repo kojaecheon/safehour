@@ -443,7 +443,8 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
   // 지금 시각을 쓰지 않으므로 시간만 흘러서는 값이 바뀌지 않는다. 병원은 저장된 마감(당겨진 시각)이 아니라 출발 시각이 든
   // 창의 병원 일정으로 찾는다. 출발 시각을 둘 창이 없으면(옮긴 블록이 출발을 덮음, 환자 외출이 막힘) null 이다
   const heldSlack = (o) => {
-    const at = context.patientAllowed && o.stops.length > 0 ? patientDeadlineAt(context, toMinutes(o.departAt), o.returnPlace) : null;
+    // 정거장 0개 외출(이동 중에 비운 외출)도 같은 식으로 다시 잰다(manualEvaluation 이 숙소에서 복귀 장소까지로 계산)
+    const at = context.patientAllowed ? patientDeadlineAt(context, toMinutes(o.departAt), o.returnPlace) : null;
     if (!at) return null;
     return assembleOuting(manualEvaluation(context, 'P', o, o.stops, at.returnPoint), outingMeta(context, 'P', { id: o.id, deadline: at })).slackMin;
   };

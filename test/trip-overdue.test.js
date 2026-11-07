@@ -214,6 +214,75 @@ describe('경우 2: 외출 중 재계획으로 이미 늦으면 즉시 복귀 (O
   });
 });
 
+describe('경우 2: 이동 중(첫 장소 도착 전)인 외출도 즉시 복귀 (findings 10)', () => {
+  // 오늘 15:00 병원 일정 (위 describe 와 같은 withVisit). 병원으로 돌아가는 외출이 출발했고 첫 정거장에는 아직 도착하지 않았다
+  const withVisit = tripStay({}, {
+    pace: 'NORMAL',
+    appointments: [
+      { id: 'A-PROC', hospitalId: 'H1', type: 'PROCEDURE', date: '2026-10-04', start: '09:00', source: 'USER' },
+      { id: 'A-VISIT', hospitalId: 'H1', type: 'VISIT', date: TODAY, start: '15:00', source: 'USER' },
+    ],
+  });
+  const base = plan(withVisit);
+  const outing = base.days[TODAY].outings.find((o) => o.returnPlace === 'HOSPITAL');
+  assert.ok(outing && outing.stops.length > 0, '병원으로 돌아가는 외출이 있어야 한다');
+  // 출발 + 7분: 출발했고 첫 정거장 도착 전이다
+  const T = plus(outing.departAt, 7);
+  const now = at(TODAY, T);
+  assert.ok(mins(T) < mins(outing.stops[0].arriveAt), 'T 는 첫 정거장 도착 전이다');
+  // 병원 일정을 출발 23분 전으로 당긴다 (보고된 재현: 13:33 출발, 13:47 도착, 13:40 에 병원 일정 13:10)
+  const events = [{ type: 'APPOINTMENT', deltaMin: -(mins('15:00') - mins(outing.departAt) + 23) }];
+  const overdue = replanToday(withVisit, base, { now, events });
+  const kept = overdue.outings.find((o) => o.id === outing.id);
+
+  test('이동 중(첫 장소 도착 전)에 병원 일정이 앞당겨지면 즉시 복귀: 외출은 정거장 0개로 남고 OUTING_OVERDUE', () => {
+    assert.equal(overdue.returnNow, true);
+    assert.ok(overdue.reasons.includes(REASON.OUTING_OVERDUE));
+    assert.equal(overdue.dayState, STATE.NO_TOURISM);
+    assert.ok(kept, '이동 중인 그 외출은 취소되지 않고 남는다');
+    assert.equal(kept.departAt, outing.departAt);
+    assert.equal(kept.stops.length, 0, '남은 정거장은 비운다');
+    assert.ok(kept.slackMin < 0);
+    assert.equal(kept.returnPlace, outing.returnPlace, '복귀 장소(병원)는 그대로다');
+    assert.equal(kept.returnPlace, 'HOSPITAL');
+    assert.equal(patientStopsAfter(overdue, T).length, 0, '지금 뒤 환자 정거장이 없다');
+    assert.equal(stopsAfter(overdue, T).length, 0);
+    assert.ok(overdue.delta.reasons.includes(REASON.OUTING_OVERDUE));
+    // 전후 비교: 그 외출은 '취소된 외출'이 아니다(남아 있다). 비운 정거장은 빠진 곳, 당겨진 마감은 새 마감으로 보인다
+    assert.ok(!overdue.delta.cancelledOutings.includes(outing.id));
+    assert.ok(outing.stops.every((s) => overdue.delta.removed.includes(s.id)));
+    assert.ok(overdue.delta.newDeadlines.some((d) => d.outingId === outing.id && d.returnBy === kept.returnBy));
+    assert.equal(overdueOutingId({ prevDay: base.days[TODAY], day: overdue, nowMin: mins(T) }), outing.id);
+  });
+
+  test('바뀐 일정이 그대로면 60분 뒤에도 유지한다', () => {
+    const later = plus(T, 60);
+    const day = replanToday(withVisit, withToday(base, overdue), { now: at(TODAY, later), events });
+    assert.equal(day.returnNow, true);
+    assert.ok(day.reasons.includes(REASON.OUTING_OVERDUE));
+    assert.equal(day.dayState, STATE.NO_TOURISM);
+    assert.equal(stopsAfter(day, later).length, 0);
+  });
+
+  test('사건을 초기화하면 풀리고 지금 이후를 다시 짠다', () => {
+    const day = replanToday(withVisit, withToday(base, overdue), { now, events: [] });
+    assert.equal(day.returnNow, false);
+    assert.ok(!day.reasons.includes(REASON.OUTING_OVERDUE));
+    assert.notEqual(day.dayState, STATE.NO_TOURISM);
+    assert.ok(patientStopsAfter(day, T).length > 0, '지금 뒤 환자 정거장이 다시 생긴다');
+  });
+
+  test('바뀐 것에 영향받지 않은 이동 중 외출은 취소하지도, 즉시 복귀를 켜지도 않는다', () => {
+    const day = replanToday(withVisit, base, { now, events: [{ type: 'TRAFFIC_SURGE', extraMin: 5 }] });
+    assert.equal(day.returnNow, false);
+    assert.ok(!day.reasons.includes(REASON.OUTING_OVERDUE));
+    const same = day.outings.find((o) => o.id === outing.id && o.departAt === outing.departAt);
+    assert.ok(same, '그 외출은 남는다');
+    assert.ok(same.stops.length > 0, '정거장도 남는다');
+    assert.ok(same.slackMin >= 0);
+  });
+});
+
 test('RETURN_NOW_CAUSES 와 사유 문구', () => {
   assert.deepEqual(RETURN_NOW_CAUSES, [REASON.PATIENT_RECALLED, REASON.PLAN_REVOKED, REASON.PLAN_EXPIRED, REASON.OUTING_OVERDUE]);
   assert.ok(Object.isFrozen(RETURN_NOW_CAUSES));
