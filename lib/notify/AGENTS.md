@@ -34,7 +34,9 @@
   가장 최근에 가져온 보호자 사본의 오늘(KST) 하루에 담긴 환자 복귀 마감). 마감 시각에 울리고, 늦게 깨어나도
   `expiresAt` = 마감 + 60분까지는 낸다. 때가 된 id 는 밀려서 내지 않은 것까지 모두 저장소 `overdueSeen` 에 남겨,
   앱을 다시 열어도 다시 내지 않는다.
-- 즉시 복귀 중인 날(`dayPlan.returnNow`)에는 `RETURN_PASSED` 를 만들지 않는다. 마감을 지금으로 당겨 놓은 값이라 실제 마감 시각이 아니다.
+- 외출 중 재계획으로 즉시 복귀가 켜져 마감이 지금으로 당겨진 외출만 `RETURN_PASSED` 를 만들지 않는다(`returnNow` 이고 사유에
+  `OUTING_OVERDUE`, 그 외출의 `slackMin < 0`). 그 마감은 실제 마감 시각이 아니다. 같은 날의 다른 외출, `PATIENT_RECALLED`·
+  `PLAN_REVOKED`·`PLAN_EXPIRED` 로 즉시 복귀가 켜진 날의 외출은 실제 마감이 남아 있으므로 그대로 만든다(`isOverdueClampedDay`).
 - 앱 안 배너는 스위치와 상관없이 늘 바뀐다. 스위치(`prefs.notifications`)는 기기 알림만 막는다.
 - 기기 알림을 누르면 서비스 워커가 알림 `data.url` 의 화면을 연다. 허용 목록(`/today`, `/g`) 밖이면 `/today` 를 연다.
   서비스 워커 없이 생성자로 낸 알림은 `onclick` 이 같은 허용 목록(`notificationClickPath`)으로 창을 옮긴다.
