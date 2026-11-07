@@ -1,12 +1,12 @@
 'use client';
 
-// 앱 안 알림 배너 (AX-319 · spec 4.13)
+// 앱 안 알림 배너 (AX-319 · docs/business-rules.md '알림과 카드')
 //
 // 예약한 시각이 되면 기기 알림과 **함께 항상** 이 배너가 뜬다 — 알림 권한이 없거나 설정에서 꺼 두었어도 뜬다.
 //   - 화면 데이터를 받지 않는다. 저장소의 오늘 일정으로 실행기(lib/notify)가 스스로 예약한다.
 //   - 이미 앱 전체에 한 번 달려 있다(app/layout.js → PwaRuntime). 화면이 따로 다시 달지 않는다 —
 //     두 번 달면 배너가 두 개 보인다.
-//   - 문구는 notifications 이름공간의 안전 문구다: 주 언어 + 병기 줄(safetyPair). 조건·병원·복약 정보가 없다(규칙 47).
+//   - 문구는 notifications 이름공간의 안전 문구다: 주 언어 + 병기 줄(safetyPair). 조건·병원·복약 정보가 없다(docs/business-rules.md '알림과 카드', lib/notify/AGENTS.md).
 //   - 닫을 수 있고, 목표 시각이 지나면 스스로 사라진다. 자리(aria-live)는 늘 DOM 에 남아 뜨는 순간 읽어 준다.
 //
 // 스타일: 공용 안내 상자(SEED Callout, .ui-callout.has-icon: 앞 20px info 아이콘 칸, 왼쪽 색 띠 없음, 설계서 5.6)를 쓴다.

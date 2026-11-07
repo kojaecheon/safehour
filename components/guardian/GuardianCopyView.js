@@ -1,6 +1,6 @@
 'use client';
 
-// 보호자 사본 보기 (AX-320 · spec 4.11, 4.18, 5.4)
+// 보호자 사본 보기 (AX-320 · docs/business-rules.md '보호자', docs/platform/IA_AND_FLOWS.md '보호자'·'보기 전용 상태')
 //
 // 가져온 스냅샷(허용 목록 필드만)을 그린다. 로그인 만료·오프라인에서도 그린다(보기 전용 안전 정보).
 //   - 맨 위: '○월 ○일 ○시 기준'(만든 시각, 한국 시각) + 자동으로 바뀌지 않는다는 고지 + 만료 시각
@@ -226,7 +226,7 @@ export default function GuardianCopyView({ snapshot, headingRef, notice }) {
   const { t, locale } = useLang();
   const asOf = kstStamp(snapshot.createdAt, locale);
   const expires = kstStamp(snapshot.expiresAt, locale);
-  // 번호는 스냅샷 내용과 무관하게 늘 119·1330 이다(spec 4.11)
+  // 번호는 스냅샷 내용과 무관하게 늘 119·1330 이다(docs/business-rules.md '보호자', 긴급 번호)
   const numbers = EMERGENCY_NUMBERS;
   const nowMs = useNowMs();
 

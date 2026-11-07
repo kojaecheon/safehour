@@ -1,11 +1,11 @@
-// 체류 전체 일정 조립과 재계획 (AX-307 · spec 4.9, 4.10 엔진 쪽, 6장 POST /api/itinerary/plan)
+// 체류 전체 일정 조립과 재계획 (AX-307 · docs/business-rules.md '전체 일정 확정과 변화 대응'·'사용자 편집', docs/contracts.md '`POST /api/itinerary/plan`')
 //
 // 순수·결정적 함수다. 시계·난수를 읽지 않는다 — 현재 시각(now)은 입력이다.
 // 판정은 하루 일정 엔진(planStayDay → planDay) 한 경로로만 한다. 이 모듈은 날짜를 순회하고,
 // 체류 중 1회 규칙·재계획 규칙·데모 사건·전후 비교·즉시 복귀·표시만 다시 쓰기를 맡는다.
 //
 // 날짜별 처리
-//   지난 날짜(< 오늘)   previous 가 있으면 그대로 돌려준다(재계획 규칙 2, 규칙 30). 없으면 새로 만든다.
+//   지난 날짜(< 오늘)   previous 가 있으면 그대로 돌려준다(재계획 규칙 2, docs/business-rules.md '전체 일정 확정과 변화 대응'). 없으면 새로 만든다.
 //   previous 가 있음    최소 변경(dayRepair.js): 확정 일정을 지금 입력으로 다시 판정해(게이트 1단계부터) 통과하고 맞는
 //                      정거장은 제자리에 두고, 통과하지 못한 정거장만 대체 → 체류 축소 → 제외 → 외출 취소 순으로 고친다.
 //                      오늘은 도착 시각이 지난 정거장과 이미 출발한 외출의 출발 시각을 건드리지 않는다.
@@ -14,7 +14,7 @@
 //   합친 하루도 외출·하루 정거장 한도(식사 포함)를 지킨다. 비운 식사 칸은 다시 채우지 않는다.
 //   병원 일정마다 병원에서 끝나는 외출은 하나다 — 병원 일정이 옮겨지면 그 외출의 마감만 옮긴다(새 외출을 더하지 않는다).
 //
-// 결정성·멱등(규칙 28·55): 오늘 사건은 받은 목록 전체를 접어 한 번에 적용하므로(tripEvents.js) 같은 사건을 다시 보내도
+// 결정성·멱등(docs/business-rules.md '하루 일정 생성'의 같은 입력이면 같은 결과, docs/platform/ITINERARY_RULES.md '데모 사건'): 오늘 사건은 받은 목록 전체를 접어 한 번에 적용하므로(tripEvents.js) 같은 사건을 다시 보내도
 // 결과가 같다. 고친 결과는 다시 고쳐도 그대로인 고정점이다. 변화가 없으면 전후 비교를 새로 만들지 않고 저장된 것을 둔다.
 // 사용자 편집(삭제·교체·비움)으로 생긴 변화는 '변경됨'으로 알리지 않는다. 보이는 변화에는 늘 원인 사유가 있다.
 
@@ -101,14 +101,14 @@ function started(stop, nowMin) {
   return toMinutes(stop.arriveAt) <= nowMin;
 }
 
-/** 오늘을 덮는 유효한(철회·만료 아님) 병원 지침이 있는가 — returnNow 해제 조건 (spec 4.9) */
+/** 오늘을 덮는 유효한(철회·만료 아님) 병원 지침이 있는가, returnNow 해제 조건 (docs/platform/IA_AND_FLOWS.md '즉시 복귀') */
 function hospitalPlanCoversDate(stay, date) {
   const consent = hasSensitiveConsent(stay);
   return (stay.periods ?? []).some((p) => p?.source === 'HOSPITAL' && periodAppliesOnDate(p, date, { consent }));
 }
 
 /**
- * 외출 중 지침 철회·만료 (spec 4.9 즉시 복귀, 규칙 13).
+ * 외출 중 지침 철회·만료 (docs/platform/IA_AND_FLOWS.md '즉시 복귀').
  * previous 오늘 일정에서 환자가 외출 중이고(출발했고 아직 돌아오지 않음), 그 일정이 쓴 병원 기간
  * (effective 출처)이 지금 철회·만료됐으면 원인을 돌려준다.
  * @returns {'PLAN_REVOKED'|'PLAN_EXPIRED'|null}
@@ -166,7 +166,7 @@ export function overdueOutingId({ prevDay, day, nowMin, heldSlack = null }) {
 }
 
 /**
- * 오늘 returnNow 의 원인 (spec 4.9, 규칙 13·55).
+ * 오늘 returnNow 의 원인 (docs/platform/IA_AND_FLOWS.md '즉시 복귀').
  * - 환자 호출 사건이 오늘 사건 목록에 있다 → PATIENT_RECALLED (사건 초기화로 목록에서 빠지면 풀린다)
  * - 이전에 철회·만료로 켜졌다 → 유효한 지침이 다시 오늘을 덮기 전까지 유지
  * - 외출 중 철회·만료가 지금 감지됐다
@@ -333,7 +333,7 @@ function assembleDay({ context, fresh, date, repaired, source, structural, nowMi
   };
 }
 
-/** previous 정거장 중 지금 게이트를 통과하지 못해 반드시 바뀌어야 하는 것 (규칙 31 확인용). 사용자가 지운 것은 뺀다 */
+/** previous 정거장 중 지금 게이트를 통과하지 못해 반드시 바뀌어야 하는 것 (docs/business-rules.md '전체 일정 확정과 변화 대응'의 '변화가 필요한데 전후 비교가 비면 실패' 확인용). 사용자가 지운 것은 뺀다 */
 function requiredStopIds(prevDay, context, nowMin, emptyAll) {
   const out = [];
   for (const [role, list] of [
@@ -458,7 +458,7 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
   let { log, day } = pass;
 
   // 원인이 풀렸다(사건 초기화, 유효한 지침이 다시 덮음, 예보가 풀림). 그 원인으로 비우거나 줄인 남은 시간을
-  // 지금 이후로 다시 짠다. 이미 출발한 외출과 도착한 정거장은 그대로다(spec 4.9 returnNow 해제·사건 초기화)
+  // 지금 이후로 다시 짠다. 이미 출발한 외출과 도착한 정거장은 그대로다(docs/platform/IA_AND_FLOWS.md '즉시 복귀'의 returnNow 해제·사건 초기화)
   let lifted = [];
   if (!structural && prevDay && emptyReasons.length === 0) {
     lifted = LIFTABLE_CAUSES.filter((r) => (prevDay.reasons ?? []).includes(r) && !day.reasons.includes(r));
@@ -512,7 +512,7 @@ function relabelStop(stop, byId) {
 }
 
 /**
- * 표시만 다시 쓰기 (spec 4.9 변화 원천 7, 6장 relabelOnly, 규칙 51).
+ * 표시만 다시 쓰기 (docs/business-rules.md '전체 일정 확정과 변화 대응': 언어 변경만 예외, docs/contracts.md '`POST /api/itinerary/plan`'의 relabelOnly).
  * 게이트·시각·상태를 다시 판정하지 않는다. 정거장의 제목·주소·표시 언어·'번역 필요' 표시와 언어별 원본 id 만
  * 새 언어 후보(contentId 로 매칭)에서 다시 채운다. ko 원문은 그대로다. 전후 비교를 만들지 않는다.
  */
@@ -535,7 +535,7 @@ export function relabelDay(day, candidates) {
 }
 
 /**
- * @typedef {object} PlanTripInput  spec 6장 POST /api/itinerary/plan 요청 + 서버가 준비한 외부 데이터
+ * @typedef {object} PlanTripInput  docs/contracts.md '`POST /api/itinerary/plan`' 요청 + 서버가 준비한 외부 데이터
  * @property {object} stay  PlanStay(또는 Stay) — validateStay 를 통과한 것
  * @property {Record<string, object[]> | ((lodgingId: string, date: string) => object[])} candidatesByLodging
  *   숙소 id → 관광 후보 모듈(normalizeTourCandidate) 후보 목록. 선택 언어(lang)로 정규화된 것.
@@ -547,18 +547,18 @@ export function relabelDay(day, candidates) {
  * @property {string[]} [dates]  없으면 체류 전체. 체류 밖 날짜는 무시
  * @property {Record<string, object>} [previous]  날짜 → 저장된 DayPlan. 있으면 delta 를 채운다
  * @property {Record<string, {pinned?: string[], deleted?: string[], clearedMeals?: Array<'LUNCH'|'DINNER'>}>} [edits]
- * @property {string[]} [usedContentIds]  요청하지 않은 날짜에 이미 배치된 contentId (규칙 29)
+ * @property {string[]} [usedContentIds]  요청하지 않은 날짜에 이미 배치된 contentId (docs/business-rules.md '하루 일정 생성': 같은 장소는 체류 중 한 번만)
  * @property {object[]} [events]  오늘 데모 사건 전체(누적) — 오늘에만 적용
  * @property {boolean} [relabelOnly]
  * @property {{TAXI?: object, TRANSIT?: object}} [estimators]  동기 이동 추정기 주입(기본: 폴백·대중교통 추정기)
  */
 
 /**
- * 체류 전체(또는 dates) 일정을 만든다 (spec 4.9, 6장).
+ * 체류 전체(또는 dates) 일정을 만든다 (docs/business-rules.md '전체 일정 확정과 변화 대응', docs/contracts.md '`POST /api/itinerary/plan`').
  * @param {PlanTripInput} input
  * @returns {{engineVersion: string, days: Record<string, object>}}
  * @throws {TypeError} now·stay 가 없음, 잘못된 사건
- * @throws {SilentReplanError} 변화가 필요한데 전후 비교가 빔(엔진 결함 — 규칙 31)
+ * @throws {SilentReplanError} 변화가 필요한데 전후 비교가 빔(엔진 결함, docs/business-rules.md '전체 일정 확정과 변화 대응')
  */
 export function planTrip(input) {
   return runPlan(input, { forceFresh: false });
@@ -598,7 +598,7 @@ function runPlan(input, { forceFresh }) {
   }
 
   const fold = foldDemoEvents(events ?? []);
-  // 체류 중 1회 규칙(규칙 29): 날짜 D 는 다른 날짜에 이미 둔 장소를 쓰지 않는다 —
+  // 체류 중 1회 규칙(docs/business-rules.md '하루 일정 생성'): 날짜 D 는 다른 날짜에 이미 둔 장소를 쓰지 않는다.
   // 요청하지 않은 날짜의 배치(usedContentIds·previous), 다른 요청 날짜의 확정 일정(previous), 이번에 먼저 만든 날짜.
   // 확정 일정을 예약해 두므로 오늘 사건으로 오늘을 고쳐도 다른 날짜의 장소를 가져가지 않는다(변화 원천 6: 오늘만).
   const external = new Set((usedContentIds ?? []).map(String));
@@ -633,7 +633,7 @@ function runPlan(input, { forceFresh }) {
 }
 
 /**
- * 다시 만들기 (spec 4.10): 범위의 고정·삭제·비움 기록을 지우고 새로 만든다. 지난 날짜는 다시 만들 수 없다.
+ * 다시 만들기 (docs/business-rules.md '사용자 편집'): 범위의 고정·삭제·비움 기록을 지우고 새로 만든다. 지난 날짜는 다시 만들 수 없다.
  * 오늘이 범위에 들면 도착 시각이 지난 정거장은 그대로다(재계획 규칙 2).
  * @param {PlanTripInput & {scope: 'DAY'|'FROM_TODAY', date?: string}} input  dates 는 무시한다(범위가 정한다)
  * @returns {{engineVersion: string, days: Record<string, object>, edits: Record<string, object>}}
@@ -694,7 +694,7 @@ function recomputeTruncated(outing, original, { stay, day, estimators = {} }) {
 }
 
 /**
- * 즉시 복귀 변환 (spec 4.9 즉시 복귀, 규칙 13) — 외출 중 지침 철회·만료(또는 환자 호출)를 기기에서 바로 반영한다.
+ * 즉시 복귀 변환 (docs/platform/IA_AND_FLOWS.md '즉시 복귀'): 외출 중 지침 철회·만료(또는 환자 호출)를 기기에서 바로 반영한다.
  * 오늘 남은 정거장(도착 시각이 지나지 않은 것)을 비우고 returnNow=true, 원인 사유를 붙인다.
  * 시작된 정거장은 그대로 둔다. stay(숙소·병원 좌표)를 주면 비운 외출의 예상 귀가·이동·보행 합계·여유를 남은 정거장으로
  * 다시 계산한다(주지 않으면 외출 단위 값은 비우기 전 값 그대로다). 다음 재계획(planTrip)도 returnNow 를 해제 조건까지 유지한다.

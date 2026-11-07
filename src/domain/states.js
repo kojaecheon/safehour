@@ -33,7 +33,7 @@ export function mostConservative(...states) {
 
 /**
  * 사용자에게 반드시 보여야 하는 상태 설명 — 안전 문구다.
- * 화면은 src/i18n 의 safetyPair() 규칙으로 두 언어를 함께 보여준다 (spec 4.17).
+ * 화면은 src/i18n 의 safetyPair() 규칙으로 두 언어를 함께 보여준다 (docs/business-rules.md '언어').
  * ja·zh: 검수 전 번역 — 사람 검수 필요 (검수 스위치가 켜지기 전까지 화면에는 영어로 대체된다)
  */
 export const STATE_MESSAGE = {
@@ -123,7 +123,7 @@ export const REASON = {
   /** 복약 시각이 외출 창을 자른다 */
   MEDICATION_WINDOW: 'MEDICATION_WINDOW',
 
-  // ── 체류 동반 플랫폼 (AX-302 · spec 5.2 새 사유 코드) ──
+  // ── 체류 동반 플랫폼 (AX-302 · docs/platform/IA_AND_FLOWS.md '이번에 새로 쓰는 사유 코드') ──
   /** 입국일 시작 전·출국일 마감 후라 일정을 만들지 않는다 */
   OUTSIDE_STAY_WINDOW: 'OUTSIDE_STAY_WINDOW',
   /** 그 날짜의 숙소가 없다 */
@@ -162,7 +162,7 @@ export const RETURN_NOW_CAUSES = Object.freeze([
 ]);
 
 /**
- * 사유 문구 — 안전 문구다. 화면은 src/i18n 의 safetyPair() 규칙으로 보여준다 (spec 4.17).
+ * 사유 문구: 안전 문구다. 화면은 src/i18n 의 safetyPair() 규칙으로 보여준다 (docs/business-rules.md '언어').
  * 4개 언어를 모두 가진다. 새 사유 코드는 도메인 작업이 추가하고 문구는 언어 작업이 채운다.
  * ja·zh: 검수 전 번역 — 사람 검수 필요 (검수 스위치가 켜지기 전까지 화면에는 영어로 대체된다)
  */
@@ -318,7 +318,7 @@ export const REASON_TEXT = {
     zh: '必须在用药时间前返回',
   },
 
-  // 체류 동반 플랫폼 (AX-302 · spec 5.2 새 사유 코드)
+  // 체류 동반 플랫폼 (AX-302 · docs/platform/IA_AND_FLOWS.md '이번에 새로 쓰는 사유 코드')
   [REASON.OUTSIDE_STAY_WINDOW]: {
     ko: '입국 후 일정 시작 전이거나 출국 준비 시간이라 일정을 만들지 않았습니다',
     en: 'No plan here — this is before your arrival-day start or after your departure-day cutoff',

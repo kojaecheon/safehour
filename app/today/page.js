@@ -1,12 +1,12 @@
 'use client';
 
-// /today — 홈: 오늘 상태·매일 확인·다음 일정·복귀 마감·변경 알림 (AX-317 · spec 3.1 · 4.6 · 4.9 · 4.11 · 4.18)
+// /today 홈: 오늘 상태·매일 확인·다음 일정·복귀 마감·변경 알림 (AX-317 · docs/platform/IA_AND_FLOWS.md '매일 쓰는 흐름'·'매일 확인과 오늘 게이트 덧씌우기'·'보기 전용 상태')
 //
 // 화면 원칙
 //   - **판정을 새로 만들지 않는다.** 기기에 저장된 확정 일정을 동기화 모듈(lib/trip useTrip)로만 읽는다.
-//     오늘은 매일 확인·확인하지 않은 병원 중요 안내를 덧씌운 표시용 일정이다 — 저장 일정은 바꾸지 않는다(규칙 49).
+//     오늘은 매일 확인·확인하지 않은 병원 중요 안내를 덧씌운 표시용 일정이다. 저장 일정은 바꾸지 않는다(docs/business-rules.md '전체 일정 확정과 변화 대응', 오늘 게이트 덧씌우기).
 //   - 매일 확인 카드는 맨 위에 고정한다. 확인 전에는 상태가 STANDBY + DAILY_CHECK_PENDING 이고
-//     길찾기·장소 이동과 편집을 막는다(규칙 32).
+//     길찾기·장소 이동과 편집을 막는다(docs/business-rules.md '매일 확인'·'사용자 편집').
 //   - 상태·사유는 늘 보인다(안전 문구 병기). 복귀 마감은 마감 이유·예상 귀가와 함께, 두 언어로 보인다.
 //   - '변경됨'은 전후 비교 시트로 연다(닫으면 본 것으로 기록). 즉시 복귀 시트는 앱 셸 옆 TripRuntime 이 자동으로 연다.
 //   - 업데이트 실패·보호자 링크 다시 보내기·동반 보호자 '다시 만들기' 안내를 보인다.
@@ -192,7 +192,7 @@ export default function TodayPage() {
         <div className="ui-block today-status-block">
           <p className="today-date" tabIndex={-1} ref={dateRef}>
             <span>{formatDate(today, locale)}</span>
-            {/* 연결된 지침이 데모면 늘 밝힌다 — 데모를 실제 연동처럼 보이지 않게 (spec 4.20 · 9.1) */}
+            {/* 연결된 지침이 데모면 늘 밝힌다. 데모를 실제 연동처럼 보이지 않게 (docs/business-rules.md '병원 연동') */}
             {isDemoMode(stay) && <Badge kind="demo" label={t('link.demoBadge')} />}
           </p>
 

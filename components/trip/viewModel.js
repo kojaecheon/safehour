@@ -1,16 +1,16 @@
-// 오늘·일정·장소 화면의 표시 모델 (AX-317 · spec 4.5–4.10, 4.14, 4.16, 5.2)
+// 오늘·일정·장소 화면의 표시 모델 (AX-317 · docs/business-rules.md, docs/platform/IA_AND_FLOWS.md)
 //
 // 저장된 DayPlan 을 화면이 그릴 모양으로 바꾸는 **순수 함수** 모음이다. 판정을 새로 만들지 않는다 —
 // 엔진·동기화 모듈(lib/trip)이 만든 값을 고르고 늘어놓기만 한다. 테스트는 test/trip-view.test.js.
 //
 //   timelineEntries    하루 타임라인 항목 (블록·외출·정거장·식사 칸·복귀·휴식) — components/ui/DayTimeline 이 그린다
-//   guardianTabInfo    보호자 탭 잠금 사유 — 합성된 escortRequired / guardianMustStay 에서 읽는다 (spec 4.7)
-//   deltaSummary       전후 비교 요약 줄 (spec 4.9)
+//   guardianTabInfo    보호자 탭 잠금 사유, 합성된 escortRequired / guardianMustStay 에서 읽는다 (docs/business-rules.md '하루 일정 생성')
+//   deltaSummary       전후 비교 요약 줄 (docs/business-rules.md '전체 일정 확정과 변화 대응')
 //   todayFocus         오늘 화면의 지금·다음 외출과 다음 정거장
 //   tripDateRows       전체 일정 날짜 줄 · needsInputFix 입력 필요 날짜의 고칠 곳
-//   introRequestFor    AI 소개 요청 — 허용 목록(이름·유형·시각·관심사·강도)만 (spec 4.16 · 규칙 36) · introCacheKey
-//   placeDetailRequest 장소 상세 요청(Stop 형식, spec 6장) · findPlaceStop · stopBadges
-//   canEditDay / stopEditable  편집 가능 여부 (spec 4.10 · 규칙 32)
+//   introRequestFor    AI 소개 요청, 허용 목록(이름·유형·시각·관심사·강도)만 (docs/business-rules.md 'AI 소개 문장') · introCacheKey
+//   placeDetailRequest 장소 상세 요청(Stop 형식, docs/contracts.md '`POST /api/place`') · findPlaceStop · stopBadges
+//   canEditDay / stopEditable  편집 가능 여부 (docs/business-rules.md '사용자 편집')
 //   returnTargetOf / overdueOutingOf  복귀 시트의 돌아갈 곳과 여유가 음수인 외출 (마감 지남 설계서 4.2·4.3)
 //
 // Next 밖(node --test)에서도 읽히도록 상대 경로만 쓴다. React·브라우저 API 를 쓰지 않는다.
@@ -24,7 +24,7 @@ import { DEFAULTS } from '../../src/stay/defaults.js';
 import { appointmentsOnDate } from '../../src/stay/stay.js';
 import { toMinutes } from '../../src/stay/time.js';
 
-/** 외출 마감 이유 → 문구 키 (spec 4.7 표 · 5.2 Outing.deadlineReason) — 복귀 안내라 안전 문구다 */
+/** 외출 마감 이유 → 문구 키 (docs/business-rules.md '하루 일정 생성'의 마감 후보 표). 복귀 안내라 안전 문구다 */
 export const DEADLINE_REASON_KEY = Object.freeze({
   RETURN_TIME: 'trip.deadlineRETURN_TIME',
   MEDICATION: 'trip.deadlineMEDICATION',
@@ -34,10 +34,10 @@ export const DEADLINE_REASON_KEY = Object.freeze({
   PATIENT_SCHEDULE: 'trip.deadlinePATIENT_SCHEDULE',
 });
 
-/** 데모 사건 6종 — 패널 순서 (spec 4.9 DemoEvent 표) */
+/** 데모 사건 6종, 패널 순서 (docs/platform/ITINERARY_RULES.md '데모 사건') */
 export const DEMO_EVENT_TYPES = Object.freeze(['CLOSURE', 'WEATHER', 'TRAFFIC_SURGE', 'APPOINTMENT', 'PATIENT_RECALL', 'RISK_SIGNAL']);
 
-/** 데모 사건 매개변수 — 시연용 고정값 (spec 4.9 표의 범위 안) */
+/** 데모 사건 매개변수, 시연용 고정값 (docs/platform/ITINERARY_RULES.md '데모 사건' 표의 범위 안) */
 const DEMO_TRAFFIC_EXTRA_MIN = 20;
 const DEMO_APPOINTMENT_DELTA_MIN = -60;
 
@@ -146,7 +146,7 @@ export function overdueOutingOf(day) {
 }
 
 /**
- * 하루 타임라인 항목 (spec 4.7 · 5.2).
+ * 하루 타임라인 항목 (docs/business-rules.md '하루 일정 생성').
  *
  *   블록        { kind: 'appointment'|'medication', time: start, endTime: end, place? }       — 환자 탭만
  *   외출        depart → stop / meal(식사 칸을 채운 식당) … → return
@@ -255,7 +255,7 @@ function provenanceInfo(entry) {
 }
 
 /**
- * 보호자 탭 안내 (spec 4.7 보호자 일정 · 4.11).
+ * 보호자 탭 안내 (docs/business-rules.md '하루 일정 생성'의 보호자 단독 외출, '보호자').
  * @returns {{ locked: boolean, reason: null|'NO_COMPANION'|'NEEDS_INPUT'|'ESCORT_REQUIRED'|'GUARDIAN_MUST_STAY'|'WITH_PATIENT'|'NO_OUTING',
  *             sources: Array<'HOSPITAL'|'SELF'>, defaulted: boolean }}
  *   locked 이면 잠금 표시와 함께 사유를 보여준다(동행 필수·곁 지키기). 출처는 합성 값의 출처다.
@@ -284,7 +284,7 @@ function parseStopId(stopId) {
 }
 
 /**
- * 전후 비교 요약 (spec 4.9 · 5.2 DayDelta).
+ * 전후 비교 요약 (docs/business-rules.md '전체 일정 확정과 변화 대응').
  * 장소 이름은 지금 일정의 정거장 → 제외 목록(빠진 곳의 제외 사유) 순으로 찾는다. 못 찾으면 null(지어내지 않는다).
  * @returns {null | { visible: boolean, unseen: boolean, state: {before, after}|null, reasons: string[], rows: object[] }}
  */
@@ -348,7 +348,7 @@ export function todayFocus(day, nowMin) {
 }
 
 /**
- * 입력 필요 날짜를 고칠 곳 (spec 4.5 NEEDS_INPUT 사유 표).
+ * 입력 필요 날짜를 고칠 곳 (docs/business-rules.md '날짜 분류'의 NEEDS_INPUT 사유).
  * @returns {null | { href: string, key: string }}
  */
 export function needsInputFix(day) {
@@ -396,7 +396,7 @@ export function tripDateRows({ stay, days, today }) {
 }
 
 /**
- * AI 소개 요청 본문 (spec 4.16 · 6장 POST /api/itinerary/intro).
+ * AI 소개 요청 본문 (docs/business-rules.md 'AI 소개 문장', docs/contracts.md '`POST /api/itinerary/intro`').
  * 담는 것: 언어, 그날 환자 정거장의 공개 이름·유형·도착 시각, 관심사, 이동 강도. 그 밖(조건·병원·숙소·날짜·주소·좌표)은 없다.
  * @returns {null | { lang, stops: Array<{title, category, arriveAt}>, interests: string[], pace: string|null }}
  */
@@ -438,7 +438,7 @@ export function introCacheKey(request) {
 }
 
 /**
- * 장소 상세 요청 (spec 6장 POST /api/place — Stop 과 같은 형식)
+ * 장소 상세 요청 (docs/contracts.md '`POST /api/place`', Stop 과 같은 형식)
  * @returns {{ lang, contentId: string, sourceIds: object, contentTypeIds: object }}
  */
 export function placeDetailRequest(stop, lang) {
@@ -477,7 +477,7 @@ export function findPlaceStop(tripPlan, candidateId, { stopId = null, date = nul
 }
 
 /**
- * 정거장 라벨 → 표시 (spec 4.8 · 5.2 Stop.labels).
+ * 정거장 라벨 → 표시 (docs/business-rules.md '장소 후보와 필터').
  * 배지 5종 중 '추정'·'운영 확인 필요'는 Badge 로, 번역 필요·식이 추정·주문 카드는 화면이 따로 그린다.
  */
 export function stopBadges(stop) {
@@ -491,7 +491,7 @@ export function stopBadges(stop) {
 }
 
 /**
- * 하루 편집(교체·삭제·비움·다시 만들기)을 할 수 있는가 (spec 4.10 · 4.18 · 규칙 32).
+ * 하루 편집(교체·삭제·비움·다시 만들기)을 할 수 있는가 (docs/business-rules.md '사용자 편집', docs/platform/IA_AND_FLOWS.md '보기 전용 상태').
  * 순서: 보기 전용 → 지난 날짜 → 일정 없음·입력 필요 → 매일 확인 전인 오늘.
  */
 export function canEditDay({ date, today, readOnly, dailyCheckPending, day }) {
@@ -530,7 +530,7 @@ export function stopEditable(stop, { date, today, nowMin }) {
 }
 
 /**
- * 매일 확인 카드의 오늘 조건 요약 (spec 4.6 '오늘 적용 항목 요약').
+ * 매일 확인 카드의 오늘 조건 요약 (docs/business-rules.md '매일 확인').
  * 외출·복귀 시각은 늘 보이고, 나머지는 제한(값 있음)인 항목만, 제한 없음은 개수로 줄인다.
  */
 export function dailyCheckSummary(effective) {
@@ -561,13 +561,13 @@ export function formatDate(date, locale, style = 'long') {
   return new Intl.DateTimeFormat(locale, options).format(at);
 }
 
-/** '병원 연동 데모' 모드 — 연결된 지침 중 데모가 있다 (spec 4.9 변화 원천 6 · 4.20) */
+/** '병원 연동 데모' 모드: 연결된 지침 중 데모가 있다 (docs/business-rules.md '병원 연동') */
 export function isDemoMode(stay) {
   return list(stay?.linkedPlans).some((lp) => lp?.plan?.demo === true);
 }
 
 /**
- * 데모 사건 하나 (spec 4.9 DemoEvent). 휴무는 아직 도착하지 않은 첫 환자 정거장을 닫는다 — 없으면 null.
+ * 데모 사건 하나 (docs/platform/ITINERARY_RULES.md '데모 사건'). 휴무는 아직 도착하지 않은 첫 환자 정거장을 닫는다, 없으면 null.
  * @param {string} type
  * @param {object|null} day  오늘 DayPlan
  * @param {number} nowMin

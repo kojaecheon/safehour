@@ -156,7 +156,7 @@ export const messages = {
     zh: '照片 ⓒ韩国观光公社',
   },
 
-  // ── 편집 (spec 4.10) ──
+  // ── 편집 (docs/business-rules.md '사용자 편집') ──
   'trip.actionSwap': { ko: '바꾸기', en: 'Swap', ja: '変更', zh: '更换' },
   'trip.actionDelete': { ko: '빼기', en: 'Remove', ja: '外す', zh: '移除' },
   'trip.actionClearMeal': { ko: '식사 칸 비우기', en: 'Clear this meal', ja: 'この食事枠を空ける', zh: '清空此餐' },
@@ -324,7 +324,7 @@ export const messages = {
     zh: '未入选地点及原因（{n}）',
   },
 
-  // ── 하루 소개 (spec 4.16) ──
+  // ── 하루 소개 (docs/business-rules.md 'AI 소개 문장') ──
   'trip.introTitle': { ko: '하루 소개', en: 'About the day', ja: '1日の紹介', zh: '当天简介' },
   'trip.introAiNote': {
     ko: 'AI가 쓴 소개예요. 판정과 사유에는 쓰지 않고, 틀릴 수 있어요.',
@@ -356,7 +356,7 @@ export const messages = {
     zh: '已清除演示事件并重新判定今天的行程。',
   },
 
-  // ── 데모 사건 6종 (spec 4.9 DemoEvent) ──
+  // ── 데모 사건 6종 (docs/platform/ITINERARY_RULES.md '데모 사건') ──
   'event.CLOSURE': { ko: '장소 휴무', en: 'Place closed', ja: '場所が休業', zh: '地点停业' },
   'event.WEATHER': { ko: '기상 악화', en: 'Bad weather', ja: '天候の悪化', zh: '天气恶化' },
   'event.TRAFFIC_SURGE': { ko: '교통 지연', en: 'Traffic delay', ja: '交通の遅れ', zh: '交通延误' },
@@ -428,7 +428,7 @@ export const messages = {
     zh: '不解读内容，停止今天剩余的全部外出。',
   },
 
-  // ── 전후 비교 시트 (spec 4.9) ──
+  // ── 전후 비교 시트 (docs/business-rules.md '전체 일정 확정과 변화 대응') ──
   'delta.title': { ko: '무엇이 바뀌었나요', en: 'What changed', ja: '何が変わりましたか', zh: '有哪些变化' },
   'delta.lead': {
     ko: '변화를 반영해 일정을 이미 다시 짰어요. 알림만 보내고 예전 일정을 그대로 두지 않아요.',
@@ -526,7 +526,7 @@ export const safety = {
   'return.deadline': { ko: '복귀 마감 {time}', en: 'Be back by {time}', ja: '帰着期限 {time}', zh: '返回截止 {time}' },
   'trip.plannedReturn': { ko: '예상 귀가 {time}', en: 'Expected back {time}', ja: '帰着予定 {time}', zh: '预计返回 {time}' },
 
-  // 외출 마감 이유 (spec 4.7 표)
+  // 외출 마감 이유 (docs/business-rules.md '하루 일정 생성'의 마감 후보 표)
   'trip.deadlineRETURN_TIME': {
     ko: '정해진 복귀 시각 기준',
     en: 'Set by your return time',
@@ -564,7 +564,7 @@ export const safety = {
     zh: '依据患者的下一项安排',
   },
 
-  // 보호자 탭 안내 (spec 4.7 보호자 일정 — 동행 필수라 만들 수 없으면 잠금과 사유를 보인다)
+  // 보호자 탭 안내 (docs/business-rules.md '하루 일정 생성'의 보호자 단독 외출: 동행 필수라 만들 수 없으면 잠금과 사유를 보인다)
   'trip.guardianESCORT_REQUIRED': {
     ko: '동행이 필요한 날이라 보호자는 환자와 함께 있어요. 보호자 단독 외출을 만들지 않았어요.',
     en: 'A companion must stay with the patient this day, so no solo outing was planned for the companion.',
@@ -602,7 +602,7 @@ export const safety = {
     zh: '这一天陪同者没有单独外出：患者没有休息时间，或没有合适的地点。',
   },
 
-  // 하루 일정 경고 (spec 5.2 warnings)
+  // 하루 일정 경고 (docs/contracts.md '`POST /api/itinerary/plan`'의 warnings)
   'trip.warnMEDICATION_TIMES_MISSING': {
     ko: '복약 시각을 입력하지 않아 복약 마감은 만들지 않았어요. 약은 병원 안내대로 챙겨 주세요.',
     en: 'No medication times were entered, so no medication deadline was set. Take your medicine as your hospital told you.',

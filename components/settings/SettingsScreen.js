@@ -1,6 +1,6 @@
 'use client';
 
-// 설정 화면 본문 (AX-318 · spec 4.13 설정 UI · 4.17 · 4.19)
+// 설정 화면 본문 (AX-318 · docs/business-rules.md '알림과 카드'·'언어', docs/platform/IA_AND_FLOWS.md '동의 철회와 데이터 삭제')
 //
 //   언어 · 알림 · 민감정보 동의 철회 · 이 기기에서 내 정보 지우기
 //
