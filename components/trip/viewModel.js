@@ -148,7 +148,7 @@ export function returnTargetOf({ day, stay, outing = null }) {
 
 /**
  * 복귀 시트 맺음말 문구 키. 한국어 복귀 카드(/cards)는 숙소 카드라 숙소일 때만 'return.note'(카드 안내)이고,
- * 병원·정해 둔 장소는 카드를 말하지 않는 'return.notePlace'(아래 이름·주소를 보여 주라는 안내)다.
+ * 병원·정해 둔 장소는 카드를 말하지 않는 'return.notePlace'(위의 장소 정보를 보여 주라는 안내와 119)다.
  * @param {{ kind: 'LODGING'|'HOSPITAL'|'PLANNED' }|null} place  returnTargetOf 의 결과
  * @returns {'return.note'|'return.notePlace'}
  */

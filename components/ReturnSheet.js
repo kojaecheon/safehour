@@ -12,7 +12,7 @@
 //     숙소(그날 숙소) · 병원(hospitalId 로만 찾은 병원) · 정해 둔 장소(찾지 못함, 추측하지 않는다) 중 하나다
 //     (viewModel.returnTargetOf). PASSED 와 OUTING_OVERDUE 는 그 외출의 returnPlace 를, 다른 원인은 숙소를 보인다.
 //     택시 기사에게 보여 줄 한국어 복귀 카드(/cards)는 숙소 카드라 숙소일 때만 잇는다. 맺음말도 숙소면 카드 안내(return.note),
-//     병원·정해 둔 장소면 카드를 말하지 않는 이름·주소 안내(return.notePlace)다(viewModel.returnNoteKeyOf, PASSED·CLEARED 모두).
+//     병원·정해 둔 장소면 카드를 말하지 않는 위의 장소 정보 안내(return.notePlace)다(viewModel.returnNoteKeyOf, PASSED·CLEARED 모두).
 //   - 긴급 연락: 119 전화 걸기와 /emergency.
 //   - 닫기(X)는 없다. '확인했어요' · Escape · 뒤로 가기가 모두 시트만 닫는다(useModalSheet — 페이지를 떠나지 않는다).
 //     닫아도 저장 일정의 returnNow 는 그대로다. 오늘 화면이 '복귀 안내 다시 보기'를 계속 보인다.
