@@ -6,12 +6,14 @@
 //   2. 현재 위치 요청 0건 (spec 9.1 · 규칙 46)
 //      - navigator.geolocation 의 모든 호출과 위치 권한 조회를 기록한다. 한 번이라도 있으면 실패다.
 //   3. 캐시 수명 — 심은 TourAPI 캐시 파일의 시각을 새로 고쳐 긴 실행에서도 외부로 나가지 않게 한다.
+//   4. 시계 — 테스트 앞뒤로 시계 이동(helpers.js setClock)을 0 으로 되돌려, 쓰지 않는 테스트는 실제 시계를 본다.
 //
 // 테스트가 browser.newContext() 로 만든 추가 컨텍스트는 guardContext() 로 같은 감시를 건다.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { test as base, expect } from '@playwright/test';
+import { resetClock } from './helpers.js';
 
 const DATA_ROOT = path.resolve(process.env.SAFEHOUR_DATA_ROOT ?? '.e2e-data');
 export const SERVER_GUARD_DIR = path.join(DATA_ROOT, 'guard');
@@ -121,10 +123,12 @@ export const test = base.extend({
   /** 자동 감시 — 모든 테스트의 기본 컨텍스트 */
   guard: [
     async ({ context }, use) => {
+      await resetClock();
       await refreshSeed();
       const serverBefore = readServerExternalLog();
       const record = await guardContext(context);
       await use(record);
+      await resetClock();
       expectGuardClean(record);
       const serverAfter = readServerExternalLog();
       expect(serverAfter.slice(serverBefore.length), '서버가 외부로 연결하려 했다 (외부 호출 0건 위반)').toBe('');

@@ -7,7 +7,7 @@
 // 휴무 사건은 '아직 도착하지 않은 첫 장소'를 닫는다. 오늘 남은 정거장이 없는 시각(늦은 밤)에는 그 사건을 걸 수 없다.
 
 import { test, expect } from './fixtures.js';
-import { evidenceShot, fireDemoEvent, kstDate, kstMinutes, openDemoToday, readRecord, stopsOf } from './helpers.js';
+import { evidenceShot, fireDemoEvent, kstDate, kstMinutes, openDemoToday, readRecord, setClock, stopsOf } from './helpers.js';
 
 const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
@@ -20,13 +20,15 @@ async function openDemoTodayWithLabel(page) {
 
 test.describe('시나리오 3 — 데모 사건', () => {
   test('휴무 사건은 그 장소를 자동으로 대체하고 전후 비교 시트로 보여 준다', async ({ page }) => {
+    // 하루 중 언제 돌려도 오늘 남은 정거장이 있게 오늘 오전 10시로 서버·브라우저 시계를 함께 맞춘다
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const { today, panel } = await openDemoTodayWithLabel(page);
     const before = (await readRecord(page, 'tripPlan')).days[today];
     const now = kstMinutes();
     const next = stopsOf(before)
       .filter((s) => minutesOf(s.arriveAt) > now + 2)
       .sort((a, b) => minutesOf(a.arriveAt) - minutesOf(b.arriveAt))[0];
-    test.skip(!next, '오늘 남은 정거장이 없는 시각이라 휴무 사건을 걸 수 없다');
+    expect(next, '오전 10시 기준으로 오늘 남은 정거장이 있어야 휴무 사건을 걸 수 있다').toBeTruthy();
 
     await fireDemoEvent(panel, /다음 장소 휴무/);
     await expect(page.getByText('데모 사건을 반영해 오늘 일정을 다시 판정했어요.')).toBeVisible();

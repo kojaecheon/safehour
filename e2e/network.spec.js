@@ -16,6 +16,11 @@ test.describe('외부 호출 0건 장치', () => {
     expect(readServerExternalLog(), '서버가 외부로 연결하려 했다').toBe('');
   });
 
+  test('서버에 시계 이동기가 실려 있다 (쓰지 않는 테스트에는 영향이 없다)', async () => {
+    const ready = fs.readdirSync(SERVER_GUARD_DIR).filter((name) => name.startsWith('clock-ready-'));
+    expect(ready.length, 'E2E 서버가 clock-shim.cjs 를 싣지 않았다 (NODE_OPTIONS 확인)').toBeGreaterThan(0);
+  });
+
   test('브라우저 감시는 127.0.0.1 밖 요청을 막고 기록한다', async ({ browser }, testInfo) => {
     const { baseURL, viewport, locale, timezoneId } = testInfo.project.use;
     const context = await browser.newContext({ baseURL, viewport, locale, timezoneId });

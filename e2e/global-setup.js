@@ -18,7 +18,7 @@ export default async function globalSetup() {
   // 차단기 표식은 이번 실행의 것만 남긴다 — 서버는 globalSetup 보다 먼저 떠서 방금 표식을 남겼다
   const guardDir = path.join(dataRoot, 'guard');
   for (const name of fs.existsSync(guardDir) ? fs.readdirSync(guardDir) : []) {
-    if (!name.startsWith('ready-')) continue;
+    if (!name.startsWith('ready-') && !name.startsWith('clock-ready-')) continue;
     const file = path.join(guardDir, name);
     if (Date.now() - fs.statSync(file).mtimeMs > 10 * 60_000) fs.rmSync(file, { force: true });
   }
