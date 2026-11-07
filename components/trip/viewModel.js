@@ -22,6 +22,7 @@ import { effectiveRows } from '../conditions/summary.js';
 import { safeStayDates } from '../../lib/trip/affected.js';
 import { canonicalJson } from '../../lib/store/fingerprint.js';
 import { declaredReturnHospitalId, returnHospitalOf } from '../../src/engine/returnTarget.js';
+import { isOverdueClampedDay } from '../../src/domain/states.js';
 import { DEFAULTS } from '../../src/stay/defaults.js';
 import { appointmentsOnDate } from '../../src/stay/stay.js';
 import { toMinutes } from '../../src/stay/time.js';
@@ -355,8 +356,8 @@ export function nextAppointmentBlock(day, nowMin) {
 /**
  * 오늘 화면의 초점 — 지금 외출 중(OUT)이면 그 외출, 아니면 다음 외출(NEXT), 다 끝났으면 DONE.
  * 정거장은 아직 떠나지 않은 첫 곳(머무는 중 포함). 환자 외출이 없으면 null.
- * 즉시 복귀 중(returnNow)이고 여유가 음수인 외출(OUTING_OVERDUE 의 외출)이 이미 출발했으면, 시각과 상관없이 그 외출이
- * OUT 이다. 밖에 있는 사람에게 '외출을 모두 마쳤어요'를 보이지 않는다.
+ * 외출 중 재계획으로 즉시 복귀가 켜진 날(returnNow 이고 사유에 OUTING_OVERDUE)에 여유가 음수인 외출이 이미 출발했으면,
+ * 시각과 상관없이 그 외출이 OUT 이다. 밖에 있는 사람에게 '외출을 모두 마쳤어요'를 보이지 않는다.
  * @param {object|null} day  오늘 표시용 DayPlan
  * @param {number} nowMin  KST 자정부터의 분
  */
@@ -365,7 +366,8 @@ export function todayFocus(day, nowMin) {
   if (outings.length === 0) return null;
   const nextAppointment = nextAppointmentBlock(day, nowMin);
   const endOf = (o) => minutesOf(plannedReturnOf(o) || o.returnBy);
-  const overdue = day?.returnNow === true ? overdueOutingOf(day) : null;
+  // 마감을 지금으로 당긴 날(OUTING_OVERDUE)만 붙잡는다. 다른 즉시 복귀 원인의 날에 끝난 여유 음수 외출을 OUT 으로 두지 않는다
+  const overdue = isOverdueClampedDay(day) ? overdueOutingOf(day) : null;
   const held = overdue && minutesOf(overdue.departAt) <= nowMin ? overdue : null;
   const current = held ?? outings.find((o) => minutesOf(o.departAt) <= nowMin && nowMin < endOf(o));
   if (current) {

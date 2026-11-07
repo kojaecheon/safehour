@@ -445,9 +445,18 @@ describe('이동 중에 비운 정거장 0개 외출 (findings 10 화면)', () =
   });
 
   test('즉시 복귀 중 OUT 은 다음 외출보다 앞선다', () => {
-    const f = todayFocus(day({ returnNow: true, outings: [empty, later] }), 16 * 60);
+    const f = todayFocus(day({ returnNow: true, reasons: ['OUTING_OVERDUE'], outings: [empty, later] }), 16 * 60);
     assert.equal(f.phase, 'OUT');
     assert.equal(f.outing.id, empty.id);
+  });
+
+  test('즉시 복귀가 다른 원인(PATIENT_RECALLED 등)이면 끝난 여유 음수 외출을 OUT 으로 붙잡지 않는다', () => {
+    for (const reason of ['PATIENT_RECALLED', 'PLAN_REVOKED', 'PLAN_EXPIRED']) {
+      const f = todayFocus(day({ returnNow: true, reasons: [reason], outings: [empty, later] }), 16 * 60);
+      assert.equal(f.phase, 'NEXT', reason);
+      assert.equal(f.outing.id, later.id);
+    }
+    assert.equal(todayFocus(day({ returnNow: true, reasons: ['PATIENT_RECALLED'], outings: [empty] }), 16 * 60).phase, 'DONE');
   });
 
   test('즉시 복귀가 아니면 기존 규칙대로(마감 뒤 DONE)', () => {

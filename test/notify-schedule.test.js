@@ -77,12 +77,12 @@ function medicationEffective(list) {
   };
 }
 
-function dayPlan({ outings = [], guardianOutings = [], blocks = [], medication = null, date = DATE, returnNow = false } = {}) {
+function dayPlan({ outings = [], guardianOutings = [], blocks = [], medication = null, date = DATE, returnNow = false, reasons = [] } = {}) {
   return {
     date,
     coverage: 'RESTRICTED',
     dayState: outings.length ? 'TOGETHER' : 'NO_TOURISM',
-    reasons: [],
+    reasons,
     window: { start: '09:00', end: '21:00' },
     lodgingId: 'lodging-gangnam-1',
     transportMode: 'TAXI',
@@ -347,14 +347,33 @@ describe('복귀 마감이 지남 (설계서 4.1·4.2)', () => {
     );
   });
 
-  test('즉시 복귀 중인 날(returnNow)은 RETURN_PASSED 를 내지 않고, 보호자 사본 알림은 그대로 둔다', () => {
+  test('외출 중 재계획으로 마감이 지금으로 당겨진 외출(OUTING_OVERDUE, 여유 음수)은 RETURN_PASSED 를 내지 않고, 보호자 사본 알림은 그대로 둔다', () => {
     const companionDay = { date: DATE, patientReturn: [{ by: '19:00' }] };
-    const plan = dayPlan({ outings: [outing()], returnNow: true });
+    const plan = dayPlan({ outings: [outing({ returnBy: '16:10', slackMin: -12 })], returnNow: true, reasons: ['OUTING_OVERDUE'] });
     const items = planNotifications(plan, { nowMs: EARLY, companionDay });
     assert.equal(byKind(items, NOTIFY_KIND.RETURN_PASSED).length, 0);
     assert.equal(byKind(items, NOTIFY_KIND.COMPANION_RETURN_PASSED).length, 1);
     // 늦게 깨어난 경우에도 내지 않는다(마감을 now 로 당겨 놓은 값이라 실제 마감 시각이 아니다)
-    assert.equal(byKind(planNotifications(plan, { nowMs: kst('18:30') }), NOTIFY_KIND.RETURN_PASSED).length, 0);
+    assert.equal(byKind(planNotifications(plan, { nowMs: kst('16:30') }), NOTIFY_KIND.RETURN_PASSED).length, 0);
+  });
+
+  test('같은 OUTING_OVERDUE 날이라도 여유가 0 이상인 다른 외출의 RETURN_PASSED 는 그대로 낸다', () => {
+    const clamped = outing({ id: `${DATE}:P:outing-1`, departAt: '10:00', returnBy: '11:40', slackMin: -8, plannedReturnAt: '11:48', stops: [] });
+    const later = outing({ id: `${DATE}:P:outing-2`, departAt: '15:00', returnBy: '18:00', slackMin: 20 });
+    const plan = dayPlan({ outings: [clamped, later], returnNow: true, reasons: ['OUTING_OVERDUE'] });
+    const passed = byKind(planNotifications(plan, { nowMs: EARLY }), NOTIFY_KIND.RETURN_PASSED);
+    assert.deepEqual(passed.map((i) => i.time), ['18:00']);
+  });
+
+  test('즉시 복귀가 다른 원인(PATIENT_RECALLED·PLAN_REVOKED·PLAN_EXPIRED)으로 켜진 날은 실제 마감이 남아 RETURN_PASSED 를 낸다', () => {
+    for (const reason of ['PATIENT_RECALLED', 'PLAN_REVOKED', 'PLAN_EXPIRED']) {
+      const plan = dayPlan({ outings: [outing({ returnBy: '21:00' })], returnNow: true, reasons: [reason] });
+      const passed = byKind(planNotifications(plan, { nowMs: EARLY }), NOTIFY_KIND.RETURN_PASSED);
+      assert.deepEqual(passed.map((i) => i.time), ['21:00'], reason);
+    }
+    // 여유가 음수인 외출이라도 OUTING_OVERDUE 가 아니면 마감은 실제 값이다
+    const recalled = dayPlan({ outings: [outing({ returnBy: '21:00', slackMin: -5 })], returnNow: true, reasons: ['PATIENT_RECALLED'] });
+    assert.equal(byKind(planNotifications(recalled, { nowMs: EARLY }), NOTIFY_KIND.RETURN_PASSED).length, 1);
   });
 
   test('returnNow 가 false 이면 그대로 낸다', () => {

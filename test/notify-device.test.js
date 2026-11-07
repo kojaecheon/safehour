@@ -168,6 +168,23 @@ describe('기기 알림 한 장 (deliverToDevice)', () => {
     assert.equal(b.made[0].instance.onclick, undefined);
   });
 
+  test('이미 그 화면(/g)에 있으면 생성자 알림을 눌러도 다시 불러오지 않고 창만 앞으로 가져온다', async () => {
+    const guardian = planNotifications(null, {
+      nowMs: kst('06:00'),
+      companionDay: { date: DATE, patientReturn: [{ by: '12:00' }] },
+    })[0];
+    const { FakeNotification, made } = fakeNotification();
+    const calls = [];
+    const win = {
+      location: { origin: 'https://safehour.example', pathname: '/g', assign: (href) => calls.push(['assign', href]) },
+      focus: () => calls.push(['focus']),
+    };
+    await deliverToDevice(guardian, { store: fakeStore(), nav: fakeNav({ registration: null }), NotificationImpl: FakeNotification, win });
+    made[0].instance.close = () => calls.push(['close']);
+    made[0].instance.onclick();
+    assert.deepEqual(calls, [['focus'], ['close']]);
+  });
+
   test('서비스 워커가 아직 설치 중이면 생성자로 낸다', async () => {
     const { FakeNotification, made } = fakeNotification();
     const reg = fakeRegistration({ active: false });

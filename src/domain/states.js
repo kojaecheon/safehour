@@ -162,6 +162,16 @@ export const RETURN_NOW_CAUSES = Object.freeze([
 ]);
 
 /**
+ * 마감을 '지금'으로 당긴 즉시 복귀 날인가. 외출 중 재계획으로 늦어 OUTING_OVERDUE 가 켜진 날만 그렇다.
+ * PATIENT_RECALLED·PLAN_REVOKED·PLAN_EXPIRED 로 켜진 날은 외출의 실제 마감(returnBy)이 그대로 남는다.
+ * 쓰는 곳: lib/notify/schedule.js(마감 지남 알림 제외), components/trip/viewModel.js todayFocus(외출 중 유지).
+ * @param {object|null} day  DayPlan
+ */
+export function isOverdueClampedDay(day) {
+  return day?.returnNow === true && Array.isArray(day.reasons) && day.reasons.includes(REASON.OUTING_OVERDUE);
+}
+
+/**
  * 사유 문구: 안전 문구다. 화면은 src/i18n 의 safetyPair() 규칙으로 보여준다 (docs/business-rules.md '언어').
  * 4개 언어를 모두 가진다. 새 사유 코드는 도메인 작업이 추가하고 문구는 언어 작업이 채운다.
  * ja·zh: 검수 전 번역 — 사람 검수 필요 (검수 스위치가 켜지기 전까지 화면에는 영어로 대체된다)
