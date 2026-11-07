@@ -660,16 +660,6 @@ export function regenerate({ scope, date, ...input }) {
 }
 
 /**
- * 즉시 복귀 변환 (spec 4.9 즉시 복귀, 규칙 13) — 외출 중 지침 철회·만료(또는 환자 호출)를 기기에서 바로 반영한다.
- * 오늘 남은 정거장(도착 시각이 지나지 않은 것)을 비우고 returnNow=true, 원인 사유를 붙인다.
- * 시작된 정거장은 그대로 둔다. stay(숙소·병원 좌표)를 주면 비운 외출의 예상 귀가·이동·보행 합계·여유를 남은 정거장으로
- * 다시 계산한다(주지 않으면 외출 단위 값은 비우기 전 값 그대로다). 다음 재계획(planTrip)도 returnNow 를 해제 조건까지 유지한다.
- * @param {object} day  오늘 DayPlan
- * @param {{now: string|number|Date, cause: 'PLAN_REVOKED'|'PLAN_EXPIRED'|'PATIENT_RECALLED', stay?: object,
- *          estimators?: {TAXI?: object, TRANSIT?: object}}} opts
- * @returns {object} 새 DayPlan (입력은 바꾸지 않는다). 보이는 변화가 있으면 delta 를 붙인다
- */
-/**
  * 비운 외출의 복귀 시각·이동·보행 합계를 남은(시작된) 정거장으로 다시 계산한다 — 저장된 체류(숙소·병원 좌표)가 있을 때.
  * 복귀 마감(returnBy)은 그대로이고, 여유는 추가 버퍼 없이 다시 계산한다.
  */
@@ -703,6 +693,16 @@ function recomputeTruncated(outing, original, { stay, day, estimators = {} }) {
   };
 }
 
+/**
+ * 즉시 복귀 변환 (spec 4.9 즉시 복귀, 규칙 13) — 외출 중 지침 철회·만료(또는 환자 호출)를 기기에서 바로 반영한다.
+ * 오늘 남은 정거장(도착 시각이 지나지 않은 것)을 비우고 returnNow=true, 원인 사유를 붙인다.
+ * 시작된 정거장은 그대로 둔다. stay(숙소·병원 좌표)를 주면 비운 외출의 예상 귀가·이동·보행 합계·여유를 남은 정거장으로
+ * 다시 계산한다(주지 않으면 외출 단위 값은 비우기 전 값 그대로다). 다음 재계획(planTrip)도 returnNow 를 해제 조건까지 유지한다.
+ * @param {object} day  오늘 DayPlan
+ * @param {{now: string|number|Date, cause: 'PLAN_REVOKED'|'PLAN_EXPIRED'|'PATIENT_RECALLED', stay?: object,
+ *          estimators?: {TAXI?: object, TRANSIT?: object}}} opts
+ * @returns {object} 새 DayPlan (입력은 바꾸지 않는다). 보이는 변화가 있으면 delta 를 붙인다
+ */
 export function applyImmediateReturn(day, { now, cause, stay = null, estimators = {} } = {}) {
   if (!IMMEDIATE_RETURN_CAUSES.includes(cause)) throw new RangeError(`즉시 복귀 원인이 올바르지 않습니다: ${String(cause)}`);
   const clock = kstClock(now);

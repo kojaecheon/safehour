@@ -661,6 +661,17 @@ describe('returnTargetOf · overdueOutingOf: 복귀 시트의 돌아갈 곳 (마
     assert.deepEqual(returnTargetOf({ day: day(), stay, outing: o }), { kind: 'HOSPITAL', name: '데모 의원', address: '데모 병원 주소' });
   });
 
+  test('적힌 hospitalId 가 병원 목록에 없으면 그날 병원이 하나뿐이어도 정해 둔 장소', () => {
+    // 일정(start === returnBy)이 H9 를 적었지만 목록에 없다. 그날 다른 일정은 모두 H1 이어도 H1 으로 대신하지 않는다
+    const byAppt = { ...STAY, appointments: [...STAY.appointments, { id: 'A9', hospitalId: 'H9', type: 'VISIT', date: DATE, start: '13:07', source: 'USER' }] };
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });
+    assert.deepEqual(returnTargetOf({ day: day(), stay: byAppt, outing: o }), PLANNED);
+    // 복귀 시각 조건이 H9 를 적은 경우도 같다
+    const d = day({ effective: { returnTime: eff({ time: '18:00', place: 'HOSPITAL', hospitalId: 'H9' }) } });
+    const r = outing('o', { returnPlace: 'HOSPITAL', returnBy: '18:00', deadlineReason: 'RETURN_TIME' });
+    assert.deepEqual(returnTargetOf({ day: d, stay: STAY, outing: r }), PLANNED);
+  });
+
   test('못 찾으면 정해 둔 장소, 그날 병원이 둘이면 고르지 않는다', () => {
     const stay = { ...STAY, hospitals: [STAY.hospitals[0], H2], appointments: [...STAY.appointments, { id: 'A2', hospitalId: 'H2', type: 'VISIT', date: DATE, start: '18:00', source: 'USER' }] };
     const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });

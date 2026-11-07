@@ -346,9 +346,12 @@ describe('복귀 마감 지남: overdueReturn 신호(표시만)', () => {
     // 기본 세션(12시간)이 마감 전에 끝나 보기 전용이 되지 않게 늘린다
     ctx.store.setSession({ authenticated: true, accountKey: ctx.store.getStatus().accountKey, expiresAt: new Date(kst(TODAY, '23:59')).toISOString() });
     const day = ctx.store.readTripPlan().days[TODAY];
-    const outing = day.outings[0];
-    assert.ok(outing, 'fixture: 오늘 환자 외출이 있어야 한다');
-    const sameDeadline = day.outings.filter((o) => o.returnBy === outing.returnBy).map((o) => o.id);
+    assert.ok(day.outings[0], 'fixture: 오늘 환자 외출이 있어야 한다');
+    const sameDeadline = day.outings.filter((o) => o.returnBy === day.outings[0].returnBy).map((o) => o.id);
+    assert.ok(sameDeadline.length >= 2, 'fixture: 마감이 같은 외출이 둘 이상이어야 한다(동순위 정렬 확인)');
+    // 마감이 같으면 나중에 출발한 외출이 시트에 뜬다
+    const outing = day.outings.find((o) => o.id === sameDeadline.at(-1));
+    assert.notEqual(outing.id, day.outings[0].id);
     assert.equal(ctx.store.getStatus().readOnly, false);
     const deadline = kst(TODAY, outing.returnBy);
     ctx.timers.advanceTo(deadline - 60_000);

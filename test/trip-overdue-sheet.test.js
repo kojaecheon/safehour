@@ -64,6 +64,11 @@ describe('selectOverdueReturn', () => {
     );
   });
 
+  test('마감이 같으면 나중에 출발한 외출', () => {
+    const tie = day([outing('1', '21:00'), outing('2', '21:00', { departAt: '15:00' })]);
+    assert.equal(selectOverdueReturn({ day: tie, nowMs: at('21:05'), dismissed: [], graceMin: GRACE }).outingId, `${DATE}:P:2`);
+  });
+
   test('날짜가 오늘(KST)이 아니면 null', () => {
     assert.equal(selectOverdueReturn({ day: d, nowMs: at('13:05', '2026-10-06'), dismissed: [], graceMin: GRACE }), null);
     // UTC 로는 같은 날이어도 KST 로 다음 날이면 오늘이 아니다

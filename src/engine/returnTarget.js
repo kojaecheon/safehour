@@ -13,8 +13,21 @@
  * @returns {object|null} Hospital
  */
 export function returnHospitalOf(outing, { stay, day }) {
+  const hospitalId = declaredReturnHospitalId(outing, { stay, day });
+  if (hospitalId === null) return null;
+  return (stay.hospitals ?? []).find((h) => h?.id === hospitalId) ?? null;
+}
+
+/**
+ * 외출의 복귀 병원으로 적힌 `hospitalId` (returnHospitalOf 와 같은 순서). 적힌 것이 없으면 null.
+ * 적혀 있는데 병원 목록에 없으면 returnHospitalOf 는 null 이지만 이 값은 남는다. 화면은 이 둘을 구분해
+ * 적힌 병원을 못 찾았을 때 다른 병원으로 대신하지 않는다.
+ * @param {object} outing
+ * @param {{ stay: object, day: object }} ctx
+ * @returns {string|null}
+ */
+export function declaredReturnHospitalId(outing, { stay, day }) {
   const appt = (stay.appointments ?? []).find((a) => a?.date === day.date && a.start === outing.returnBy);
   const hospitalId = appt?.hospitalId ?? day.effective?.returnTime?.value?.hospitalId;
-  if (typeof hospitalId !== 'string' || hospitalId === '') return null;
-  return (stay.hospitals ?? []).find((h) => h?.id === hospitalId) ?? null;
+  return typeof hospitalId === 'string' && hospitalId !== '' ? hospitalId : null;
 }

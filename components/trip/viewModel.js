@@ -19,7 +19,7 @@
 import { effectiveRows } from '../conditions/summary.js';
 import { safeStayDates } from '../../lib/trip/affected.js';
 import { canonicalJson } from '../../lib/store/fingerprint.js';
-import { returnHospitalOf } from '../../src/engine/returnTarget.js';
+import { declaredReturnHospitalId, returnHospitalOf } from '../../src/engine/returnTarget.js';
 import { DEFAULTS } from '../../src/stay/defaults.js';
 import { appointmentsOnDate } from '../../src/stay/stay.js';
 import { toMinutes } from '../../src/stay/time.js';
@@ -122,8 +122,8 @@ function soleHospitalOfDay(day, stay) {
  * 복귀 시트의 돌아갈 곳 `{ kind: 'LODGING'|'HOSPITAL'|'PLANNED', name, address }` (마감 지남 설계서 4.2·4.3).
  * 외출이 없거나 숙소 외출이면 그날 숙소(못 찾으면 name·address 가 null 인 LODGING). 병원 외출이면
  * returnHospitalOf(엔진과 같은 규칙, hospitalId 로만)로 찾은 병원 이름·도로명주소다.
- * 경우 2 에서는 엔진이 마감을 지금으로 당겨(overdueSafe) 그 시각에 시작하는 병원 일정이 없을 수 있다. 그때만
- * 그날 병원 일정이 모두 한 병원이면 그 병원을 쓴다. 그 밖에는 PLANNED('정해 둔 장소')이고 추측하지 않는다.
+ * 경우 2 에서는 엔진이 마감을 지금으로 당겨(overdueSafe) 그 시각에 시작하는 병원 일정이 없을 수 있다. 그렇게
+ * 적힌 hospitalId 가 하나도 없을 때만 그날 병원 일정이 모두 한 병원이면 그 병원을 쓴다. 그 밖에는 PLANNED('정해 둔 장소')이고 추측하지 않는다.
  * 저장된 외출의 returnPlace 를 그대로 따른다. 장소를 다시 판정하지 않는다.
  * @param {{ day: object|null, stay: object|null, outing?: object|null }} args
  */
@@ -132,7 +132,10 @@ export function returnTargetOf({ day, stay, outing = null }) {
     const lodging = lodgingOf(day, stay);
     return { kind: 'LODGING', name: lodging?.name ?? null, address: lodging?.address ?? null };
   }
-  const hospital = isObject(stay) && isObject(day) ? returnHospitalOf(outing, { stay, day }) ?? soleHospitalOfDay(day, stay) : null;
+  if (!isObject(stay) || !isObject(day)) return { kind: 'PLANNED', name: null, address: null };
+  // 적힌 hospitalId 가 있으면 그 병원만 본다(목록에 없으면 PLANNED). 대비책은 아무것도 적히지 않았을 때만 쓴다
+  const hospital =
+    declaredReturnHospitalId(outing, { stay, day }) !== null ? returnHospitalOf(outing, { stay, day }) : soleHospitalOfDay(day, stay);
   if (!hospital) return { kind: 'PLANNED', name: null, address: null };
   return { kind: 'HOSPITAL', name: hospital.name ?? null, address: hospital.address?.roadAddress ?? null };
 }
