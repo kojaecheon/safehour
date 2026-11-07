@@ -6,12 +6,13 @@
 //   - 닫은 외출, 즉시 복귀(returnNow) 중인 날, 오늘(KST)이 아닌 날은 고르지 않는다
 //   - 두 외출이 모두 창 안이면 마감이 늦은 쪽, returnBy 가 깨진 외출은 건너뛴다
 //   - nextOverdueWakeMs: 다음 마감, 표시 중이면 만료, 남은 경계가 없으면 null
-//   - overdueIdsThrough: 닫을 때 함께 닫는 외출은 창 안이고 마감이 같거나 이른 것뿐
+//   - overdueKeysThrough: 닫을 때 함께 닫는 외출은 창 안이고 마감이 같거나 이른 것뿐
+//   - 닫은 기억은 `${outingId}@${returnBy}` 키다. 전체 재계획이 외출 id 를 다시 매겨도 다른 외출을 막지 않는다
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { nextOverdueWakeMs, overdueIdsThrough, selectOverdueReturn } from '../lib/trip/overdue.js';
+import { nextOverdueWakeMs, overdueDismissKey, overdueKeysThrough, selectOverdueReturn } from '../lib/trip/overdue.js';
 import { kstInstantMs } from '../src/stay/time.js';
 
 const DATE = '2026-10-05';
@@ -44,9 +45,17 @@ describe('selectOverdueReturn', () => {
     assert.equal(selectOverdueReturn({ day: d, nowMs: at('14:00'), dismissed: [], graceMin: GRACE }), null);
   });
 
-  test('닫은 외출이면 null (배열·Set 모두)', () => {
-    assert.equal(selectOverdueReturn({ day: d, nowMs: at('13:05'), dismissed: [`${DATE}:P:1`], graceMin: GRACE }), null);
-    assert.equal(selectOverdueReturn({ day: d, nowMs: at('13:05'), dismissed: new Set([`${DATE}:P:1`]), graceMin: GRACE }), null);
+  test('닫은 외출이면 null (배열·Set 모두), 키는 외출 id 와 마감 시각', () => {
+    assert.equal(overdueDismissKey(`${DATE}:P:1`, '13:00'), `${DATE}:P:1@13:00`);
+    assert.equal(selectOverdueReturn({ day: d, nowMs: at('13:05'), dismissed: [`${DATE}:P:1@13:00`], graceMin: GRACE }), null);
+    assert.equal(selectOverdueReturn({ day: d, nowMs: at('13:05'), dismissed: new Set([`${DATE}:P:1@13:00`]), graceMin: GRACE }), null);
+  });
+
+  test('같은 외출 id 라도 마감 시각이 다르면 닫은 것으로 보지 않는다 (전체 재계획의 id 재사용)', () => {
+    // 재계획 전 P:1 은 12:30 마감이었고 그때 닫았다. 지금 P:1 은 13:00 마감인 다른 외출이다
+    assert.equal(selectOverdueReturn({ day: d, nowMs: at('13:05'), dismissed: [`${DATE}:P:1@12:30`], graceMin: GRACE }).outingId, `${DATE}:P:1`);
+    // 예전 형식(외출 id 만)의 기억은 더 이상 맞지 않는다. 오늘 하루치 값이라 받아들인다
+    assert.equal(selectOverdueReturn({ day: d, nowMs: at('13:05'), dismissed: [`${DATE}:P:1`], graceMin: GRACE }).outingId, `${DATE}:P:1`);
   });
 
   test('그날이 즉시 복귀(returnNow) 중이면 null, 기존 시트가 우선이다', () => {
@@ -59,7 +68,7 @@ describe('selectOverdueReturn', () => {
     assert.equal(selectOverdueReturn({ day: two, nowMs: at('13:40'), dismissed: [], graceMin: GRACE }).outingId, `${DATE}:P:2`);
     // 늦은 쪽을 닫으면 아직 창 안의 이른 쪽
     assert.equal(
-      selectOverdueReturn({ day: two, nowMs: at('13:40'), dismissed: [`${DATE}:P:2`], graceMin: GRACE }).outingId,
+      selectOverdueReturn({ day: two, nowMs: at('13:40'), dismissed: [`${DATE}:P:2@13:30`], graceMin: GRACE }).outingId,
       `${DATE}:P:1`,
     );
   });
@@ -129,20 +138,20 @@ describe('nextOverdueWakeMs', () => {
   });
 });
 
-describe('overdueIdsThrough: 시트를 닫을 때 함께 닫는 외출', () => {
+describe('overdueKeysThrough: 시트를 닫을 때 함께 닫는 외출(닫은 기억 키)', () => {
   test('창 안이고 마감이 같거나 이른 외출만', () => {
     const d = day([outing('1', '13:00'), outing('2', '13:30', { departAt: '13:10' }), outing('3', '13:30', { departAt: '13:15' }), outing('4', '17:00', { departAt: '15:00' })]);
-    assert.deepEqual(overdueIdsThrough({ day: d, nowMs: at('13:40'), graceMin: GRACE, returnBy: '13:30' }), [`${DATE}:P:1`, `${DATE}:P:2`, `${DATE}:P:3`]);
+    assert.deepEqual(overdueKeysThrough({ day: d, nowMs: at('13:40'), graceMin: GRACE, returnBy: '13:30' }), [`${DATE}:P:1@13:00`, `${DATE}:P:2@13:30`, `${DATE}:P:3@13:30`]);
     // 이른 쪽만 닫으면 늦은 쪽은 남는다
-    assert.deepEqual(overdueIdsThrough({ day: d, nowMs: at('13:10'), graceMin: GRACE, returnBy: '13:00' }), [`${DATE}:P:1`]);
+    assert.deepEqual(overdueKeysThrough({ day: d, nowMs: at('13:10'), graceMin: GRACE, returnBy: '13:00' }), [`${DATE}:P:1@13:00`]);
     // 창이 지난 외출은 넣지 않는다
-    assert.deepEqual(overdueIdsThrough({ day: d, nowMs: at('14:10'), graceMin: GRACE, returnBy: '13:30' }), [`${DATE}:P:2`, `${DATE}:P:3`]);
+    assert.deepEqual(overdueKeysThrough({ day: d, nowMs: at('14:10'), graceMin: GRACE, returnBy: '13:30' }), [`${DATE}:P:2@13:30`, `${DATE}:P:3@13:30`]);
   });
 
   test('입력이 깨졌거나 즉시 복귀 중이면 빈 목록', () => {
     const d = day([outing('1', '13:00')]);
-    assert.deepEqual(overdueIdsThrough({ day: d, nowMs: at('13:10'), graceMin: GRACE, returnBy: 'nope' }), []);
-    assert.deepEqual(overdueIdsThrough({ day: null, nowMs: at('13:10'), graceMin: GRACE, returnBy: '13:00' }), []);
-    assert.deepEqual(overdueIdsThrough({ day: { ...d, returnNow: true }, nowMs: at('13:10'), graceMin: GRACE, returnBy: '13:00' }), []);
+    assert.deepEqual(overdueKeysThrough({ day: d, nowMs: at('13:10'), graceMin: GRACE, returnBy: 'nope' }), []);
+    assert.deepEqual(overdueKeysThrough({ day: null, nowMs: at('13:10'), graceMin: GRACE, returnBy: '13:00' }), []);
+    assert.deepEqual(overdueKeysThrough({ day: { ...d, returnNow: true }, nowMs: at('13:10'), graceMin: GRACE, returnBy: '13:00' }), []);
   });
 });
