@@ -12,6 +12,7 @@
 //   placeDetailRequest 장소 상세 요청(Stop 형식, docs/contracts.md '`POST /api/place`') · findPlaceStop · stopBadges
 //   canEditDay / stopEditable  편집 가능 여부 (docs/business-rules.md '사용자 편집')
 //   returnTargetOf / overdueOutingOf  복귀 시트의 돌아갈 곳과 여유가 음수인 외출 (마감 지남 설계서 4.2·4.3)
+//   returnNoteKeyOf    복귀 시트 맺음말 키, 숙소만 한국어 복귀 카드를 안내한다 (findings 11)
 //
 // Next 밖(node --test)에서도 읽히도록 상대 경로만 쓴다. React·브라우저 API 를 쓰지 않는다.
 // 문구 키는 화면에서 쓰는 키를 그대로 적는다(test/i18n.test.js 가 키 모양 문자열로 사용 여부를 확인한다).
@@ -140,6 +141,16 @@ export function returnTargetOf({ day, stay, outing = null }) {
   else if (outing.deadlineReason === 'APPOINTMENT') hospital = soleHospitalOfDay(day, stay);
   if (!hospital) return { kind: 'PLANNED', name: null, address: null };
   return { kind: 'HOSPITAL', name: hospital.name ?? null, address: hospital.address?.roadAddress ?? null };
+}
+
+/**
+ * 복귀 시트 맺음말 문구 키. 한국어 복귀 카드(/cards)는 숙소 카드라 숙소일 때만 'return.note'(카드 안내)이고,
+ * 병원·정해 둔 장소는 카드를 말하지 않는 'return.notePlace'(아래 이름·주소를 보여 주라는 안내)다.
+ * @param {{ kind: 'LODGING'|'HOSPITAL'|'PLANNED' }|null} place  returnTargetOf 의 결과
+ * @returns {'return.note'|'return.notePlace'}
+ */
+export function returnNoteKeyOf(place) {
+  return place?.kind === 'LODGING' ? 'return.note' : 'return.notePlace';
 }
 
 /** 저장된 하루에서 여유(slackMin)가 음수인 첫 환자 외출, 즉시 복귀 원인 OUTING_OVERDUE 의 외출. 없으면 null */

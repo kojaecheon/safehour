@@ -11,7 +11,8 @@
 //   - 돌아갈 곳은 이름·주소 **글자만** 보인다. 좌표·지도 링크를 넣지 않는다(docs/business-rules.md '알림과 카드': 숙소·병원 좌표는 어떤 지도 링크에도 넣지 않는다).
 //     숙소(그날 숙소) · 병원(hospitalId 로만 찾은 병원) · 정해 둔 장소(찾지 못함, 추측하지 않는다) 중 하나다
 //     (viewModel.returnTargetOf). PASSED 와 OUTING_OVERDUE 는 그 외출의 returnPlace 를, 다른 원인은 숙소를 보인다.
-//     택시 기사에게 보여 줄 한국어 복귀 카드(/cards)는 숙소 카드라 숙소일 때만 잇는다.
+//     택시 기사에게 보여 줄 한국어 복귀 카드(/cards)는 숙소 카드라 숙소일 때만 잇는다. 맺음말도 숙소면 카드 안내(return.note),
+//     병원·정해 둔 장소면 카드를 말하지 않는 이름·주소 안내(return.notePlace)다(viewModel.returnNoteKeyOf, PASSED·CLEARED 모두).
 //   - 긴급 연락: 119 전화 걸기와 /emergency.
 //   - 닫기(X)는 없다. '확인했어요' · Escape · 뒤로 가기가 모두 시트만 닫는다(useModalSheet — 페이지를 떠나지 않는다).
 //     닫아도 저장 일정의 returnNow 는 그대로다. 오늘 화면이 '복귀 안내 다시 보기'를 계속 보인다.
@@ -20,7 +21,7 @@ import Link from 'next/link';
 import { useLang } from './LanguageProvider.js';
 import { Icon, Sheet } from './ui/index.js';
 import { REASON } from '@/src/domain/states.js';
-import { overdueOutingOf, returnTargetOf } from './trip/viewModel.js';
+import { overdueOutingOf, returnNoteKeyOf, returnTargetOf } from './trip/viewModel.js';
 
 const PLACE_ICON = Object.freeze({ LODGING: 'bed', HOSPITAL: 'hospital', PLANNED: 'flag' });
 
@@ -54,8 +55,8 @@ export default function ReturnSheet({ day, stay, cause = null, variant = 'CLEARE
   const content = sheetContent({ variant, day, stay, cause, outingId });
   const title = pair(content.titleKey);
   const body = pair(content.bodyKey);
-  const note = pair('return.note');
   const { place } = content;
+  const note = pair(returnNoteKeyOf(place));
   const reasonLang = safety.primary === lang ? undefined : safety.primary;
 
   return (

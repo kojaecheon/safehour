@@ -29,6 +29,7 @@ import {
   needsInputFix,
   overdueOutingOf,
   placeDetailRequest,
+  returnNoteKeyOf,
   returnTargetOf,
   stopBadges,
   stopEditable,
@@ -704,5 +705,20 @@ describe('returnTargetOf · overdueOutingOf: 복귀 시트의 돌아갈 곳 (마
     assert.equal(overdueOutingOf(day({ outings: [outing('a')] })), null);
     assert.equal(overdueOutingOf(day({ guardianOutings: [{ ...outing('g', { role: 'G' }), slackMin: -3 }] })), null);
     assert.equal(overdueOutingOf(null), null);
+  });
+});
+
+describe('returnNoteKeyOf: 복귀 시트 맺음말 (findings 11)', () => {
+  test('숙소면 한국어 복귀 카드 안내(return.note), 병원·정해 둔 장소면 이름·주소 안내(return.notePlace)', () => {
+    assert.equal(returnNoteKeyOf({ kind: 'LODGING', name: '데모 숙소', address: '데모 주소' }), 'return.note');
+    assert.equal(returnNoteKeyOf({ kind: 'LODGING', name: null, address: null }), 'return.note');
+    assert.equal(returnNoteKeyOf({ kind: 'HOSPITAL', name: '데모 의원', address: '데모 병원 주소' }), 'return.notePlace');
+    assert.equal(returnNoteKeyOf({ kind: 'PLANNED', name: null, address: null }), 'return.notePlace');
+  });
+
+  test('시트가 보이는 장소와 같은 규칙: 병원 외출이면 return.notePlace, 숙소 외출이면 return.note', () => {
+    const hospital = outing('o', { returnPlace: 'HOSPITAL', returnBy: '15:00', deadlineReason: 'APPOINTMENT' });
+    assert.equal(returnNoteKeyOf(returnTargetOf({ day: day(), stay: STAY, outing: hospital })), 'return.notePlace');
+    assert.equal(returnNoteKeyOf(returnTargetOf({ day: day(), stay: STAY, outing: outing('o') })), 'return.note');
   });
 });
