@@ -8,7 +8,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deliverToDevice, notificationClickPath, notificationOpenUrl } from '../lib/notify/device.js';
+import { readFileSync } from 'node:fs';
+import { deliverToDevice, NOTIFICATION_CLICK_PATHS, notificationClickPath, notificationOpenUrl } from '../lib/notify/device.js';
 import { planNotifications } from '../lib/notify/schedule.js';
 import { attachSessionUpkeep, createSessionUpkeep } from '../components/pwa/sessionUpkeep.js';
 import { registerServiceWorker } from '../components/pwa/registerServiceWorker.js';
@@ -309,5 +310,13 @@ describe('알림 누름 목적지 (notificationClickPath)', () => {
     for (const data of [undefined, null, {}, { url: 42 }, { url: '/settings' }, { url: 'https://evil.example/g' }, { url: '//evil' }, { url: '/g?x=1' }]) {
       assert.equal(notificationClickPath(data), '/today', JSON.stringify(data));
     }
+  });
+
+  test('public/sw.js 의 NOTIFICATION_PATHS 와 같은 목록이다', () => {
+    const source = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
+    const match = source.match(/const NOTIFICATION_PATHS = (\[[^\]]*\])/);
+    assert.ok(match, 'public/sw.js 에서 NOTIFICATION_PATHS 를 찾지 못했다');
+    const swPaths = JSON.parse(match[1].replace(/'/g, '"'));
+    assert.deepEqual(swPaths, [...NOTIFICATION_CLICK_PATHS], '두 목록(public/sw.js, lib/notify/device.js)은 함께 바꿔야 한다');
   });
 });
