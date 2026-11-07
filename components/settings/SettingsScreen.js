@@ -18,6 +18,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { getStore } from '@/lib/store/index.js';
+import { turnOnDeviceNotifications } from '@/lib/notify/permission.js';
 import { LANGS, LANG_NAMES } from '@/src/i18n/index.js';
 import ClearSessionButton from '../ClearSessionButton.js';
 import { useLang } from '../LanguageProvider.js';
@@ -85,33 +86,12 @@ function NotificationSection({ readOnly, showReadOnly, inert }) {
   const [message, setMessage] = useState(null);
   const on = prefs?.notifications === true;
 
-  async function turnOn() {
-    if (typeof window === 'undefined' || !('Notification' in window)) {
-      setMessage('unsupported');
-      return;
-    }
-    let permission = window.Notification.permission;
-    if (permission === 'default') {
-      // 권한 요청은 이 한 곳 — 사용자가 켜기를 눌렀을 때만
-      try {
-        permission = await window.Notification.requestPermission();
-      } catch {
-        permission = 'denied';
-      }
-    }
-    if (permission !== 'granted') {
-      setMessage('denied');
-      return;
-    }
-    setMessage(getStore().writePrefs({ notifications: true }).ok ? 'on' : 'failed');
-  }
-
   async function onChange(event) {
     if (readOnly || busy) return;
     const want = event.target.checked;
     setBusy(true);
     try {
-      if (want) await turnOn();
+      if (want) setMessage(await turnOnDeviceNotifications({ store: getStore() }));
       else setMessage(getStore().writePrefs({ notifications: false }).ok ? 'off' : 'failed');
     } finally {
       setBusy(false);

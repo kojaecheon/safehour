@@ -469,6 +469,37 @@ export const messages = {
     ja: '時刻はすべて韓国時間です。',
     zh: '所有时间均为韩国时间。',
   },
+  // ── /g — 받은 일정의 복귀 마감 알림·마감 지남 표시 ──
+  'guardian.alertsToggle': {
+    ko: '복귀 마감 알림 받기',
+    en: 'Get return-time alerts',
+    ja: '戻り期限の通知を受け取る',
+    zh: '接收返回截止时间提醒',
+  },
+  'guardian.alertsNote': {
+    ko: '이 휴대폰에서 앱이 완전히 닫혀 있으면 알림이 오지 않을 수 있어요.',
+    en: 'If the app is fully closed on this phone, alerts may not arrive.',
+    ja: 'このスマートフォンでアプリが完全に閉じていると、通知が届かないことがあります。',
+    zh: '如果此手机上的应用已完全关闭，可能收不到提醒。',
+  },
+  'guardian.overdueTag': {
+    ko: '마감 지남',
+    en: 'Time passed',
+    ja: '期限超過',
+    zh: '已过截止时间',
+  },
+  'guardian.upcomingTag': {
+    ko: '예정',
+    en: 'Upcoming',
+    ja: '予定',
+    zh: '未到',
+  },
+  'guardian.overdueHelp': {
+    ko: '함께 있지 않다면 환자에게 연락해 돌아왔는지 확인해 주세요.',
+    en: 'If you are not together, contact the patient to check they are back.',
+    ja: '一緒にいない場合は、患者さんに連絡して戻ったか確認してください。',
+    zh: '如果你们不在一起，请联系患者确认其是否已返回。',
+  },
   'guardian.emergencyTitle': {
     ko: '긴급 연락',
     en: 'Emergency contacts',

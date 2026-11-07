@@ -30,6 +30,7 @@ import {
   shareLang,
 } from '../components/guardian/share.js';
 import { copyIdFor, guardianErrorView, kstClock, kstDate } from '../components/guardian/errorView.js';
+import { patientReturnStatus } from '../components/guardian/returnStatus.js';
 import { makeGuardianStay, makeTripPlan, guardianOuting } from './guardian-fixtures.js';
 
 const HOUR = 60 * 60 * 1000;
@@ -314,5 +315,34 @@ describe('오류 → 사용자 문구 (spec 4.11)', () => {
     assert.match(id, /^[0-9a-f]{64}$/);
     assert.equal(await copyIdFor('Q'.repeat(120)), id);
     assert.notEqual(await copyIdFor('R'.repeat(120)), id);
+  });
+});
+
+describe('patientReturnStatus (받은 일정 마감 지남 표시)', () => {
+  const now = Date.parse('2026-11-06T06:30:00Z'); // KST 2026-11-06 15:30
+
+  test('오늘 지난 마감은 PASSED, 아직은 UPCOMING, 다른 날짜는 null', () => {
+    assert.equal(patientReturnStatus({ date: '2026-11-06', by: '15:30', nowMs: now }), 'PASSED');
+    assert.equal(patientReturnStatus({ date: '2026-11-06', by: '14:00', nowMs: now }), 'PASSED');
+    assert.equal(patientReturnStatus({ date: '2026-11-06', by: '15:31', nowMs: now }), 'UPCOMING');
+    assert.equal(patientReturnStatus({ date: '2026-11-07', by: '10:00', nowMs: now }), null);
+    assert.equal(patientReturnStatus({ date: '2026-11-05', by: '10:00', nowMs: now }), null);
+  });
+
+  test('KST 기준 오늘', () => {
+    const late = Date.parse('2026-11-06T15:30:00Z'); // KST 2026-11-07 00:30
+    assert.equal(patientReturnStatus({ date: '2026-11-07', by: '00:10', nowMs: late }), 'PASSED');
+    assert.equal(patientReturnStatus({ date: '2026-11-06', by: '23:00', nowMs: late }), null);
+  });
+
+  test('깨진 by 는 null', () => {
+    for (const by of [null, undefined, '', '25:00', '9:00', '12:60', '12:3x']) {
+      assert.equal(patientReturnStatus({ date: '2026-11-06', by, nowMs: now }), null);
+    }
+  });
+
+  test('깨진 nowMs 나 date 는 null', () => {
+    assert.equal(patientReturnStatus({ date: '2026-11-06', by: '10:00', nowMs: NaN }), null);
+    assert.equal(patientReturnStatus({ date: 'x', by: '10:00', nowMs: now }), null);
   });
 });

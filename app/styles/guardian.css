@@ -344,3 +344,60 @@
   display: grid;
   gap: var(--space-2);
 }
+
+/* ───────────────────────── 복귀 마감 알림 · 마감 지남 표시 ───────────────────────── */
+/* 알림 스위치 블록: 흰 바탕 위 스위치 행(터치 대상 52px) + 회색 안내 */
+.guardian-alerts-row {
+  min-height: var(--tap-min);
+  border-bottom: none;
+}
+.guardian-alerts-note {
+  margin-top: var(--space-2);
+}
+.guardian-alerts-note p {
+  color: var(--ink);
+  font-size: var(--text-body);
+}
+.guardian-alerts-status:not(:empty) {
+  margin-top: var(--space-2);
+  color: var(--ink);
+  font-weight: var(--weight-medium);
+}
+/* 상태 꼬리표: 아이콘 + 글자라 색만으로 뜻을 나누지 않는다 */
+.guardian-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-10);
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+}
+.guardian-tag.is-passed {
+  border-color: var(--state-standby-line);
+  background: var(--state-standby-bg);
+  color: var(--state-standby-ink);
+}
+.guardian-tag.is-upcoming {
+  color: var(--ink-soft);
+}
+.guardian-return-time {
+  flex-wrap: wrap;
+}
+.guardian-overdue-help {
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+}
+.guardian-overdue-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.guardian-overdue-actions .btn {
+  min-height: var(--tap-min);
+  gap: var(--space-2);
+}
