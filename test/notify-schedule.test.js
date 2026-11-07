@@ -77,7 +77,7 @@ function medicationEffective(list) {
   };
 }
 
-function dayPlan({ outings = [], guardianOutings = [], blocks = [], medication = null, date = DATE } = {}) {
+function dayPlan({ outings = [], guardianOutings = [], blocks = [], medication = null, date = DATE, returnNow = false } = {}) {
   return {
     date,
     coverage: 'RESTRICTED',
@@ -98,7 +98,7 @@ function dayPlan({ outings = [], guardianOutings = [], blocks = [], medication =
     mealSlots: [],
     excluded: [],
     warnings: [],
-    returnNow: false,
+    returnNow,
   };
 }
 
@@ -345,6 +345,21 @@ describe('복귀 마감이 지남 (설계서 4.1·4.2)', () => {
       byKind(items, NOTIFY_KIND.RETURN_PASSED).map(({ at, expiresAt, time, key }) => ({ at, expiresAt, time, key })),
       [{ at: iso('18:00'), expiresAt: iso('19:00'), time: '18:00', key: NOTIFY_TEXT_KEY.RETURN_PASSED }],
     );
+  });
+
+  test('즉시 복귀 중인 날(returnNow)은 RETURN_PASSED 를 내지 않고, 보호자 사본 알림은 그대로 둔다', () => {
+    const companionDay = { date: DATE, patientReturn: [{ by: '19:00' }] };
+    const plan = dayPlan({ outings: [outing()], returnNow: true });
+    const items = planNotifications(plan, { nowMs: EARLY, companionDay });
+    assert.equal(byKind(items, NOTIFY_KIND.RETURN_PASSED).length, 0);
+    assert.equal(byKind(items, NOTIFY_KIND.COMPANION_RETURN_PASSED).length, 1);
+    // 늦게 깨어난 경우에도 내지 않는다(마감을 now 로 당겨 놓은 값이라 실제 마감 시각이 아니다)
+    assert.equal(byKind(planNotifications(plan, { nowMs: kst('18:30') }), NOTIFY_KIND.RETURN_PASSED).length, 0);
+  });
+
+  test('returnNow 가 false 이면 그대로 낸다', () => {
+    const plan = dayPlan({ outings: [outing()], returnNow: false });
+    assert.equal(byKind(planNotifications(plan, { nowMs: EARLY }), NOTIFY_KIND.RETURN_PASSED).length, 1);
   });
 
   test('시점 기본값: returnPassedGraceMin 60', () => {
