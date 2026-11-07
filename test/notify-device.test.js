@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deliverToDevice, notificationOpenUrl } from '../lib/notify/device.js';
+import { deliverToDevice, notificationClickPath, notificationOpenUrl } from '../lib/notify/device.js';
 import { planNotifications } from '../lib/notify/schedule.js';
 import { attachSessionUpkeep, createSessionUpkeep } from '../components/pwa/sessionUpkeep.js';
 import { registerServiceWorker } from '../components/pwa/registerServiceWorker.js';
@@ -42,7 +42,7 @@ function fakeNotification(permission = 'granted') {
   const made = [];
   let requested = 0;
   function FakeNotification(title, options) {
-    made.push({ title, options });
+    made.push({ title, options, instance: this });
   }
   FakeNotification.permission = permission;
   FakeNotification.requestPermission = async () => {
@@ -131,6 +131,40 @@ describe('기기 알림 한 장 (deliverToDevice)', () => {
     const ok = await deliverToDevice(ITEMS[0], { store: fakeStore(), nav: fakeNav({ registration: undefined }), NotificationImpl: FakeNotification });
     assert.equal(ok, true);
     assert.equal(made.length, 1);
+  });
+
+  test('서비스 워커가 없을 때 생성자 알림을 누르면 허용 목록 화면으로 이동한다', async () => {
+    const { FakeNotification, made } = fakeNotification();
+    const calls = [];
+    const win = {
+      location: { origin: 'https://safehour.example', assign: (href) => calls.push(['assign', href]) },
+      focus: () => calls.push(['focus']),
+    };
+    await deliverToDevice(ITEMS[0], { store: fakeStore(), nav: fakeNav({ registration: null }), NotificationImpl: FakeNotification, win });
+    const { instance } = made[0];
+    assert.equal(typeof instance.onclick, 'function');
+    instance.close = () => calls.push(['close']);
+    instance.onclick();
+    assert.deepEqual(calls, [['focus'], ['assign', 'https://safehour.example/today'], ['close']]);
+  });
+
+  test('보호자 알림을 누르면 /g 로 이동하고, window 가 없으면 onclick 을 달지 않는다', async () => {
+    const guardian = planNotifications(null, {
+      nowMs: kst('06:00'),
+      companionDay: { date: DATE, patientReturn: [{ by: '12:00' }] },
+    })[0];
+    const a = fakeNotification();
+    const assigned = [];
+    const win = { location: { origin: 'https://safehour.example', assign: (h) => assigned.push(h) }, focus() {} };
+    await deliverToDevice(guardian, { store: fakeStore(), nav: fakeNav({ registration: null }), NotificationImpl: a.FakeNotification, win });
+    a.made[0].instance.close = () => {};
+    a.made[0].instance.onclick();
+    assert.deepEqual(assigned, ['https://safehour.example/g']);
+
+    const b = fakeNotification();
+    const ok = await deliverToDevice(ITEMS[0], { store: fakeStore(), nav: fakeNav({ registration: null }), NotificationImpl: b.FakeNotification, win: null });
+    assert.equal(ok, true);
+    assert.equal(b.made[0].instance.onclick, undefined);
   });
 
   test('서비스 워커가 아직 설치 중이면 생성자로 낸다', async () => {
@@ -265,5 +299,15 @@ describe('서비스 워커 등록', () => {
     };
     assert.doesNotThrow(() => registerServiceWorker(win));
     await new Promise((r) => setImmediate(r));
+  });
+});
+
+describe('알림 누름 목적지 (notificationClickPath)', () => {
+  test("허용 목록('/today', '/g')만 그대로, 그 밖은 /today", () => {
+    assert.equal(notificationClickPath({ url: '/g' }), '/g');
+    assert.equal(notificationClickPath({ url: '/today' }), '/today');
+    for (const data of [undefined, null, {}, { url: 42 }, { url: '/settings' }, { url: 'https://evil.example/g' }, { url: '//evil' }, { url: '/g?x=1' }]) {
+      assert.equal(notificationClickPath(data), '/today', JSON.stringify(data));
+    }
   });
 });

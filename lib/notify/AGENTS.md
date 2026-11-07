@@ -37,6 +37,7 @@
 - 즉시 복귀 중인 날(`dayPlan.returnNow`)에는 `RETURN_PASSED` 를 만들지 않는다. 마감을 지금으로 당겨 놓은 값이라 실제 마감 시각이 아니다.
 - 앱 안 배너는 스위치와 상관없이 늘 바뀐다. 스위치(`prefs.notifications`)는 기기 알림만 막는다.
 - 기기 알림을 누르면 서비스 워커가 알림 `data.url` 의 화면을 연다. 허용 목록(`/today`, `/g`) 밖이면 `/today` 를 연다.
+  서비스 워커 없이 생성자로 낸 알림은 `onclick` 이 같은 허용 목록(`notificationClickPath`)으로 창을 옮긴다.
 
 ## 테스트
 
