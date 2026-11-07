@@ -113,13 +113,13 @@
   overflow-wrap: anywhere;
 }
 .designBoard-hex {
-  margin-top: 2px;
+  margin-top: var(--space-0-5);
 }
 .designBoard-verdict {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-1) 6px;
+  gap: var(--space-1) var(--space-1-5);
   margin-top: var(--space-1);
   color: var(--ink);
 }
