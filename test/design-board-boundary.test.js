@@ -3,10 +3,13 @@
 // 시안 보드는 고정 데모 데이터만 쓰고 기기 저장소를 읽지 않는다. 저장소·알림 런타임·체류 훅을
 // import 하는 순간 사용자 데이터가 시안 화면에 섞인다. 이 테스트가 import 줄을 정적으로 읽어 막는다.
 // 시안 보드가 그리는 components/guardian 표시 부품 두 개도 같은 기준으로 검사한다.
+// 정적 import 줄만 본다. require(...), 동적 import(...), `export ... from` 재수출, 그 두 부품 말고 다른
+// 컴포넌트를 거치는 간접 저장소 사용은 잡지 못한다.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -42,7 +45,7 @@ function walk(dir) {
 function parseImports(source) {
   const code = source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const found = [];
-  const re = /import\s+(?:([\s\S]*?)\s+from\s+)?['"]([^'"]+)['"]/g;
+  const re = /import\s+(?:((?:(?!['"])[\s\S])*?)\s+from\s+)?['"]([^'"]+)['"]/g;
   for (const m of code.matchAll(re)) found.push({ clause: m[1] ?? '', specifier: m[2] });
   return found;
 }
@@ -86,5 +89,15 @@ describe('시안 보드 경계: 기기 저장소를 읽지 않는다', () => {
     assert.equal(imports.length, 3);
     assert.ok(imports.every((i) => FORBIDDEN_SPECIFIERS.some((f) => i.specifier.includes(f))));
     assert.ok(imports.some((i) => /\bgetStore\b/.test(i.clause)));
+  });
+
+  test('검사기 자체: from 없는 부작용 import 뒤에 다른 import 가 와도 금지 경로를 잃지 않는다', () => {
+    const sample = "import '@/lib/store/init.js';\nimport React from 'react';";
+    const imports = parseImports(sample);
+    assert.deepEqual(imports.map((i) => i.specifier), ['@/lib/store/init.js', 'react']);
+    const dir = mkdtempSync(join(tmpdir(), 'board-'));
+    const file = join(dir, 'x.js');
+    writeFileSync(file, sample);
+    assert.ok(violations(file).length > 0, '부작용 저장소 import 를 잡아야 한다');
   });
 });
