@@ -18,6 +18,7 @@ import { useLang } from '@/components/LanguageProvider.js';
 import Icon from '@/components/ui/Icon.js';
 import { getNotifier } from '@/lib/notify/client.js';
 import { notificationOpenUrl } from '@/lib/notify/device.js';
+import { NOTIFY_KIND } from '@/lib/notify/schedule.js';
 import { NOTIFY_TITLE_KEY } from '@/lib/notify/text.js';
 
 const NO_SUBSCRIPTION = () => {};
@@ -64,7 +65,7 @@ export default function NotificationBanner() {
               {lines.secondary.text}
             </p>
             <Link href={openUrl} className="pwa-notify-link" onClick={dismiss}>
-              {t(openUrl === '/g' ? 'notifications.openGuardianCopy' : 'notifications.openToday')}
+              {t(item?.kind === NOTIFY_KIND.COMPANION_RETURN_PASSED ? 'notifications.openGuardianCopy' : 'notifications.openToday')}
             </Link>
           </div>
           <button type="button" className="pwa-notify-close" onClick={dismiss} aria-label={t('notifications.dismiss')}>

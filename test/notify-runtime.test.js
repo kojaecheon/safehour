@@ -209,6 +209,13 @@ describe('알림 내기', () => {
     notifier.tick();
     assert.deepEqual(returnItems(delivered), []);
     assert.notEqual(notifier.getBanner()?.kind, NOTIFY_KIND.RETURN);
+    // 마감 지남 알림은 마감(18:00) 뒤 60분 안이므로 늦게라도 한 번 낸다
+    const passed = delivered.filter((i) => i.kind === NOTIFY_KIND.RETURN_PASSED);
+    assert.equal(passed.length, 1);
+    assert.equal(notifier.getBanner()?.id, passed[0].id);
+    notifier.tick();
+    notifier.refresh();
+    assert.equal(delivered.filter((i) => i.kind === NOTIFY_KIND.RETURN_PASSED).length, 1);
   });
 
   test('배너는 닫을 수 있고, 목표 시각이 지나면 스스로 사라진다', () => {
@@ -285,5 +292,124 @@ describe('알림 내기', () => {
     notifier.start();
     notifier.start();
     assert.equal(timers.pending.size, 1);
+  });
+});
+
+// ── 보호자 사본과 이미 낸 마감 지남 알림 ─────────────────────────────
+
+const COMPANION = NOTIFY_KIND.COMPANION_RETURN_PASSED;
+const companionItems = (items) => items.filter((i) => i.kind === COMPANION);
+
+function copyOf(days, importedAt, expiresAt = iso('23:00', '2026-09-30')) {
+  return { snapshot: { days }, importedAt, expiresAt };
+}
+const day = (date, ...bys) => ({ date, patientReturn: bys.map((by) => ({ by, placeName: '숙소', placeAddress: null })) });
+
+/** 환자 일정 없이 보호자 사본만 있는 기기 */
+function setupGuardian(copies) {
+  setup({ plans: { [NEXT]: plan(NEXT) } });
+  for (const [id, copy] of Object.entries(copies)) assert.equal(store.writeGuardianCopy(id, copy).ok, true);
+}
+
+describe('보호자 사본 마감 알림', () => {
+  test('가장 최근에 가져온 사본의 오늘 마감만 예약한다', () => {
+    setupGuardian({
+      old: copyOf([day(DATE, '15:00')], iso('05:00')),
+      latest: copyOf([day(DATE, '17:00'), day(NEXT, '12:00')], iso('05:30')),
+    });
+    notifier.start();
+    assert.deepEqual(
+      companionItems(notifier.getItems()).map((i) => i.at),
+      [iso('17:00')],
+    );
+  });
+
+  test('최신 사본이 만료되어 사라지면 예약도 없다', () => {
+    setupGuardian({ latest: copyOf([day(DATE, '17:00')], iso('05:30'), iso('07:00')) });
+    notifier.start();
+    assert.equal(companionItems(notifier.getItems()).length, 1);
+    clock = kst('07:00');
+    notifier.refresh();
+    assert.deepEqual(companionItems(notifier.getItems()), []);
+  });
+
+  test('KST 가 아닌 시간대에서도 KST 날짜의 사본 하루만 쓴다', () => {
+    const prevTz = process.env.TZ;
+    process.env.TZ = 'America/Los_Angeles';
+    try {
+      setupGuardian({ latest: copyOf([day(DATE, '17:00'), day(NEXT, '12:00')], iso('05:30')) });
+      clock = Date.parse('2026-09-20T15:30:00Z'); // KST 2026-09-21 00:30
+      notifier.start();
+      assert.deepEqual(
+        companionItems(notifier.getItems()).map((i) => i.at),
+        [iso('12:00', NEXT)],
+      );
+    } finally {
+      if (prevTz === undefined) delete process.env.TZ;
+      else process.env.TZ = prevTz;
+    }
+  });
+
+  test('마감 뒤 60분 안에 시작하면 한 번 내고 기억한다', () => {
+    setupGuardian({ latest: copyOf([day(DATE, '17:00')], iso('05:30')) });
+    const marks = [];
+    const wrapped = {
+      ...store,
+      markOverdueNotified: (date, id) => {
+        marks.push([date, id]);
+        return store.markOverdueNotified(date, id);
+      },
+    };
+    notifier = createNotifier({ store: wrapped, now: () => clock, timers, deliver: (item) => delivered.push(item) });
+    clock = kst('17:20');
+    notifier.start();
+    assert.equal(delivered.length, 1);
+    assert.equal(delivered[0].kind, COMPANION);
+    assert.equal(notifier.getBanner()?.id, delivered[0].id);
+    assert.deepEqual(marks, [[DATE, delivered[0].id]]);
+    assert.deepEqual(store.readOverdueSeen(DATE).notified, [delivered[0].id]);
+    notifier.stop();
+
+    const again = createNotifier({ store, now: () => clock, timers, deliver: (item) => delivered.push(item) });
+    again.start();
+    assert.equal(delivered.length, 1, '다시 열어도 이미 낸 알림은 내지 않는다');
+    assert.deepEqual(companionItems(again.getItems()), []);
+    again.stop();
+  });
+
+  test('마감 뒤 60분이 지났으면 내지 않는다', () => {
+    setupGuardian({ latest: copyOf([day(DATE, '17:00')], iso('05:30')) });
+    clock = kst('18:01');
+    notifier.start();
+    assert.deepEqual(delivered, []);
+  });
+
+  test('기억 쓰기가 실패해도 같은 실행 안에서는 한 번만 낸다', () => {
+    setupGuardian({ latest: copyOf([day(DATE, '17:00')], iso('05:30')) });
+    notifier = createNotifier({
+      store: { ...store, markOverdueNotified: () => ({ ok: false }) },
+      now: () => clock,
+      timers,
+      deliver: (item) => delivered.push(item),
+    });
+    clock = kst('17:05');
+    notifier.start();
+    notifier.tick();
+    notifier.refresh();
+    clock = kst('17:10');
+    notifier.tick();
+    notifier.refresh();
+    assert.equal(delivered.length, 1);
+  });
+
+  test('guardianCopies 가 바뀌면 다시 예약한다', () => {
+    setupGuardian({});
+    notifier.start();
+    assert.deepEqual(companionItems(notifier.getItems()), []);
+    assert.equal(store.writeGuardianCopy('latest', copyOf([day(DATE, '17:00')], iso('05:30'))).ok, true);
+    assert.deepEqual(
+      companionItems(notifier.getItems()).map((i) => i.at),
+      [iso('17:00')],
+    );
   });
 });
