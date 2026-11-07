@@ -30,6 +30,7 @@ import {
   overdueOutingOf,
   placeDetailRequest,
   returnNoteKeyOf,
+  returnPlaceOf,
   returnTargetOf,
   stopBadges,
   stopEditable,
@@ -720,5 +721,89 @@ describe('returnNoteKeyOf: 복귀 시트 맺음말 (findings 11)', () => {
     const hospital = outing('o', { returnPlace: 'HOSPITAL', returnBy: '15:00', deadlineReason: 'APPOINTMENT' });
     assert.equal(returnNoteKeyOf(returnTargetOf({ day: day(), stay: STAY, outing: hospital })), 'return.notePlace');
     assert.equal(returnNoteKeyOf(returnTargetOf({ day: day(), stay: STAY, outing: outing('o') })), 'return.note');
+  });
+});
+
+describe('returnPlaceOf: 타임라인과 복귀 시트가 같은 돌아갈 곳을 보인다 (B7)', () => {
+  const H2 = { id: 'H2', name: '둘째 의원', address: { roadAddress: '둘째 병원 주소', lat: 37.53, lng: 127.04 } };
+  const TWO = { ...STAY, hospitals: [STAY.hospitals[0], H2] };
+
+  /** 같은 외출을 타임라인(returnPlaceOf · timelineEntries)과 시트(returnTargetOf)로 읽는다 */
+  function both(o, d, stay) {
+    const dayWith = { ...d, outings: [o] };
+    const timeline = returnPlaceOf(o, dayWith, stay);
+    const entry = timelineEntries(dayWith, { role: 'P', stay }).find((e) => e.kind === 'return');
+    assert.deepEqual(entry.place, timeline, 'timelineEntries 의 복귀 항목은 returnPlaceOf 를 그대로 싣는다');
+    return { timeline, sheet: returnTargetOf({ day: dayWith, stay, outing: o }) };
+  }
+
+  test('숙소 외출: 둘 다 그날 숙소', () => {
+    const { timeline, sheet } = both(outing('o'), day(), STAY);
+    assert.deepEqual(timeline, { kind: 'LODGING', name: '데모 숙소' });
+    assert.equal(sheet.kind, 'LODGING');
+    assert.equal(sheet.name, timeline.name);
+  });
+
+  test('병원 외출, 적힌 id(병원 일정 start === returnBy): 둘 다 그 병원', () => {
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '15:00', deadlineReason: 'APPOINTMENT' });
+    const { timeline, sheet } = both(o, day(), STAY);
+    assert.deepEqual(timeline, { kind: 'HOSPITAL', name: '데모 의원' });
+    assert.equal(sheet.name, timeline.name);
+  });
+
+  test('병원 일정과 복귀 시각 조건이 다른 병원을 적으면 둘 다 엔진 규칙(병원 일정 먼저)을 따른다', () => {
+    // 예전 타임라인은 RETURN_TIME 이면 복귀 시각 조건의 H2 를 먼저 봤고, 시트는 병원 일정의 H1 을 봤다
+    const stay = { ...TWO, appointments: [{ id: 'A1', hospitalId: 'H1', type: 'VISIT', date: DATE, start: '18:00', source: 'USER' }] };
+    const d = day({ effective: { returnTime: eff({ time: '18:00', place: 'HOSPITAL', hospitalId: 'H2' }) } });
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '18:00', deadlineReason: 'RETURN_TIME' });
+    const { timeline, sheet } = both(o, d, stay);
+    assert.deepEqual(timeline, { kind: 'HOSPITAL', name: '데모 의원' });
+    assert.equal(sheet.name, '데모 의원');
+  });
+
+  test('복귀 시각 조건의 hospitalId 만 적혔으면 둘 다 그 병원', () => {
+    const stay = { ...TWO, appointments: [] };
+    const d = day({ effective: { returnTime: eff({ time: '18:00', place: 'HOSPITAL', hospitalId: 'H2' }) } });
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '18:00', deadlineReason: 'RETURN_TIME' });
+    const { timeline, sheet } = both(o, d, stay);
+    assert.deepEqual(timeline, { kind: 'HOSPITAL', name: '둘째 의원' });
+    assert.equal(sheet.name, '둘째 의원');
+  });
+
+  test('적힌 id 가 없으면 시트는 정해 둔 장소, 타임라인은 이름 없는 병원(일반 라벨)', () => {
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'DAY_END' });
+    const { timeline, sheet } = both(o, day(), STAY);
+    assert.deepEqual(sheet, { kind: 'PLANNED', name: null, address: null });
+    assert.deepEqual(timeline, { kind: 'HOSPITAL', name: null });
+  });
+
+  test('적힌 id 가 병원 목록에 없으면 다른 병원으로 대신하지 않는다', () => {
+    const stay = { ...STAY, appointments: [...STAY.appointments, { id: 'A9', hospitalId: 'H9', type: 'VISIT', date: DATE, start: '13:07', source: 'USER' }] };
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });
+    const { timeline, sheet } = both(o, day(), stay);
+    assert.equal(sheet.kind, 'PLANNED');
+    assert.deepEqual(timeline, { kind: 'HOSPITAL', name: null });
+  });
+
+  test('한 병원 대비책: 적힌 id 가 없고 마감 이유가 병원 일정(APPOINTMENT)일 때만 둘 다 그 병원', () => {
+    // 경우 2: 마감이 지금으로 당겨져 start === returnBy 일정이 없다. 그날 병원 일정은 모두 H1
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });
+    const { timeline, sheet } = both(o, day(), STAY);
+    assert.deepEqual(timeline, { kind: 'HOSPITAL', name: '데모 의원' });
+    assert.equal(sheet.name, '데모 의원');
+    for (const deadlineReason of ['RETURN_TIME', 'MEDICATION', 'DAY_END']) {
+      const other = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason });
+      const r = both(other, day(), STAY);
+      assert.equal(r.sheet.kind, 'PLANNED', deadlineReason);
+      assert.deepEqual(r.timeline, { kind: 'HOSPITAL', name: null }, deadlineReason);
+    }
+  });
+
+  test('그날 병원이 둘이면 대비책도 고르지 않는다', () => {
+    const stay = { ...TWO, appointments: [...STAY.appointments, { id: 'A2', hospitalId: 'H2', type: 'VISIT', date: DATE, start: '18:00', source: 'USER' }] };
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });
+    const { timeline, sheet } = both(o, day(), stay);
+    assert.equal(sheet.kind, 'PLANNED');
+    assert.deepEqual(timeline, { kind: 'HOSPITAL', name: null });
   });
 });

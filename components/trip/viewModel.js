@@ -4,6 +4,7 @@
 // 엔진·동기화 모듈(lib/trip)이 만든 값을 고르고 늘어놓기만 한다. 테스트는 test/trip-view.test.js.
 //
 //   timelineEntries    하루 타임라인 항목 (블록·외출·정거장·식사 칸·복귀·휴식) — components/ui/DayTimeline 이 그린다
+//   returnPlaceOf      타임라인·오늘 화면의 복귀 장소, returnTargetOf 에서 읽는다(시트와 같은 돌아갈 곳)
 //   guardianTabInfo    보호자 탭 잠금 사유, 합성된 escortRequired / guardianMustStay 에서 읽는다 (docs/business-rules.md '하루 일정 생성')
 //   deltaSummary       전후 비교 요약 줄 (docs/business-rules.md '전체 일정 확정과 변화 대응')
 //   todayFocus         오늘 화면의 지금·다음 외출과 다음 정거장
@@ -94,20 +95,21 @@ function appointmentHospitalId(stay, appointmentId) {
 }
 
 /**
- * 외출의 복귀 장소 `{ kind: 'LODGING'|'HOSPITAL', name }`.
- * 병원이면 복귀 시각 조건의 병원(RETURN_TIME) 또는 그 시각에 시작하는 병원 일정(APPOINTMENT)의 병원 이름.
- * 이름을 모르면 name 은 null — 화면은 일반 라벨('숙소'·'병원')을 쓴다.
+ * 타임라인·오늘 화면의 복귀 장소 `{ kind: 'LODGING'|'HOSPITAL', name }`.
+ * 돌아갈 곳은 복귀 시트와 같은 한 규칙(returnTargetOf: 엔진의 적힌 hospitalId 규칙과 한 병원 대비책)에서 읽는다.
+ * 같은 외출을 타임라인과 시트가 다른 병원으로 보이지 않게 하려는 것이다.
+ * 모양은 그대로다: 시트가 '정해 둔 장소'(PLANNED)로 보이는 병원 외출은 여기서 이름 없는 병원(name null)이다.
+ * 저장된 외출의 returnPlace 가 병원이라는 것은 사실이라 화면은 일반 라벨('병원')을 쓰고, 병원 이름은 추측하지 않는다.
+ * 이름을 모르면 name 은 null, 화면은 일반 라벨('숙소'·'병원')을 쓴다.
+ * @param {object|null} outing
+ * @param {object|null} day
+ * @param {object|null} stay
+ * @returns {{ kind: 'LODGING'|'HOSPITAL', name: string|null }}
  */
 export function returnPlaceOf(outing, day, stay) {
-  if (outing?.returnPlace !== 'HOSPITAL') return { kind: 'LODGING', name: lodgingOf(day, stay)?.name ?? null };
-  let hospitalId = null;
-  const returnTime = day?.effective?.returnTime?.value;
-  if (outing.deadlineReason === 'RETURN_TIME' && returnTime?.place === 'HOSPITAL') hospitalId = returnTime.hospitalId ?? null;
-  if (!hospitalId) {
-    const appt = list(stay?.appointments).find((a) => a?.date === day?.date && a?.start === outing.returnBy);
-    hospitalId = appt?.hospitalId ?? null;
-  }
-  return { kind: 'HOSPITAL', name: hospitalId ? hospitalName(stay, hospitalId) : null };
+  const target = returnTargetOf({ day, stay, outing });
+  if (target.kind === 'LODGING') return { kind: 'LODGING', name: target.name };
+  return { kind: 'HOSPITAL', name: target.kind === 'HOSPITAL' ? target.name : null };
 }
 
 /** 그날 병원 일정이 모두 한 병원이면 그 병원, 아니면 null (둘 중에서 고르지 않는다) */
@@ -126,6 +128,7 @@ function soleHospitalOfDay(day, stay) {
  * 경우 2 에서는 엔진이 마감을 지금으로 당겨(overdueSafe) 그 시각에 시작하는 병원 일정이 없을 수 있다. 그렇게
  * 적힌 hospitalId 가 하나도 없고 마감 이유가 병원 일정(deadlineReason 'APPOINTMENT')일 때만 그날 병원 일정이 모두 한 병원이면 그 병원을 쓴다. 그 밖에는 PLANNED('정해 둔 장소')이고 추측하지 않는다.
  * 저장된 외출의 returnPlace 를 그대로 따른다. 장소를 다시 판정하지 않는다.
+ * 타임라인(returnPlaceOf)도 이 함수에서 읽는다. 돌아갈 곳을 찾는 규칙은 여기 하나다.
  * @param {{ day: object|null, stay: object|null, outing?: object|null }} args
  */
 export function returnTargetOf({ day, stay, outing = null }) {
