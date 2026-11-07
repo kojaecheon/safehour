@@ -11,24 +11,13 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useLang } from '@/components/LanguageProvider.js';
-import { usePrefs } from '@/components/cards/useDeviceData.js';
 import { DayTimeline, Icon } from '@/components/ui/index.js';
-import useStoreStatus, { shouldShowReadOnly } from '@/components/ui/useStoreStatus.js';
-import { turnOnDeviceNotifications } from '@/lib/notify/permission.js';
-import { getStore } from '@/lib/store/index.js';
 import { EMERGENCY_NUMBERS, HOSPITAL_RETURN_LABEL } from '@/src/guardian/index.js';
 import { parseInstantMs } from '@/src/stay/index.js';
 import { dateLabel, kstClock, kstDate } from './errorView.js';
 import { patientReturnStatus } from './returnStatus.js';
 import SafetyNote from './SafetyNote.js';
 
-const NOTIFY_MESSAGE = Object.freeze({
-  on: 'settings.notifyOn',
-  off: 'settings.notifyOff',
-  unsupported: 'settings.notifyUnsupported',
-  denied: 'settings.notifyDenied',
-  failed: 'settings.saveFailed',
-});
 const TICK_MS = 60 * 1000;
 
 const CALL_KEY = { 119: 'guardian.call119', 1330: 'guardian.call1330' };
@@ -73,56 +62,6 @@ function useNowMs() {
     return () => clearInterval(timer);
   }, []);
   return nowMs;
-}
-
-/** 복귀 마감 알림 스위치: 설정 화면의 알림 스위치와 같은 기기 설정(prefs.notifications) */
-function AlertsToggle() {
-  const { t } = useLang();
-  const prefs = usePrefs();
-  const status = useStoreStatus();
-  const showReadOnly = shouldShowReadOnly(status);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState(null);
-  const on = prefs?.notifications === true;
-
-  async function onChange(event) {
-    if (status.readOnly || busy) return;
-    const want = event.target.checked;
-    setBusy(true);
-    try {
-      if (want) setMessage(await turnOnDeviceNotifications({ store: getStore() }));
-      else setMessage(getStore().writePrefs({ notifications: false }).ok ? 'off' : 'failed');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="guardian-alerts" aria-label={t('guardian.alertsToggle')}>
-      <label className="toggle-row guardian-alerts-row">
-        <span className="label">{t('guardian.alertsToggle')}</span>
-        <input
-          type="checkbox"
-          role="switch"
-          className="ui-switch"
-          checked={on}
-          aria-checked={on}
-          disabled={status.readOnly || busy || prefs === null}
-          onChange={onChange}
-        />
-      </label>
-      <div className="ui-callout has-icon guardian-alerts-note" role="note">
-        <span className="ui-callout-icon" aria-hidden="true">
-          <Icon name="info" size={20} />
-        </span>
-        <p>{t('guardian.alertsNote')}</p>
-      </div>
-      <div role="status" className="guardian-alerts-status">
-        {message && <p>{t(NOTIFY_MESSAGE[message])}</p>}
-      </div>
-      {showReadOnly && <p className="guardian-meta">{t('settings.readOnlyNote')}</p>}
-    </section>
-  );
 }
 
 function ReturnTag({ status }) {
@@ -221,8 +160,10 @@ function GuardianDay({ day, nowMs }) {
  * @param {import('@/src/guardian/snapshot.js').GuardianSnapshot} props.snapshot
  * @param {React.Ref} [props.headingRef]
  * @param {React.ReactNode} [props.notice]  저장 실패 같은 안내
+ * @param {React.ReactNode} [props.alerts]  복귀 마감 알림 스위치 자리. 부품은 저장소를 읽지 않으므로
+ *   실제 화면은 AlertsToggle, 디자인 보드는 고정 상태의 AlertsToggleView 를 넘긴다
  */
-export default function GuardianCopyView({ snapshot, headingRef, notice }) {
+export default function GuardianCopyView({ snapshot, headingRef, notice, alerts }) {
   const { t, locale } = useLang();
   const asOf = kstStamp(snapshot.createdAt, locale);
   const expires = kstStamp(snapshot.expiresAt, locale);
@@ -243,7 +184,7 @@ export default function GuardianCopyView({ snapshot, headingRef, notice }) {
         {notice}
       </header>
 
-      <AlertsToggle />
+      {alerts}
 
       <section className="guardian-emergency" aria-labelledby="guardian-emergency-title">
         <h3 id="guardian-emergency-title">{t('guardian.emergencyTitle')}</h3>

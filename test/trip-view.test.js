@@ -661,6 +661,15 @@ describe('returnTargetOf · overdueOutingOf: 복귀 시트의 돌아갈 곳 (마
     assert.deepEqual(returnTargetOf({ day: day(), stay, outing: o }), { kind: 'HOSPITAL', name: '데모 의원', address: '데모 병원 주소' });
   });
 
+  test('마감 이유가 병원 일정이 아니면 적힌 id 가 없을 때 그날 병원이 하나뿐이어도 정해 둔 장소', () => {
+    // 위 대비책과 같은 하루지만 deadlineReason 이 APPOINTMENT 가 아니고, 일정·복귀 시각 조건 어디에도 id 가 없다
+    const stay = { ...STAY, appointments: [...STAY.appointments, { id: 'A2', hospitalId: 'H1', type: 'VISIT', date: DATE, start: '18:00', source: 'USER' }] };
+    for (const deadlineReason of ['RETURN_TIME', 'MEDICATION', 'DAY_END']) {
+      const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason });
+      assert.deepEqual(returnTargetOf({ day: day(), stay, outing: o }), PLANNED, String(deadlineReason));
+    }
+  });
+
   test('적힌 hospitalId 가 병원 목록에 없으면 그날 병원이 하나뿐이어도 정해 둔 장소', () => {
     // 일정(start === returnBy)이 H9 를 적었지만 목록에 없다. 그날 다른 일정은 모두 H1 이어도 H1 으로 대신하지 않는다
     const byAppt = { ...STAY, appointments: [...STAY.appointments, { id: 'A9', hospitalId: 'H9', type: 'VISIT', date: DATE, start: '13:07', source: 'USER' }] };

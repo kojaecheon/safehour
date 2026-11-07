@@ -55,6 +55,7 @@ import CoverageTag from '@/components/conditions/CoverageTag.js';
 import DayConditions from '@/components/conditions/DayConditions.js';
 import PeriodCard from '@/components/conditions/PeriodCard.js';
 import SafetyText from '@/components/conditions/SafetyText.js';
+import AlertsToggleView from '@/components/guardian/AlertsToggleView.js';
 import GuardianCopyView from '@/components/guardian/GuardianCopyView.js';
 import PairText from '@/components/settings/PairText.js';
 import { AppliedConditions, ExcludedList } from '@/components/trip/DayFacts.js';
@@ -817,7 +818,8 @@ function GuardianScreen({ demo }) {
       <div className="page guardian-page designBoard-phone-page">
         <p className="guardian-lead">{t('guardian.openLead')}</p>
         <GuardianPinSection />
-        <GuardianCopyView snapshot={demo.guardianSnapshot} />
+        {/* 알림 스위치는 꺼짐·잠금으로 고정한다: 기기 설정(prefs)을 읽지 않는다 */}
+        <GuardianCopyView snapshot={demo.guardianSnapshot} alerts={<AlertsToggleView on={false} disabled />} />
       </div>
     </>
   );

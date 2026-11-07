@@ -10,7 +10,7 @@ import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createNotifier } from '../lib/notify/runtime.js';
-import { NOTIFY_KIND } from '../lib/notify/schedule.js';
+import { NOTIFY_KIND, planNotifications } from '../lib/notify/schedule.js';
 import { createMemoryStorage, createStore } from '../lib/store/index.js';
 
 const DATE = '2026-09-20';
@@ -374,6 +374,25 @@ describe('보호자 사본 마감 알림', () => {
     again.start();
     assert.equal(delivered.length, 1, '다시 열어도 이미 낸 알림은 내지 않는다');
     assert.deepEqual(companionItems(again.getItems()), []);
+    again.stop();
+  });
+
+  test('마감 지남 알림이 한꺼번에 밀리면 하나만 내고, 밀린 것까지 모두 기억한다', () => {
+    setupGuardian({ latest: copyOf([day(DATE, '17:00', '17:10')], iso('05:30')) });
+    clock = kst('17:20');
+    notifier.start();
+    assert.equal(delivered.length, 1);
+    assert.equal(delivered[0].at, iso('17:10'));
+    const ids = companionItems(
+      planNotifications(null, { nowMs: clock, companionDay: day(DATE, '17:00', '17:10') }),
+    ).map((i) => i.id);
+    assert.equal(ids.length, 2);
+    assert.deepEqual([...store.readOverdueSeen(DATE).notified].sort(), [...ids].sort());
+    notifier.stop();
+
+    const again = createNotifier({ store, now: () => clock, timers, deliver: (item) => delivered.push(item) });
+    again.start();
+    assert.equal(delivered.length, 1, '다시 열어도 밀렸던 앞 알림이 늦게 나오지 않는다');
     again.stop();
   });
 

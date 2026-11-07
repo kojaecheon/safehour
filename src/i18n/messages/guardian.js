@@ -469,7 +469,7 @@ export const messages = {
     ja: '時刻はすべて韓国時間です。',
     zh: '所有时间均为韩国时间。',
   },
-  // ── /g — 받은 일정의 복귀 마감 알림·마감 지남 표시 ──
+  // ── /g: 받은 일정의 복귀 마감 알림·마감 지남 표시 ──
   'guardian.alertsToggle': {
     ko: '복귀 마감 알림 받기',
     en: 'Get return-time alerts',

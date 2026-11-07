@@ -441,12 +441,12 @@ describe('입력이 없거나 깨졌을 때', () => {
 
 // ── 규칙 47 ───────────────────────────────────────────────────────
 
-/** 잠금 화면에 나오면 안 되는 말 — 조건 항목·병원·복약 */
+/** 잠금 화면에 나오면 안 되는 말: 조건 항목·병원·복약, 환자라는 말 */
 const FORBIDDEN = {
-  ko: /병원|의원|클리닉|진료|수술|시술|약|복용|투약|처방|조건|보행|걷기|식이|금식|음주|술|매운|날음식|자외선|햇빛|더위|물놀이|수중|동행|보호자|회복|증상/,
-  en: /hospital|clinic|doctor|appointment|surgery|procedure|medic|medicine|pill|dose|dosage|drug|prescri|condition|walk|diet|fast(ing)?\b|alcohol|spicy|\braw\b|\buv\b|sun|heat|water|swim|escort|guardian|recover|symptom|treatment/i,
-  ja: /病院|医院|クリニック|診察|診療|手術|施術|薬|服用|処方|条件|歩行|食事|断食|飲酒|酒|辛い|生もの|紫外線|暑|水|同行|保護者|回復|症状|通院/,
-  zh: /医院|诊所|就诊|门诊|手术|药|服用|处方|条件|步行|饮食|禁食|饮酒|酒|辣|生食|紫外线|高温|水|陪同|监护|恢复|症状|预约/,
+  ko: /병원|의원|클리닉|진료|수술|시술|약|복용|투약|처방|조건|보행|걷기|식이|금식|음주|술|매운|날음식|자외선|햇빛|더위|물놀이|수중|동행|보호자|회복|증상|환자/,
+  en: /hospital|clinic|doctor|appointment|surgery|procedure|medic|medicine|pill|dose|dosage|drug|prescri|condition|walk|diet|fast(ing)?\b|alcohol|spicy|\braw\b|\buv\b|sun|heat|water|swim|escort|guardian|recover|symptom|treatment|patient/i,
+  ja: /病院|医院|クリニック|診察|診療|手術|施術|薬|服用|処方|条件|歩行|食事|断食|飲酒|酒|辛い|生もの|紫外線|暑|水|同行|保護者|回復|症状|通院|患者/,
+  zh: /医院|诊所|就诊|门诊|手术|药|服用|处方|条件|步行|饮食|禁食|饮酒|酒|辣|生食|紫外线|高温|水|陪同|监护|恢复|症状|预约|患者/,
 };
 
 function everyNamespaceText() {

@@ -15,7 +15,7 @@ export default async function globalSetup() {
   fs.mkdirSync(dataRoot, { recursive: true });
   for (const sub of ['.cache', 'logs']) fs.rmSync(path.join(dataRoot, sub), { recursive: true, force: true });
   fs.rmSync(path.join(dataRoot, 'guard', 'external.log'), { force: true });
-  // 중단된 실행이 남긴 시계 이동량 (서버가 옮겨진 채 떴다면 아래에서 0 으로 돌린다)
+  // 중단된 실행이 남긴 시계 이동량을 지운다. e2e/clock-shim.cjs 는 파일이 없으면 이동량 0 으로 읽는다
   fs.rmSync(path.join(dataRoot, 'guard', 'clock-offset'), { force: true });
   // 차단기 표식은 이번 실행의 것만 남긴다 — 서버는 globalSetup 보다 먼저 떠서 방금 표식을 남겼다
   const guardDir = path.join(dataRoot, 'guard');
