@@ -16,6 +16,7 @@ const PORT = process.env.E2E_PORT ?? '3100';
 const DATA_ROOT = path.resolve(process.env.SAFEHOUR_DATA_ROOT ?? '.e2e-data');
 const GUARD_DIR = path.join(DATA_ROOT, 'guard');
 const GUARD_FILE = path.resolve('e2e/network-guard.cjs');
+const CLOCK_SHIM_FILE = path.resolve('e2e/clock-shim.cjs');
 
 export default defineConfig({
   testDir: './e2e',
@@ -55,7 +56,7 @@ export default defineConfig({
     env: {
       SAFEHOUR_DATA_ROOT: DATA_ROOT,
       SAFEHOUR_E2E_GUARD_DIR: GUARD_DIR,
-      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${GUARD_FILE}`.trim(),
+      NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ''} --require ${GUARD_FILE} --require ${CLOCK_SHIM_FILE}`.trim(),
       // Next.js 사용 통계 전송도 외부 호출이다
       NEXT_TELEMETRY_DISABLED: '1',
       // 캐시가 적중하므로 실제로 쓰이지 않지만, 키 검사를 통과해야 캐시까지 도달한다

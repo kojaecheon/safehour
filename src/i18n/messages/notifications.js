@@ -4,7 +4,7 @@
 // 형식과 쓰기 규칙은 ./index.js 머리 주석을 따른다. 새 키는 `notifications.` 으로 시작한다.
 // ja·zh: 검수 전 번역 — 사람 검수 필요
 //
-// ── 규칙 47 (spec 4.13) — 잠금 화면에 그대로 보이는 문구다 ──
+// ── 잠금 화면에 그대로 보이는 문구다 (docs/business-rules.md '알림과 카드', lib/notify/AGENTS.md) ──
 //   - 조건 항목(보행·식이·자외선 …), 병원(이름·'병원'이라는 말 포함), 복약(약·복용 …)을 쓰지 않는다.
 //     복약 알림도 '숙소에서 챙길 일정' 처럼 일반 표현으로만 적는다.
 //   - 본문 자리표시자는 {time}("HH:MM") 하나뿐이다. 장소 이름·주소·병원 이름을 넣을 자리를 만들지 않는다.
@@ -30,6 +30,13 @@ export const messages = {
     en: "See today's plan",
     ja: '今日の予定を見る',
     zh: '查看今天的行程',
+  },
+  /** 보호자 알림을 눌렀을 때 열리는 화면 안내 */
+  'notifications.openGuardianCopy': {
+    ko: '받은 일정 보기',
+    en: 'See the shared plan',
+    ja: '受け取った予定を見る',
+    zh: '查看收到的行程',
   },
 };
 
@@ -72,5 +79,19 @@ export const safety = {
     en: "It's {time} — you have something scheduled now",
     ja: '{time}になりました — 予定の時間です',
     zh: '现在是{time} — 您有一项安排',
+  },
+  /** 환자 외출의 복귀 마감이 지남. 마감 뒤 60분까지 낸다 */
+  'notifications.returnPassed': {
+    ko: '{time} 복귀 마감이 지났어요. 아직 밖이라면 지금 돌아가세요',
+    en: 'Your {time} return time has passed. If you are still out, head back now',
+    ja: '{time}の戻り期限を過ぎました。まだ外出中なら、今すぐ戻ってください',
+    zh: '{time}的返回截止时间已过。如果你还在外面，请立即返回',
+  },
+  /** 보호자 기기: 일행의 복귀 마감이 지남. 함께 있는지 알 수 없으므로 조건부로 쓴다 */
+  'notifications.companionReturnPassed': {
+    ko: '일행의 복귀 마감 {time}이 지났어요. 함께 있지 않다면 지금 연락해 보세요',
+    en: "Your companion's {time} return time has passed. If you're not together, contact them now",
+    ja: 'お連れの方の戻り期限{time}を過ぎました。一緒にいない場合は、今すぐ連絡してみてください',
+    zh: '同伴的返回截止时间{time}已过。如果你们不在一起，请立即联系对方',
   },
 };

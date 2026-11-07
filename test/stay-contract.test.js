@@ -79,6 +79,7 @@ describe('spec 11장 숫자 기본값 — 한 파일', () => {
       medicationAtLodgingBeforeMin: 10,
       medicationAwayBeforeMin: 0,
       appointmentBeforeMin: 15,
+      returnPassedGraceMin: 60,
     });
     assert.deepEqual(DEFAULTS.stay, { maxNights: 45, deleteAfterDepartureDays: 7 });
     assert.deepEqual(DEFAULTS.guardianPin, { maxAttempts: 5, lockMin: 60 });

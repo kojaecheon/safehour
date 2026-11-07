@@ -450,6 +450,59 @@ describe('알림 누르기', () => {
     assert.equal(closed, true);
     assert.deepEqual(worker.calls.openWindow, [`${ORIGIN}/today`]);
   });
+
+  test('알림 data.url 이 허용 목록(/today, /g)이면 그 화면, 아니면 오늘 화면', () => {
+    const { context } = loadWorker();
+    assert.equal(context.notificationTargetPath({ url: '/g' }), '/g');
+    assert.equal(context.notificationTargetPath({ url: '/today' }), '/today');
+    for (const data of [undefined, null, {}, { url: 42 }, { url: '/settings' }, { url: 'https://evil.example/g' }, { url: '//evil.example' }, { url: '/g?x=1' }]) {
+      assert.equal(context.notificationTargetPath(data), '/today', JSON.stringify(data));
+    }
+  });
+
+  async function clickWith(worker, data) {
+    const waits = [];
+    worker.handlers.notificationclick({
+      notification: { data, close() {} },
+      waitUntil(p) {
+        waits.push(p);
+      },
+    });
+    await settle(waits);
+  }
+
+  test('보호자 알림(data.url /g)을 누르면 받은 일정 화면을 연다', async () => {
+    const worker = loadWorker();
+    await clickWith(worker, { url: '/g' });
+    assert.deepEqual(worker.calls.openWindow, [`${ORIGIN}/g`]);
+  });
+
+  test('허용 목록 밖의 data.url 은 무시하고 오늘 화면을 연다', async () => {
+    const worker = loadWorker();
+    await clickWith(worker, { url: 'https://evil.example/' });
+    assert.deepEqual(worker.calls.openWindow, [`${ORIGIN}/today`]);
+  });
+
+  test('열린 창이 있으면 그 창을 data.url 화면으로 옮긴다, 이미 그 화면이면 옮기지 않는다', async () => {
+    for (const [current, expected] of [
+      ['/today', [`${ORIGIN}/g`]],
+      ['/g', []],
+    ]) {
+      const worker = loadWorker();
+      const navigated = [];
+      const client = {
+        url: `${ORIGIN}${current}`,
+        focus: async () => {},
+        navigate: async (url) => {
+          navigated.push(url);
+        },
+      };
+      worker.context.self.clients.matchAll = async () => [client];
+      await clickWith(worker, { url: '/g' });
+      assert.deepEqual(navigated, expected, current);
+      assert.deepEqual(worker.calls.openWindow, []);
+    }
+  });
 });
 
 describe('소스 고정 — API 제외가 가로채기보다 앞에 있다', () => {

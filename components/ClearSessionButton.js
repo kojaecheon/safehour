@@ -1,6 +1,6 @@
 'use client';
 
-// 이 기기에서 내 정보 지우기 (AX-210 → AX-318 · spec 4.19 · 규칙 41)
+// 이 기기에서 내 정보 지우기 (AX-210 → AX-318 · docs/security.md '기기 저장소와 계정 이름공간', docs/platform/IA_AND_FLOWS.md '동의 철회와 데이터 삭제')
 //
 // 기기 저장소의 deleteAllMyData() 를 부른다 — `safehour.v2.` 아래를 언어만 빼고 모두 지우고
 // (모든 계정 이름공간, 보호자 사본, 알림 예약, AI 문장 캐시, 언어 외 설정, 예전 탭 저장 키), 로그아웃한다.
@@ -20,10 +20,14 @@ import { clearSafeHourSession } from '@/lib/session.js';
 import { useLang } from './LanguageProvider.js';
 import useStoreStatus from './ui/useStoreStatus.js';
 
-/** 시작 화면으로 전체 새로고침 — 삭제 안내를 한 번 띄우도록 표시한다 */
+/**
+ * 시작 화면으로 전체 새로고침. 삭제 안내를 한 번 띄우도록 표시한다.
+ * 라우터 이동이 아니라 전체 새로고침이어야 React 메모리 사본까지 버려진다. 절대 주소로 가면
+ * next/no-location-assign-relative-destination 규칙(상대 경로 assign 경고)에 걸리지 않는다.
+ */
 function goHome() {
   clearSafeHourSession();
-  window.location.assign('/');
+  window.location.assign(new URL('/', window.location.origin).href);
 }
 
 /**

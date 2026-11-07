@@ -44,10 +44,18 @@ const PRECACHE_ASSETS = [
 const ASSET_CACHE_MAX = 200;
 /** 캐시 사본이 있는 화면은 네트워크를 이만큼만 기다린다(느린 연결에서도 긴급 화면이 열리게) */
 const NETWORK_TIMEOUT_MS = 6000;
-/** 알림을 누르면 여는 화면 */
+/** 알림을 누르면 여는 기본 화면 */
 const NOTIFICATION_URL = '/today';
+/** 알림 data.url 로 열어도 되는 화면 (이 목록 밖이면 기본 화면을 연다) */
+const NOTIFICATION_PATHS = ['/today', '/g'];
 
 // ── 판정 도우미 (test/pwa-sw.test.js 가 직접 부른다) ─────────────────────
+
+/** 알림을 누르면 열 경로. data.url 이 허용 목록에 있으면 그 경로, 아니면 기본 화면 */
+function notificationTargetPath(data) {
+  const url = data && typeof data.url === 'string' ? data.url : null;
+  return url && NOTIFICATION_PATHS.includes(url) ? url : NOTIFICATION_URL;
+}
 
 /** API 경로인가 — 이 경로는 절대 캐시하지 않는다 */
 function isApiPath(pathname) {
@@ -282,12 +290,13 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
     (async () => {
-      const target = new URL(NOTIFICATION_URL, self.location.origin).href;
+      const path = notificationTargetPath(event.notification.data);
+      const target = new URL(path, self.location.origin).href;
       const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
       for (const client of windows) {
         if (new URL(client.url).origin === self.location.origin && 'focus' in client) {
           await client.focus();
-          if ('navigate' in client && new URL(client.url).pathname !== NOTIFICATION_URL) {
+          if ('navigate' in client && new URL(client.url).pathname !== path) {
             await client.navigate(target).catch(() => {});
           }
           return;

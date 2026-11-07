@@ -17,6 +17,7 @@ import { READ_ONLY_REASON, getStore } from '@/lib/store/index.js';
 import { GUARDIAN_ERROR, GuardianError, isValidPin, unlockSnapshot } from '@/src/guardian/index.js';
 import { parseInstantMs } from '@/src/stay/index.js';
 import { copyIdFor, guardianErrorView } from './errorView.js';
+import AlertsToggle from './AlertsToggle.js';
 import { ErrorText, WarningNote } from './Feedback.js';
 import GuardianCopyView, { kstStamp } from './GuardianCopyView.js';
 import {
@@ -289,6 +290,7 @@ export default function GuardianOpen() {
             snapshot={current.snapshot}
             headingRef={copyHeadingRef}
             notice={unsaved ? <WarningNote>{t('guardian.errSaveFailed')}</WarningNote> : null}
+            alerts={<AlertsToggle />}
           />
         )}
         {others.length > 0 && (

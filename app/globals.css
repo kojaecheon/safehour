@@ -166,6 +166,7 @@
   --space-12: 48px;
   --space-0-5: 2px;
   --space-1-5: 6px;
+  --space-3-5: 14px;      /* 안내 상자 안쪽 위아래 (SEED Callout 14px) */
   --space-14: 56px;
   /* 의미 간격 (SEED spacing-y) */
   --gap-component: var(--space-3);        /* 부품 사이 기본 12px */

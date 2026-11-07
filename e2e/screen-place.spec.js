@@ -5,7 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245), 흰 면 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { findEditableStop, gapBetween, kstDate, startTrip, stopsOf, styles } from './helpers.js';
+import { findEditableStop, gapBetween, kstDate, setClock, startTrip, stopsOf, styles } from './helpers.js';
 
 /** 장소 상세 주소 (components/CourseCard.js placeHref 와 같다) */
 const placeHrefOf = (stop) =>
@@ -124,9 +124,11 @@ test.describe('③층 장소 상세, 지도 버튼과 상태별 블록', () => {
   }
 
   test('매일 확인 전인 오늘 장소: 막힌 두 버튼도 반반, 막은 이유가 지도 블록 안', async ({ page }) => {
+    // 하루 중 언제 돌려도 오늘 남은 정거장이 있게 오늘 오전 10시로 서버·브라우저 시계를 함께 맞춘다
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const { tripPlan } = await startTrip(page, {}, { path: '/trip', confirmToday: false });
     const stop = stopsOf(tripPlan.days[kstDate(0)] ?? { outings: [] })[0];
-    test.skip(!stop, '오늘 남은 정거장이 없는 시각이다');
+    expect(stop, '오전 10시 기준으로 오늘 남은 정거장이 있어야 한다').toBeTruthy();
     await page.goto(placeHrefOf(stop));
     const maps = page.locator('main.place-page > .place-maps');
     await expect(maps.getByRole('button', { name: /구글 지도로 열기/ })).toBeDisabled();

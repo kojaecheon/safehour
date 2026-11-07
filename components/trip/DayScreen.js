@@ -1,6 +1,6 @@
 'use client';
 
-// 하루 일정 화면 본문 — /trip/[date] (AX-317 · spec 3.1, 4.5–4.11, 4.16, 4.18)
+// 하루 일정 화면 본문, /trip/[date] (AX-317 · docs/platform/IA_AND_FLOWS.md '변화가 생겼을 때'·'일정 편집'·'보호자'·'날짜와 상태를 보여주는 원칙', docs/business-rules.md 'AI 소개 문장')
 //
 // 날짜는 클라이언트에서 읽는다(useParams). 페이지는 정적으로 그려져 서비스 워커가 한 번 연 날짜를 오프라인에서도 연다.
 // 일정은 기기 저장소의 확정 일정만 읽는다 — 동기화 모듈(lib/trip useTrip)이 유일한 통로다.
@@ -29,6 +29,7 @@ import ReturnSheet from '../ReturnSheet.js';
 import { useLang } from '../LanguageProvider.js';
 import { Button, DateChip, DayTimeline, EmptyState, Icon, MealSlot, SourceTag, StateBanner, TopBar, Badge } from '../ui/index.js';
 import useTrip from '@/lib/trip/useTrip.js';
+import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
 import { isStayDate } from '@/src/stay/stay.js';
 import { AppliedConditions, ExcludedList } from './DayFacts.js';
 import IntroArea from './IntroArea.js';
@@ -447,7 +448,7 @@ export default function DayScreen() {
 
         {/* 하루 소개는 타임라인 **뒤에** 둔다. 앞에 두면 일정이 첫 화면 밖으로 밀리는데,
             소개는 아래 타임라인을 한 줄로 요약한 것이라 먼저 읽을 이유가 없다.
-            판정·사유 영역과 떨어진 별도 영역이라는 점은 그대로다(spec 4.16). */}
+            판정·사유 영역과 떨어진 별도 영역이라는 점은 그대로다(docs/business-rules.md 'AI 소개 문장'). */}
         <IntroArea day={day} stay={stay} readOnly={trip.readOnly} />
 
         <div className="ui-block trip-tools-block">
@@ -547,7 +548,7 @@ export default function DayScreen() {
         />
       )}
       {sheet?.kind === 'return' && !trip.immediateReturn && (
-        <ReturnSheet day={stored} stay={stay} cause={(stored?.reasons ?? []).find((r) => ['PATIENT_RECALLED', 'PLAN_REVOKED', 'PLAN_EXPIRED'].includes(r)) ?? null} onClose={() => setSheet(null)} />
+        <ReturnSheet day={stored} stay={stay} cause={(stored?.reasons ?? []).find((r) => RETURN_NOW_CAUSES.includes(r)) ?? null} onClose={() => setSheet(null)} />
       )}
     </>
   );

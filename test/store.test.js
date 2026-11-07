@@ -1248,3 +1248,74 @@ describe('getStore — 서버 렌더링 중', () => {
     assert.equal(store.readLastAccountKey(), null);
   });
 });
+
+describe('overdueSeen: 이미 낸 마감 지남 알림과 닫은 안내의 기억', () => {
+  const D1 = '2026-10-02';
+  const D2 = '2026-10-03';
+
+  test('overdueSeen: 같은 날짜만 읽고, 날짜가 바뀌면 새로 시작한다', () => {
+    const store = signedIn();
+    assert.deepEqual(store.readOverdueSeen(D1), { notified: [], dismissed: [] });
+    assert.equal(store.markOverdueNotified(D1, 'n1').ok, true);
+    assert.equal(store.markOverdueNotified(D1, 'n1').ok, true, '같은 id 를 두 번 써도 한 개만 남는다');
+    assert.equal(store.markOverdueDismissed(D1, 'o1').ok, true);
+    assert.deepEqual(store.readOverdueSeen(D1), { notified: ['n1'], dismissed: ['o1'] });
+    assert.deepEqual(store.readOverdueSeen(D2), { notified: [], dismissed: [] }, '다른 날짜로 읽으면 비어 있다');
+    assert.equal(store.markOverdueNotified(D2, 'n2').ok, true);
+    assert.deepEqual(store.readOverdueSeen(D2), { notified: ['n2'], dismissed: [] }, '이전 날짜 값은 버리고 새로 시작한다');
+    assert.deepEqual(store.readOverdueSeen(D1), { notified: [], dismissed: [] });
+    const topics = [];
+    store.subscribe('overdueSeen', (event) => topics.push(event.topic));
+    store.markOverdueDismissed(D2, 'o2');
+    assert.deepEqual(topics, ['overdueSeen']);
+  });
+
+  test('overdueSeen: 보기 전용이면 READ_ONLY, 잘못된 값은 INVALID, 50개를 넘으면 오래된 것부터 버린다', () => {
+    const store = signedIn();
+    assert.equal(store.markOverdueNotified('2026-13-45', 'n').code, STORE_ERROR.INVALID);
+    assert.equal(store.markOverdueNotified(D1, '').code, STORE_ERROR.INVALID);
+    assert.equal(store.markOverdueNotified(D1, 'x'.repeat(129)).code, STORE_ERROR.INVALID);
+    assert.equal(store.markOverdueDismissed(D1, 42).code, STORE_ERROR.INVALID);
+    assert.equal(store.markOverdueNotified(D1, 'x'.repeat(128)).ok, true);
+    for (let i = 0; i < 55; i += 1) assert.equal(store.markOverdueNotified(D1, `id-${i}`).ok, true);
+    const { notified } = store.readOverdueSeen(D1);
+    assert.equal(notified.length, 50);
+    assert.equal(notified[0], 'id-5');
+    assert.equal(notified.at(-1), 'id-54');
+    for (let i = 0; i < 51; i += 1) store.markOverdueDismissed(D1, `o-${i}`);
+    assert.equal(store.readOverdueSeen(D1).dismissed.length, 50);
+    assert.equal(store.readOverdueSeen(D1).dismissed[0], 'o-1');
+
+    store.setOnline(false);
+    assert.equal(store.markOverdueNotified(D1, 'late').code, STORE_ERROR.READ_ONLY);
+    assert.equal(store.markOverdueDismissed(D1, 'late').code, STORE_ERROR.READ_ONLY);
+    assert.deepEqual(store.readOverdueSeen(D1).dismissed.includes('late'), false);
+  });
+
+  test('저장된 모양이 깨졌으면 빈 값으로 읽는다', () => {
+    const store = signedIn();
+    store.markOverdueNotified(D1, 'n1');
+    const key = accountRecordKey(KEY_A, 'overdueSeen');
+    const raw = JSON.parse(local.getItem(key));
+    raw.data = { date: D1, notified: 'oops', dismissed: [1, 'ok'] };
+    local.setItem(key, JSON.stringify(raw));
+    assert.deepEqual(makeStore().readOverdueSeen(D1), { notified: [], dismissed: ['ok'] });
+  });
+
+  test('deleteStay 가 overdueSeen 을 지운다', () => {
+    const store = signedIn();
+    store.markOverdueNotified(D1, 'n1');
+    store.markOverdueDismissed(D1, 'o1');
+    assert.notEqual(local.getItem(accountRecordKey(KEY_A, 'overdueSeen')), null);
+    assert.deepEqual(store.deleteStay(), { ok: true });
+    assert.equal(local.getItem(accountRecordKey(KEY_A, 'overdueSeen')), null);
+    assert.deepEqual(store.readOverdueSeen(D1), { notified: [], dismissed: [] });
+  });
+
+  test('내 정보 지우기도 overdueSeen 을 지운다', async () => {
+    const store = signedIn();
+    store.markOverdueNotified(D1, 'n1');
+    await store.deleteAllMyData();
+    assert.equal(local.getItem(accountRecordKey(KEY_A, 'overdueSeen')), null);
+  });
+});

@@ -156,7 +156,7 @@ export const messages = {
     zh: '照片 ⓒ韩国观光公社',
   },
 
-  // ── 편집 (spec 4.10) ──
+  // ── 편집 (docs/business-rules.md '사용자 편집') ──
   'trip.actionSwap': { ko: '바꾸기', en: 'Swap', ja: '変更', zh: '更换' },
   'trip.actionDelete': { ko: '빼기', en: 'Remove', ja: '外す', zh: '移除' },
   'trip.actionClearMeal': { ko: '식사 칸 비우기', en: 'Clear this meal', ja: 'この食事枠を空ける', zh: '清空此餐' },
@@ -324,7 +324,7 @@ export const messages = {
     zh: '未入选地点及原因（{n}）',
   },
 
-  // ── 하루 소개 (spec 4.16) ──
+  // ── 하루 소개 (docs/business-rules.md 'AI 소개 문장') ──
   'trip.introTitle': { ko: '하루 소개', en: 'About the day', ja: '1日の紹介', zh: '当天简介' },
   'trip.introAiNote': {
     ko: 'AI가 쓴 소개예요. 판정과 사유에는 쓰지 않고, 틀릴 수 있어요.',
@@ -356,7 +356,7 @@ export const messages = {
     zh: '已清除演示事件并重新判定今天的行程。',
   },
 
-  // ── 데모 사건 6종 (spec 4.9 DemoEvent) ──
+  // ── 데모 사건 6종 (docs/platform/ITINERARY_RULES.md '데모 사건') ──
   'event.CLOSURE': { ko: '장소 휴무', en: 'Place closed', ja: '場所が休業', zh: '地点停业' },
   'event.WEATHER': { ko: '기상 악화', en: 'Bad weather', ja: '天候の悪化', zh: '天气恶化' },
   'event.TRAFFIC_SURGE': { ko: '교통 지연', en: 'Traffic delay', ja: '交通の遅れ', zh: '交通延误' },
@@ -428,7 +428,7 @@ export const messages = {
     zh: '不解读内容，停止今天剩余的全部外出。',
   },
 
-  // ── 전후 비교 시트 (spec 4.9) ──
+  // ── 전후 비교 시트 (docs/business-rules.md '전체 일정 확정과 변화 대응') ──
   'delta.title': { ko: '무엇이 바뀌었나요', en: 'What changed', ja: '何が変わりましたか', zh: '有哪些变化' },
   'delta.lead': {
     ko: '변화를 반영해 일정을 이미 다시 짰어요. 알림만 보내고 예전 일정을 그대로 두지 않아요.',
@@ -486,6 +486,7 @@ export const messages = {
     zh: '查看所有紧急联系方式',
   },
   'return.confirm': { ko: '확인했어요', en: 'I understand', ja: '確認しました', zh: '我已知晓' },
+  'return.placePlanned': { ko: '정해 둔 장소', en: 'Your planned place', ja: '予定の場所', zh: '预定地点' },
   'return.reopen': {
     ko: '복귀 안내 다시 보기',
     en: 'Show return guidance again',
@@ -509,10 +510,23 @@ export const safety = {
     ja: '地図のリンクに宿泊先の位置は入れません。タクシー運転手に韓国語の帰着カードを見せてください。緊急時はすぐに119へ電話してください。',
     zh: '地图链接不会包含住处位置。请向出租车司机出示韩语返回卡片。如遇紧急情况，请立即拨打 119。',
   },
+  'return.bodyPlace': {
+    ko: '오늘 남은 일정을 비웠어요. 아래 장소로 이동하세요. 몸 상태가 걱정되면 이동하기 전에 병원에 먼저 연락하세요.',
+    en: 'The rest of today’s plan was cleared. Head to the place below. If you are worried about how you feel, contact your hospital before you move.',
+    ja: '今日の残りの予定を空にしました。下の場所へ移動してください。体調が心配なときは、移動する前にまず病院へ連絡してください。',
+    zh: '今天剩余的行程已清空。请前往下方地点。如担心身体状况，请在出发前先联系医院。',
+  },
+  'return.passedTitle': { ko: '복귀 마감 시각이 지났어요', en: 'Your return time has passed', ja: '帰着期限を過ぎました', zh: '返回截止时间已过' },
+  'return.passedBody': {
+    ko: '아직 밖이라면 아래 장소로 바로 이동하세요. 이미 돌아왔다면 아래 버튼을 눌러 닫으세요.',
+    en: 'If you are still out, go straight to the place below. If you are already back, close this with the button below.',
+    ja: 'まだ外出中なら、下の場所へすぐ移動してください。すでに戻っている場合は、下のボタンで閉じてください。',
+    zh: '如果你还在外面，请立即前往下方地点。如果已经返回，请点击下方按钮关闭。',
+  },
   'return.deadline': { ko: '복귀 마감 {time}', en: 'Be back by {time}', ja: '帰着期限 {time}', zh: '返回截止 {time}' },
   'trip.plannedReturn': { ko: '예상 귀가 {time}', en: 'Expected back {time}', ja: '帰着予定 {time}', zh: '预计返回 {time}' },
 
-  // 외출 마감 이유 (spec 4.7 표)
+  // 외출 마감 이유 (docs/business-rules.md '하루 일정 생성'의 마감 후보 표)
   'trip.deadlineRETURN_TIME': {
     ko: '정해진 복귀 시각 기준',
     en: 'Set by your return time',
@@ -550,7 +564,7 @@ export const safety = {
     zh: '依据患者的下一项安排',
   },
 
-  // 보호자 탭 안내 (spec 4.7 보호자 일정 — 동행 필수라 만들 수 없으면 잠금과 사유를 보인다)
+  // 보호자 탭 안내 (docs/business-rules.md '하루 일정 생성'의 보호자 단독 외출: 동행 필수라 만들 수 없으면 잠금과 사유를 보인다)
   'trip.guardianESCORT_REQUIRED': {
     ko: '동행이 필요한 날이라 보호자는 환자와 함께 있어요. 보호자 단독 외출을 만들지 않았어요.',
     en: 'A companion must stay with the patient this day, so no solo outing was planned for the companion.',
@@ -588,7 +602,7 @@ export const safety = {
     zh: '这一天陪同者没有单独外出：患者没有休息时间，或没有合适的地点。',
   },
 
-  // 하루 일정 경고 (spec 5.2 warnings)
+  // 하루 일정 경고 (docs/contracts.md '`POST /api/itinerary/plan`'의 warnings)
   'trip.warnMEDICATION_TIMES_MISSING': {
     ko: '복약 시각을 입력하지 않아 복약 마감은 만들지 않았어요. 약은 병원 안내대로 챙겨 주세요.',
     en: 'No medication times were entered, so no medication deadline was set. Take your medicine as your hospital told you.',

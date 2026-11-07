@@ -216,6 +216,8 @@ test.describe('③층 보호자 링크 열기', () => {
     await page.getByRole('button', { name: '열기', exact: true }).click();
     await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
     await expect(page.locator('main .card')).toHaveCount(0);
+    // 알림 스위치 블록이 위에 생겨 '열기'를 누른 자리에 119 버튼이 놓일 수 있다: 눌림 배경이 섞이지 않게 포인터를 치운다
+    await page.mouse.move(0, 0);
 
     const asOf = page.locator('.guardian-asof');
     expect(await styles(asOf, ['background-color', 'border-top-width'])).toEqual({ 'background-color': 'rgba(0, 0, 0, 0)', 'border-top-width': '0px' });

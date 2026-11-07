@@ -7,6 +7,8 @@
 //
 // 날짜는 모두 **한국 달력 날짜**(KST)다. 테스트가 언제 돌든 '오늘'을 기준으로 상대 날짜를 쓴다.
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -15,15 +17,144 @@ import AxeBuilder from '@axe-core/playwright';
 const DAY_MS = 86_400_000;
 const KST_OFFSET_MS = 9 * 3_600_000;
 
-/** 오늘(KST)에서 n일 뒤의 'YYYY-MM-DD' */
-export function kstDate(offsetDays = 0, nowMs = Date.now()) {
+/** 오늘(KST)에서 n일 뒤의 'YYYY-MM-DD'. nowMs 기본값은 시계 이동(setClock)을 반영한 지금이다 */
+export function kstDate(offsetDays = 0, nowMs = nowWithClock()) {
   return new Date(nowMs + KST_OFFSET_MS + offsetDays * DAY_MS).toISOString().slice(0, 10);
 }
 
-/** 지금 KST 분(0–1439) */
-export function kstMinutes(nowMs = Date.now()) {
+/** 지금 KST 분(0~1439). nowMs 기본값은 시계 이동(setClock)을 반영한 지금이다 */
+export function kstMinutes(nowMs = nowWithClock()) {
   const d = new Date(nowMs + KST_OFFSET_MS);
   return d.getUTCHours() * 60 + d.getUTCMinutes();
+}
+
+// ── 시계 이동 (테스트 전용, 선택 사용) ───────────────────────────────
+//
+// 일정의 '지금'은 서버가 자기 시계로만 정하고(요청의 now 는 쓰지 않는다), 브라우저도 실제 시계를 읽는다
+// (날짜 넘김·매일 확인·알림 예약·lib/trip/runtime.js 타이머). 그래서 한쪽만 옮겨서는 '외출 중 15:31' 같은
+// 시각을 만들 수 없다. setClock 은 세 곳을 함께 옮긴다.
+//   1. 서버: SAFEHOUR_E2E_GUARD_DIR/clock-offset 에 이동량(ms)을 쓴다. e2e/clock-shim.cjs 가 읽어 서버의 Date 를 옮긴다.
+//   2. 브라우저: page.clock 을 심어 앱이 보는 Date 와 타이머를 같은 시각으로 맞춘다.
+//   3. 이 파일의 kstDate()·kstMinutes() 기본값도 옮긴 지금을 따른다.
+// 이동량은 테스트 러너만 정한다. 요청에 시각을 실어 보내는 길은 만들지 않는다(서버는 여전히 자기 시계만 읽는다).
+// e2e/fixtures.js 가 테스트 앞뒤로 이동을 0 으로 되돌리므로 쓰지 않는 테스트는 실제 시계를 본다.
+//
+// 주의: page.clock 이 심기면 앱의 setTimeout·setInterval 은 가짜 시계 위에서 돈다. 실제 시간을 기다려서는
+// 타이머가 원하는 만큼 진행되지 않을 수 있으니, 시간을 보내려면 advanceClock(또는 page.clock.runFor)을 쓴다.
+// 같은 날 안(KST)에서 옮기는 것을 전제로 한다: 세션 쿠키·체류 날짜·시드한 일정이 모두 '오늘'을 기준으로 한다.
+
+const CLOCK_OFFSET_FILE = path.join(path.resolve(process.env.SAFEHOUR_DATA_ROOT ?? '.e2e-data'), 'guard', 'clock-offset');
+const TOUR_CACHE_DIR = path.join(path.resolve(process.env.SAFEHOUR_DATA_ROOT ?? '.e2e-data'), '.cache', 'tour-api');
+// 서버 shim 의 재확인 간격(250ms)보다 넉넉히 기다려 바뀐 이동량이 적용된 뒤에 다음 동작을 한다
+const SHIM_SETTLE_MS = 400;
+
+let clockShiftMs = 0;
+const clockInstalled = new WeakSet();
+
+/** 시계 이동을 반영한 지금(ms). 이동이 없으면 Date.now() 와 같다 */
+export function nowWithClock() {
+  return Date.now() + clockShiftMs;
+}
+
+function writeServerOffset(ms) {
+  fs.mkdirSync(path.dirname(CLOCK_OFFSET_FILE), { recursive: true });
+  fs.writeFileSync(CLOCK_OFFSET_FILE, String(Math.round(ms)), 'utf8');
+}
+
+/** 서버가 옮긴 시계로 TourAPI 캐시(수명 15분)를 낡았다고 보지 않게 시드 파일 시각을 옮긴 지금으로 맞춘다 */
+function touchSeedCache(atMs) {
+  let names = [];
+  try {
+    names = fs.readdirSync(TOUR_CACHE_DIR);
+  } catch {
+    return;
+  }
+  const at = new Date(atMs);
+  for (const name of names) {
+    if (!name.endsWith('.json')) continue;
+    try {
+      fs.utimesSync(path.join(TOUR_CACHE_DIR, name), at, at);
+    } catch {
+      // 지워진 파일은 건너뛴다
+    }
+  }
+}
+
+async function applyShift(shiftMs) {
+  // 같은 날 안에서만 옮긴다: 옮긴 지금의 KST 날짜가 실제 오늘과 다르면 세션 쿠키·체류 날짜·시드 일정 가정이 깨진다
+  const realToday = kstDate(0, Date.now());
+  const shiftedDay = kstDate(0, Date.now() + shiftMs);
+  if (shiftedDay !== realToday) {
+    throw new Error(`시계는 실제 오늘(KST ${realToday}) 안에서만 옮길 수 있다 (옮긴 날짜: ${shiftedDay})`);
+  }
+  // 캐시 시각을 먼저 옮긴다: 옮기기 전 서버가 미래 시각 파일을 보면 '방금 씀'(나이 0)으로 읽어 안전하다
+  touchSeedCache(Date.now() + shiftMs);
+  writeServerOffset(shiftMs);
+  clockShiftMs = shiftMs;
+  await new Promise((resolve) => setTimeout(resolve, SHIM_SETTLE_MS));
+}
+
+/** 'YYYY-MM-DDTHH:MM'(KST) 을 UTC ms 로 */
+function kstToMs(kst) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(kst);
+  if (!m) throw new Error(`setClock: kst 는 'YYYY-MM-DDTHH:MM' 모양이어야 한다 (받은 값: ${kst})`);
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) - KST_OFFSET_MS;
+}
+
+/**
+ * 서버와 브라우저의 '지금'을 KST 로 정한 시각에 맞춘다.
+ *
+ * - 시계는 멈추지 않는다. 정한 시각은 '옮긴 출발점'이고 그때부터 양쪽 모두 실제 속도로 흐른다.
+ *   그러니 '복귀 마감 1분 전'으로 맞추면 60초가 안 돼 저절로 넘어간다. 여유를 2~3분 두거나 advanceClock 으로 보낸다.
+ * - 브라우저는 서버보다 약 400ms 늦게 따라온다(서버 shim 이 250ms 간격으로 파일을 읽는다). 초 단위 경계 단언에는 여유를 둔다.
+ * - 가장 먼저, page.goto·startTrip 보다 앞서 부른다(이미 이동한 페이지에서 처음 부르면 오류).
+ * - 같은 KST 날짜 안(실제 오늘)에서만 옮긴다. 다른 날짜면 오류.
+ * - page.clock 이 심기면 앱의 타이머는 가짜 시계 위에서 돈다. 실제 대기 대신 advanceClock 을 쓴다.
+ * @param {import('@playwright/test').Page} page
+ * @param {{kst: string}} when 'YYYY-MM-DDTHH:MM' (한국 시각): `${kstDate(0)}T10:00`
+ */
+export async function setClock(page, { kst }) {
+  const target = kstToMs(kst);
+  if (!clockInstalled.has(page) && page.url() !== 'about:blank') {
+    throw new Error(`setClock 은 page.goto·startTrip 보다 먼저 불러야 한다 (현재 주소: ${page.url()})`);
+  }
+  await applyShift(target - Date.now());
+  if (clockInstalled.has(page)) await page.clock.setSystemTime(target);
+  else {
+    await page.clock.install({ time: target });
+    clockInstalled.add(page);
+  }
+}
+
+/**
+ * 서버와 브라우저의 시계를 ms 만큼 함께 앞으로 보낸다. 기본은 page.clock.fastForward 라 밀린 타이머가 한 번만 돈다.
+ * 앱의 분 단위 틱이 매번 돌아야 하면 { run: true } (page.clock.runFor, 긴 구간은 느리다). 같은 KST 날짜를 넘으면 오류.
+ * @param {import('@playwright/test').Page} page
+ * @param {number} ms
+ * @param {{run?: boolean}} [options]
+ */
+export async function advanceClock(page, ms, { run = false } = {}) {
+  if (!clockInstalled.has(page)) throw new Error('advanceClock: 먼저 setClock 으로 시계를 정해야 한다');
+  await applyShift(clockShiftMs + ms);
+  if (run) await page.clock.runFor(ms);
+  else await page.clock.fastForward(ms);
+}
+
+/**
+ * 시계 이동을 없앤다 (e2e/fixtures.js 가 테스트 앞뒤로 부른다). 서버가 옮겨 둔 상태였다면 shim 이 0 을 읽을 때까지
+ * 기다린다: 기다리지 않으면 다음 테스트의 로그인이 옮겨진 시각으로 서명돼 곧바로 만료된 세션이 될 수 있다.
+ */
+export async function resetClock() {
+  clockShiftMs = 0;
+  let wasShifted = false;
+  try {
+    wasShifted = (Number.parseInt(fs.readFileSync(CLOCK_OFFSET_FILE, 'utf8').trim(), 10) || 0) !== 0;
+  } catch {
+    // 파일 없음 = 이동 없음
+  }
+  if (!wasShifted) return;
+  writeServerOffset(0);
+  await new Promise((resolve) => setTimeout(resolve, SHIM_SETTLE_MS));
 }
 
 // ── 데모 주소 (src/adapters/demoAddresses.js 와 같은 값 — 시드 기준점과 좌표가 같아야 캐시가 적중한다) ──

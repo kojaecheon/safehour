@@ -10,6 +10,7 @@
 //   - AI 소개 요청은 허용 목록(이름·유형·시각·관심사·강도)만 담고 캐시 키가 결정적이다 (spec 4.16 · 규칙 36)
 //   - 장소 상세 요청은 Stop 형식이고 지도 링크 입력은 정거장뿐이다 (spec 6장 · 4.14 · 규칙 39)
 //   - 편집 가능 여부: 지난 날짜·보기 전용·매일 확인 전 오늘은 막는다 (spec 4.10 · 규칙 32)
+//   - 복귀 시트의 돌아갈 곳: 숙소·병원(hospitalId 로만)·정해 둔 장소, 첫 병원으로 추측하지 않는다 (마감 지남 설계서 4.2·4.3)
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
@@ -26,7 +27,9 @@ import {
   introRequestFor,
   isDemoMode,
   needsInputFix,
+  overdueOutingOf,
   placeDetailRequest,
+  returnTargetOf,
   stopBadges,
   stopEditable,
   timelineEntries,
@@ -625,5 +628,81 @@ describe('dailyCheckSummary · isDemoMode · demoEventFor · 마감 이유', () 
 
   test('마감 이유 6종 모두 문구 키가 있다', () => {
     assert.deepEqual(Object.keys(DEADLINE_REASON_KEY).sort(), ['APPOINTMENT', 'DAY_END', 'DEPARTURE', 'MEDICATION', 'PATIENT_SCHEDULE', 'RETURN_TIME']);
+  });
+});
+
+describe('returnTargetOf · overdueOutingOf: 복귀 시트의 돌아갈 곳 (마감 지남 설계서 4.2 · 4.3)', () => {
+  const H2 = { id: 'H2', name: '둘째 의원', address: { roadAddress: '둘째 병원 주소', lat: 37.53, lng: 127.04 } };
+  const PLANNED = { kind: 'PLANNED', name: null, address: null };
+
+  test('외출이 없거나 숙소 외출이면 그날 숙소', () => {
+    const d = day();
+    assert.deepEqual(returnTargetOf({ day: d, stay: STAY, outing: null }), { kind: 'LODGING', name: '데모 숙소', address: '데모 주소' });
+    assert.deepEqual(returnTargetOf({ day: d, stay: STAY, outing: outing('o') }), { kind: 'LODGING', name: '데모 숙소', address: '데모 주소' });
+    assert.deepEqual(returnTargetOf({ day: day({ lodgingId: 'NOPE' }), stay: STAY, outing: null }), { kind: 'LODGING', name: null, address: null });
+  });
+
+  test('병원 외출은 그 시각에 시작하는 병원 일정의 hospitalId 로 찾은 병원 이름·도로명주소', () => {
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '15:00', deadlineReason: 'APPOINTMENT' });
+    assert.deepEqual(returnTargetOf({ day: day(), stay: STAY, outing: o }), { kind: 'HOSPITAL', name: '데모 의원', address: '데모 병원 주소' });
+  });
+
+  test('병원 외출은 복귀 시각 조건(RETURN_TIME)의 hospitalId 로도 찾는다', () => {
+    const stay = { ...STAY, hospitals: [...STAY.hospitals, H2], appointments: [] };
+    const d = day({ effective: { returnTime: eff({ time: '18:00', place: 'HOSPITAL', hospitalId: 'H2' }) } });
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '18:00', deadlineReason: 'RETURN_TIME' });
+    assert.deepEqual(returnTargetOf({ day: d, stay, outing: o }), { kind: 'HOSPITAL', name: '둘째 의원', address: '둘째 병원 주소' });
+  });
+
+  test('마감이 지금으로 당겨져 일정과 맞지 않아도 그날 병원 일정이 한 병원뿐이면 그 병원', () => {
+    // 경우 2: overdueSafe 가 returnBy 를 지금으로 당겨 start === returnBy 일정이 없다
+    const stay = { ...STAY, hospitals: [STAY.hospitals[0], H2], appointments: [...STAY.appointments, { id: 'A2', hospitalId: 'H1', type: 'VISIT', date: DATE, start: '18:00', source: 'USER' }, { id: 'A3', hospitalId: 'H2', type: 'VISIT', date: '2026-10-06', start: '10:00', source: 'USER' }] };
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });
+    assert.deepEqual(returnTargetOf({ day: day(), stay, outing: o }), { kind: 'HOSPITAL', name: '데모 의원', address: '데모 병원 주소' });
+  });
+
+  test('마감 이유가 병원 일정이 아니면 적힌 id 가 없을 때 그날 병원이 하나뿐이어도 정해 둔 장소', () => {
+    // 위 대비책과 같은 하루지만 deadlineReason 이 APPOINTMENT 가 아니고, 일정·복귀 시각 조건 어디에도 id 가 없다
+    const stay = { ...STAY, appointments: [...STAY.appointments, { id: 'A2', hospitalId: 'H1', type: 'VISIT', date: DATE, start: '18:00', source: 'USER' }] };
+    for (const deadlineReason of ['RETURN_TIME', 'MEDICATION', 'DAY_END']) {
+      const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason });
+      assert.deepEqual(returnTargetOf({ day: day(), stay, outing: o }), PLANNED, String(deadlineReason));
+    }
+  });
+
+  test('적힌 hospitalId 가 병원 목록에 없으면 그날 병원이 하나뿐이어도 정해 둔 장소', () => {
+    // 일정(start === returnBy)이 H9 를 적었지만 목록에 없다. 그날 다른 일정은 모두 H1 이어도 H1 으로 대신하지 않는다
+    const byAppt = { ...STAY, appointments: [...STAY.appointments, { id: 'A9', hospitalId: 'H9', type: 'VISIT', date: DATE, start: '13:07', source: 'USER' }] };
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });
+    assert.deepEqual(returnTargetOf({ day: day(), stay: byAppt, outing: o }), PLANNED);
+    // 복귀 시각 조건이 H9 를 적은 경우도 같다
+    const d = day({ effective: { returnTime: eff({ time: '18:00', place: 'HOSPITAL', hospitalId: 'H9' }) } });
+    const r = outing('o', { returnPlace: 'HOSPITAL', returnBy: '18:00', deadlineReason: 'RETURN_TIME' });
+    assert.deepEqual(returnTargetOf({ day: d, stay: STAY, outing: r }), PLANNED);
+  });
+
+  test('못 찾으면 정해 둔 장소, 그날 병원이 둘이면 고르지 않는다', () => {
+    const stay = { ...STAY, hospitals: [STAY.hospitals[0], H2], appointments: [...STAY.appointments, { id: 'A2', hospitalId: 'H2', type: 'VISIT', date: DATE, start: '18:00', source: 'USER' }] };
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '13:07', deadlineReason: 'APPOINTMENT' });
+    assert.deepEqual(returnTargetOf({ day: day(), stay, outing: o }), PLANNED);
+  });
+
+  test('첫 병원으로 추측하지 않는다: 병원 2곳, 맞는 id 없음', () => {
+    const stay = { ...STAY, hospitals: [STAY.hospitals[0], H2], appointments: [] };
+    const o = outing('o', { returnPlace: 'HOSPITAL', returnBy: '15:00', deadlineReason: 'APPOINTMENT' });
+    assert.deepEqual(returnTargetOf({ day: day(), stay, outing: o }), PLANNED);
+    // 일정의 hospitalId 가 병원 목록에 없으면 정해 둔 장소
+    const ghost = { ...STAY, appointments: [{ ...STAY.appointments[0], hospitalId: 'H9' }] };
+    assert.deepEqual(returnTargetOf({ day: day(), stay: ghost, outing: o }), PLANNED);
+    assert.deepEqual(returnTargetOf({ day: day(), stay: null, outing: o }), PLANNED);
+  });
+
+  test('overdueOutingOf: 여유가 음수인 첫 환자 외출, 없으면 null', () => {
+    const late = { ...outing('b', { departAt: '13:00' }), slackMin: -5 };
+    const later = { ...outing('c', { departAt: '15:00' }), slackMin: -1 };
+    assert.equal(overdueOutingOf(day({ outings: [outing('a'), late, later] })), late);
+    assert.equal(overdueOutingOf(day({ outings: [outing('a')] })), null);
+    assert.equal(overdueOutingOf(day({ guardianOutings: [{ ...outing('g', { role: 'G' }), slackMin: -3 }] })), null);
+    assert.equal(overdueOutingOf(null), null);
   });
 });
