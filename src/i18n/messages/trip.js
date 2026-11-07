@@ -486,6 +486,7 @@ export const messages = {
     zh: '查看所有紧急联系方式',
   },
   'return.confirm': { ko: '확인했어요', en: 'I understand', ja: '確認しました', zh: '我已知晓' },
+  'return.placePlanned': { ko: '정해 둔 장소', en: 'Your planned place', ja: '予定の場所', zh: '预定地点' },
   'return.reopen': {
     ko: '복귀 안내 다시 보기',
     en: 'Show return guidance again',
@@ -508,6 +509,19 @@ export const safety = {
     en: 'We never put where you stay into map links. Show the Korean return card to a taxi driver. In an emergency call 119 right away.',
     ja: '地図のリンクに宿泊先の位置は入れません。タクシー運転手に韓国語の帰着カードを見せてください。緊急時はすぐに119へ電話してください。',
     zh: '地图链接不会包含住处位置。请向出租车司机出示韩语返回卡片。如遇紧急情况，请立即拨打 119。',
+  },
+  'return.bodyPlace': {
+    ko: '오늘 남은 일정을 비웠어요. 아래 장소로 이동하세요. 몸 상태가 걱정되면 이동하기 전에 병원에 먼저 연락하세요.',
+    en: 'The rest of today’s plan was cleared. Head to the place below. If you are worried about how you feel, contact your hospital before you move.',
+    ja: '今日の残りの予定を空にしました。下の場所へ移動してください。体調が心配なときは、移動する前にまず病院へ連絡してください。',
+    zh: '今天剩余的行程已清空。请前往下方地点。如担心身体状况，请在出发前先联系医院。',
+  },
+  'return.passedTitle': { ko: '복귀 마감 시각이 지났어요', en: 'Your return time has passed', ja: '帰着期限を過ぎました', zh: '返回截止时间已过' },
+  'return.passedBody': {
+    ko: '아직 밖이라면 아래 장소로 바로 이동하세요. 이미 돌아왔다면 아래 버튼을 눌러 닫으세요.',
+    en: 'If you are still out, go straight to the place below. If you are already back, close this with the button below.',
+    ja: 'まだ外出中なら、下の場所へすぐ移動してください。すでに戻っている場合は、下のボタンで閉じてください。',
+    zh: '如果你还在外面，请立即前往下方地点。如果已经返回，请点击下方按钮关闭。',
   },
   'return.deadline': { ko: '복귀 마감 {time}', en: 'Be back by {time}', ja: '帰着期限 {time}', zh: '返回截止 {time}' },
   'trip.plannedReturn': { ko: '예상 귀가 {time}', en: 'Expected back {time}', ja: '帰着予定 {time}', zh: '预计返回 {time}' },

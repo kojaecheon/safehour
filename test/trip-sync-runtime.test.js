@@ -7,6 +7,7 @@
 //   - 매일 확인 전이, 오늘 게이트 덧씌우기가 저장값을 바꾸지 않음
 //   - 교체 요청 모양, 삭제·다시 만들기, 데모 사건 전체 재전송, 언어 변경은 표시만
 //   - 동의 철회 오프라인 대비, 실패 시 일정 유지, 보기 전용은 호출·쓰기 0건, 보호자 켬 안내
+//   - 복귀 마감이 지난 외출의 시트 신호(overdueReturn): 저장 일정은 그대로, 외출마다 한 번, 즉시 복귀가 우선
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,8 +45,36 @@ function linkedStay(nowMs, { plan = demoPlanStandard(nowMs), base = stay(), ackn
   return { stay: merged, plan };
 }
 
-async function setup({ at = kst('2026-10-02', '08:00'), stayValue = null, lang = 'en' } = {}) {
+/** 가짜 타이머, advanceTo(ms) 가 그때까지 걸린 타이머를 시각 순서로 실행한다 */
+function fakeTimers(clock) {
+  let seq = 0;
+  const queue = new Map();
+  return {
+    setTimeout(fn, ms) {
+      seq += 1;
+      queue.set(seq, { fn, at: clock.now() + ms });
+      return seq;
+    },
+    clearTimeout(id) {
+      queue.delete(id);
+    },
+    advanceTo(target) {
+      for (;;) {
+        const due = [...queue.entries()].filter(([, t]) => t.at <= target).sort((a, b) => a[1].at - b[1].at || a[0] - b[0])[0];
+        if (!due) break;
+        queue.delete(due[0]);
+        clock.set(Math.max(clock.now(), due[1].at));
+        due[1].fn();
+      }
+      clock.set(target);
+    },
+    pending: () => [...queue.values()].map((t) => t.at),
+  };
+}
+
+async function setup({ at = kst('2026-10-02', '08:00'), stayValue = null, lang = 'en', withTimers = false } = {}) {
   const clock = createClock(at);
+  const timers = withTimers ? fakeTimers(clock) : null;
   const store = signedInStore(clock);
   const server = createFakeServer({ clock });
   const log = [];
@@ -55,7 +84,7 @@ async function setup({ at = kst('2026-10-02', '08:00'), stayValue = null, lang =
       return server.fetchImpl(url, init);
     },
   });
-  const sync = createTripSync({ store: spyStore(store, log), api, now: clock.now, getLang: () => store.readLang() ?? lang });
+  const sync = createTripSync({ store: spyStore(store, log), api, now: clock.now, getLang: () => store.readLang() ?? lang, timers });
   sync.start();
   if (stayValue) {
     assert.equal(store.writeStay(stayValue).ok, true);
@@ -65,7 +94,7 @@ async function setup({ at = kst('2026-10-02', '08:00'), stayValue = null, lang =
     server.calls.length = 0;
     log.length = 0;
   };
-  return { clock, store, server, sync, log, reset, lastPlan: () => server.planCalls.at(-1)?.body };
+  return { clock, store, server, sync, log, reset, timers, api, lastPlan: () => server.planCalls.at(-1)?.body };
 }
 
 // ── 처음 생성 (spec 4.9 생성) ─────────────────────────────────────────
@@ -304,6 +333,92 @@ describe('외출 중 지침 철회·만료 → 즉시 복귀', () => {
     assert.equal(sync.getState().immediateReturn, null);
     assert.equal(today.coverage, 'NEEDS_INPUT');
     assert.ok(today.reasons.includes('PLAN_REVOKED'));
+  });
+});
+
+// ── 복귀 마감 지남 시트 신호 (마감 지남 설계서 4.2 경우 1) ─────────────────
+
+describe('복귀 마감 지남: overdueReturn 신호(표시만)', () => {
+  const TODAY = '2026-10-03';
+
+  async function beforeDeadline() {
+    const ctx = await setup({ at: kst(TODAY, '08:00'), stayValue: selfStay(), withTimers: true });
+    // 기본 세션(12시간)이 마감 전에 끝나 보기 전용이 되지 않게 늘린다
+    ctx.store.setSession({ authenticated: true, accountKey: ctx.store.getStatus().accountKey, expiresAt: new Date(kst(TODAY, '23:59')).toISOString() });
+    const day = ctx.store.readTripPlan().days[TODAY];
+    const outing = day.outings[0];
+    assert.ok(outing, 'fixture: 오늘 환자 외출이 있어야 한다');
+    const sameDeadline = day.outings.filter((o) => o.returnBy === outing.returnBy).map((o) => o.id);
+    assert.equal(ctx.store.getStatus().readOnly, false);
+    const deadline = kst(TODAY, outing.returnBy);
+    ctx.timers.advanceTo(deadline - 60_000);
+    assert.equal(ctx.sync.getState().overdueReturn, null, '마감 전에는 꺼져 있다');
+    return { ...ctx, outing, deadline, sameDeadline };
+  }
+
+  test('마감이 지나면 overdueReturn 신호가 켜지고 저장 일정은 그대로다', async () => {
+    const { sync, store, timers, outing, deadline } = await beforeDeadline();
+    const stored = store.readTripPlan();
+    timers.advanceTo(deadline + 1000);
+    assert.deepEqual(sync.getState().overdueReturn, { date: TODAY, outingId: outing.id, returnBy: outing.returnBy });
+    assert.equal(store.readTripPlan(), stored, '저장 일정 객체가 바뀌었다');
+    assert.equal(store.readTripPlan().days[TODAY].returnNow, false);
+    assert.equal(sync.getState().immediateReturn, null);
+
+    // 60분이 지나면 꺼진다
+    timers.advanceTo(deadline + 60 * 60_000);
+    assert.equal(sync.getState().overdueReturn, null);
+    sync.stop();
+    assert.deepEqual(timers.pending(), [], 'stop() 이 타이머를 모두 지우지 않았다');
+  });
+
+  test('닫으면 기기에 기억하고 다시 시작해도 켜지지 않는다', async () => {
+    const { sync, store, timers, outing, deadline, api, clock, sameDeadline } = await beforeDeadline();
+    timers.advanceTo(deadline + 1000);
+    assert.equal(sync.getState().overdueReturn?.outingId, outing.id);
+    sync.dismissOverdueReturn();
+    assert.equal(sync.getState().overdueReturn, null, '같은 마감의 다른 외출로 시트가 다시 떴다');
+    assert.ok(store.readOverdueSeen(TODAY).dismissed.includes(outing.id));
+    // 같은 마감(fixture 는 활동 종료 21:00)의 외출은 함께 닫는다
+    assert.deepEqual([...store.readOverdueSeen(TODAY).dismissed].sort(), [...sameDeadline].sort());
+    timers.advanceTo(deadline + 5 * 60_000);
+    assert.equal(sync.getState().overdueReturn, null);
+    sync.stop();
+
+    // 새로 고침, 같은 저장소로 새 실행기
+    const again = createTripSync({ store, api, now: clock.now, timers });
+    again.start();
+    assert.equal(again.getState().overdueReturn, null);
+    again.stop();
+  });
+
+  test('기억 쓰기가 실패해도 같은 실행 안에서는 다시 켜지지 않는다', async () => {
+    const { sync, store, timers, outing, deadline } = await beforeDeadline();
+    timers.advanceTo(deadline + 1000);
+    assert.ok(sync.getState().overdueReturn);
+    store.setOnline(false); // 보기 전용
+    await sync.idle();
+    assert.equal(store.getStatus().readOnly, true);
+    assert.equal(store.markOverdueDismissed(TODAY, outing.id).ok, false);
+    assert.equal(sync.getState().overdueReturn?.outingId, outing.id, '보기 전용이어도 신호는 켜져 있다');
+    sync.dismissOverdueReturn();
+    assert.equal(sync.getState().overdueReturn, null);
+    assert.deepEqual([...store.readOverdueSeen(TODAY).dismissed], []);
+    timers.advanceTo(deadline + 10 * 60_000);
+    assert.equal(sync.getState().overdueReturn, null, '같은 실행 안에서 다시 켜졌다');
+    sync.stop();
+  });
+
+  test('즉시 복귀 중이면 overdueReturn 은 null', async () => {
+    const { sync, store, timers, deadline } = await beforeDeadline();
+    const plan = store.readTripPlan();
+    const day = plan.days[TODAY];
+    const written = store.writeTripPlan({ ...plan, days: { ...plan.days, [TODAY]: { ...day, returnNow: true, reasons: [...day.reasons, 'PATIENT_RECALLED'] } } });
+    assert.deepEqual(written, { ok: true });
+    timers.advanceTo(deadline + 1000);
+    assert.equal(sync.getState().overdueReturn, null);
+    assert.deepEqual(sync.getState().immediateReturn, { date: TODAY, cause: 'PATIENT_RECALLED' });
+    sync.stop();
   });
 });
 

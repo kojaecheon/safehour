@@ -11,6 +11,7 @@
 //   introRequestFor    AI 소개 요청 — 허용 목록(이름·유형·시각·관심사·강도)만 (spec 4.16 · 규칙 36) · introCacheKey
 //   placeDetailRequest 장소 상세 요청(Stop 형식, spec 6장) · findPlaceStop · stopBadges
 //   canEditDay / stopEditable  편집 가능 여부 (spec 4.10 · 규칙 32)
+//   returnTargetOf / overdueOutingOf  복귀 시트의 돌아갈 곳과 여유가 음수인 외출 (마감 지남 설계서 4.2·4.3)
 //
 // Next 밖(node --test)에서도 읽히도록 상대 경로만 쓴다. React·브라우저 API 를 쓰지 않는다.
 // 문구 키는 화면에서 쓰는 키를 그대로 적는다(test/i18n.test.js 가 키 모양 문자열로 사용 여부를 확인한다).
@@ -18,6 +19,7 @@
 import { effectiveRows } from '../conditions/summary.js';
 import { safeStayDates } from '../../lib/trip/affected.js';
 import { canonicalJson } from '../../lib/store/fingerprint.js';
+import { returnHospitalOf } from '../../src/engine/returnTarget.js';
 import { DEFAULTS } from '../../src/stay/defaults.js';
 import { appointmentsOnDate } from '../../src/stay/stay.js';
 import { toMinutes } from '../../src/stay/time.js';
@@ -105,6 +107,39 @@ export function returnPlaceOf(outing, day, stay) {
     hospitalId = appt?.hospitalId ?? null;
   }
   return { kind: 'HOSPITAL', name: hospitalId ? hospitalName(stay, hospitalId) : null };
+}
+
+/** 그날 병원 일정이 모두 한 병원이면 그 병원, 아니면 null (둘 중에서 고르지 않는다) */
+function soleHospitalOfDay(day, stay) {
+  const ids = new Set(list(stay?.appointments).filter((a) => a?.date === day?.date).map((a) => a?.hospitalId));
+  if (ids.size !== 1) return null;
+  const [id] = ids;
+  if (typeof id !== 'string' || id === '') return null;
+  return list(stay?.hospitals).find((h) => h?.id === id) ?? null;
+}
+
+/**
+ * 복귀 시트의 돌아갈 곳 `{ kind: 'LODGING'|'HOSPITAL'|'PLANNED', name, address }` (마감 지남 설계서 4.2·4.3).
+ * 외출이 없거나 숙소 외출이면 그날 숙소(못 찾으면 name·address 가 null 인 LODGING). 병원 외출이면
+ * returnHospitalOf(엔진과 같은 규칙, hospitalId 로만)로 찾은 병원 이름·도로명주소다.
+ * 경우 2 에서는 엔진이 마감을 지금으로 당겨(overdueSafe) 그 시각에 시작하는 병원 일정이 없을 수 있다. 그때만
+ * 그날 병원 일정이 모두 한 병원이면 그 병원을 쓴다. 그 밖에는 PLANNED('정해 둔 장소')이고 추측하지 않는다.
+ * 저장된 외출의 returnPlace 를 그대로 따른다. 장소를 다시 판정하지 않는다.
+ * @param {{ day: object|null, stay: object|null, outing?: object|null }} args
+ */
+export function returnTargetOf({ day, stay, outing = null }) {
+  if (outing?.returnPlace !== 'HOSPITAL') {
+    const lodging = lodgingOf(day, stay);
+    return { kind: 'LODGING', name: lodging?.name ?? null, address: lodging?.address ?? null };
+  }
+  const hospital = isObject(stay) && isObject(day) ? returnHospitalOf(outing, { stay, day }) ?? soleHospitalOfDay(day, stay) : null;
+  if (!hospital) return { kind: 'PLANNED', name: null, address: null };
+  return { kind: 'HOSPITAL', name: hospital.name ?? null, address: hospital.address?.roadAddress ?? null };
+}
+
+/** 저장된 하루에서 여유(slackMin)가 음수인 첫 환자 외출, 즉시 복귀 원인 OUTING_OVERDUE 의 외출. 없으면 null */
+export function overdueOutingOf(day) {
+  return outingsOf(day, 'P').find((o) => typeof o.slackMin === 'number' && o.slackMin < 0) ?? null;
 }
 
 /**
