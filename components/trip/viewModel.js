@@ -156,6 +156,16 @@ export function returnNoteKeyOf(place) {
   return place?.kind === 'LODGING' ? 'return.note' : 'return.notePlace';
 }
 
+/**
+ * 외출의 예상 귀가(plannedReturnAt). 정거장이 0개인 외출은 null 이다: 이동 중(첫 정거장 도착 전)에 남은 정거장을
+ * 비운 외출이라(엔진 dayRepair.js) 엔진의 예상 귀가는 숙소 기준 계산값이고 지금보다 이를 수 있다. 그때는 복귀 마감만 보인다.
+ * @returns {string|null}
+ */
+export function plannedReturnOf(outing) {
+  if (stopsIn(outing).length === 0) return null;
+  return typeof outing?.plannedReturnAt === 'string' && outing.plannedReturnAt ? outing.plannedReturnAt : null;
+}
+
 /** 저장된 하루에서 여유(slackMin)가 음수인 첫 환자 외출, 즉시 복귀 원인 OUTING_OVERDUE 의 외출. 없으면 null */
 export function overdueOutingOf(day) {
   return outingsOf(day, 'P').find((o) => typeof o.slackMin === 'number' && o.slackMin < 0) ?? null;
@@ -216,7 +226,7 @@ export function timelineEntries(day, { role = 'P', stay = null } = {}) {
         ...(stop.isMeal ? { slot: meal?.slot ?? null, status: 'FILLED', reasons: meal?.reasons ?? [] } : {}),
       });
     }
-    const planned = typeof outing.plannedReturnAt === 'string' && outing.plannedReturnAt ? outing.plannedReturnAt : null;
+    const planned = plannedReturnOf(outing);
     const entry = {
       id: `${outing.id}:return`,
       kind: 'return',
@@ -345,6 +355,8 @@ export function nextAppointmentBlock(day, nowMin) {
 /**
  * 오늘 화면의 초점 — 지금 외출 중(OUT)이면 그 외출, 아니면 다음 외출(NEXT), 다 끝났으면 DONE.
  * 정거장은 아직 떠나지 않은 첫 곳(머무는 중 포함). 환자 외출이 없으면 null.
+ * 즉시 복귀 중(returnNow)이고 여유가 음수인 외출(OUTING_OVERDUE 의 외출)이 이미 출발했으면, 시각과 상관없이 그 외출이
+ * OUT 이다. 밖에 있는 사람에게 '외출을 모두 마쳤어요'를 보이지 않는다.
  * @param {object|null} day  오늘 표시용 DayPlan
  * @param {number} nowMin  KST 자정부터의 분
  */
@@ -352,8 +364,10 @@ export function todayFocus(day, nowMin) {
   const outings = [...outingsOf(day, 'P')].sort(byDepart);
   if (outings.length === 0) return null;
   const nextAppointment = nextAppointmentBlock(day, nowMin);
-  const endOf = (o) => minutesOf(o.plannedReturnAt || o.returnBy);
-  const current = outings.find((o) => minutesOf(o.departAt) <= nowMin && nowMin < endOf(o));
+  const endOf = (o) => minutesOf(plannedReturnOf(o) || o.returnBy);
+  const overdue = day?.returnNow === true ? overdueOutingOf(day) : null;
+  const held = overdue && minutesOf(overdue.departAt) <= nowMin ? overdue : null;
+  const current = held ?? outings.find((o) => minutesOf(o.departAt) <= nowMin && nowMin < endOf(o));
   if (current) {
     const stop = stopsIn(current).find((s) => minutesOf(s.leaveAt) > nowMin) ?? null;
     return { phase: 'OUT', outing: current, stop, nextAppointment };

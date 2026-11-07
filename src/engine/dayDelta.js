@@ -7,7 +7,8 @@
 //   shortened 줄어든 곳        양쪽에 있고 체류가 줄어든 정거장
 //   cancelledOutings           정거장이 모두 빠진(대체도 없는) before 외출. 같은 외출(같은 id·출발 시각)이 after 에
 //                              정거장 0개로 남아 있으면(이미 출발한 외출, dayRepair.js) 취소가 아니다: 빠진 곳·새 마감으로 보인다
-//   newDeadlines               마감(returnBy·복귀 장소)이 바뀌었거나 새로 생긴 외출, 또는 복귀 여유가 음수가 된 외출
+//   newDeadlines               마감(returnBy·복귀 장소)이 바뀌었거나 새로 생긴 외출, 복귀 여유가 음수가 된 외출,
+//                              또는 정거장을 모두 비우고 남은 외출(늦지 않아도)
 //   stateChanged / before / after, reasons, hasVisibleChange, seen=false
 // 정거장 id 는 `${date}:${role}:${contentId}` 로 결정적이므로 같은 장소는 같은 id 다.
 //
@@ -160,9 +161,11 @@ export function computeDayDelta(before, after, { reasons = [], requiredStopIds =
       beforeOutings.find((b) => b.role === role && b.outing.id === outing.id)?.outing ??
       null;
     const changed = !match || match.returnBy !== outing.returnBy || match.returnPlace !== outing.returnPlace;
+    // 정거장을 모두 비우고 남은 외출(이미 출발한 외출, dayRepair.js)은 늦지 않아도 마감을 늘 싣는다(설계서 4.3)
+    const emptied = Boolean(match) && outing.stops.length === 0 && match.stops.length > 0;
     // 새로 마감을 넘기게 된 외출(여유가 음수로 바뀜)도 새 마감으로 알린다 — 이미 음수였으면 새 변화가 아니다
     const newlyOverdue = outing.slackMin < 0 && !(match && match.slackMin < 0);
-    if (changed || newlyOverdue) newDeadlines.push({ outingId: outing.id, returnBy: outing.returnBy });
+    if (changed || newlyOverdue || emptied) newDeadlines.push({ outingId: outing.id, returnBy: outing.returnBy });
   }
 
   // 사유: 넘겨받은 사유 → 빠진·대체된 정거장의 제외 사유 → 줄어든 곳의 시간 부족 → after 에 새로 생긴 사유

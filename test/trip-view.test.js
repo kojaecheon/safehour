@@ -29,6 +29,7 @@ import {
   needsInputFix,
   overdueOutingOf,
   placeDetailRequest,
+  plannedReturnOf,
   returnNoteKeyOf,
   returnPlaceOf,
   returnTargetOf,
@@ -424,6 +425,43 @@ describe('todayFocus — 오늘 화면의 지금 외출과 다음 정거장', ()
     const f = todayFocus(day({ outings: [a], blocks: [{ kind: 'APPOINTMENT', start: '15:00', end: '16:30', appointmentId: 'A1' }] }), at9);
     assert.equal(f.nextAppointment.start, '15:00');
     assert.equal(todayFocus(day({ outings: [a], blocks: [{ kind: 'APPOINTMENT', start: '08:00', end: '08:30' }] }), at9).nextAppointment, null);
+  });
+});
+
+describe('이동 중에 비운 정거장 0개 외출 (findings 10 화면)', () => {
+  // 엔진 재현: 10:25 출발, 10:32 재계획, 예상 귀가 10:28(숙소 기준 계산), 마감 10:39, 여유 -15, 즉시 복귀
+  const empty = { ...outing('o1', { departAt: '10:25', plannedReturnAt: '10:28', returnBy: '10:39', deadlineReason: 'APPOINTMENT', stops: [] }), slackMin: -15 };
+  const later = outing('o2', { departAt: '17:00', plannedReturnAt: '18:40', stops: [stop('3', { arriveAt: '17:20', leaveAt: '18:00' })] });
+  const now = 10 * 60 + 32;
+
+  test('즉시 복귀 중이면 그 외출이 OUT 이다: 예상 귀가·마감이 지나도 DONE 이 아니다', () => {
+    const d = day({ returnNow: true, reasons: ['OUTING_OVERDUE'], outings: [empty] });
+    for (const t of [now, 10 * 60 + 45, 16 * 60]) {
+      const f = todayFocus(d, t);
+      assert.equal(f.phase, 'OUT', String(t));
+      assert.equal(f.outing.id, empty.id);
+      assert.equal(f.stop, null);
+    }
+  });
+
+  test('즉시 복귀 중 OUT 은 다음 외출보다 앞선다', () => {
+    const f = todayFocus(day({ returnNow: true, outings: [empty, later] }), 16 * 60);
+    assert.equal(f.phase, 'OUT');
+    assert.equal(f.outing.id, empty.id);
+  });
+
+  test('즉시 복귀가 아니면 기존 규칙대로(마감 뒤 DONE)', () => {
+    assert.equal(todayFocus(day({ outings: [empty] }), 10 * 60 + 45).phase, 'DONE');
+  });
+
+  test('타임라인과 오늘 화면은 정거장 0개 외출의 예상 귀가를 보이지 않고 복귀 마감만 보인다', () => {
+    assert.equal(plannedReturnOf(empty), null);
+    assert.equal(plannedReturnOf(later), '18:40');
+    const ret = timelineEntries(day({ returnNow: true, outings: [empty] }), { role: 'P' }).find((e) => e.kind === 'return');
+    assert.equal(ret.plannedReturnAt, null);
+    assert.equal(ret.time, '10:39', '항목 시각은 복귀 마감이다(지금보다 이른 예상 귀가가 아니다)');
+    assert.equal(ret.returnBy, '10:39');
+    assert.equal(ret.endTime, undefined);
   });
 });
 

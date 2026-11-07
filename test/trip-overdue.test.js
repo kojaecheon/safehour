@@ -8,6 +8,7 @@ import { describe, test } from 'node:test';
 
 import { REASON, REASON_TEXT, RETURN_NOW_CAUSES, STATE } from '../src/domain/states.js';
 import { occupancyEnd } from '../src/engine/dayContext.js';
+import { computeDayDelta } from '../src/engine/dayDelta.js';
 import { overdueOutingId, planTrip } from '../src/engine/tripPlan.js';
 import { fromMinutes } from '../src/stay/time.js';
 import { AIRPORT_TRAVEL, at, byLodging, contentIdsOf, mins, plus, stopsOf, tripPool, tripStay } from './trip-fixtures.js';
@@ -280,6 +281,37 @@ describe('경우 2: 이동 중(첫 장소 도착 전)인 외출도 즉시 복귀
     assert.ok(same, '그 외출은 남는다');
     assert.ok(same.stops.length > 0, '정거장도 남는다');
     assert.ok(same.slackMin >= 0);
+  });
+});
+
+describe('이미 출발한 외출은 옮기지 않는다 (fix round 1 M4·M5)', () => {
+  const withVisit = tripStay({}, {
+    pace: 'NORMAL',
+    appointments: [
+      { id: 'A-PROC', hospitalId: 'H1', type: 'PROCEDURE', date: '2026-10-04', start: '09:00', source: 'USER' },
+      { id: 'A-VISIT', hospitalId: 'H1', type: 'VISIT', date: TODAY, start: '15:00', source: 'USER' },
+    ],
+  });
+  const base = plan(withVisit);
+  const first = base.days[TODAY].outings[0];
+
+  test('출발 뒤 첫 장소 도착 전에 첫 장소가 휴무가 되어도 출발 시각은 그대로다', () => {
+    const T = plus(first.departAt, 2);
+    assert.ok(mins(T) < mins(first.stops[0].arriveAt));
+    const day = replanToday(withVisit, base, { now: at(TODAY, T), events: [{ type: 'CLOSURE', closedIds: [first.stops[0].contentId] }] });
+    const same = day.outings.find((o) => o.id === first.id);
+    assert.ok(same, '그 외출은 남는다');
+    assert.equal(same.departAt, first.departAt, '출발 시각을 늦추지 않는다');
+    assert.ok(!day.outings.some((o) => o.id !== first.id && mins(o.departAt) <= mins(T) && mins(T) < occupancyEnd(o)), '겹치는 외출이 없다');
+  });
+
+  test('정거장을 모두 비우고 남은 외출은 늦지 않아도 전후 비교에 마감을 싣는다', () => {
+    const before = base.days[TODAY];
+    const after = { ...before, outings: before.outings.map((o) => (o.id === first.id ? { ...o, stops: [] } : o)) };
+    assert.ok(first.slackMin >= 0);
+    const delta = computeDayDelta(before, after, { reasons: [REASON.CLOSED] });
+    assert.ok(delta.newDeadlines.some((d) => d.outingId === first.id && d.returnBy === first.returnBy));
+    assert.ok(!delta.cancelledOutings.includes(first.id));
   });
 });
 

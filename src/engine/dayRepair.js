@@ -2,7 +2,8 @@
 //
 // 확정 일정은 바뀐 것이 없으면 그대로 둔다. 외출마다:
 //   1. 지금 입력으로 다시 만든 창에서 그 외출의 마감을 찾는다(병원에서 끝나는 외출은 같은 병원 일정의 창).
-//   2. 도착 시각이 지난 정거장(오늘)은 건드리지 않는다. 이미 출발한 외출은 출발 시각을 옮기지 않는다.
+//   2. 도착 시각이 지난 정거장(오늘)은 건드리지 않는다. 이미 출발한 외출은 출발 시각을 옮기지 않는다
+//      (시작된 정거장이 없어 새 시간표가 더 늦게 출발해도 저장된 출발 시각을 둔다).
 //   3. 남은 정거장 중 게이트를 여전히 통과하는 것은 제자리에 둔다.
 //      통과하지 못한 정거장만 같은 종류(식사 칸 식당 / 일반 정거장)의 다른 후보로 대체한다.
 //      사용자가 지운 정거장은 대체하지 않는다(고정한 장소로 바꾼 교체만 그 자리에 넣는다). 비운 식사 칸은 채우지 않는다.
@@ -261,6 +262,9 @@ export function repairOuting({ context, role, outing, loc, nowMin, nextDepart, b
     repaired = assembleOuting(manualEvaluation(context, role, outing, frozen, loc.deadline.returnPoint), meta, { original, exact });
   }
   if (!repaired) return null;
+  // 이미 출발한 외출의 출발 시각은 옮기지 않는다. 시작된 정거장이 없으면 새 시간표가 더 늦게 출발할 수 있다
+  // (식사 칸 시작에 맞춤 등, prefixOk). 정거장 시각과 여유는 새 시간표 그대로 두고(복귀 도착은 같다) 출발 시각만 저장된 값으로 둔다
+  if (departed && repaired.departAt !== outing.departAt) repaired = { ...repaired, departAt: outing.departAt };
   if (repaired.slackMin < 0) log.reasons.add(REASON.SLA_INSUFFICIENT);
   noteMeals(repaired.stops, ev ? ev.items : []);
   return repaired;
