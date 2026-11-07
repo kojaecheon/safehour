@@ -11,6 +11,8 @@
 // 시드는 오늘 오전 8시 기준이다: 외출1(09:38 출발, 병원 복귀 11:00), 외출2·3(숙소 복귀 21:00).
 
 import { test, expect, expectGuardClean, guardContext } from './fixtures.js';
+import { returnHospitalOf } from '../src/engine/returnTarget.js';
+import { shiftAppointmentsOnDate } from '../src/engine/tripEvents.js';
 import {
   LODGING_NAME,
   HOSPITAL_NAME,
@@ -34,7 +36,7 @@ const PIN = '482915';
 const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const hhmm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
 
-/** 보호자 기기 — 로그인하지 않은 새 컨텍스트 (guardian.spec.js 와 같은 방식) */
+/** 보호자 기기: 로그인하지 않은 새 컨텍스트 (guardian.spec.js 와 같은 방식) */
 async function guardianDevice(browser, testInfo) {
   const { baseURL, viewport, locale, timezoneId } = testInfo.project.use;
   const context = await browser.newContext({ baseURL, viewport, locale, timezoneId, permissions: [] });
@@ -96,14 +98,17 @@ test.describe('복귀 마감이 지난 외출', () => {
     expect(shown.reasons ?? []).not.toContain('OUTING_OVERDUE');
     await expect(page.getByRole('button', { name: '복귀 안내 다시 보기' })).toHaveCount(0);
 
-    // 확인했어요 → 닫힘 → 새로 고쳐도 다시 뜨지 않는다
+    // 확인했어요를 누르면 시트가 닫히고, 새로 고쳐도 다시 뜨지 않는다
     await sheet.getByRole('button', { name: '확인했어요' }).click();
     await expect(sheet).toHaveCount(0);
     await page.reload();
-    await expect(page.locator('main')).toBeVisible();
+    // 실행기가 켜진 뒤의 화면을 기다린다: 저장 일정을 읽고 오늘 일정의 마감 시각이 그려진 때
+    await expect.poll(async () => (await readRecord(page, 'tripPlan'))?.days?.[today]?.outings?.length ?? 0).toBeGreaterThan(0);
+    await expect(page.locator('main').getByText(target.returnBy).first()).toBeVisible();
     await expect(page.getByRole('dialog')).toHaveCount(0);
     // 앱이 한 번 더 확인할 시간을 준다(1분 틱) 그래도 다시 뜨지 않는다
     await advanceClock(page, 60_000, { run: true });
+    await expect(page.getByRole('dialog')).toHaveCount(0);
     await expect(page.getByRole('dialog', { name: '복귀 마감 시각이 지났어요' })).toHaveCount(0);
     const after = (await readRecord(page, 'tripPlan')).days[today];
     expect(stopsOf(after).length).toBe(stopCountBefore);
@@ -148,12 +153,14 @@ test.describe('복귀 마감이 지난 외출', () => {
     const nowMin = kstMinutes();
     for (const stop of stopsOf(stored)) expect(minutesOf(stop.arriveAt), '남은 정거장이 비워져야 한다').toBeLessThanOrEqual(nowMin + 1);
     const returning = stored.outings.find((o) => minutesOf(o.departAt) <= nowMin && nowMin < minutesOf(o.occupancyEnd ?? o.returnBy)) ?? stored.outings[0];
-    if (returning.returnPlace === 'LODGING') {
-      await expect(placeBlock).toContainText(LODGING_NAME);
-    } else {
-      await expect(sheet).toContainText('오늘 남은 일정을 비웠어요. 아래 장소로 이동하세요.');
-      await expect(placeBlock.getByText(new RegExp(`${HOSPITAL_NAME}|정해 둔 장소`))).toBeVisible();
-    }
+    // 시드의 외출 1은 병원으로 돌아온다: 숙소가 되면 아래 '아래 장소로' 문구 경로가 시험되지 않으므로 크게 실패시킨다
+    expect(returning.returnPlace, '외출 중이던 외출은 병원으로 돌아와야 한다').toBe('HOSPITAL');
+    await expect(sheet).toContainText('오늘 남은 일정을 비웠어요. 아래 장소로 이동하세요.');
+    // 엔진이 쓰는 규칙 그대로: 적힌 병원 id 가 체류 병원 목록에 있으면 병원 이름, 없으면 '정해 둔 장소'
+    // (데모 사건이 옮긴 병원 일정을 엔진과 같은 함수로 반영한 체류로 찾는다)
+    const shiftedStay = shiftAppointmentsOnDate(await readRecord(page, 'stay'), today, -60);
+    if (returnHospitalOf(returning, { stay: shiftedStay, day: stored })) await expect(placeBlock).toContainText(HOSPITAL_NAME);
+    else await expect(placeBlock).toContainText('정해 둔 장소');
     await expect(sheet).not.toContainText('안전합니다');
     await evidenceShot(page, 'overdue-02-patient-return-now-sheet', { fullPage: false });
     await expectNoAxeViolations(page, '지금 돌아가세요 시트(OUTING_OVERDUE)');
@@ -237,7 +244,7 @@ test.describe('복귀 마감이 지난 외출', () => {
     page.on('pageerror', (error) => errors.push(String(error)));
     const response = await page.goto('/design-board');
     expect(response?.ok()).toBe(true);
-    await expect(page.getByRole('switch', { name: '복귀 마감 알림 받기' }).first()).toBeAttached();
+    await expect.poll(() => page.getByRole('switch', { name: '복귀 마감 알림 받기' }).count()).toBeGreaterThan(0);
     expect(errors, '디자인 보드 콘솔 오류').toEqual([]);
   });
 });
