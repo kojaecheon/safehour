@@ -91,6 +91,15 @@ src/domain → src/stay → src/engine → lib/server → app
   검증하면 모양이 어긋나도 검사·테스트·빌드·화면 테스트가 모두 통과한다. 실제 요청 조립 함수가
   만든 본문을 실제 라우트 처리기에 넣어 확인한다.
 - **안전 판정에 관한 규칙은 테스트가 있어야 한다.** 규칙을 바꾸면 테스트도 같은 커밋에서 바꾼다.
+- **알림을 더하거나 바꿀 때 확인할 것.**
+  - 잠금 화면 문구의 금지어 검사: `test/notify-schedule.test.js`의 `FORBIDDEN`에 새 문구가 걸리지 않는지 본다.
+  - 예약 항목 필드 허용 목록: `NOTIFY_ITEM_FIELDS` 밖의 필드를 예약 항목에 싣지 않는다.
+  - **알림을 눌렀을 때 열리는 화면**: 서비스 워커 `public/sw.js`의 허용 목록과 `lib/notify/device.js`의
+    `data.url`이 같이 바뀌어야 한다. 한쪽만 바꾸면 알림을 눌러도 원하는 화면이 열리지 않는다.
+- **시안 보드(`app/design-board`)는 고정 데모 데이터만 쓰고 기기 저장소를 읽지 않는다.**
+  `test/design-board-boundary.test.js`가 저장소·알림 런타임·체류 훅의 import를 막는다. 저장소를 읽는
+  부품은 표시 부품과 저장소 부품으로 나누고, 시안 보드에는 표시 부품만 넣는다
+  (`components/guardian/AlertsToggleView.js`가 예).
 
 ## 작업 단위와 기록
 

@@ -314,6 +314,7 @@ describe('규칙 43 — 화면에 보이는 안전 문구', () => {
       'return.title',
       'return.body',
       'return.note',
+      'return.notePlace',
       'home.p1Title',
       'home.p1Body',
       'home.p2Title',

@@ -28,7 +28,7 @@ import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
-import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
+import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, plannedReturnOf, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
 import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
 import { isStayDate } from '@/src/stay/stay.js';
@@ -45,7 +45,8 @@ function Deadline({ outing, day, stay }) {
   const deadline = pair('return.deadline', { time: outing.returnBy });
   const reasonKey = DEADLINE_REASON_KEY[outing.deadlineReason];
   const reason = reasonKey ? pair(reasonKey) : null;
-  const planned = outing.plannedReturnAt ? pair('trip.plannedReturn', { time: outing.plannedReturnAt }) : null;
+  const plannedAt = plannedReturnOf(outing);
+  const planned = plannedAt ? pair('trip.plannedReturn', { time: plannedAt }) : null;
   const place = returnPlaceOf(outing, day, stay);
   const placeName = place.name ?? (place.kind === 'HOSPITAL' ? t('trip.placeHospital') : t('trip.placeLodging'));
   return (
@@ -178,7 +179,8 @@ export default function TodayPage() {
     const fix = needsInputFix(day);
     const returnTitle = pair('return.title');
     const outingNow = Boolean(focus && focus.phase !== 'DONE' && focus.outing);
-    const outingDone = focus?.phase === 'DONE';
+    // 즉시 복귀 중에는 '외출을 모두 마쳤어요'를 보이지 않는다(복귀 배너와 어긋난다)
+    const outingDone = focus?.phase === 'DONE' && !stored?.returnNow;
     const outingNone = !focus && nowMin !== null && !fix && !stored?.returnNow;
     const hasOutingBlock = outingNow || outingDone || outingNone || Boolean(focus?.nextAppointment);
     body = (

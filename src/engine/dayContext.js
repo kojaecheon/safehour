@@ -319,9 +319,24 @@ export function recFromStop(stop) {
 
 /**
  * 저장된 정거장만으로 외출 시간표를 다시 쓴다(검증 없이). 시작된 정거장만 남은 외출의 마감을 새로 계산할 때 쓴다.
+ * 정거장이 없으면(이미 출발했고 첫 정거장 도착 전에 남은 정거장을 모두 비운 외출) 복귀 구간은 출발지(숙소)에서
+ * 복귀 장소까지로 계산한다. 지금 위치는 모으지 않으므로 사용자가 고른 고정 좌표만 쓴다. 지금 시각을 쓰지 않으므로
+ * 시간만 흘러서는 값이 바뀌지 않는다.
  * @returns {object} evaluateOuting 결과와 같은 모양
  */
 export function manualEvaluation(context, role, outing, stops, returnPoint) {
+  if (stops.length === 0) {
+    const departMin = toMinutes(outing.departAt);
+    const back = context.ctx[role].estimate(context.ctx[role].lodgingPoint ?? context.lodgingPoint, returnPoint);
+    return {
+      departMin,
+      items: [],
+      back,
+      walkTotal: back.mode === 'walk' ? back.min : 0,
+      travelTotalMin: back.min,
+      returnArriveMin: departMin + back.min,
+    };
+  }
   const items = stops.map((s) => ({
     rec: recFromStop(s),
     stayMin: s.stayMin,

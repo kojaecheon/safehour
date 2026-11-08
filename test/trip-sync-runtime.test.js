@@ -381,9 +381,10 @@ describe('복귀 마감 지남: overdueReturn 신호(표시만)', () => {
     assert.equal(sync.getState().overdueReturn?.outingId, outing.id);
     sync.dismissOverdueReturn();
     assert.equal(sync.getState().overdueReturn, null, '같은 마감의 다른 외출로 시트가 다시 떴다');
-    assert.ok(store.readOverdueSeen(TODAY).dismissed.includes(outing.id));
+    // 닫은 기억은 외출 id 와 마감 시각을 함께 적는다(전체 재계획이 id 를 다시 매겨도 다른 외출을 막지 않게)
+    assert.ok(store.readOverdueSeen(TODAY).dismissed.includes(`${outing.id}@${outing.returnBy}`));
     // 같은 마감(fixture 는 활동 종료 21:00)의 외출은 함께 닫는다
-    assert.deepEqual([...store.readOverdueSeen(TODAY).dismissed].sort(), [...sameDeadline].sort());
+    assert.deepEqual([...store.readOverdueSeen(TODAY).dismissed].sort(), sameDeadline.map((id) => `${id}@${outing.returnBy}`).sort());
     timers.advanceTo(deadline + 5 * 60_000);
     assert.equal(sync.getState().overdueReturn, null);
     sync.stop();
@@ -393,6 +394,28 @@ describe('복귀 마감 지남: overdueReturn 신호(표시만)', () => {
     again.start();
     assert.equal(again.getState().overdueReturn, null);
     again.stop();
+  });
+
+  test('같은 외출 id 라도 마감 시각이 다른 기억(또는 예전 형식의 id 만 적은 기억)으로는 막지 않는다', async () => {
+    const { sync, store, timers, outing, deadline, api, clock } = await beforeDeadline();
+    // 재계획 전 같은 id 의 다른 마감 외출을 닫았던 기억, 그리고 예전 형식 기억
+    assert.equal(store.markOverdueDismissed(TODAY, `${outing.id}@00:01`).ok, true);
+    assert.equal(store.markOverdueDismissed(TODAY, outing.id).ok, true);
+    timers.advanceTo(deadline + 1000);
+    assert.equal(sync.getState().overdueReturn?.outingId, outing.id, '다른 마감의 기억이 시트를 막았다');
+    sync.stop();
+    // 다시 시작해도 같다
+    const again = createTripSync({ store, api, now: clock.now, timers });
+    again.start();
+    assert.equal(again.getState().overdueReturn?.outingId, outing.id);
+    again.dismissOverdueReturn();
+    assert.equal(again.getState().overdueReturn, null);
+    again.stop();
+    // 같은 id + 같은 마감으로 닫은 기억은 다시 시작해도 유지된다
+    const third = createTripSync({ store, api, now: clock.now, timers });
+    third.start();
+    assert.equal(third.getState().overdueReturn, null);
+    third.stop();
   });
 
   test('기억 쓰기가 실패해도 같은 실행 안에서는 다시 켜지지 않는다', async () => {

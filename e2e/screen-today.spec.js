@@ -6,7 +6,7 @@
 // --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
 
 import { test, expect } from './fixtures.js';
-import { buildStay, fireDemoEvent, gapBetween, kstDate, linkDemoPlan, openDemoToday, startTrip, styles } from './helpers.js';
+import { buildStay, fireDemoEvent, gapBetween, kstDate, linkDemoPlan, openDemoToday, setClock, startTrip, styles } from './helpers.js';
 
 /**
  * 다음 재계획을 실패시킨다: 일정 API 를 503 으로 막고, 다른 탭에서 체류를 바꾼 것처럼 storage 이벤트를 보낸다
@@ -159,6 +159,8 @@ test.describe('③층 오늘, 매일 확인과 다음 외출', () => {
 
 test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
   test('확인하지 않은 병원 안내: 자기 흰 블록, 회색 버튼이 흰 면 위에 보인다', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     await startTrip(page);
     await linkDemoPlan(page, 'A');
     await page.goto('/today');
@@ -192,6 +194,8 @@ test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
   });
 
   test('데모 사건 뒤 오늘: 변경됨은 하루 일정과 같은 누르는 안내 상자, 즉시 복귀 배너는 2px 먹색', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const panel = await openDemoToday(page);
     await fireDemoEvent(panel, /환자 호출/);
     const returnSheet = page.getByRole('dialog', { name: '지금 돌아가세요' });

@@ -510,6 +510,13 @@ export const safety = {
     ja: '地図のリンクに宿泊先の位置は入れません。タクシー運転手に韓国語の帰着カードを見せてください。緊急時はすぐに119へ電話してください。',
     zh: '地图链接不会包含住处位置。请向出租车司机出示韩语返回卡片。如遇紧急情况，请立即拨打 119。',
   },
+  // 병원·정해 둔 장소용 맺음말. 시트 맨 아래에 놓이므로 위의 장소 칸을 가리킨다. 한국어 복귀 카드는 숙소 카드라 말하지 않는다 (findings 11)
+  'return.notePlace': {
+    ko: '길을 물을 때는 위의 장소 정보를 보여 주세요. 위급하면 119에 전화하세요.',
+    en: 'When asking for directions, show the place details above. In an emergency, call 119.',
+    ja: '道をたずねるときは、上の場所の情報を見せてください。緊急のときは119に電話してください。',
+    zh: '问路时请出示上方的地点信息。紧急情况请拨打119。',
+  },
   'return.bodyPlace': {
     ko: '오늘 남은 일정을 비웠어요. 아래 장소로 이동하세요. 몸 상태가 걱정되면 이동하기 전에 병원에 먼저 연락하세요.',
     en: 'The rest of today’s plan was cleared. Head to the place below. If you are worried about how you feel, contact your hospital before you move.',

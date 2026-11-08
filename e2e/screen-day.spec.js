@@ -5,7 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245).
 
 import { test, expect } from './fixtures.js';
-import { findEditableStop, fireDemoEvent, gapBetween, kstDate, openDemoToday, startTrip, styles } from './helpers.js';
+import { findEditableStop, fireDemoEvent, gapBetween, kstDate, openDemoToday, setClock, startTrip, styles } from './helpers.js';
 
 test.describe('③층 하루 일정, 회색 바탕과 블록', () => {
   test('회색 바탕 위 흰 블록: 날짜 칩 줄 / 상태 / 전환·타임라인 / 도구, 블록 사이 8px', async ({ page }) => {
@@ -145,6 +145,8 @@ test.describe('③층 하루 일정, 소개와 도구', () => {
 
 test.describe('③층 하루 일정, 안전 표시 회귀 가드', () => {
   test('데모 패널은 2px 점선 · 모서리 12, 즉시 복귀 배너는 2px 먹색 실선 · 모서리 12', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const panel = await openDemoToday(page);
 
     // (a) 데모 표시: 2px 대기 색 점선을 지키고 모서리만 12

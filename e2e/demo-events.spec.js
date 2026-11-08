@@ -58,6 +58,8 @@ test.describe('시나리오 3 — 데모 사건', () => {
   });
 
   test('환자 호출은 오늘 남은 일정을 비우고 복귀 시트를 자동으로 연다. 뒤로 가기는 시트만 닫는다. 초기화하면 풀린다', async ({ page }) => {
+    // 저녁에 지침을 연결하면 복귀 시트가 먼저 덮으므로 오늘 오전 10시로 서버·브라우저 시계를 맞춘다
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const { today, panel } = await openDemoTodayWithLabel(page);
     const url = page.url();
 
@@ -100,6 +102,8 @@ test.describe('시나리오 3 — 데모 사건', () => {
   });
 
   test('위험 신호는 오늘을 관광 미추천(NO_TOURISM)으로 만든다 — 오류 스타일이 아니다', async ({ page }) => {
+    // 저녁에 지침을 연결하면 복귀 시트가 먼저 덮으므로 오늘 오전 10시로 서버·브라우저 시계를 맞춘다
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const { today, panel } = await openDemoTodayWithLabel(page);
     await fireDemoEvent(panel, /위험 신호 입력/);
     await expect(page.getByText('데모 사건을 반영해 오늘 일정을 다시 판정했어요.')).toBeVisible();
