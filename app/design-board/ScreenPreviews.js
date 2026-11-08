@@ -61,11 +61,12 @@ import PairText from '@/components/settings/PairText.js';
 import { AppliedConditions, ExcludedList } from '@/components/trip/DayFacts.js';
 import MapLinks from '@/components/trip/MapLinks.js';
 import {
-  DEADLINE_REASON_KEY,
+  deadlineCopyOf,
   deltaSummary,
   formatDate,
   guardianTabInfo,
   introRequestFor,
+  outingDayNote,
   returnPlaceOf,
   stopBadges,
   timelineEntries,
@@ -110,9 +111,9 @@ function Phone({ name, route, note, nav, children }) {
 /** 복귀 마감 — app/today/page.js 의 Deadline 과 같은 배치 */
 function Deadline({ outing, day, stay }) {
   const { t, pair } = useLang();
-  const deadline = pair('return.deadline', { time: outing.returnBy });
-  const reasonKey = DEADLINE_REASON_KEY[outing.deadlineReason];
-  const reason = reasonKey ? pair(reasonKey) : null;
+  const copy = deadlineCopyOf(outing, { isToday: true });
+  const deadline = pair(copy.timeKey, { time: outing.returnBy });
+  const reason = copy.reasonKey ? pair(copy.reasonKey) : null;
   const planned = outing.plannedReturnAt ? pair('trip.plannedReturn', { time: outing.plannedReturnAt }) : null;
   const place = returnPlaceOf(outing, day, stay);
   const placeName = place.name ?? (place.kind === 'HOSPITAL' ? t('trip.placeHospital') : t('trip.placeLodging'));
@@ -148,7 +149,7 @@ function TodayScreen({ demo }) {
           <p className="today-date">
             <span>{formatDate(DEMO_TODAY, locale)}</span>
           </p>
-          <StateBanner state={day.dayState} reasons={day.reasons ?? []} />
+          <StateBanner state={day.dayState} reasons={day.reasons ?? []} outingNote={outingDayNote(day)} />
         </div>
 
         {(focus?.outing || focus?.nextAppointment) && (
@@ -302,12 +303,13 @@ function useTimeline(day, stay, role) {
           return { id: entry.id, kind: 'depart', time: entry.time, title: entry.place?.name ?? t('trip.placeLodging') };
         case 'return': {
           const place = entry.place?.name ?? (entry.place?.kind === 'HOSPITAL' ? t('trip.placeHospital') : t('trip.placeLodging'));
+          const copy = deadlineCopyOf(entry, { isToday: DEMO_DETAIL_DATE === DEMO_TODAY });
           const notes = [
             entry.plannedReturnAt ? t('trip.plannedReturn', { time: entry.plannedReturnAt }) : null,
-            t('return.deadline', { time: entry.returnBy }),
-            entry.deadlineReason && DEADLINE_REASON_KEY[entry.deadlineReason] ? t(DEADLINE_REASON_KEY[entry.deadlineReason]) : null,
+            t(copy.timeKey, { time: entry.returnBy }),
+            copy.reasonKey ? t(copy.reasonKey) : null,
           ].filter(Boolean);
-          return { id: entry.id, kind: 'return', time: entry.time, endTime: entry.endTime, title: place, note: notes.join(' · ') };
+          return { id: entry.id, kind: 'return', kindKey: copy.labelKey, time: entry.time, endTime: entry.endTime, title: place, note: notes.join(' · ') };
         }
         case 'appointment':
           return { id: entry.id, kind: 'appointment', time: entry.time, endTime: entry.endTime, title: entry.place?.name ?? t('trip.placeHospital') };
@@ -391,7 +393,7 @@ function DayDetailScreen({ demo }) {
         </div>
 
         <div className="ui-block trip-status-block">
-          <StateBanner state={day.dayState} reasons={day.reasons ?? []} />
+          <StateBanner state={day.dayState} reasons={day.reasons ?? []} outingNote={outingDayNote(day)} />
           {delta?.unseen && (
             <button type="button" className="trip-changed">
               <span className="trip-changed-dot" aria-hidden="true" />

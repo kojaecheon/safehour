@@ -15,6 +15,8 @@
 //   returnTargetOf / overdueOutingOf  복귀 시트의 돌아갈 곳과 여유가 음수인 외출 (마감 지남 설계서 4.2·4.3)
 //   returnNoteKeyOf    복귀 시트 맺음말 키, 숙소만 한국어 복귀 카드를 안내한다 (findings 11)
 //   updateFailedBodyKey 일정 갱신 실패 안내 본문 키, 관광공사 실패 분류(upstream)에 따라 고른다 (docs/contracts.md 일정 502)
+//   dayActionKey       상태 상자의 행동 줄, 사유별로 하나 (사용성 점검 2026-11-08 A1·A2) · outingDayNote 외출 있는 날 고정 줄(A3)
+//   deadlineCopyOf     복귀 마감 이름·시각·이유 키, 하루 활동 종료(DAY_END)는 '오늘 활동 종료'로 나눈다 (A4)
 //
 // Next 밖(node --test)에서도 읽히도록 상대 경로만 쓴다. React·브라우저 API 를 쓰지 않는다.
 // 문구 키는 화면에서 쓰는 키를 그대로 적는다(test/i18n.test.js 가 키 모양 문자열로 사용 여부를 확인한다).
@@ -23,7 +25,7 @@ import { effectiveRows } from '../conditions/summary.js';
 import { safeStayDates } from '../../lib/trip/affected.js';
 import { canonicalJson } from '../../lib/store/fingerprint.js';
 import { declaredReturnHospitalId, returnHospitalOf } from '../../src/engine/returnTarget.js';
-import { isOverdueClampedDay } from '../../src/domain/states.js';
+import { REASON, RETURN_NOW_CAUSES, STATE, isOverdueClampedDay } from '../../src/domain/states.js';
 import { DEFAULTS } from '../../src/stay/defaults.js';
 import { appointmentsOnDate } from '../../src/stay/stay.js';
 import { toMinutes } from '../../src/stay/time.js';
@@ -37,6 +39,103 @@ export const DEADLINE_REASON_KEY = Object.freeze({
   DEPARTURE: 'trip.deadlineDEPARTURE',
   PATIENT_SCHEDULE: 'trip.deadlinePATIENT_SCHEDULE',
 });
+
+/**
+ * 상태 상자의 사유별 행동 줄 (사용성 점검 2026-11-08 A1·A2 · docs/business-rules.md '날짜 분류'·'오늘 게이트 덧씌우기').
+ * 병원과 무관한 사유(시각·입력 누락·확인 대기)에 '병원 연락'·'병원 인근 대기'를 쓰지 않으려고 고른다.
+ * 판정을 새로 만들지 않는다. 엔진이 적은 상태·사유를 읽어 문구만 고른다.
+ */
+export const DAY_ACTION_KEY = Object.freeze({
+  TIME_SHORT: 'common.actionTimeShort',
+  NEEDS_INPUT: 'common.actionNeedsInput',
+  NEEDS_INPUT_OTHER: 'common.actionNeedsInputOther',
+  DAILY_CHECK: 'common.actionDailyCheck',
+  DAILY_CHECK_ELSEWHERE: 'common.actionDailyCheckElsewhere',
+  HOSPITAL_GUIDE: 'common.actionHospitalGuide',
+});
+
+/**
+ * 이 사유가 하나라도 있으면 상태 기본 행동 줄(src/domain/states.js STATE_MESSAGE 의 action, 예: '병원 연락 또는 숙소 대기')을 그대로 둔다.
+ * 병원 지침 사유(외출 제한·상충·복귀 요청·지침 철회·만료·외출 늦음)와, 병원 안내를 먼저 따르라는 사유(주의 상태·서비스 중단·동행 필요)다.
+ */
+const HOSPITAL_ACTION_REASONS = Object.freeze([
+  ...RETURN_NOW_CAUSES,
+  REASON.OUTING_FORBIDDEN,
+  REASON.CONFLICTING_CONDITION,
+  REASON.RISK_SIGNAL,
+  REASON.SERVICE_PAUSED,
+  REASON.ESCORT_REQUIRED,
+]);
+
+/** 입력 필요(NEEDS_INPUT) 사유 중 조건 입력이 아닌 것: 숙소 없음, 병원 지침 만료 */
+const NEEDS_OTHER_INPUT = Object.freeze([REASON.LODGING_REQUIRED, REASON.HOSPITAL_PLAN_EXPIRED_INPUT_REQUIRED]);
+
+/**
+ * 상태 상자에 보일 행동 줄 키. null 이면 상태 기본 행동 줄을 쓴다.
+ *
+ *   병원 지침 사유가 있거나 즉시 복귀 중          → null (기본 줄, NO_TOURISM 이면 '병원 연락 또는 숙소 대기')
+ *   NO_TOURISM + 입력 필요(coverage NEEDS_INPUT)   → 조건 입력 줄 (숙소 없음·지침 만료는 입력 줄)
+ *   NO_TOURISM + 오늘 + 시간 부족(DEPARTURE_WINDOW_TOO_SHORT · SLA_INSUFFICIENT) → 시간 부족 줄
+ *   STANDBY + 오늘 + 매일 확인 대기                 → 매일 확인 줄 (오늘 화면은 '위의 확인 항목', 하루 일정 화면은 '오늘 화면에서')
+ *   STANDBY + 오늘 + 확인하지 않은 병원 중요 안내   → 병원 안내 확인 줄
+ *
+ * NO_TOURISM 날에 덧씌운 확인 대기는 고르지 않는다. 확인해도 외출이 열리지 않기 때문이다.
+ *
+ * @param {object|null} day  표시용 DayPlan (오늘이면 게이트를 덧씌운 값)
+ * @param {{ isToday?: boolean, screen?: 'today'|'day' }} [options]
+ * @returns {string|null}
+ */
+export function dayActionKey(day, { isToday = false, screen = 'today' } = {}) {
+  if (!isObject(day)) return null;
+  const reasons = list(day.reasons);
+  if (day.returnNow === true || reasons.some((r) => HOSPITAL_ACTION_REASONS.includes(r))) return null;
+  if (day.dayState === STATE.NO_TOURISM) {
+    if (day.coverage === 'NEEDS_INPUT') {
+      return reasons.some((r) => NEEDS_OTHER_INPUT.includes(r)) ? DAY_ACTION_KEY.NEEDS_INPUT_OTHER : DAY_ACTION_KEY.NEEDS_INPUT;
+    }
+    if (isToday && (reasons.includes(REASON.DEPARTURE_WINDOW_TOO_SHORT) || reasons.includes(REASON.SLA_INSUFFICIENT))) {
+      return DAY_ACTION_KEY.TIME_SHORT;
+    }
+    return null;
+  }
+  if (isToday && day.dayState === STATE.STANDBY) {
+    if (reasons.includes(REASON.DAILY_CHECK_PENDING)) {
+      return screen === 'day' ? DAY_ACTION_KEY.DAILY_CHECK_ELSEWHERE : DAY_ACTION_KEY.DAILY_CHECK;
+    }
+    if (reasons.includes(REASON.PLAN_UNCONFIRMED_UPDATE)) return DAY_ACTION_KEY.HOSPITAL_GUIDE;
+  }
+  return null;
+}
+
+/**
+ * 외출이 있는 날인가. 상태 상자 아래 고정 줄 'common.outingDayNote'를 보일지 정한다 (사용성 점검 A3).
+ * 환자 외출이나 보호자 외출이 하나라도 있으면 참이다.
+ */
+export function outingDayNote(day) {
+  if (!isObject(day)) return false;
+  return outingsOf(day, 'P').length + outingsOf(day, 'G').length > 0;
+}
+
+/**
+ * 복귀 마감의 이름·시각·이유 키 (사용성 점검 A4, 이름만 나눈다. 마감 지남 시트가 뜨는 때는 그대로다).
+ * 마감 이유가 하루 활동 종료(DAY_END)면 병원이 정한 마감이 아니므로 '오늘 활동 종료'(오늘이 아니면 '활동 종료')로 부르고,
+ * 같은 말을 되풀이하는 이유 줄('하루 활동 종료 기준')은 뺀다. 그 밖의 마감은 '복귀 마감'과 이유 줄을 그대로 쓴다.
+ * @param {object|null} outing  외출 또는 타임라인 복귀 항목 ({ deadlineReason })
+ * @param {{ isToday?: boolean }} [options]
+ * @returns {{ dayEnd: boolean, labelKey: string, timeKey: string, reasonKey: string|null }}
+ */
+export function deadlineCopyOf(outing, { isToday = false } = {}) {
+  const reason = outing?.deadlineReason ?? null;
+  if (reason === 'DAY_END') {
+    return {
+      dayEnd: true,
+      labelKey: isToday ? 'common.tlDayEndToday' : 'common.tlDayEnd',
+      timeKey: isToday ? 'return.dayEnd' : 'trip.dayEndAt',
+      reasonKey: null,
+    };
+  }
+  return { dayEnd: false, labelKey: 'common.tlReturn', timeKey: 'return.deadline', reasonKey: DEADLINE_REASON_KEY[reason] ?? null };
+}
 
 /** 데모 사건 6종, 패널 순서 (docs/platform/ITINERARY_RULES.md '데모 사건') */
 export const DEMO_EVENT_TYPES = Object.freeze(['CLOSURE', 'WEATHER', 'TRAFFIC_SURGE', 'APPOINTMENT', 'PATIENT_RECALL', 'RISK_SIGNAL']);

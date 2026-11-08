@@ -12,12 +12,16 @@
 //   - 아이콘 모양이 상태마다 다르다(함께 걷는 두 사람 / 한 사람과 집 / 모래시계 / 달).
 //   - NO_TOURISM 은 쉬는 날의 차분한 회청색과 달 아이콘이다 — 오류 빨강·경고 삼각형을 쓰지 않는다.
 //   - 배경 위 모든 글자는 4.5:1 이상이다(app/globals.css 상태 토큰 주석).
+//
+// 행동 줄 (사용성 점검 2026-11-08 A1·A2): actionKey 가 있으면 상태 기본 행동 줄 대신 그 안전 문구를 보인다.
+//   고르는 규칙은 components/trip/viewModel.js dayActionKey 한곳이다. 이 부품은 고르지 않는다.
+// 고정 줄 (A3): outingNote 가 참이면 상자 바로 아래에 '입력한 조건 안에서 짠 일정이에요…'를 한 줄 둔다(16px, 보조 글자색).
 
 import { useLang } from './LanguageProvider.js';
 import Icon, { STATE_ICON } from './ui/Icon.js';
 import { stateMessage } from '@/src/i18n/index.js';
 
-export default function StateBanner({ state, reasons = [], live = false }) {
+export default function StateBanner({ state, reasons = [], live = false, actionKey = null, outingNote = false }) {
   const { lang, safety, t, stateMessage: primaryOf, reasonText } = useLang();
   const primary = primaryOf(state);
   if (!primary) return null;
@@ -27,7 +31,9 @@ export default function StateBanner({ state, reasons = [], live = false }) {
   // 주 언어가 화면 언어와 다르면(ja·zh 검수 전 → en) 스크린리더가 맞는 음성으로 읽게 표시한다
   const primaryLang = safety.primary === lang ? undefined : safety.primary;
 
-  return (
+  const action = actionKey ? t(actionKey) : primary.action;
+
+  const banner = (
     // 본문 콘텐츠이므로 status 롤을 덮어쓰지 않고, 재판정 갱신 고지만 aria-live 로 한다
     <section className={`state-banner state-${state}`} aria-live={live ? 'polite' : undefined}>
       <span className="state-label" lang={primaryLang}>
@@ -44,7 +50,7 @@ export default function StateBanner({ state, reasons = [], live = false }) {
         </p>
       )}
       <p className="state-action" lang={primaryLang}>
-        {primary.action}
+        {action}
       </p>
       {reasons.length > 0 && (
         <ul className="state-reasons" lang={primaryLang}>
@@ -54,5 +60,14 @@ export default function StateBanner({ state, reasons = [], live = false }) {
         </ul>
       )}
     </section>
+  );
+  if (!outingNote) return banner;
+  return (
+    <>
+      {banner}
+      <p className="state-note" lang={primaryLang}>
+        {t('common.outingDayNote')}
+      </p>
+    </>
   );
 }

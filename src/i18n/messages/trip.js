@@ -532,6 +532,9 @@ export const safety = {
   },
   'return.deadline': { ko: '복귀 마감 {time}', en: 'Be back by {time}', ja: '帰着期限 {time}', zh: '返回截止 {time}' },
   'trip.plannedReturn': { ko: '예상 귀가 {time}', en: 'Expected back {time}', ja: '帰着予定 {time}', zh: '预计返回 {time}' },
+  // 마감 이유가 하루 활동 종료(DAY_END)면 '복귀 마감' 대신 이 이름을 쓴다. 병원이 정한 마감이 아니다 (사용성 점검 A4)
+  'return.dayEnd': { ko: '오늘 활동 종료 {time}', en: 'Today’s activities end at {time}', ja: '今日の活動終了 {time}', zh: '今日活动结束 {time}' },
+  'trip.dayEndAt': { ko: '활동 종료 {time}', en: 'Activities end at {time}', ja: '活動終了 {time}', zh: '活动结束 {time}' },
 
   // 외출 마감 이유 (docs/business-rules.md '하루 일정 생성'의 마감 후보 표)
   'trip.deadlineRETURN_TIME': {

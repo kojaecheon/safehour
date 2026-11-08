@@ -398,6 +398,15 @@ time,
   font-size: var(--text-body);
 }
 
+/* 외출 있는 날 상태 상자 아래 고정 줄 (사용성 점검 A3): 16px 보조 글자색. 상자 밖이라 흰·회색 바탕 모두 6:1 이상.
+   상태 블록(grid 간격 12px) 안에 서므로 바깥 여백을 두지 않는다 */
+.state-note {
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+  color: var(--ink-soft);
+  margin: 0;
+}
+
 .state-NO_TOURISM   { background: var(--state-no-tourism-bg); color: var(--state-no-tourism-ink); border-color: var(--state-no-tourism-line); }
 .state-STANDBY      { background: var(--state-standby-bg);    color: var(--state-standby-ink);    border-color: var(--state-standby-line); }
 .state-SPLIT_NEARBY { background: var(--state-split-bg);      color: var(--state-split-ink);      border-color: var(--state-split-line); }

@@ -79,8 +79,11 @@ const COPIES = [
         "t('trip.placeHospital')",
         "t('trip.medicationAtLodging')",
         "t('trip.plannedReturn'",
-        "t('return.deadline'",
-        'DEADLINE_REASON_KEY[entry.deadlineReason]',
+        // 복귀 마감 이름·시각·이유는 deadlineCopyOf 한곳이 고른다 (사용성 점검 A4: 하루 활동 종료는 '오늘 활동 종료')
+        'deadlineCopyOf(entry',
+        't(copy.timeKey',
+        'copy.reasonKey ? t(copy.reasonKey) : null',
+        'kindKey: copy.labelKey',
       ],
     },
   },

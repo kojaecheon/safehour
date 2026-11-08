@@ -29,7 +29,7 @@ import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
 import { GUARDIAN_WINDOW_DAYS } from '@/src/guardian/index.js';
-import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, plannedReturnOf, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
+import { dayActionKey, deadlineCopyOf, deltaSummary, formatDate, isDemoMode, needsInputFix, outingDayNote, plannedReturnOf, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
 import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
 import { isStayDate } from '@/src/stay/stay.js';
@@ -40,12 +40,12 @@ function nextDate(date) {
   return d.toISOString().slice(0, 10);
 }
 
-/** 복귀 마감 — 안전 문구 두 줄(주 언어 + 병기) */
+/** 복귀 마감: 안전 문구 두 줄(주 언어 + 병기). 하루 활동 종료(DAY_END)면 '오늘 활동 종료'로 부른다(viewModel deadlineCopyOf) */
 function Deadline({ outing, day, stay }) {
   const { t, pair } = useLang();
-  const deadline = pair('return.deadline', { time: outing.returnBy });
-  const reasonKey = DEADLINE_REASON_KEY[outing.deadlineReason];
-  const reason = reasonKey ? pair(reasonKey) : null;
+  const copy = deadlineCopyOf(outing, { isToday: true });
+  const deadline = pair(copy.timeKey, { time: outing.returnBy });
+  const reason = copy.reasonKey ? pair(copy.reasonKey) : null;
   const plannedAt = plannedReturnOf(outing);
   const planned = plannedAt ? pair('trip.plannedReturn', { time: plannedAt }) : null;
   const place = returnPlaceOf(outing, day, stay);
@@ -206,7 +206,13 @@ export default function TodayPage() {
             </p>
           )}
 
-          <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
+          <StateBanner
+            state={day.dayState}
+            reasons={day.reasons ?? []}
+            actionKey={dayActionKey(day, { isToday: true, screen: 'today' })}
+            outingNote={outingDayNote(day)}
+            live
+          />
 
           <TripNotice slot role="status">
             {notice ? t(notice) : ''}

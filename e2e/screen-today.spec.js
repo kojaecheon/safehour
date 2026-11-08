@@ -273,3 +273,51 @@ test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
     await expect(deadline.locator('.today-deadline-main svg')).toHaveCount(1);
   });
 });
+
+// 상태 상자의 사유별 행동 줄과 외출 있는 날 고정 줄 (사용성 점검 2026-11-08 A1·A2·A3, components/trip/viewModel.js dayActionKey)
+// 병원과 무관한 사유(시각·입력 누락·매일 확인 대기)에는 '병원 연락'·'병원 인근 대기'를 쓰지 않는다.
+test.describe('오늘 상태 상자의 행동 줄', () => {
+  const NOTE = '입력한 조건 안에서 짠 일정이에요. 몸 상태는 병원 안내를 따르세요.';
+
+  test('매일 확인 전(10:00): 행동 줄은 매일 확인 안내이고 병원 인근 대기를 말하지 않는다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page, {}, { confirmToday: false });
+    const action = page.locator('.today-status-block .state-banner .state-action');
+    await expect(action).toHaveText('오늘 일정은 매일 확인을 마치면 열려요. 위의 확인 항목을 눌러 주세요.');
+    await expect(page.locator('.today-status-block .state-banner')).not.toContainText('병원 인근 대기');
+  });
+
+  test('확인 마친 외출 있는 날(10:00): 상태 상자 바로 아래 고정 줄이 16px 보조 글자색으로 한 번 보인다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    const { tripPlan } = await startTrip(page);
+    const today = tripPlan.days[kstDate(0)];
+    test.skip(!today || (today.outings ?? []).length + (today.guardianOutings ?? []).length === 0, '오늘 외출이 없는 체류');
+    const note = page.locator('.today-status-block > .state-note');
+    await expect(note).toHaveText(NOTE);
+    await expect(note).toHaveCount(1);
+    expect(await styles(note, ['font-size', 'color'])).toEqual({ 'font-size': '16px', color: 'rgb(85, 93, 109)' });
+    // 상태 상자 바로 다음 형제다
+    expect(await note.evaluate((el) => el.previousElementSibling?.classList.contains('state-banner'))).toBe(true);
+  });
+
+  test('늦은 저녁(21:30): 시간 부족 행동 줄이고 병원 연락을 말하지 않으며 고정 줄이 없다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T21:30` });
+    await startTrip(page);
+    const banner = page.locator('.today-status-block .state-banner');
+    await expect(banner).toHaveClass(/state-NO_TOURISM/);
+    await expect(banner.locator('.state-action')).toHaveText('오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요. 내일 일정은 그대로예요.');
+    await expect(banner).not.toContainText('병원 연락');
+    await expect(page.locator('.today-status-block > .state-note')).toHaveCount(0);
+  });
+
+  test('조건 입력 필요(동의 없음): 조건 입력 행동 줄과 입력 버튼', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page, { consent: false });
+    const status = page.locator('.today-status-block');
+    await expect(status.locator('.state-banner .state-action')).toHaveText(
+      '아직 조건을 입력하지 않아 일정을 만들지 않았어요. 조건을 입력하면 일정이 생겨요.',
+    );
+    await expect(status.locator('.state-banner')).not.toContainText('병원 연락');
+    await expect(status.locator('.trip-fix a, .trip-fix button')).toHaveCount(1);
+  });
+});
