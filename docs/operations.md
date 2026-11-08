@@ -84,7 +84,22 @@ npm ci
 curl -s localhost:3000/api/health
 ```
 
-응답의 `ok`, 기상 설정 상태, 추천 중단 스위치 상태를 한 번에 보여준다. 배포 뒤 첫 확인은 이 경로다.
+응답의 `ok`, 기상 설정 상태, 추천 중단 스위치 상태, 관광공사 자체 호출 카운터(`tourApiUsage`: 오늘
+operation별 `used/limit`, `warningAt`, `dailyLimit`)를 한 번에 보여준다. 배포 뒤 첫 확인은 이 경로다.
+
+카운터는 `SAFEHOUR_DATA_ROOT` 아래 파일이다. 서버리스 배포에서는 이 경로(`/tmp`)가 실행 인스턴스마다 따로라
+헬스가 보여 주는 숫자는 **응답한 인스턴스 한 곳의 오늘 호출 수**다. 공공데이터포털에 실제로 쌓인 전체 호출 수가
+아니다. 제공처 쪽 한도는 공공데이터포털 마이페이지에서 확인한다.
+
+일정 API 가 502 `SAFEHOUR_EXTERNAL_API`를 내면 응답 본문의 `upstream`과 서버 로그
+`[itinerary.plan] candidate load failed: SAFEHOUR_EXTERNAL_API upstream=<분류>`로 원인 갈래를 본다.
+
+| `upstream` | 먼저 볼 곳 |
+| --- | --- |
+| `QUOTA` | 공공데이터포털 일일 한도 소진. 자정(한국 시각)에 풀린다. 그날 배포 확인은 `--skip-plan`으로 |
+| `SELF_LIMIT` | 우리 operation별 차단 값(`TOUR_API_DAILY_LIMIT`)에 닿았다. 헬스의 `tourApiUsage`로 어느 조회인지 본다 |
+| `AUTH` | 인증키 미설정·미등록·만료, 서비스 활용 신청 여부 |
+| `UPSTREAM_ERROR` · `PARSE` · `NETWORK` | 제공처 장애나 일시 오류. 잠시 뒤 다시 확인한다 |
 
 ## 배포
 
@@ -100,7 +115,9 @@ Vercel(서울 리전) 설정이 저장소에 있다. `main`에 병합하면 운�
 | 병합 | `npm run merge -- <PR번호> --wait`. CI 통과를 확인한 뒤에만 squash 병합한다 |
 | 환경변수 | Vercel 설정의 Environments에서 Production과 Preview에 **따로** 넣는다. `TOUR_API_KEY`, `SAFEHOUR_DATA_ROOT`(`/tmp/safehour`), `SAFEHOUR_SESSION_SECRET`, `SAFEHOUR_ALLOW_DEMO_LOGIN`(`1`)이 두 곳 모두에 있어야 데모 로그인과 일정 만들기가 된다. `SAFEHOUR_BASE_URL`은 소셜 로그인 콜백에만 쓰므로 운영에만 둔다. 세션 비밀값은 환경마다 다른 값을 쓴다 |
 | 환경변수 반영 | 값을 바꾼 뒤 다시 배포해야 반영된다. 미리보기는 해당 배포의 메뉴에서 Redeploy를 고르고 환경이 Preview인지 확인한다 |
-| 배포 확인 | `npm run verify:deploy -- https://safehour.vercel.app`. 헬스·보안 헤더·로그인·일정 API를 본다. 데모 로그인이 켜진 배포본에서는 관광공사 API를 실제로 2회 부른다 |
+| 배포 확인 | `npm run verify:deploy -- https://safehour.vercel.app`. 헬스·보안 헤더·로그인·일정 API를 본다. 헬스에 호출 카운터가 있으면 operation별 사용량을 한 줄로 보인다 |
+| 배포 확인의 호출 비용 | 데모 로그인이 켜진 배포본에서는 일정 생성 검사가 실제 일정 요청을 한 번 보낸다. 캐시가 없으면 관광공사 목록 조회 2회(국문·무장애)가 나가고 상세 조회가 더해질 수 있어 **그날 호출 한도를 쓴다** |
+| 일정 검사 생략 | `npm run verify:deploy -- <주소> --skip-plan`(또는 `SAFEHOUR_VERIFY_SKIP_PLAN=1`). 일정 생성 검사 두 건을 '생략'으로 표시하고 실패로 세지 않는다. 그날 이미 502 `upstream=QUOTA`를 봤을 때, 헬스 카운터가 `WARNING`·`BLOCKED`일 때, 하루에 여러 번 다시 확인할 때 쓴다. 코드·환경변수가 바뀐 첫 배포 확인은 생략하지 않는다 |
 | 되돌리기 | Vercel의 Instant Rollback으로 직전 운영 배포로 돌린다 |
 
 ## 데이터 초기화

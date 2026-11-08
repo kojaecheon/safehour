@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 // 배포본 검증 — 배포 직후·kill switch 발동 후·롤백 후에 **사람이 손으로** 실행한다.
 //
-// 사용법: node scripts/verify-deployment.mjs https://<배포주소>
+// 사용법: node scripts/verify-deployment.mjs https://<배포주소> [--skip-plan]
 //
 // 수동 실행 전용이다. CI·npm test·E2E 는 이 스크립트를 부르지 않는다.
-// 데모 로그인이 켜진 배포본에서는 일정 API 를 실제로 부르므로 관광공사 API 호출이 생긴다(요청 날짜 1일 · 2회).
+// 데모 로그인이 켜진 배포본에서는 일정 API 를 실제로 부르므로 관광공사 API 호출이 생긴다(요청 날짜 1일, 일정 요청 1회:
+// 캐시가 없으면 목록 조회 2회와 상세 조회 몇 회). 국외 좌표 검사는 입력 검증에서 끝나 호출이 없다.
+// 오늘 호출 한도가 빠듯하면 --skip-plan(또는 SAFEHOUR_VERIFY_SKIP_PLAN=1)으로 일정 생성 검사 두 건을 '생략'으로 둔다.
+// 생략은 실패로 세지 않는다. 헬스 응답에 호출 카운터가 있으면 operation별 사용량을 한 줄로 보인다.
 //
 // 확인 항목 (docs/DEPLOYMENT.md 5장 체크리스트와 대응)
 //   1. 헬스 응답과 인증키 설정 여부, 로그인 가능 여부
@@ -16,17 +19,37 @@
 //
 // 퇴역한 단일 외출 API(/api/recommend·/api/recalculate)는 부르지 않는다 (AX-308 에서 삭제, AX-321 에서 이 스크립트 갱신).
 
-const baseUrl = process.argv[2]?.replace(/\/$/, '');
+const args = process.argv.slice(2);
+const baseUrl = args.find((a) => !a.startsWith('--'))?.replace(/\/$/, '');
+const skipPlan = args.includes('--skip-plan') || process.env.SAFEHOUR_VERIFY_SKIP_PLAN === '1';
 if (!baseUrl) {
-  console.error('사용법: node scripts/verify-deployment.mjs https://<배포주소>');
+  console.error('사용법: node scripts/verify-deployment.mjs https://<배포주소> [--skip-plan]');
   process.exit(1);
 }
 
 const results = [];
+const skipped = [];
 
 function record(name, passed, detail) {
   results.push({ name, passed, detail });
   console.log(`${passed ? '  ✓' : '  ✖'} ${name}${detail ? ` — ${detail}` : ''}`);
+}
+
+/** 일부러 하지 않은 검사(관광공사 호출 한도 절약 등). 실패로 세지 않는다 */
+function skip(name, detail) {
+  skipped.push({ name, detail });
+  console.log(`  - ${name} (생략)${detail ? `: ${detail}` : ''}`);
+}
+
+/** 헬스의 관광공사 자체 호출 카운터를 한 줄로. 키·URL 은 헬스 응답에 없다 */
+function describeTourApiUsage(usage) {
+  if (!usage || typeof usage !== 'object') return null;
+  if (usage.counterReadable === false) return { ok: false, line: '호출 카운터를 읽을 수 없음(손상), 이 상태면 관광공사 호출이 막힌다' };
+  const ops = Object.entries(usage.operations ?? {});
+  const list = ops.length
+    ? ops.map(([name, o]) => `${name} ${o.used}/${o.limit}${o.state && o.state !== 'OK' ? ` ${o.state}` : ''}`).join(', ')
+    : '오늘 호출 없음';
+  return { ok: true, line: `${usage.date ?? '?'} 경고 ${usage.warningAt} · 차단 ${usage.dailyLimit} · ${list}` };
 }
 
 /** 실패는 아니지만 알아야 하는 것 — 종료 코드에 반영하지 않는다 */
@@ -124,6 +147,9 @@ if (health.config?.weatherApiKeyConfigured) {
 } else {
   warn('기상 키 미설정', '기상은 "확인 불가"로 표기되고 판정에 반영되지 않음 (AC011 증거 없음)');
 }
+const usage = describeTourApiUsage(health.tourApiUsage);
+if (usage?.ok) console.log(`  · TourAPI 오늘 호출: ${usage.line}`);
+else if (usage) warn('TourAPI 호출 카운터', usage.line);
 if (health.flags?.recommendationKilled) {
   console.log('\n  ⚠ kill switch 가 켜져 있습니다. 아래 판정 검사는 미추천이 정상입니다.\n');
 }
@@ -201,10 +227,16 @@ if (!auth.demoLogin) {
     );
 
     const today = kstDate(0);
-    const plan = await postJson('/api/itinerary/plan', { lang: 'ko', stay: demoStay(), dates: [today] }, { cookie });
-    planData = plan.data;
-    const day = plan.data?.days?.[today];
-    if (paused) {
+    const plan = skipPlan ? null : await postJson('/api/itinerary/plan', { lang: 'ko', stay: demoStay(), dates: [today] }, { cookie });
+    planData = plan?.data ?? null;
+    const day = plan?.data?.days?.[today];
+    // 502 면 관광공사 실패 분류(upstream)를 함께 보인다(QUOTA·AUTH·NETWORK 등, 키·URL 은 없다)
+    const upstreamNote = plan?.data?.upstream ? ` upstream=${plan.data.upstream}` : '';
+    if (skipPlan) {
+      const why = '--skip-plan / SAFEHOUR_VERIFY_SKIP_PLAN=1, 관광공사 호출 한도 절약';
+      skip(paused ? '추천 중단 스위치 적용됨' : '일정 생성 응답', why);
+      if (!paused) skip('외출 불가 조건 → 환자 외출 0개', why);
+    } else if (paused) {
       record(
         '추천 중단 스위치 적용됨',
         plan.data?.servicePaused === true && day?.dayState === 'NO_TOURISM' && (day?.reasons ?? []).includes('SERVICE_PAUSED'),
@@ -214,7 +246,8 @@ if (!auth.demoLogin) {
       record(
         '일정 생성 응답',
         plan.res.status === 200 && plan.data?.ok === true && typeof plan.data.engineVersion === 'string' && Boolean(day),
-        plan.parseError ?? `HTTP ${plan.res.status} engine=${plan.data?.engineVersion} 후보=${plan.data?.diagnostics?.candidateCount}`,
+        plan.parseError ??
+          `HTTP ${plan.res.status} engine=${plan.data?.engineVersion} 후보=${plan.data?.diagnostics?.candidateCount}${upstreamNote}`,
       );
       record(
         '외출 불가 조건 → 환자 외출 0개',
@@ -251,10 +284,11 @@ if (localKeys.length > 0) {
 // ── 요약 ──
 const failed = results.filter((r) => !r.passed);
 console.log(`\n${'─'.repeat(50)}`);
+const skippedNote = skipped.length ? ` (생략 ${skipped.length}건)` : '';
 if (failed.length === 0) {
-  console.log(`✓ 전체 ${results.length}건 통과`);
+  console.log(`✓ 전체 ${results.length}건 통과${skippedNote}`);
 } else {
-  console.log(`✖ ${failed.length}/${results.length} 실패:`);
+  console.log(`✖ ${failed.length}/${results.length} 실패${skippedNote}:`);
   for (const f of failed) console.log(`    - ${f.name}`);
 }
 console.log(`${'─'.repeat(50)}\n`);

@@ -1,4 +1,4 @@
-// GET /api/health — 관광공사 자체 호출 카운터 요약
+// GET /api/health: 관광공사 자체 호출 카운터 요약
 //
 // 계약:
 //   - 오늘(KST) operation별 사용 횟수와 차단 값(used/limit), 경고 값(warningAt), 차단 값(dailyLimit)을 알린다.
