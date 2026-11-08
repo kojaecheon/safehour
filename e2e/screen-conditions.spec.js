@@ -376,6 +376,69 @@ test.describe('③층 조건 화면, 편집기', () => {
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom)).toBe('272px');
   });
 
+  // 운영자 결정(2026-11-08): 외출·복귀 다음 항목은 묶음으로 접고, 묶음마다 '제한 없음' 버튼을 둔다.
+  // 첫 기간을 저장하면 오늘 화면으로 가서 '첫 일정을 만들었어요'를 한 번 보인다
+  test("묶음은 접혀 있고 '제한 없음'이 묶음을 '아니오'로 채운다. 첫 저장은 오늘 화면으로 간다", async ({ page }) => {
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+
+    // 외출·복귀는 늘 보이고 '모르겠음'이 없다
+    await expect(page.getByRole('group', { name: '외출이 허용되나요?' })).toBeVisible();
+    await expect(page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '모르겠음' })).toHaveCount(0);
+    const toggles = page.locator('.conditions-group-toggle');
+    await expect(toggles).toHaveCount(5);
+    for (const toggle of await toggles.all()) {
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect((await toggle.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    }
+    const noneButtons = page.locator('.conditions-group-none');
+    await expect(noneButtons).toHaveCount(5);
+    for (const button of await noneButtons.all()) expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByRole('group', { name: '자외선을 피해야 하나요?' })).toHaveCount(0);
+
+    // '피해야 할 환경' 묶음: 제한 없음 → 3개 중 3개 답함, 펼치면 모두 '아니오'
+    const exposure = page.locator('.conditions-group').filter({ has: page.locator('.conditions-group-toggle', { hasText: '피해야 할 환경' }) });
+    await expect(exposure.locator('.conditions-group-count')).toHaveText('3개 중 0개 답함');
+    await exposure.locator('.conditions-group-none').click();
+    await expect(exposure.locator('.conditions-group-count')).toHaveText('3개 중 3개 답함');
+    await exposure.locator('.conditions-group-toggle').click();
+    await expect(exposure.locator('.conditions-group-toggle')).toHaveAttribute('aria-expanded', 'true');
+    for (const q of ['자외선을 피해야 하나요?', '사우나·찜질 등 열을 피해야 하나요?', '수영·온천 등 물에 들어가면 안 되나요?']) {
+      await expect(page.getByRole('group', { name: q }).getByRole('radio', { name: '아니오', exact: true })).toBeChecked();
+    }
+    // 외출·복귀를 고르지 않으면 묶음을 다 채워도 저장되지 않는다
+    for (const button of await noneButtons.all()) await button.click();
+    // 묶음 안에서 하나를 '모르겠음'으로 바꿀 수 있다(가장 엄격한 기본값 뜻 그대로)
+    await page.getByRole('group', { name: '사우나·찜질 등 열을 피해야 하나요?' }).getByRole('radio', { name: '모르겠음', exact: true }).check();
+    await expect(page.getByText('가장 엄격한 기본값을 적용해요').first()).toBeVisible();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    const summary = page.locator('.conditions-error-summary');
+    await expect(summary).toBeVisible();
+    await expect(summary.locator('li')).toHaveCount(2);
+
+    await page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '허용', exact: true }).check();
+    await page
+      .getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' })
+      .getByRole('radio', { name: '아니오', exact: true })
+      .check();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.locator('.trip-notice, [role="status"]').filter({ hasText: '첫 일정을 만들었어요.' }).first()).toBeVisible();
+    const period = (await readRecord(page, 'stay')).periods[0];
+    expect(period.items.avoidHeat).toEqual({ kind: 'UNKNOWN' });
+    expect(period.items.avoidUv).toEqual({ kind: 'NONE' });
+    // 새로 고쳐도 다시 뜨지 않는다
+    await page.reload();
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(0);
+
+    // 두 번째 기간은 지금처럼 조건 화면에 남는다
+    await page.goto('/conditions');
+    await page.getByRole('button', { name: '고치기' }).first().click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page.getByText('기간을 저장했어요.')).toBeVisible();
+    await expect(page).toHaveURL(/\/conditions$/);
+  });
+
   test('편집 중에는 체류 정보 고치기 행이 없다: 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다', async ({ page }) => {
     await startTrip(page, { periods: [] }, { path: '/conditions' });
     await expect(page.getByRole('link', { name: '체류 정보 고치기' })).toHaveCount(1);

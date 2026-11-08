@@ -97,7 +97,12 @@ export const messages = {
     ja: 'デモは試用のためのものです。住所検索が接続されていない環境では「デモ住所」だけが表示され、実際の病院情報は含まれていません。',
     zh: '演示仅供试用。在未接通地址搜索的环境中只会显示“演示地址”，其中不含真实的医院信息。',
   },
-  'login.notConfigured': { ko: '준비 중', en: 'Not available yet', ja: '準備中', zh: '准备中' },
+  'login.noMethods': {
+    ko: '지금은 이용할 수 있는 로그인 방법이 없어요. 잠시 뒤 다시 열어 주세요.',
+    en: 'No sign-in method is available right now. Please try again later.',
+    ja: '現在利用できるログイン方法がありません。しばらくしてからもう一度開いてください。',
+    zh: '目前没有可用的登录方式。请稍后再打开。',
+  },
   'login.hospitalNext': {
     ko: '로그인 다음에는 입·출국, 숙소, 병원 일정을 입력합니다. 병원 연동 코드는 그 뒤 조건 화면에서 연결할 수 있습니다.',
     en: 'After signing in, you enter your arrival and departure, lodging and hospital appointments. You can connect a hospital code later on the conditions screen.',
@@ -201,6 +206,18 @@ export const messages = {
   'onboarding.arrivalAirport': { ko: '도착 공항', en: 'Arrival airport', ja: '到着空港', zh: '抵达机场' },
   'onboarding.departureDate': { ko: '출국 날짜', en: 'Departure date', ja: '出国日', zh: '出境日期' },
   'onboarding.departureTime': { ko: '출발 시각', en: 'Take-off time', ja: '出発時刻', zh: '起飞时间' },
+  'onboarding.departureTimeOptional': {
+    ko: '출발 시각 (선택)',
+    en: 'Take-off time (optional)',
+    ja: '出発時刻（任意）',
+    zh: '起飞时间（选填）',
+  },
+  'onboarding.departureTimeHint': {
+    ko: '모르면 비워 두세요. 비워 두면 출국일은 가장 이른 시각 기준으로 보고 외출 일정을 만들지 않아요.',
+    en: 'Leave it blank if you do not know. If blank, we use the earliest possible time and plan no outings on departure day.',
+    ja: '分からなければ空欄で構いません。空欄の場合は最も早い時刻を基準にし、出国日には外出の予定を作りません。',
+    zh: '不清楚可以留空。留空时按最早的时间计算，出境当天不安排外出行程。',
+  },
   'onboarding.departureAirport': { ko: '출발 공항', en: 'Departure airport', ja: '出発空港', zh: '出发机场' },
   'onboarding.airportICN': {
     ko: '인천국제공항 (ICN)',
@@ -225,6 +242,18 @@ export const messages = {
   // ── 2단계: 숙소 ──
   'onboarding.lodgingItem': { ko: '숙소 {n}', en: 'Lodging {n}', ja: '宿泊先 {n}', zh: '住处 {n}' },
   'onboarding.lodgingName': { ko: '숙소 이름', en: 'Lodging name', ja: '宿泊先の名前', zh: '住处名称' },
+  'onboarding.lodgingNameOptional': {
+    ko: '숙소 이름 (선택)',
+    en: 'Lodging name (optional)',
+    ja: '宿泊先の名前（任意）',
+    zh: '住处名称（选填）',
+  },
+  'onboarding.lodgingNameHint': {
+    ko: '비워 두면 ‘숙소’로 보여요. 보호자 링크와 택시 카드에 이 이름이 나와요 (최대 {max}자).',
+    en: 'If blank, it shows as “Your stay”. This name appears in the companion link and the taxi card (up to {max} characters).',
+    ja: '空欄の場合は「宿泊先」と表示します。この名前は同行者リンクとタクシーカードに表示されます（最大{max}文字）。',
+    zh: '留空时显示为“住处”。此名称会显示在陪同者链接和出租车卡片中（最多{max}个字）。',
+  },
   'onboarding.nameHint': {
     ko: '알아보기 쉬운 이름이면 됩니다 (최대 {max}자).',
     en: 'Any name you will recognise (up to {max} characters).',
@@ -457,6 +486,12 @@ export const messages = {
   'onboarding.paceLegend': { ko: '이동 강도', en: 'Pace', ja: '移動のペース', zh: '出行节奏' },
   'onboarding.paceRELAXED': { ko: '느긋하게', en: 'Relaxed', ja: 'ゆったり', zh: '悠闲' },
   'onboarding.paceNORMAL': { ko: '보통', en: 'Normal', ja: 'ふつう', zh: '普通' },
+  'onboarding.paceDefaultHint': {
+    ko: '모르면 느긋하게를 그대로 두세요. 하루에 들르는 곳이 더 적어요.',
+    en: 'If unsure, keep Relaxed. It includes fewer places each day.',
+    ja: '分からなければ「ゆったり」のままにしてください。1日に立ち寄る場所が少なくなります。',
+    zh: '不确定时请保留“悠闲”。每天安排的地点更少。',
+  },
   'onboarding.paceHint': {
     ko: '외출 한 번에 {perOuting}곳, 하루 {perDay}곳까지',
     en: 'Up to {perOuting} places per outing and {perDay} per day',

@@ -11,7 +11,10 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  ITEM_GROUPS,
   emptyPeriodForm,
+  fillGroupNone,
+  formAnswerOf,
   formToPeriod,
   makeSelfPeriodId,
   periodToForm,
@@ -368,5 +371,75 @@ describe('본인 체크 기간 id', () => {
     assert.notEqual(id, 'S-a');
     const clash = makeSelfPeriodId([id], 1000, () => 0.5);
     assert.notEqual(clash, id);
+  });
+});
+
+describe('본인 체크 묶음과 제한 없음 버튼 (운영자 결정 2026-11-08)', () => {
+  const ALL_GROUP_FIELDS = ITEM_GROUPS.flatMap((g) => g.fields);
+
+  test('묶음은 외출·복귀를 빼고 나머지 항목을 한 번씩 덮는다', () => {
+    const expected = ['walkLimit', 'travelLimit', ...YES_NO_KEYS, 'mealRestriction', 'medication'];
+    assert.deepEqual([...ALL_GROUP_FIELDS].sort(), [...expected].sort());
+    assert.equal(new Set(ALL_GROUP_FIELDS).size, ALL_GROUP_FIELDS.length);
+    assert.equal(ALL_GROUP_FIELDS.includes('outing'), false);
+    assert.equal(ALL_GROUP_FIELDS.includes('returnTime'), false);
+  });
+
+  test("제한 없음은 그 묶음만 '아니오'로 채우고 다른 묶음·외출·복귀는 건드리지 않는다", () => {
+    const form = emptyPeriodForm({ startDate: '2026-10-03', endDate: '2026-10-05' });
+    const limits = ITEM_GROUPS.find((g) => g.id === 'limits');
+    const next = fillGroupNone(form, limits.fields);
+    assert.equal(next.walkLimit.answer, 'NO');
+    assert.equal(next.travelLimit.answer, 'NO');
+    assert.equal(next.outing, null);
+    assert.equal(next.returnTime.answer, null);
+    assert.equal(next.yesNo.avoidUv, null);
+    assert.equal(form.walkLimit.answer, null, '입력 폼을 바꾸지 않는다');
+  });
+
+  test("모든 묶음을 제한 없음으로 채워도 외출·복귀를 고르기 전에는 저장되지 않는다 (규칙 6)", () => {
+    let form = emptyPeriodForm({ startDate: '2026-10-03', endDate: '2026-10-05' });
+    for (const group of ITEM_GROUPS) form = fillGroupNone(form, group.fields);
+    const result = validatePeriodForm(form, { id: 'S-1', hospitals: ONE_HOSPITAL });
+    assert.equal(result.ok, false);
+    assert.deepEqual(Object.keys(result.errors).sort(), ['outing', 'returnTime']);
+  });
+
+  test("묶음 버튼으로 채운 기간은 항목마다 '아니오'를 고른 기간과 같다", () => {
+    let form = emptyPeriodForm({ startDate: '2026-10-03', endDate: '2026-10-05' });
+    form.outing = 'ALLOWED';
+    form.returnTime = { ...form.returnTime, answer: 'NO' };
+    for (const group of ITEM_GROUPS) form = fillGroupNone(form, group.fields);
+    const byGroups = validatePeriodForm(form, { id: 'S-1', hospitals: ONE_HOSPITAL });
+    const byHand = validatePeriodForm(
+      answeredForm({
+        returnTime: { answer: 'NO', time: '', place: 'LODGING', hospitalId: '' },
+        walkLimit: { answer: 'NO', minutes: '' },
+      }),
+      { id: 'S-1', hospitals: ONE_HOSPITAL },
+    );
+    assert.equal(byGroups.ok, true);
+    assert.deepEqual(byGroups.period, { ...byHand.period, startDate: '2026-10-03', endDate: '2026-10-05' });
+  });
+
+  test("'모르겠음'은 묶음과 무관하게 가장 엄격한 기본값 뜻을 유지한다 (UNKNOWN 그대로 저장)", () => {
+    let form = emptyPeriodForm({ startDate: '2026-10-03', endDate: '2026-10-05' });
+    form.outing = 'ALLOWED';
+    form.returnTime = { ...form.returnTime, answer: 'NO' };
+    for (const group of ITEM_GROUPS) form = fillGroupNone(form, group.fields);
+    form.yesNo.avoidHeat = 'UNKNOWN';
+    const { period } = validatePeriodForm(form, { id: 'S-1', hospitals: ONE_HOSPITAL });
+    assert.deepEqual(getItem(period.items, 'avoidHeat'), { kind: 'UNKNOWN' });
+  });
+
+  test('답한 수: 동행 필수=예 이면 보호자 곁 지킴은 답한 것으로 센다', () => {
+    const form = emptyPeriodForm();
+    assert.equal(formAnswerOf(form, 'guardianMustStay'), null);
+    form.yesNo.escortRequired = 'YES';
+    assert.equal(formAnswerOf(form, 'guardianMustStay'), 'YES');
+    form.medication.answer = 'NO';
+    assert.equal(formAnswerOf(form, 'medication'), 'NO');
+    form.walkLimit.answer = 'UNKNOWN';
+    assert.equal(formAnswerOf(form, 'walkLimit'), 'UNKNOWN');
   });
 });

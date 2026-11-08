@@ -3,6 +3,9 @@
 // 순수 함수만 둔다(React·브라우저 API 없음). 화면(app/onboarding)과 테스트가 함께 쓴다.
 //
 //   초안(draft)  — 입력 칸과 1:1. 빈 칸은 '' 또는 null 로 둔다(숨은 기본값을 넣지 않는다).
+//                  예외(운영자 결정 2026-11-08, 판정을 느슨하게 하지 않는 기본 선택만): 공항은 인천(ICN),
+//                  이동 강도는 느긋하게(RELAXED, 덜 움직이는 쪽)를 미리 골라 둔다. 화면에서 바꿀 수 있다.
+//   선택 칸      : 숙소 이름(비우면 저장하지 않고 화면은 '숙소'로 부른다), 출발 시각(비우면 아래 DEPARTURE_TIME_UNSET).
 //   체류(Stay)   — spec 5.1. stayFromDraft() 가 만들고, 검증은 도메인의 validateStay() 하나만 쓴다.
 //
 // 원칙
@@ -39,6 +42,18 @@ export const KEYWORD_MIN_LENGTH = 2;
 export const KEYWORD_MAX_LENGTH = 60;
 
 export { NAME_MAX_LENGTH };
+
+/**
+ * 출발 시각을 비웠을 때 저장하는 시각: 출국일의 가장 이른 시각.
+ * 출국일 마감(출발 − 공항 도착 여유 − 이동 − 여유)이 활동 시작보다 앞서 출국일에는 외출을 만들지 않는다.
+ * 가장 엄격한 쪽으로만 기운다. 이 값은 조정 가능한 기본값이 아니라 하루의 시작(00:00)이다.
+ * 비웠다는 사실은 departure.timeUnset 으로 기기에만 남긴다(일정 요청 허용 목록에는 없다).
+ */
+export const DEPARTURE_TIME_UNSET = '00:00';
+
+/** 미리 골라 두는 공항·이동 강도 (운영자 결정 2026-11-08). 판정을 느슨하게 하지 않는다 */
+export const DEFAULT_AIRPORT = 'ICN';
+export const DEFAULT_PACE = 'RELAXED';
 
 let idCounter = 0;
 
@@ -95,14 +110,14 @@ export function emptyAppointment(id, hospitalId = '') {
  */
 export function emptyDraft() {
   return {
-    arrival: { date: '', time: '', airport: null },
-    departure: { date: '', time: '', airport: null },
+    arrival: { date: '', time: '', airport: DEFAULT_AIRPORT },
+    departure: { date: '', time: '', airport: DEFAULT_AIRPORT },
     lodgings: [emptyLodging('lodging-1')],
     hospitals: [emptyHospital('hospital-1')],
     appointments: [emptyAppointment('appointment-1', 'hospital-1')],
     hasCompanion: null,
     interests: [],
-    pace: null,
+    pace: DEFAULT_PACE,
   };
 }
 
@@ -165,7 +180,8 @@ export function draftFromStay(stay) {
   if (!stay || typeof stay !== 'object') return emptyDraft();
   const endpoint = (e) => ({
     date: str(e?.date),
-    time: str(e?.time),
+    // 비워 두고 저장한 출발 시각은 다시 빈 칸으로 보여 준다(저장된 00:00 을 사용자가 고른 값처럼 보이지 않게)
+    time: e?.timeUnset === true ? '' : str(e?.time),
     airport: AIRPORTS.includes(e?.airport) ? e.airport : null,
   });
   const lodgings = list(stay.lodgings).map((l, i) => ({
@@ -209,6 +225,13 @@ export function draftFromStay(stay) {
   };
 }
 
+/** 출국 칸 → 저장 모델. 출발 시각이 비면 가장 이른 시각과 timeUnset 표시를 남긴다 */
+function departureOf(departure) {
+  const time = str(departure.time);
+  if (time.trim() !== '') return { date: departure.date, time, airport: departure.airport };
+  return { date: departure.date, time: DEPARTURE_TIME_UNSET, airport: departure.airport, timeUnset: true };
+}
+
 /**
  * 초안 → 기기 저장 체류(spec 5.1). 저장 시각(createdAt·updatedAt)은 저장소가 채운다.
  *
@@ -221,14 +244,15 @@ export function stayFromDraft(draft, previous = null) {
     ...base,
     schemaVersion: 2,
     arrival: { date: draft.arrival.date, time: draft.arrival.time, airport: draft.arrival.airport },
-    departure: { date: draft.departure.date, time: draft.departure.time, airport: draft.departure.airport },
+    departure: departureOf(draft.departure),
     hasCompanion: draft.hasCompanion,
     interests: INTERESTS.filter((tag) => draft.interests.includes(tag)),
     pace: draft.pace,
     lodgings: draft.lodgings.map((l) =>
       compact({
         id: l.id,
-        name: l.name.trim(),
+        // 숙소 이름은 선택이다. 비우면 저장하지 않는다(화면은 '숙소'로 부른다)
+        name: l.name.trim() === '' ? undefined : l.name.trim(),
         address: l.address ?? undefined,
         checkIn: l.checkIn,
         checkOut: l.checkOut,
@@ -282,7 +306,15 @@ export function normalizeIssues(issues) {
  * @returns {Array<{field: string, code: string}>}
  */
 export function draftIssues(draft, previous = null) {
-  const { issues } = validateStay(stayFromDraft(draft, previous));
+  let { issues } = validateStay(stayFromDraft(draft, previous));
+  // 출발 시각을 비운 당일 출국(입국일 = 출국일)은 출발이 도착보다 앞선다는 오류 대신 '입력 필요'로 알린다
+  if (str(draft.departure.time).trim() === '') {
+    issues = issues.map((issue) =>
+      issue.field === 'departure.time' && issue.code === VALIDATION_ISSUE.DEPARTURE_BEFORE_ARRIVAL
+        ? { field: 'departure.time', code: VALIDATION_ISSUE.REQUIRED }
+        : issue,
+    );
+  }
   const extra = [];
   draft.hospitals.forEach((h, i) => {
     const phone = h.phone.trim();

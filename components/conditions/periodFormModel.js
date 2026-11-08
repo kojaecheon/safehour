@@ -81,6 +81,52 @@ export function returnHospitalId(returnTime, hospitals = []) {
   return Array.isArray(hospitals) && hospitals.length === 1 && hospitals[0]?.id ? hospitals[0].id : '';
 }
 
+/**
+ * 화면 묶음: 외출·복귀(필수, 늘 펼침) 다음에 오는 항목을 묶는다(운영자 결정 2026-11-08).
+ * 묶음은 접혀 있고, 맨 위 '제한 없음' 버튼이 그 묶음 항목을 모두 '아니오'로 채운다.
+ * '모르겠음'의 뜻(가장 엄격한 기본값)은 그대로다. 외출·복귀는 여기 없다: 늘 직접 고른다.
+ */
+export const ITEM_GROUPS = Object.freeze([
+  Object.freeze({ id: 'limits', titleKey: 'conditions.groupLimits', fields: Object.freeze(['walkLimit', 'travelLimit']) }),
+  Object.freeze({ id: 'exposure', titleKey: 'conditions.groupExposure', fields: Object.freeze(['avoidUv', 'avoidHeat', 'avoidWater']) }),
+  Object.freeze({ id: 'guardian', titleKey: 'conditions.groupGuardian', fields: Object.freeze(['escortRequired', 'guardianMustStay']) }),
+  Object.freeze({
+    id: 'meal',
+    titleKey: 'conditions.groupMeal',
+    fields: Object.freeze(['mealRestriction', 'diet.spicy', 'diet.alcohol', 'diet.hard', 'diet.hot', 'diet.raw']),
+  }),
+  Object.freeze({ id: 'medication', titleKey: 'conditions.groupMedication', fields: Object.freeze(['medication']) }),
+]);
+
+/**
+ * 폼에서 한 항목의 답('YES'|'NO'|'UNKNOWN'|null).
+ * 동행 필수=예 이면 보호자 곁 지킴은 '예'로 고정된 것으로 본다(저장도 '예').
+ */
+export function formAnswerOf(form, field) {
+  if (LIMIT_KEYS.includes(field)) return form?.[field]?.answer ?? null;
+  if (field === 'mealRestriction' || field === 'medication') return form?.[field]?.answer ?? null;
+  if (field === 'guardianMustStay' && form?.yesNo?.escortRequired === ANSWER.YES) return ANSWER.YES;
+  return form?.yesNo?.[field] ?? null;
+}
+
+/**
+ * 묶음의 모든 항목을 '아니오'(병원이 그런 안내를 하지 않음)로 채운 새 폼. 다른 묶음·외출·복귀는 그대로 둔다.
+ * 사용자가 버튼을 눌러 직접 고르는 답이다. 앱이 값을 짐작해 넣는 것이 아니다.
+ * @param {ReturnType<typeof emptyPeriodForm>} form
+ * @param {readonly string[]} fields  ITEM_GROUPS[].fields
+ */
+export function fillGroupNone(form, fields) {
+  const next = { ...form, yesNo: { ...form.yesNo } };
+  for (const field of fields) {
+    if (LIMIT_KEYS.includes(field) || field === 'mealRestriction' || field === 'medication') {
+      next[field] = { ...form[field], answer: ANSWER.NO };
+    } else {
+      next.yesNo[field] = ANSWER.NO;
+    }
+  }
+  return next;
+}
+
 /** 폼의 답 → Answer<true>. 고르지 않았으면 undefined(검증이 REQUIRED 로 막는다) */
 function yesNoAnswer(answer) {
   if (answer === ANSWER.YES) return { kind: 'SET', value: true };

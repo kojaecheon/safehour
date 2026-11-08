@@ -1,7 +1,7 @@
 // 로그인 화면과 세션 (AX-322 · spec 4.18, 4.19, 6장)
 //
 // 자격증명 없이도 검증해야 하는 것들이다.
-//   - 설정되지 않은 공급자 버튼이 사라지지 않고 '준비 중'으로 남는가
+//   - 설정되지 않은 공급자 버튼은 보이지 않는가('준비 중'으로 남기지 않는다, 운영자 결정 2026-11-08)
 //   - 로그인이 **본인 확인이 아니라는 사실**이 화면에 있는가
 //   - 세션 API 가 원래 계정 식별자를 흘리지 않고 **불투명 계정 키**만 주는가 (spec 4.19)
 //   - 실패 코드가 기술 사유가 아니라 사람 문구로 나오는가
@@ -10,15 +10,19 @@ import { test, expect } from './fixtures.js';
 import { loginDemo } from './helpers.js';
 
 test.describe('로그인 화면', () => {
-  test('두 공급자가 모두 보이고, 미설정이면 준비 중으로 남는다', async ({ page }) => {
+  test('미설정 공급자는 숨기고, 데모만 되면 데모가 유일한 길이다', async ({ page }) => {
     await page.goto('/login');
-    for (const name of [/Google로 계속하기/, /카카오로 계속하기/]) {
-      const control = page.getByRole('link', { name }).or(page.getByRole('button', { name }));
-      await expect(control).toBeVisible();
+    // 이 실행 환경에는 공급자 자격증명이 없다. 세션 확인이 끝나 데모 버튼이 그려질 때까지 기다린다
+    await expect(page.getByRole('link', { name: '데모 계정으로 둘러보기' })).toBeVisible();
+    for (const name of [/Google/, /카카오/]) {
+      await expect(page.getByRole('link', { name })).toHaveCount(0);
+      await expect(page.getByRole('button', { name })).toHaveCount(0);
     }
-    // 이 실행 환경에는 공급자 자격증명이 없다 — 버튼을 숨기지 않고 '준비 중'으로 남긴다
-    await expect(page.getByText('준비 중').first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Google로 계속하기/ })).toHaveAttribute('aria-disabled', 'true');
+    await expect(page.getByText('준비 중')).toHaveCount(0);
+    // 세션 API 는 공급자 준비 여부를 그대로 알려 준다(화면이 이 값으로 숨긴다)
+    const body = await page.evaluate(async () => (await fetch('/api/auth/session', { cache: 'no-store' })).json());
+    expect(body.auth.providers.every((p) => p.configured === false)).toBe(true);
+    expect(body.auth.demoLogin).toBe(true);
   });
 
   test('로그인이 본인 확인이 아니라는 것과, 무엇을 받지 않는지를 밝힌다', async ({ page }) => {

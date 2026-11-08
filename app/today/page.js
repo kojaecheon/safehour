@@ -14,7 +14,7 @@
 //   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
 //     '새로 고치는 중' 줄은 따로 블록을 두지 않고 날짜·상태 블록 안 날짜 줄 아래에 둔다(열 때마다 화면이 흔들리지 않게).
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CourseCard from '@/components/CourseCard.js';
@@ -77,6 +77,18 @@ export default function TodayPage() {
   const [sheet, setSheet] = useState(null);
   const [notice, setNotice] = useState(null);
   const dateRef = useRef(null);
+
+  // 첫 조건 기간을 저장하고 넘어온 경우(/today?welcome=1) 한 번만 알린다. 주소에서 바로 지워 새로 고쳐도 다시 뜨지 않는다
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('welcome') !== '1') return undefined;
+    const timer = window.setTimeout(() => {
+      url.searchParams.delete('welcome');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      setNotice('today.firstPlanReady');
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const today = trip.todayDate;
   const stay = trip.stay;

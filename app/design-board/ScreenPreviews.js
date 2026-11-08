@@ -451,7 +451,7 @@ function ConsentWithdrawBlock({ consent }) {
   return (
     <section className="ui-block conditions-withdraw">
       <h2>{t('conditions.withdrawTitle')}</h2>
-      <p>{t('conditions.consentGranted', { at: fmtDateTime(sensitive?.agreedAt, locale), version: sensitive?.version })}</p>
+      <p>{t('conditions.consentGranted', { at: fmtDateTime(sensitive?.agreedAt, locale) })}</p>
       <SafetyText k={'conditions.withdrawEffect'} className="ui-callout conditions-callout" />
       <div className="conditions-actions">
         <Button variant="secondary">{t('conditions.withdrawAction')}</Button>

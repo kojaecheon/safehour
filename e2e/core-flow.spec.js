@@ -27,6 +27,12 @@ async function answer(page, question, option) {
   await page.getByRole('group', { name: question, exact: true }).getByRole('radio', { name: option, exact: true }).check();
 }
 
+/** 접힌 본인 체크 묶음을 펼친다 (묶음 머리 버튼 = 묶음 이름) */
+async function openGroup(page, name) {
+  const toggle = page.locator('.conditions-group-toggle').filter({ hasText: name });
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+}
+
 test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
   test('로그인 → 체류 설정 → 동의 → 본인 체크 → 전체 일정 → 오늘이 끊기지 않는다', async ({ page }) => {
     const planBodies = [];
@@ -52,16 +58,17 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
     await expect(page.getByRole('heading', { name: '입국·출국', level: 2 })).toBeVisible();
     await page.getByLabel('입국 날짜').fill(arrival);
     await page.getByLabel('도착 시각').fill('09:00');
-    await page.getByRole('group', { name: '도착 공항' }).getByLabel('인천국제공항 (ICN)').check();
+    // 공항은 인천이 미리 골라져 있다 (운영자 결정 2026-11-08)
+    await expect(page.getByRole('group', { name: '도착 공항' }).getByLabel('인천국제공항 (ICN)')).toBeChecked();
     await page.getByLabel('출국 날짜').fill(departure);
-    await page.getByLabel('출발 시각').fill('20:00');
-    await page.getByRole('group', { name: '출발 공항' }).getByLabel('인천국제공항 (ICN)').check();
+    await page.getByLabel('출발 시각 (선택)').fill('20:00');
+    await expect(page.getByRole('group', { name: '출발 공항' }).getByLabel('인천국제공항 (ICN)')).toBeChecked();
     await expect(page.getByText('4박 체류')).toBeVisible();
     await page.getByRole('button', { name: '다음' }).click();
 
     // ── 2/5: 숙소 — 도로명주소 검색(키 없음 → 데모 주소) ──
     await expect(page.getByRole('heading', { name: '숙소', level: 2 })).toBeVisible();
-    await page.getByLabel('숙소 이름').fill(LODGING_NAME);
+    await page.getByLabel('숙소 이름 (선택)').fill(LODGING_NAME);
     await page.getByLabel('주소 검색').fill('강남역');
     await page.getByRole('button', { name: '검색', exact: true }).click();
     await page.getByRole('button', { name: /데모 숙소 \(강남역 인근\)/ }).click();
@@ -93,17 +100,22 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
     // ── 5/5: 관심사와 강도 → 저장 ──
     await page.getByRole('checkbox', { name: '전시' }).check();
     await page.getByRole('checkbox', { name: '음식' }).check();
+    // 강도는 느긋하게가 미리 골라져 있다. 이 시나리오는 보통으로 바꾼다
+    await expect(page.getByRole('radio', { name: '느긋하게' })).toBeChecked();
     await page.getByRole('radio', { name: '보통' }).check();
     await page.getByRole('button', { name: '저장하고 조건 입력으로' }).click();
     await expect(page).toHaveURL(/\/conditions$/);
 
     // ── 조건: 민감정보 동의가 먼저 ──
     await expect(page.getByRole('heading', { name: '민감정보 처리 동의' })).toBeVisible();
-    await expect(page.getByText('동의 문구 법무 검토 전')).toBeVisible();
+    // 내부 표시(법무 검토 전 배지·문구 버전)는 화면에 내지 않는다 (운영자 결정 2026-11-08)
+    await expect(page.getByText('법무 검토', { exact: false })).toHaveCount(0);
+    await expect(page.getByText('문구 버전', { exact: false })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '본인 체크 기간 추가' })).toHaveCount(0);
     await evidenceShot(page, '03-consent');
     await page.getByRole('button', { name: '동의합니다' }).click();
-    await expect(page.getByText(/에 동의함 · 문구 버전/).first()).toBeVisible();
+    await expect(page.getByText(/에 동의함$/).first()).toBeVisible();
+    await expect(page.getByText('sensitive-2026', { exact: false })).toHaveCount(0);
 
     // ── 본인 체크 기간 — 정해진 항목만(자유 서술 칸 없음) ──
     await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
@@ -118,6 +130,9 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
     ).toHaveCount(0);
     await answer(page, '외출이 허용되나요?', '허용');
     await answer(page, '몇 시까지 돌아와야 하는지 병원이 정했나요?', '아니오');
+    // 나머지 항목은 묶음으로 접혀 있다. 묶음 버튼 '제한 없음'은 그 묶음을 모두 '아니오'로 채운다
+    await expect(page.getByRole('group', { name: '걷는 시간 제한이 있나요?' })).toHaveCount(0);
+    for (const name of ['걷기와 이동', '피해야 할 환경', '보호자', '식사와 식이', '복약']) await openGroup(page, name);
     await answer(page, '걷는 시간 제한이 있나요?', '모르겠음');
     await answer(page, '한 번 이동하는 시간 제한이 있나요?', '아니오');
     await answer(page, '자외선을 피해야 하나요?', '아니오');
@@ -135,7 +150,10 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
     await expect(page.getByText('가장 엄격한 기본값을 적용해요')).toBeVisible();
     await evidenceShot(page, '04-self-check');
     await page.getByRole('button', { name: '저장', exact: true }).click();
-    await expect(page.getByText('기간을 저장했어요.')).toBeVisible();
+    // 첫 기간을 저장하면 오늘 화면으로 가서 한 번 알린다 (운영자 결정 2026-11-08)
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.getByText('첫 일정을 만들었어요.')).toBeVisible();
+    await page.goto('/conditions');
     await expect(page.locator('.conditions-period-list')).toContainText('본인 체크');
     await expect(page.locator('.conditions-period-list')).toContainText('제한일');
 
@@ -274,6 +292,7 @@ test.describe('시나리오 2 — 매일 확인 전 제한과 확인 후 해제'
 
     // 기간을 고친다 — 뜨거운 음식 제한을 푼다
     await page.getByRole('button', { name: '고치기' }).first().click();
+    await openGroup(page, '식사와 식이');
     await answer(page, '뜨거운 음식을 피해야 하나요?', '아니오');
     await page.getByRole('button', { name: '저장', exact: true }).click();
     await expect(page.getByText('기간을 저장했어요.')).toBeVisible();

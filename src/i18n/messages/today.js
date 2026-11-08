@@ -14,6 +14,14 @@ export const messages = {
     zh: '正在加载今天的行程…',
   },
 
+  // 첫 조건 기간 저장 뒤 한 번만 보이는 알림 (운영자 결정 2026-11-08)
+  'today.firstPlanReady': {
+    ko: '첫 일정을 만들었어요.',
+    en: 'Your first plan is ready.',
+    ja: '最初の日程を作成しました。',
+    zh: '已生成第一份行程。',
+  },
+
   // ── 빈 상태·준비 중 ──
   'today.noStayTitle': { ko: '아직 체류 정보가 없어요', en: 'No trip details yet', ja: 'まだ滞在情報がありません', zh: '还没有行程信息' },
   'today.noStayBody': {

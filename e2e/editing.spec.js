@@ -67,6 +67,7 @@ test.describe('시나리오 4 — 교체·삭제·다시 만들기', () => {
     // 조건을 고쳐 재계획이 일어나도 뺀 장소는 돌아오지 않는다 (규칙 30)
     await page.goto('/conditions');
     await page.getByRole('button', { name: '고치기' }).first().click();
+    await page.locator('.conditions-group-toggle').filter({ hasText: '식사와 식이' }).click();
     await page
       .getByRole('group', { name: '뜨거운 음식을 피해야 하나요?', exact: true })
       .getByRole('radio', { name: '아니오', exact: true })

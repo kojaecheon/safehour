@@ -2,7 +2,8 @@
 
 // 2단계 — 숙소 구간 (spec 4.2)
 //
-// - 구간마다 이름(40자), 도로명주소 검색 결과, 체크인·체크아웃 날짜.
+// - 구간마다 이름(선택, 40자), 도로명주소 검색 결과, 체크인·체크아웃 날짜.
+//   이름을 비우면 저장하지 않고 화면은 '숙소'로 부른다(운영자 결정 2026-11-08). 주소·좌표는 그대로 필수다.
 // - 규칙 3(구간 날짜 겹침)은 validateStay() 가 판정하고, 겹친 두 구간의 체크인 칸에 붙인다.
 // - 숙소가 없는 밤은 오류가 아니라 안내다 — 그 날짜는 일정을 만들지 않는다(LODGING_REQUIRED).
 
@@ -18,7 +19,7 @@ function shortDate(date, locale) {
   return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone: 'UTC' }).format(Date.UTC(y, m - 1, d));
 }
 
-export function NameField({ field, issues, label, value, onChange }) {
+export function NameField({ field, issues, label, value, onChange, hintKey = 'onboarding.nameHint' }) {
   const { t } = useLang();
   const id = fieldDomId(field);
   const countId = `${id}-count`;
@@ -27,7 +28,7 @@ export function NameField({ field, issues, label, value, onChange }) {
       field={field}
       issues={issues}
       label={label}
-      hint={t('onboarding.nameHint', { max: NAME_MAX_LENGTH })}
+      hint={t(hintKey, { max: NAME_MAX_LENGTH })}
       value={value}
       onChange={onChange}
       maxLength={NAME_MAX_LENGTH}
@@ -78,7 +79,8 @@ export default function LodgingStep({ draft, update, issues }) {
             <NameField
               field={`lodgings[${index}].name`}
               issues={issues}
-              label={t('onboarding.lodgingName')}
+              label={t('onboarding.lodgingNameOptional')}
+              hintKey={'onboarding.lodgingNameHint'}
               value={lodging.name}
               onChange={(value) => patch(index, (l) => ({ ...l, name: value }))}
             />

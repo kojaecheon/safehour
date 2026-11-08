@@ -4,6 +4,7 @@
 //
 // 관심사는 체크박스 칩이다. 선택은 테두리 + 바탕 + 체크 아이콘 + 굵기로 보인다(색 단독 금지).
 // 강도의 정거장 수 설명은 기본값 파일(DEFAULTS.stopsPerPace)에서 읽는다.
+// 강도는 느긋하게(덜 움직이는 쪽)가 미리 골라져 있다(운영자 결정 2026-11-08). 모르면 그대로 두라고 적는다.
 
 import { useLang } from '../LanguageProvider.js';
 import { Icon } from '../ui/index.js';
@@ -67,6 +68,7 @@ export default function PreferencesStep({ draft, update, issues }) {
         issues={issues}
         name="ob-pace"
         legend={t('onboarding.paceLegend')}
+        hint={t('onboarding.paceDefaultHint')}
         value={draft.pace}
         onChange={(value) => update((d) => ({ ...d, pace: value }))}
         options={Object.entries(PACE_LABEL).map(([value, key]) => ({

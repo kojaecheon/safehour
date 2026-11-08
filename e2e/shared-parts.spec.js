@@ -134,6 +134,8 @@ test.describe('공용 부품', () => {
       await expect(page.locator('html')).toHaveAttribute('lang', code);
       await startTrip(page, {}, { path: '/conditions' });
       await page.getByRole('button', { name: addPeriod }).click();
+      // 세 칸 답 칩은 접힌 묶음 안에 있다: 첫 묶음(걷기와 이동)을 펼친다
+      await page.locator('.conditions-group-toggle').first().click();
 
       // 모르겠음 칩을 고르면 앞에 체크 표시가 나온다. 칩 안 글자에 밀려 줄지 않는다
       const radio = page.getByRole('radio', { name: unknown }).first();
@@ -182,6 +184,7 @@ test.describe('공용 부품', () => {
     await page.setViewportSize({ width: 360, height: 780 });
     await startTrip(page, {}, { path: '/conditions' });
     await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.locator('.conditions-group-toggle').first().click();
     const unknown = page.getByRole('radio', { name: '모르겠음', exact: true }).first();
     await unknown.check();
     const ko = await measure(unknown.locator('xpath=ancestor::label[1]'), '360 ko 모르겠음');
@@ -213,6 +216,8 @@ test.describe('공용 부품', () => {
       await expect(page.locator('html')).toHaveAttribute('lang', code);
       await startTrip(page, {}, { path: '/conditions' });
       await page.getByRole('button', { name: addPeriod }).click();
+      // 세 칸 답 칩은 접힌 묶음 안에 있다: 첫 묶음(걷기와 이동)을 펼친다
+      await page.locator('.conditions-group-toggle').first().click();
 
       // 세 칸(예/아니오/모르겠음) 묶음의 칩. 첫 예/아니오 묶음(복귀 시각)은 필수라 두 칸이고 칩이 넓다
       const group = page.locator('.ui-answer').filter({ has: page.getByRole('radio', { name: unknown, exact: true }) }).first();
