@@ -2,14 +2,26 @@
 //
 // 배포 직후·kill switch 발동 후에 실제로 반영됐는지 확인할 수단이 필요하다.
 // 비밀정보는 담지 않는다 — 키의 존재 여부만 boolean 으로 알린다 (D07-POL009).
+// 관광공사 자체 호출 카운터(오늘 operation별 사용/한도, 경고 값)도 알린다. 키·URL·매개변수는 없다.
 
 import { runtimeFlagsSnapshot } from '../../../lib/server/runtime-flags.js';
+import { readTourApiUsage } from '../../../lib/server/tour-api-usage.js';
 import { resolveKmaServiceKey } from '../../../src/adapters/weather.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+async function tourApiUsageOrNull() {
+  try {
+    return await readTourApiUsage();
+  } catch {
+    // 관광 모듈을 못 불러와도 헬스 응답은 나가야 한다(배포 확인 경로)
+    return null;
+  }
+}
+
 export async function GET() {
+  const tourApiUsage = await tourApiUsageOrNull();
   return Response.json({
     ok: true,
     service: 'safehour',
@@ -26,5 +38,7 @@ export async function GET() {
       weatherKeySource: process.env.KMA_API_KEY ? 'KMA_API_KEY' : 'TOUR_API_KEY',
     },
     flags: runtimeFlagsSnapshot(),
+    // { date, dailyLimit, warningAt, counterReadable, operations: { '서비스.오퍼레이션': { used, limit, state } } }
+    tourApiUsage,
   });
 }

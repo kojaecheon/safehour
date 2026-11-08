@@ -105,6 +105,17 @@ describe('로그 조립 — 허용 목록', () => {
     assert.equal('errorCode' in foreign, false);
   });
 
+  test('관광공사 실패 분류는 닫힌 목록 값만 남는다', () => {
+    for (const upstream of ['SELF_LIMIT', 'QUOTA', 'AUTH', 'UPSTREAM_ERROR', 'PARSE', 'NETWORK']) {
+      const entry = buildDecisionLogEntry({ route: 'itinerary.plan', outcome: OUTCOME.FAILED, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream });
+      assert.equal(entry.upstream, upstream);
+    }
+    for (const upstream of ['quota', 'https://apis.data.go.kr/x?serviceKey=secret', 22, null, undefined]) {
+      const entry = buildDecisionLogEntry({ route: 'itinerary.plan', outcome: OUTCOME.FAILED, upstream });
+      assert.equal('upstream' in entry, false, String(upstream));
+    }
+  });
+
   test('일정 목록은 배열이어도 된다(교체 후보는 그날 하루)', () => {
     const entry = buildDecisionLogEntry({
       route: 'itinerary.alternatives',
