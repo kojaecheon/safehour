@@ -810,4 +810,17 @@ describe('보호자 링크 다시 보내기 신호', () => {
     await sync.idle();
     assert.equal(sync.getState().guardianResendNeeded, false);
   });
+
+  test('보낸 링크의 7일 범위가 지나고 체류가 이어지면 guardianWindowPassed 가 켜진다(일정 변화 신호와 따로)', async () => {
+    const { store, sync, clock } = await setup({ stayValue: selfStay() });
+    const sentAt = new Date(kst('2026-10-02', '07:00')).toISOString();
+    const fingerprint = await computeShareFingerprint({ stay: store.readStay(), tripPlan: store.readTripPlan(), since: Date.parse(sentAt) });
+    store.writeGuardianShare({ lastSentAt: sentAt, planFingerprint: fingerprint });
+    await sync.idle();
+    assert.equal(sync.getState().guardianWindowPassed, false, '10-02 에 보낸 링크는 10-08 까지 담는다');
+    clock.set(kst('2026-10-09', '09:00'));
+    await sync.appOpen();
+    await sync.idle();
+    assert.equal(sync.getState().guardianWindowPassed, true);
+  });
 });

@@ -28,6 +28,7 @@ import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
+import { GUARDIAN_WINDOW_DAYS } from '@/src/guardian/index.js';
 import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, plannedReturnOf, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
 import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
@@ -304,10 +305,15 @@ export default function TodayPage() {
           </ListGroup>
         </div>
 
-        {trip.guardianResendNeeded && (
+        {(trip.guardianResendNeeded || trip.guardianWindowPassed) && (
           <section className="ui-block today-section" aria-labelledby="today-guardian-h">
-            <h2 id="today-guardian-h">{t('today.guardianResendTitle')}</h2>
-            <p>{t('today.guardianResendBody')}</p>
+            {/* 일정 변화가 있으면 그 안내가 앞선다. 없고 보낸 링크의 7일 범위만 지났으면 다음 7일 링크를 안내한다 */}
+            <h2 id="today-guardian-h">{t(trip.guardianResendNeeded ? 'today.guardianResendTitle' : 'today.guardianWindowTitle')}</h2>
+            <p>
+              {trip.guardianResendNeeded
+                ? t('today.guardianResendBody')
+                : t('today.guardianWindowBody', { n: GUARDIAN_WINDOW_DAYS })}
+            </p>
             <Button href={trip.readOnly ? undefined : '/guardian'} variant="secondary" disabled={trip.readOnly}>
               {t('today.guardianResendCta')}
             </Button>

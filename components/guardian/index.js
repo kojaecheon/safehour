@@ -7,6 +7,6 @@ export { default as GuardianCreate } from './GuardianCreate.js';
 export { default as GuardianOpen } from './GuardianOpen.js';
 export { default as GuardianCopyView } from './GuardianCopyView.js';
 export { useGuardianResendNeeded } from './hooks.js';
-export { buildShareSnapshot, computeShareFingerprint, fingerprintContent, isGuardianResendNeeded, shareLang, shareRecordFor } from './share.js';
+export { buildShareSnapshot, computeShareFingerprint, fingerprintContent, isGuardianResendNeeded, isGuardianWindowPassed, shareLang, shareRecordFor } from './share.js';
 export { GUARDIAN_PIN_LOCK_PREFIX, createGuardianLockout, createLockoutStorage } from './lockoutStorage.js';
 export { guardianErrorView } from './errorView.js';

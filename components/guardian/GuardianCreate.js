@@ -4,7 +4,7 @@
 //
 // 흐름
 //   1. 체류·전체 일정이 있어야 한다. 없으면 무엇이 없는지와 어디서 넣는지 안내한다.
-//   2. 담는 범위: 링크는 오늘(KST)부터 7일만 담는다(출국일에서 멈춤). 범위와, 체류가 더 길면 다음 주에 새 링크가
+//   2. 담는 범위: 링크는 오늘(KST)과 입국일 중 늦은 날부터 7일만 담는다(출국일에서 멈춤). 범위와, 체류가 더 길면 다음 주에 새 링크가
 //      필요하다는 문장을 동의 앞에 둔다.
 //      공유 동의: **링크를 만들 때마다** 받는다. 담기는 것·담기지 않는 것, 병원 복귀는 '병원'으로만 보인다는 고지,
 //      PIN 잠금이 우연한 열람을 막는 수준이라는 고지를 동의 앞에 둔다. 동의는 저장하지 않는다.
@@ -24,6 +24,7 @@ import { getStore } from '@/lib/store/index.js';
 import {
   GUARDIAN_ERROR,
   GUARDIAN_LINK_BUDGET_CHARS,
+  GUARDIAN_WINDOW_DAYS,
   buildGuardianLink,
   encryptSnapshot,
   guardianCoverage,
@@ -52,6 +53,7 @@ function kstLabel(iso, locale) {
 
 /**
  * 스냅샷이 담는 범위 → 화면 문구 재료. 날짜가 없으면 null
+ * today: 범위가 오늘부터인가. 아니면 입국일부터다(입국 전에 만든 링크는 입국일부터 7일을 담는다)
  * @returns {{today: boolean, n: number, from: string, to: string, more: boolean} | null}
  */
 export function coverageView(snapshot, locale, nowMs) {
@@ -71,17 +73,31 @@ function CoverageNote({ view }) {
   if (!view) return null;
   return (
     <div className="guardian-coverage">
-      <p className="guardian-meta">{t(view.today ? 'guardian.rangeToday' : 'guardian.rangeDays', view)}</p>
-      {view.more && <p className="guardian-meta">{t('guardian.rangeNextWeek')}</p>}
+      <p className="guardian-meta">{t(view.today ? 'guardian.rangeToday' : 'guardian.rangeFromArrival', view)}</p>
+      {view.more && <p className="guardian-meta">{t('guardian.rangeNextWeek', { n: GUARDIAN_WINDOW_DAYS })}</p>}
     </div>
   );
 }
 
 const onlyDigits = (value) => value.replace(/[^0-9]/g, '').slice(0, 6);
 
-function ResendNotice({ share, needed, locale, onNewLink }) {
+function ResendNotice({ share, needed, windowPassed, locale, onNewLink }) {
   const { t } = useLang();
   const sent = kstLabel(share?.lastSentAt, locale);
+  if (!needed && windowPassed) {
+    return (
+      <section className="guardian-resend" aria-labelledby="guardian-resend-title">
+        <h2 id="guardian-resend-title">{t('guardian.windowPassedTitle')}</h2>
+        <p className="guardian-meta">{t('guardian.windowPassedBody', { n: GUARDIAN_WINDOW_DAYS })}</p>
+        {sent && <p className="guardian-meta">{t('guardian.lastSent', sent)}</p>}
+        {onNewLink && (
+          <Button variant="secondary" onClick={onNewLink}>
+            {t('guardian.newLink')}
+          </Button>
+        )}
+      </section>
+    );
+  }
   if (needed) {
     return (
       <section className="guardian-resend" aria-labelledby="guardian-resend-title">
@@ -379,7 +395,7 @@ export default function GuardianCreate() {
   const status = useStoreStatus();
   const stay = useStoreRecord('stay', readStay);
   const tripPlan = useStoreRecord('tripPlan', readTripPlan);
-  const { needed, share } = useGuardianResendNeeded();
+  const { needed, windowPassed, share } = useGuardianResendNeeded();
   const [result, setResult] = useState(null);
   const resultHeadingRef = useRef(null);
   const consentHeadingRef = useRef(null);
@@ -429,7 +445,7 @@ export default function GuardianCreate() {
   } else {
     body = (
       <>
-        <ResendNotice share={share} needed={needed} locale={locale} onNewLink={result ? startNewLink : null} />
+        <ResendNotice share={share} needed={needed} windowPassed={windowPassed} locale={locale} onNewLink={result ? startNewLink : null} />
         {result ? (
           <LinkResult result={result} onNewLink={startNewLink} headingRef={resultHeadingRef} />
         ) : (

@@ -7,7 +7,7 @@
 //
 // - 담는 것: 만든 시각, 만료 시각(출국일 23:59 KST), 언어, 날짜별 {동행 필요, 보호자 단독 외출 가능,
 //   환자 복귀 마감·장소 이름·주소, 보호자 외출}, 긴급 번호(119, 1330)
-// - 날짜는 만든 날(KST)부터 7일(DEFAULTS.guardianLink.windowDays), 출국일에서 멈춘다. 지난 날은 보호자에게
+// - 날짜는 만든 날(KST)과 입국일 중 늦은 날부터 7일(DEFAULTS.guardianLink.windowDays), 출국일에서 멈춘다. 지난 날은 보호자에게
 //   쓸모가 없고, 7일 뒤 날짜까지 담으면 긴 체류의 링크가 메신저 기준(8 KB)을 넘는다. 이후 날짜는 환자가 새 링크로 보낸다.
 //   담은 범위는 새 필드 없이 days[].date 의 처음·끝으로 읽는다(guardianCoverage)
 // - 환자 복귀 장소가 병원이면 이름·주소 대신 일반 라벨 '병원' + 주소 null
@@ -33,9 +33,20 @@ const RETURN_PLACES = Object.freeze(['LODGING', 'HOSPITAL']);
 /** 한 링크가 담는 날짜 수 (만든 날 포함) */
 export const GUARDIAN_WINDOW_DAYS = DEFAULTS.guardianLink.windowDays;
 
-/** 만든 날(KST) → 담는 마지막 날. 출국일 상한은 체류 날짜 목록이 맡는다 */
-function windowLastDate(firstDate) {
-  return addDays(firstDate, GUARDIAN_WINDOW_DAYS - 1);
+/**
+ * 범위 자르기: 만든 날(KST)보다 이른 날짜를 버리고, 남은 날짜 중 가장 이른 날부터 7일만 남긴다.
+ * 체류 날짜 목록에 적용하면 시작은 '만든 날과 입국일 중 늦은 날', 끝은 출국일 상한이 된다.
+ * 복호화 뒤 정규화도 같은 함수로 스냅샷 자신의 날짜·만든 시각에서 범위를 다시 정한다.
+ * @param {string[]} dates  YYYY-MM-DD
+ * @param {string} createdDate  만든 날(KST)
+ * @returns {(date: string) => boolean}
+ */
+function windowFilter(dates, createdDate) {
+  const upcoming = dates.filter((date) => date >= createdDate);
+  if (upcoming.length === 0) return () => false;
+  const start = upcoming.reduce((min, date) => (date < min ? date : min));
+  const last = addDays(start, GUARDIAN_WINDOW_DAYS - 1);
+  return (date) => date >= start && date <= last;
 }
 
 /**
@@ -225,8 +236,8 @@ function buildDay(stay, date, dayPlan) {
 /**
  * 체류와 전체 일정으로 보호자 스냅샷을 만든다 (spec 4.11, 5.4).
  *
- * - 날짜: 만든 날(`now` 의 KST 날짜)부터 7일 안의 체류 날짜(출국일에서 멈춤). 입국 전에 만들면 입국일부터이고,
- *   그때도 만든 날부터 7일 안의 날짜만 담는다.
+ * - 날짜: 만든 날(`now` 의 KST 날짜)과 입국일 중 늦은 날부터 7일(출국일에서 멈춤). 입국 전 집에서 만들면
+ *   입국일부터 7일이다.
  *   일정이 없는 날짜도 담고, 모르는 조건은 엄격한 값으로 둔다.
  * - 환자 복귀: 그날 환자 외출마다 {복귀 마감, 장소 이름, 장소 주소}. 숙소면 그날 숙소 이름·도로명주소,
  *   병원이면 '병원' + null.
@@ -248,11 +259,11 @@ export function buildGuardianSnapshot({ stay, tripPlan, now, lang } = {}) {
   const snapshotLang = lang ?? tripPlan.lang;
   if (!GUARDIAN_LANGS.includes(snapshotLang)) throw new TypeError('buildGuardianSnapshot: 지원하지 않는 언어입니다');
   const createdMs = toInstantMs(now, 'now');
-  const firstDate = kstDate(createdMs);
-  const lastDate = windowLastDate(firstDate);
+  const allDates = stayDates(stay);
+  const inWindow = windowFilter(allDates, kstDate(createdMs));
 
-  const days = stayDates(stay)
-    .filter((date) => date >= firstDate && date <= lastDate)
+  const days = allDates
+    .filter(inWindow)
     .map((date) => {
       const dayPlan = Object.hasOwn(tripPlan.days, date) && isObject(tripPlan.days[date]) ? tripPlan.days[date] : undefined;
       return buildDay(stay, date, dayPlan);
@@ -271,7 +282,8 @@ export function buildGuardianSnapshot({ stay, tripPlan, now, lang } = {}) {
 /**
  * 스냅샷 모양의 값에 허용 목록을 다시 적용한다. 암호화 직전과 복호화 직후에 쓴다 —
  * 손으로 만든 스냅샷이나 다른 곳에서 만든 링크에 섞인 필드도 들어오지 못한다.
- * 만든 날(createdAt 의 KST 날짜)보다 이른 날짜와 만든 날부터 7일 뒤의 날짜는 버린다. 만든 스냅샷은 정규화해도 그대로다.
+ * 만든 날(createdAt 의 KST 날짜)보다 이른 날짜를 버리고, 남은 날짜 중 가장 이른 날부터 7일 뒤의 날짜도 버린다.
+ * 만든 스냅샷은 정규화해도 그대로다.
  *
  * @param {unknown} snapshot
  * @returns {GuardianSnapshot}
@@ -287,13 +299,15 @@ export function normalizeGuardianSnapshot(snapshot) {
   if (!GUARDIAN_LANGS.includes(snapshot.lang)) throw invalid('lang');
   if (!Array.isArray(snapshot.days)) throw invalid('days');
 
-  const firstDate = kstDate(createdMs);
-  const lastDate = windowLastDate(firstDate);
   snapshot.days.forEach((d, index) => {
     if (!isObject(d) || !isDateString(d.date)) throw invalid(`days[${index}].date`);
   });
+  const inWindow = windowFilter(
+    snapshot.days.map((d) => d.date),
+    kstDate(createdMs),
+  );
   const days = snapshot.days
-    .filter((d) => d.date >= firstDate && d.date <= lastDate)
+    .filter((d) => inWindow(d.date))
     .map((d) =>
       finishDay({
         date: d.date,

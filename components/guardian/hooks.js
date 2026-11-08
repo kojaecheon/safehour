@@ -13,7 +13,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { getStore } from '@/lib/store/index.js';
 import { parseGuardianLink } from '@/src/guardian/index.js';
 import { createGuardianLockout } from './lockoutStorage.js';
-import { isGuardianResendNeeded } from './share.js';
+import { isGuardianResendNeeded, isGuardianWindowPassed } from './share.js';
 
 const noopSubscribe = () => () => {};
 
@@ -58,23 +58,26 @@ const readTripPlan = (store) => store.readTripPlan();
  * '보호자 링크 다시 보내기'를 안내해야 하는가 (spec 4.11 — 환자 일정이 바뀌면 환자 화면에 안내).
  * 판단은 share.js 의 isGuardianResendNeeded 하나다(링크 만들기 화면과 같은 함수).
  *
- * @returns {{needed: boolean, checked: boolean, share: {lastSentAt: string, planFingerprint: string} | null}}
- *   checked: 지금 체류·일정으로 판단을 마쳤는가(마치기 전 needed 는 false)
+ * 보낸 링크의 7일 범위가 지나고 체류가 이어지면 windowPassed 가 true 다(isGuardianWindowPassed, 화면을 열 때 판단).
+ *
+ * @returns {{needed: boolean, windowPassed: boolean, checked: boolean, share: {lastSentAt: string, planFingerprint: string} | null}}
+ *   checked: 지금 체류·일정으로 판단을 마쳤는가(마치기 전 needed·windowPassed 는 false)
  */
 export function useGuardianResendNeeded() {
   const stay = useStoreRecord('stay', readStay);
   const tripPlan = useStoreRecord('tripPlan', readTripPlan);
   const share = stay?.guardianShare ?? null;
-  const [result, setResult] = useState({ stay: undefined, tripPlan: undefined, needed: false });
+  const [result, setResult] = useState({ stay: undefined, tripPlan: undefined, needed: false, windowPassed: false });
 
   useEffect(() => {
     let cancelled = false;
+    const windowPassed = isGuardianWindowPassed({ stay, tripPlan, share, now: Date.now() });
     isGuardianResendNeeded({ stay, tripPlan, share }).then(
       (needed) => {
-        if (!cancelled) setResult({ stay, tripPlan, needed });
+        if (!cancelled) setResult({ stay, tripPlan, needed, windowPassed });
       },
       () => {
-        if (!cancelled) setResult({ stay, tripPlan, needed: false });
+        if (!cancelled) setResult({ stay, tripPlan, needed: false, windowPassed });
       },
     );
     return () => {
@@ -83,7 +86,7 @@ export function useGuardianResendNeeded() {
   }, [stay, tripPlan, share]);
 
   const checked = result.stay === stay && result.tripPlan === tripPlan;
-  return { needed: checked && result.needed, checked, share };
+  return { needed: checked && result.needed, windowPassed: checked && result.windowPassed, checked, share };
 }
 
 // ── /g 가 열 암호문 ──────────────────────────────────────────────

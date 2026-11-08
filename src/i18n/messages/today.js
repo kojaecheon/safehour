@@ -168,6 +168,18 @@ export const messages = {
     ja: '予定が変わりました。同行者のリンクは自動で更新されないため、もう一度送ってください。',
     zh: '行程已变化。陪同者链接不会自动更新，请重新发送。',
   },
+  'today.guardianWindowTitle': {
+    ko: '보낸 링크의 날짜가 지났어요',
+    en: 'The dates in your companion link have passed',
+    ja: '同行者に送ったリンクの日付が過ぎました',
+    zh: '发给陪同者的链接日期已过',
+  },
+  'today.guardianWindowBody': {
+    ko: '다음 {n}일 링크를 다시 보내 주세요.',
+    en: 'Please send a new link for the next {n} days.',
+    ja: '次の{n}日間のリンクを送り直してください。',
+    zh: '请重新发送接下来{n}天的链接。',
+  },
   'today.guardianResendCta': {
     ko: '보호자 링크 다시 보내기',
     en: 'Send the companion link again',

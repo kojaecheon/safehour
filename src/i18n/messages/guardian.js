@@ -293,17 +293,29 @@ export const messages = {
     ja: '今日から{n}日間（{from}～{to}）の予定を含みます。',
     zh: '包含从今天起{n}天（{from}至{to}）的日程。',
   },
-  'guardian.rangeDays': {
-    ko: '{n}일({from}~{to})의 일정을 담아요.',
-    en: 'This link covers {n} days ({from} to {to}).',
-    ja: '{n}日間（{from}～{to}）の予定を含みます。',
-    zh: '包含{n}天（{from}至{to}）的日程。',
+  'guardian.rangeFromArrival': {
+    ko: '입국일부터 {n}일({from}~{to})의 일정을 담아요.',
+    en: 'This link covers {n} days from your arrival date ({from} to {to}).',
+    ja: '入国日から{n}日間（{from}～{to}）の予定を含みます。',
+    zh: '包含从入境日起{n}天（{from}至{to}）的日程。',
   },
   'guardian.rangeNextWeek': {
-    ko: '한 링크는 7일까지만 담아요. 그다음 날짜의 일정은 다음 주에 새 링크를 만들어 다시 보내 주세요.',
-    en: 'A link covers up to 7 days. For the days after that, create a new link next week and send it again.',
-    ja: '1つのリンクに含まれるのは7日分までです。その後の予定は、来週新しいリンクを作成して送り直してください。',
-    zh: '一个链接最多包含7天。之后的日程请在下周创建新链接并重新发送。',
+    ko: '한 링크는 {n}일까지만 담아요. 그다음 날짜의 일정은 다음 주에 새 링크를 만들어 다시 보내 주세요.',
+    en: 'A link covers up to {n} days. For the days after that, create a new link next week and send it again.',
+    ja: '1つのリンクに含まれるのは{n}日分までです。その後の予定は、来週新しいリンクを作成して送り直してください。',
+    zh: '一个链接最多包含{n}天。之后的日程请在下周创建新链接并重新发送。',
+  },
+  'guardian.windowPassedTitle': {
+    ko: '보낸 링크의 날짜가 지났어요',
+    en: 'The dates in your sent link have passed',
+    ja: '送ったリンクの日付が過ぎました',
+    zh: '已发送链接的日期已过',
+  },
+  'guardian.windowPassedBody': {
+    ko: '보호자는 지난 날짜의 일정만 가지고 있어요. 다음 {n}일 링크를 다시 보내 주세요.',
+    en: 'Your guardian only has plans for past dates. Please send a new link for the next {n} days.',
+    ja: '付き添い者は過ぎた日付の予定しか持っていません。次の{n}日間のリンクを送り直してください。',
+    zh: '陪同者只有已过日期的日程。请重新发送接下来{n}天的链接。',
   },
   'guardian.newLink': {
     ko: '새 링크 만들기',
