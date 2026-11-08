@@ -38,7 +38,8 @@ export async function GET() {
       weatherKeySource: process.env.KMA_API_KEY ? 'KMA_API_KEY' : 'TOUR_API_KEY',
     },
     flags: runtimeFlagsSnapshot(),
-    // { date, dailyLimit, warningAt, counterReadable, operations: { '서비스.오퍼레이션': { used, limit, state } } }
+    // { scope: 'instance', date, dailyLimit, warningAt, counterReadable, operations: { '서비스.오퍼레이션': { used, limit, state } } }
+    // scope: 응답한 인스턴스의 카운터다. 제공처에 남은 한도가 아니다
     tourApiUsage,
   });
 }

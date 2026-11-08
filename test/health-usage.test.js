@@ -50,6 +50,7 @@ describe('헬스 응답의 tourApiUsage', () => {
     assert.equal(raw.includes('health-usage-secret-key'), false, '인증키가 응답에 노출됐다');
     assert.equal(raw.includes('apis.data.go.kr'), false, 'URL 이 응답에 노출됐다');
     const { tourApiUsage } = JSON.parse(raw);
+    assert.equal(tourApiUsage.scope, 'instance', '제공처 잔여 한도로 읽히지 않게 범위를 밝힌다');
     assert.equal(tourApiUsage.dailyLimit, 1000);
     assert.equal(tourApiUsage.warningAt, 800);
     assert.equal(tourApiUsage.counterReadable, true);
@@ -76,6 +77,7 @@ describe('헬스 응답의 tourApiUsage', () => {
     assert.equal(raw.includes(DATA_ROOT), false);
     const { tourApiUsage } = JSON.parse(raw);
     assert.equal(tourApiUsage.counterReadable, false);
+    assert.equal(tourApiUsage.scope, 'instance');
     assert.deepEqual(tourApiUsage.operations, {});
     fs.rmSync(counterFile(), { force: true });
   });

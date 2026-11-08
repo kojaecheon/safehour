@@ -148,7 +148,7 @@ if (health.config?.weatherApiKeyConfigured) {
   warn('기상 키 미설정', '기상은 "확인 불가"로 표기되고 판정에 반영되지 않음 (AC011 증거 없음)');
 }
 const usage = describeTourApiUsage(health.tourApiUsage);
-if (usage?.ok) console.log(`  · TourAPI 오늘 호출: ${usage.line}`);
+if (usage?.ok) console.log(`  · TourAPI 오늘 호출(응답한 인스턴스 기준, 제공처 잔여 아님): ${usage.line}`);
 else if (usage) warn('TourAPI 호출 카운터', usage.line);
 if (health.flags?.recommendationKilled) {
   console.log('\n  ⚠ kill switch 가 켜져 있습니다. 아래 판정 검사는 미추천이 정상입니다.\n');
@@ -269,7 +269,8 @@ const joined = bodies.join('\n');
 
 // (1) URL 에 serviceKey 가 값과 함께 실려 나간 경우
 const keyInUrl = /serviceKey=[A-Za-z0-9%+/=]{10,}/.test(joined);
-record('URL 에 serviceKey 값 미노출', !keyInUrl);
+// --skip-plan 이면 일정 응답이 없어 그 본문은 검사하지 않았다. 통과만 찍으면 전부 본 것처럼 읽힌다
+record('URL 에 serviceKey 값 미노출', !keyInUrl, skipPlan ? '(일정 본문 미검사)' : undefined);
 
 // (2) 로컬에 키가 있으면 그 값 자체가 응답에 있는지 대조한다 (가장 확실한 검사)
 const localKeys = [process.env.TOUR_API_KEY, process.env.KMA_API_KEY]

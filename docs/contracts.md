@@ -190,7 +190,8 @@ PlanStay {
   읽었는지 그 **변수 이름**만 알린다.
 - `flags`는 운영 스위치 상태다(추천 중단 등).
 - `tourApiUsage`는 관광공사 자체 호출 카운터의 오늘(KST) 요약이다:
-  `{ date, dailyLimit, warningAt, counterReadable, operations: { "서비스.오퍼레이션": { used, limit, state } } }`.
+  `{ scope, date, dailyLimit, warningAt, counterReadable, operations: { "서비스.오퍼레이션": { used, limit, state } } }`.
+  `scope`는 늘 `"instance"`다: 응답한 서버 인스턴스의 카운터이고 **제공처에 남은 한도가 아니다**.
   `state`는 `OK`·`WARNING`(경고 값 이상)·`BLOCKED`(차단 값 도달)다. 카운터 파일만 읽고 키·URL·매개변수는
   담지 않는다. 카운터가 손상됐으면 `counterReadable: false`이고, 관광 모듈을 못 불러오면 `null`이다.
   서버리스 배포에서는 카운터 파일이 실행 인스턴스마다 따로라 **응답한 인스턴스의 숫자**다(제공처 전체 호출 수가 아니다).
