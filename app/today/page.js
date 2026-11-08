@@ -119,6 +119,13 @@ export default function TodayPage() {
   }
 
   const top = <TopBar title={t('today.header')} />;
+  // 체류 중이 아닌 화면(일정 만드는 중·도착 전·출국 뒤·그날 일정 없음)에도 알림 자리를 둔다.
+  // 첫 기간을 도착 전에 저장하면 여기로 와서 '첫 일정을 만들었어요'를 보여야 한다 (2026-11-08 검토 반영)
+  const noticeSlot = (
+    <TripNotice slot role="status">
+      {notice ? t(notice) : ''}
+    </TripNotice>
+  );
   let body;
 
   if (!today) {
@@ -143,6 +150,7 @@ export default function TodayPage() {
   } else if (!trip.tripPlan) {
     body = (
       <div className="ui-block">
+        {noticeSlot}
         <EmptyState
           icon="navToday"
           title={trip.syncing ? t('today.generatingTitle') : t('today.noPlanTitle')}
@@ -161,6 +169,7 @@ export default function TodayPage() {
     const before = stay.arrival?.date && today < stay.arrival.date;
     body = (
       <div className="ui-block">
+        {noticeSlot}
         <EmptyState
           icon="navTrip"
           title={before ? t('today.beforeTripTitle') : t('today.afterTripTitle')}
@@ -172,6 +181,7 @@ export default function TodayPage() {
   } else if (!day) {
     body = (
       <div className="ui-block">
+        {noticeSlot}
         <EmptyState
           icon="navToday"
           title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
@@ -226,9 +236,7 @@ export default function TodayPage() {
             live
           />
 
-          <TripNotice slot role="status">
-            {notice ? t(notice) : ''}
-          </TripNotice>
+          {noticeSlot}
 
           {/* 변경됨 알림 (SEED Callout · actionable, 설계서 5.6): 누르면 전후 비교 시트 */}
           {delta?.unseen && (

@@ -10,7 +10,8 @@
 //   - 복약 시각마다 '숙소에서 복용'(기본 예)을 고른다.
 //   - 제한 없음 기간을 켜면 항목을 묻지 않는다.
 //   - 외출·복귀(필수) 다음 항목은 묶음(ITEM_GROUPS)으로 접어 둔다(운영자 결정 2026-11-08). 묶음 머리에 답한 수를 보이고,
-//     '제한 없음' 버튼이 그 묶음 항목을 모두 '아니오'로 채운다. 저장하려다 막히면 문제가 있는 묶음은 저절로 펼친다.
+//     '제한 없음' 버튼이 그 묶음에서 답하지 않은 항목만 '아니오'로 채운다(이미 고른 답은 바꾸지 않는다).
+//     이미 답한 항목이 있으면 버튼 이름이 '답하지 않은 N개만'으로 바뀌고, 남은 항목이 없으면 버튼을 끈다. 저장하려다 막히면 문제가 있는 묶음은 저절로 펼친다.
 //     '모르겠음'은 그대로 가장 엄격한 기본값이다. 외출·복귀는 묶음에 넣지 않고 늘 보인다.
 // 저장은 validatePeriodForm(도메인 검증) → 부모의 onSave(기간). 오류는 항목마다 붙이고 맨 위에 모아 보여준다.
 // 기기 저장이 실패하면 부모가 saveErrorKey 로 알려 준다. 그 문장은 저장 버튼 곁(하단 바 안 맨 앞)에 보인다(설계서 6.1,
@@ -31,6 +32,7 @@ import {
   emptyPeriodForm,
   fillGroupNone,
   formAnswerOf,
+  unansweredFields,
   periodToForm,
   returnHospitalId,
   validatePeriodForm,
@@ -554,6 +556,13 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
               const hasError = group.fields.some((field) => field in errors);
               const open = openGroups.has(group.id) || hasError;
               const done = group.fields.filter((field) => formAnswerOf(form, field) !== null).length;
+              const left = unansweredFields(form, group.fields).length;
+              const noneLabel =
+                left === 0
+                  ? t('conditions.groupNoneDone')
+                  : done === 0
+                    ? t('conditions.groupNone')
+                    : t('conditions.groupNoneRest', { n: left });
               return (
                 <section key={group.id} className="conditions-group" aria-labelledby={titleId}>
                   <h4 className="conditions-group-title">
@@ -576,11 +585,11 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
                     variant="secondary"
                     size="small"
                     className="conditions-group-none"
-                    disabled={readOnly}
+                    disabled={readOnly || left === 0}
                     aria-describedby={titleId}
                     onClick={() => setForm((prev) => fillGroupNone(prev, group.fields))}
                   >
-                    {t('conditions.groupNone')}
+                    {noneLabel}
                   </Button>
                   <div id={panelId} className="conditions-group-body" hidden={!open}>
                     {group.fields.map((field) => (

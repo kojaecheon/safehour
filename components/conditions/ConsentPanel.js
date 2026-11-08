@@ -73,6 +73,7 @@ export default function ConsentPanel({ consent, readOnly, lead, headingRef }) {
               <SafetyText key={key} k={key} as="li" />
             ))}
           </ul>
+          <p className="conditions-hint conditions-consent-review">{t('conditions.consentLegalReview')}</p>
           <div className="conditions-actions">
             <Button onClick={agree} disabled={readOnly}>
               {t('conditions.consentAgree')}

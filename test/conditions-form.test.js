@@ -17,6 +17,7 @@ import {
   formAnswerOf,
   formToPeriod,
   makeSelfPeriodId,
+  unansweredFields,
   periodToForm,
   returnHospitalId,
   validatePeriodForm,
@@ -441,5 +442,42 @@ describe('본인 체크 묶음과 제한 없음 버튼 (운영자 결정 2026-11
     assert.equal(formAnswerOf(form, 'medication'), 'NO');
     form.walkLimit.answer = 'UNKNOWN';
     assert.equal(formAnswerOf(form, 'walkLimit'), 'UNKNOWN');
+  });
+
+  // 검토 지적(2026-11-08): 접힌 묶음에서 한 번 눌러 이미 고른 '예'·'모르겠음'이 '아니오'로 바뀌면
+  // 판정이 느슨해진다. 버튼은 답하지 않은 항목만 채운다.
+  test("이미 고른 '예'(분 값 포함)와 '모르겠음'은 그대로 두고 답하지 않은 항목만 '아니오'로 채운다", () => {
+    const form = emptyPeriodForm({ startDate: '2026-10-03', endDate: '2026-10-05' });
+    form.walkLimit = { ...form.walkLimit, answer: 'YES', minutes: '20' };
+    form.yesNo.avoidUv = 'UNKNOWN';
+    const limits = ITEM_GROUPS.find((g) => g.id === 'limits');
+    const exposure = ITEM_GROUPS.find((g) => g.id === 'exposure');
+    let next = fillGroupNone(form, limits.fields);
+    next = fillGroupNone(next, exposure.fields);
+    assert.deepEqual(next.walkLimit, { ...form.walkLimit, answer: 'YES', minutes: '20' });
+    assert.equal(next.travelLimit.answer, 'NO');
+    assert.equal(next.yesNo.avoidUv, 'UNKNOWN');
+    assert.equal(next.yesNo.avoidHeat, 'NO');
+    assert.equal(next.yesNo.avoidWater, 'NO');
+  });
+
+  test("동행 필수=예 이면 보호자 묶음 버튼은 보호자 곁 지킴을 '아니오'로 바꾸지 않는다", () => {
+    const form = emptyPeriodForm();
+    form.yesNo.escortRequired = 'YES';
+    const guardian = ITEM_GROUPS.find((g) => g.id === 'guardian');
+    assert.deepEqual(unansweredFields(form, guardian.fields), []);
+    const next = fillGroupNone(form, guardian.fields);
+    assert.equal(next, form, '답하지 않은 항목이 없으면 같은 폼 (변경 없음)');
+    assert.equal(next.yesNo.escortRequired, 'YES');
+    assert.notEqual(next.yesNo.guardianMustStay, 'NO');
+  });
+
+  test("답하지 않은 항목이 없는 묶음은 아무것도 바꾸지 않는다 (버튼 끔의 근거)", () => {
+    const form = emptyPeriodForm();
+    form.walkLimit = { ...form.walkLimit, answer: 'UNKNOWN' };
+    form.travelLimit = { ...form.travelLimit, answer: 'YES', minutes: '30' };
+    const limits = ITEM_GROUPS.find((g) => g.id === 'limits');
+    assert.equal(unansweredFields(form, limits.fields).length, 0);
+    assert.equal(fillGroupNone(form, limits.fields), form);
   });
 });

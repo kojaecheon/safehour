@@ -108,8 +108,9 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
 
     // ── 조건: 민감정보 동의가 먼저 ──
     await expect(page.getByRole('heading', { name: '민감정보 처리 동의' })).toBeVisible();
-    // 내부 표시(법무 검토 전 배지·문구 버전)는 화면에 내지 않는다 (운영자 결정 2026-11-08)
+    // 내부 표시(법무 검토 전 배지·문구 버전)는 내지 않고, 사용자에게 알릴 한 줄만 동의 버튼 옆에 둔다 (2026-11-08 검토 반영)
     await expect(page.getByText('법무 검토', { exact: false })).toHaveCount(0);
+    await expect(page.getByText('이 동의 문구는 법률 검토를 거치는 중이에요. 검토가 끝나면 바뀔 수 있어요.')).toBeVisible();
     await expect(page.getByText('문구 버전', { exact: false })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '본인 체크 기간 추가' })).toHaveCount(0);
     await evidenceShot(page, '03-consent');

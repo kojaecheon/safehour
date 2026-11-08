@@ -7,8 +7,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { DEPARTURE_TIME_UNSET } from '../src/stay/defaults.js';
 import {
-  DEPARTURE_TIME_UNSET,
   NAME_MAX_LENGTH,
   STEPS,
   addAppointment,

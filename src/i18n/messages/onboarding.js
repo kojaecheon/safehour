@@ -249,10 +249,10 @@ export const messages = {
     zh: '住处名称（选填）',
   },
   'onboarding.lodgingNameHint': {
-    ko: '비워 두면 ‘숙소’로 보여요. 보호자 링크와 택시 카드에 이 이름이 나와요 (최대 {max}자).',
-    en: 'If blank, it shows as “Your stay”. This name appears in the companion link and the taxi card (up to {max} characters).',
-    ja: '空欄の場合は「宿泊先」と表示します。この名前は同行者リンクとタクシーカードに表示されます（最大{max}文字）。',
-    zh: '留空时显示为“住处”。此名称会显示在陪同者链接和出租车卡片中（最多{max}个字）。',
+    ko: '비워 두면 ‘숙소’로 보여요. 보호자 링크에 이 이름이 나와요 (최대 {max}자).',
+    en: 'If blank, it shows as “Your stay”. This name appears in the companion link (up to {max} characters).',
+    ja: '空欄の場合は「宿泊先」と表示します。この名前は同行者リンクに表示されます（最大{max}文字）。',
+    zh: '留空时显示为“住处”。此名称会显示在陪同者链接中（最多{max}个字）。',
   },
   'onboarding.nameHint': {
     ko: '알아보기 쉬운 이름이면 됩니다 (최대 {max}자).',

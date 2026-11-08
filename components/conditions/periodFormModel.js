@@ -83,7 +83,8 @@ export function returnHospitalId(returnTime, hospitals = []) {
 
 /**
  * 화면 묶음: 외출·복귀(필수, 늘 펼침) 다음에 오는 항목을 묶는다(운영자 결정 2026-11-08).
- * 묶음은 접혀 있고, 맨 위 '제한 없음' 버튼이 그 묶음 항목을 모두 '아니오'로 채운다.
+ * 묶음은 접혀 있고, 맨 위 '제한 없음' 버튼이 그 묶음에서 **아직 답하지 않은** 항목만 '아니오'로 채운다.
+ * 이미 고른 답('예'·'모르겠음'·'아니오')은 절대 바꾸지 않는다: 접힌 묶음에서 한 번 눌러 판정이 느슨해지면 안 된다.
  * '모르겠음'의 뜻(가장 엄격한 기본값)은 그대로다. 외출·복귀는 여기 없다: 늘 직접 고른다.
  */
 export const ITEM_GROUPS = Object.freeze([
@@ -109,15 +110,23 @@ export function formAnswerOf(form, field) {
   return form?.yesNo?.[field] ?? null;
 }
 
+/** 묶음에서 아직 답하지 않은 항목 */
+export function unansweredFields(form, fields) {
+  return fields.filter((field) => formAnswerOf(form, field) === null);
+}
+
 /**
- * 묶음의 모든 항목을 '아니오'(병원이 그런 안내를 하지 않음)로 채운 새 폼. 다른 묶음·외출·복귀는 그대로 둔다.
+ * 묶음에서 **답하지 않은 항목만** '아니오'(병원이 그런 안내를 하지 않음)로 채운 새 폼.
+ * 이미 고른 답('예'·'모르겠음'·'아니오'), 다른 묶음, 외출·복귀는 그대로 둔다. 답하지 않은 항목이 없으면 같은 폼을 돌려준다.
  * 사용자가 버튼을 눌러 직접 고르는 답이다. 앱이 값을 짐작해 넣는 것이 아니다.
  * @param {ReturnType<typeof emptyPeriodForm>} form
  * @param {readonly string[]} fields  ITEM_GROUPS[].fields
  */
 export function fillGroupNone(form, fields) {
+  const targets = unansweredFields(form, fields);
+  if (targets.length === 0) return form;
   const next = { ...form, yesNo: { ...form.yesNo } };
-  for (const field of fields) {
+  for (const field of targets) {
     if (LIMIT_KEYS.includes(field) || field === 'mealRestriction' || field === 'medication') {
       next[field] = { ...form[field], answer: ANSWER.NO };
     } else {

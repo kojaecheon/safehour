@@ -56,6 +56,14 @@ export function nowWithClock() {
   return Date.now() + clockShiftMs;
 }
 
+function readServerOffset() {
+  try {
+    return Number.parseInt(fs.readFileSync(CLOCK_OFFSET_FILE, 'utf8').trim(), 10) || 0;
+  } catch {
+    return 0; // 파일 없음 = 이동 없음
+  }
+}
+
 function writeServerOffset(ms) {
   fs.mkdirSync(path.dirname(CLOCK_OFFSET_FILE), { recursive: true });
   fs.writeFileSync(CLOCK_OFFSET_FILE, String(Math.round(ms)), 'utf8');
@@ -87,11 +95,27 @@ async function applyShift(shiftMs) {
   if (shiftedDay !== realToday) {
     throw new Error(`시계는 실제 오늘(KST ${realToday}) 안에서만 옮길 수 있다 (옮긴 날짜: ${shiftedDay})`);
   }
-  // 캐시 시각을 먼저 옮긴다: 옮기기 전 서버가 미래 시각 파일을 보면 '방금 씀'(나이 0)으로 읽어 안전하다
-  touchSeedCache(Date.now() + shiftMs);
-  writeServerOffset(shiftMs);
+  await moveServerClock(readServerOffset(), shiftMs);
   clockShiftMs = shiftMs;
+}
+
+/**
+ * 서버 시계를 prev 에서 next 로 옮기면서 시드 캐시가 서버 시계보다 낡아 보이는 순간을 없앤다.
+ *
+ * 순서가 중요하다. 캐시 신선도는 '서버의 지금 - 파일 mtime'(15분)이고, 미래 mtime 은 나이 0 으로 읽힌다
+ * (src/tour-api/client.js). shim 은 이동량 파일을 250ms 간격으로 읽으므로 쓰고 나서 최대 SHIM_SETTLE_MS 동안
+ * 서버는 옛 시계와 새 시계 중 어느 쪽이든 볼 수 있다.
+ * 1. 먼저 mtime 을 두 시계 중 늦은 쪽의 지금으로 맞춘다: 어느 시계로 읽어도 미래거나 지금이라 적중한다.
+ * 2. 그다음 이동량을 쓰고 shim 이 읽을 때까지 기다린다.
+ * 3. 뒤로 옮긴 경우(오전 10:00 고정, 이동 해제 뒤 원래대로 등)에는 그 뒤에 mtime 을 새 시계의 지금으로 다시 맞춘다.
+ * 반대로 하면(이동량 먼저, 또는 mtime 을 이른 쪽 시계로 먼저) 수백 ms 동안 캐시가 13시간 낡아 보여,
+ * 그 사이 도는 백그라운드 재계획이 캐시를 놓치고 실제 API 를 부른다 (CI 외부 호출 기록의 원인).
+ */
+async function moveServerClock(prevMs, nextMs) {
+  touchSeedCache(Date.now() + Math.max(prevMs, nextMs));
+  writeServerOffset(nextMs);
   await new Promise((resolve) => setTimeout(resolve, SHIM_SETTLE_MS));
+  if (nextMs < prevMs) touchSeedCache(Date.now() + nextMs);
 }
 
 /** 'YYYY-MM-DDTHH:MM'(KST) 을 UTC ms 로 */
@@ -146,15 +170,10 @@ export async function advanceClock(page, ms, { run = false } = {}) {
  */
 export async function resetClock() {
   clockShiftMs = 0;
-  let wasShifted = false;
-  try {
-    wasShifted = (Number.parseInt(fs.readFileSync(CLOCK_OFFSET_FILE, 'utf8').trim(), 10) || 0) !== 0;
-  } catch {
-    // 파일 없음 = 이동 없음
-  }
-  if (!wasShifted) return;
-  writeServerOffset(0);
-  await new Promise((resolve) => setTimeout(resolve, SHIM_SETTLE_MS));
+  const prev = readServerOffset();
+  if (prev === 0) return;
+  // 캐시 시각을 먼저 지금(두 시계 중 늦은 쪽)으로 올린 뒤 0 을 쓴다. 순서는 moveServerClock 주석 참고
+  await moveServerClock(prev, 0);
 }
 
 // ── 데모 주소 (src/adapters/demoAddresses.js 와 같은 값 — 시드 기준점과 좌표가 같아야 캐시가 적중한다) ──

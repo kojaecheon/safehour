@@ -285,6 +285,25 @@ export const messages = {
     ja: '制限なし（すべて「いいえ」）',
     zh: '无限制（全部选“否”）',
   },
+  // 법률 검토가 끝날 때까지 동의 버튼 옆에 둔다. 처리방침(src/i18n/legal.js) 동의 절과 같은 문장 (ja·zh 검수 전)
+  'conditions.consentLegalReview': {
+    ko: '이 동의 문구는 법률 검토를 거치는 중이에요. 검토가 끝나면 바뀔 수 있어요.',
+    en: 'This consent text is still under legal review and may change.',
+    ja: 'この同意文は法的な確認を受けている途中です。確認が終わると変わることがあります。',
+    zh: '本同意文本仍在法律审核中，审核结束后可能会有变更。',
+  },
+  'conditions.groupNoneRest': {
+    ko: "답하지 않은 {n}개만 '아니오'로",
+    en: 'Set only the {n} unanswered to “No”',
+    ja: '未回答の{n}問だけ「いいえ」にする',
+    zh: '仅将未回答的 {n} 项设为“否”',
+  },
+  'conditions.groupNoneDone': {
+    ko: '모두 답했어요',
+    en: 'All answered',
+    ja: 'すべて回答済み',
+    zh: '已全部作答',
+  },
 
   // 질문 (spec 4.4 표)
   'conditions.qOuting': { ko: '외출이 허용되나요?', en: 'Are you allowed to go out?', ja: '外出は許可されていますか？', zh: '是否允许外出？' },

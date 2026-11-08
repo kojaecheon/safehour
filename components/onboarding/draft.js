@@ -5,7 +5,7 @@
 //   초안(draft)  — 입력 칸과 1:1. 빈 칸은 '' 또는 null 로 둔다(숨은 기본값을 넣지 않는다).
 //                  예외(운영자 결정 2026-11-08, 판정을 느슨하게 하지 않는 기본 선택만): 공항은 인천(ICN),
 //                  이동 강도는 느긋하게(RELAXED, 덜 움직이는 쪽)를 미리 골라 둔다. 화면에서 바꿀 수 있다.
-//   선택 칸      : 숙소 이름(비우면 저장하지 않고 화면은 '숙소'로 부른다), 출발 시각(비우면 아래 DEPARTURE_TIME_UNSET).
+//   선택 칸      : 숙소 이름(비우면 저장하지 않고 화면은 '숙소'로 부른다), 출발 시각(비우면 src/stay/defaults.js DEPARTURE_TIME_UNSET).
 //   체류(Stay)   — spec 5.1. stayFromDraft() 가 만들고, 검증은 도메인의 validateStay() 하나만 쓴다.
 //
 // 원칙
@@ -15,7 +15,7 @@
 //   - 병원 연동으로 받은 일정(source "HOSPITAL")은 고치거나 지우지 않는다.
 //   - 주소는 사용자가 검색해 고른 결과만 받는다. 허용 필드만 남긴다(spec 5.1 Address).
 
-import { DEFAULTS } from '../../src/stay/defaults.js';
+import { DEFAULTS, DEPARTURE_TIME_UNSET } from '../../src/stay/defaults.js';
 import { VALIDATION_ISSUE } from '../../src/stay/errorCodes.js';
 import { AIRPORTS, APPOINTMENT_TYPES, INTERESTS, NAME_MAX_LENGTH, PACES, validateStay } from '../../src/stay/stay.js';
 import { appointmentEnd } from '../../src/stay/dayFrame.js';
@@ -43,13 +43,7 @@ export const KEYWORD_MAX_LENGTH = 60;
 
 export { NAME_MAX_LENGTH };
 
-/**
- * 출발 시각을 비웠을 때 저장하는 시각: 출국일의 가장 이른 시각.
- * 출국일 마감(출발 − 공항 도착 여유 − 이동 − 여유)이 활동 시작보다 앞서 출국일에는 외출을 만들지 않는다.
- * 가장 엄격한 쪽으로만 기운다. 이 값은 조정 가능한 기본값이 아니라 하루의 시작(00:00)이다.
- * 비웠다는 사실은 departure.timeUnset 으로 기기에만 남긴다(일정 요청 허용 목록에는 없다).
- */
-export const DEPARTURE_TIME_UNSET = '00:00';
+// 출발 시각을 비웠을 때 저장하는 시각(DEPARTURE_TIME_UNSET, 00:00)은 판정에 쓰이는 숫자라 src/stay/defaults.js 가 정본이다.
 
 /** 미리 골라 두는 공항·이동 강도 (운영자 결정 2026-11-08). 판정을 느슨하게 하지 않는다 */
 export const DEFAULT_AIRPORT = 'ICN';

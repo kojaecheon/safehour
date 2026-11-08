@@ -138,3 +138,11 @@ export const UNKNOWN_DEFAULTS = deepFreeze({
   /** 복약: 마감을 만들지 않고 '복약 시각 미입력' 경고(MEDICATION_TIMES_MISSING)를 붙인다 */
   medication: 'NO_DEADLINE_WITH_WARNING',
 });
+
+/**
+ * 출발 시각을 비웠을 때 저장하는 시각: 출국일의 가장 이른 시각(00:00). 판정에 쓰이는 숫자의 정본이라 여기에 둔다.
+ * 출국일 마감(출발 - 공항 도착 여유 - 이동 - 여유)이 활동 시작보다 앞서 출국일에는 외출을 만들지 않는다.
+ * 가장 엄격한 읽기이며 **조정 가능한 기본값이 아니다**: 다른 값으로 바꾸면 모르는 출발 시각을 짐작하는 셈이 된다.
+ * 비웠다는 사실은 departure.timeUnset 으로 기기에만 남긴다(일정 요청 허용 목록에는 없다). 쓰는 곳: components/onboarding/draft.js
+ */
+export const DEPARTURE_TIME_UNSET = '00:00';
