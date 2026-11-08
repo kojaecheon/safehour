@@ -30,6 +30,7 @@ import {
   withoutDates,
 } from '../lib/trip/index.js';
 import { deepFreeze, hospitalPeriod, makeStay, selfPeriod } from './stay-fixtures.js';
+import { overdueOutingOf, returnTargetOf } from '../components/trip/viewModel.js';
 
 const clone = (v) => structuredClone(v);
 
@@ -509,6 +510,60 @@ describe('동의 철회를 재계획하지 못했을 때 기기에서 먼저 지
       const text = JSON.stringify(d);
       assert.equal(text.includes('DIET_ESTIMATED') || text.includes('MEDICATION_TIMES_MISSING') || text.includes('"walkLimit"'), false);
     }
+  });
+
+  // findings 12: 이동 중에 비운 정거장 0개 외출(findings 10)로 즉시 복귀가 켜진 뒤 동의를 철회한 오늘
+  function overdueTransitPlan() {
+    const base = day('2026-10-04', { reasons: ['OUTING_OVERDUE', 'APPOINTMENT_DELAYED'], extra: { returnNow: true } });
+    const transit = {
+      ...base.outings[0],
+      id: '2026-10-04:P:outing-1',
+      departAt: '10:15',
+      returnBy: '10:15',
+      returnPlace: 'HOSPITAL',
+      deadlineReason: 'APPOINTMENT',
+      latestDepartureAt: '10:15',
+      slackMin: -38,
+      plannedReturnAt: '10:53',
+      stops: [],
+    };
+    const later = { ...base.outings[0], id: '2026-10-04:P:outing-2', departAt: '15:00', returnBy: '18:00', slackMin: 20, stops: [stop('2026-10-04', 5009, '15:20', '16:00')] };
+    return deepFreeze({
+      engineVersion: '2.0.0',
+      generatedAt: 'x',
+      lang: 'en',
+      days: { '2026-10-04': { ...base, outings: [transit, later], mealSlots: base.mealSlots.map((m) => ({ ...m, status: 'NOT_APPLICABLE', stopId: undefined })) } },
+      edits: {},
+    });
+  }
+
+  test('동의 철회 오늘 하루: 이미 출발한 정거장 0개 외출은 복귀 장소·마감·여유·id 와 함께 남아 시트가 그 병원을 찾는다', () => {
+    const stay = makeStay({
+      consent: { sensitive: null },
+      appointments: [{ id: 'A4', hospitalId: 'H1', type: 'VISIT', date: '2026-10-04', start: '10:40', source: 'USER' }],
+    });
+    const days = markConsentWithdrawnLocally({ tripPlan: overdueTransitPlan(), stay, dates: ['2026-10-04'], today: '2026-10-04', nowMin: 10 * 60 + 22 });
+    const t = days['2026-10-04'];
+    assert.equal(t.coverage, 'NEEDS_INPUT');
+    assert.equal(t.returnNow, true);
+    assert.ok(t.reasons.includes('OUTING_OVERDUE'), '즉시 복귀 원인은 남는다');
+    assert.equal(t.outings.length, 1, '출발하지 않은 15:00 외출은 빠진다');
+    const [kept] = t.outings;
+    assert.equal(kept.id, '2026-10-04:P:outing-1');
+    assert.deepEqual(kept.stops, []);
+    assert.equal(kept.returnPlace, 'HOSPITAL');
+    assert.equal(kept.returnBy, '10:15');
+    assert.equal(kept.slackMin, -38);
+    assert.equal(t.dayState, 'TOGETHER', '환자는 밖에 있다');
+    assert.equal(overdueOutingOf(t)?.id, kept.id, '시트가 여유가 음수인 외출을 찾는다');
+    assert.deepEqual(returnTargetOf({ day: t, stay, outing: overdueOutingOf(t) }).kind, 'HOSPITAL', '숙소가 아니라 병원을 가리킨다');
+  });
+
+  test('동의 철회 오늘 하루: 아직 출발하지 않은 정거장 0개 외출은 여전히 빠진다', () => {
+    const stay = makeStay({ consent: { sensitive: null }, periods: [] });
+    const days = markConsentWithdrawnLocally({ tripPlan: overdueTransitPlan(), stay, dates: ['2026-10-04'], today: '2026-10-04', nowMin: 10 * 60 });
+    assert.deepEqual(days['2026-10-04'].outings, []);
+    assert.equal(days['2026-10-04'].dayState, 'NO_TOURISM');
   });
 });
 
