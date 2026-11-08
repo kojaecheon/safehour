@@ -155,6 +155,25 @@ export const messages = {
     ja: '最後に保存した予定をそのまま表示しています。接続されたら再確認します。',
     zh: '当前显示的是最后保存的行程。联网后会再次检查。',
   },
+  // 관광공사 조회 실패 분류별 본문(components/trip/viewModel.js updateFailedBodyKey)
+  'today.updateFailedQuota': {
+    ko: '오늘 장소 데이터 제공처의 조회 한도에 닿았어요. 자정(한국 시각) 이후 다시 시도해 주세요. 저장된 일정은 그대로예요.',
+    en: 'The place data provider has reached today’s lookup limit. Please try again after midnight (Korea time). Your saved plan is unchanged.',
+    ja: '本日、場所データ提供元の照会上限に達しました。韓国時間の午前0時以降にもう一度お試しください。保存した予定はそのままです。',
+    zh: '今天地点数据提供方的查询次数已达上限。请在韩国时间午夜之后重试。已保存的行程保持不变。',
+  },
+  'today.updateFailedTemporary': {
+    ko: '장소 데이터를 잠시 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요. 저장된 일정은 그대로예요.',
+    en: 'We could not load place data just now. Please try again in a moment. Your saved plan is unchanged.',
+    ja: '場所データを一時的に読み込めませんでした。しばらくしてからもう一度お試しください。保存した予定はそのままです。',
+    zh: '暂时无法加载地点数据。请稍后重试。已保存的行程保持不变。',
+  },
+  'today.updateFailedConnection': {
+    ko: '장소 데이터 연결에 문제가 있어요. 운영자에게 알려 주세요. 저장된 일정은 그대로예요.',
+    en: 'There is a problem with the place data connection. Please let the operator know. Your saved plan is unchanged.',
+    ja: '場所データの接続に問題があります。運営者にお知らせください。保存した予定はそのままです。',
+    zh: '地点数据连接出现问题。请告知运营方。已保存的行程保持不变。',
+  },
   'today.syncing': { ko: '일정을 확인하는 중이에요…', en: 'Checking your plan…', ja: '予定を確認しています…', zh: '正在检查行程…' },
   'today.guardianResendTitle': {
     ko: '보호자에게 보낸 링크가 예전 일정이에요',

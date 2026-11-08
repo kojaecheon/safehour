@@ -346,7 +346,7 @@ export default function TodayPage() {
       <main className="page today-page is-basement">
         {trip.updateFailed && (
           <div className="ui-block today-sync-block">
-            <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />
+            <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />
           </div>
         )}
         {body}

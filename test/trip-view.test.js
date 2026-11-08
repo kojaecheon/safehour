@@ -38,8 +38,10 @@ import {
   timelineEntries,
   todayFocus,
   tripDateRows,
+  updateFailedBodyKey,
 } from '../components/trip/viewModel.js';
 import { buildMapLinks } from '../lib/maps.js';
+import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { planTrip } from '../src/engine/tripPlan.js';
 import { AIRPORT_TRAVEL, SET, at, byLodging, tripPool, tripStay } from './trip-fixtures.js';
 
@@ -852,5 +854,25 @@ describe('returnPlaceOf: 타임라인과 복귀 시트가 같은 돌아갈 곳�
     const { timeline, sheet } = both(o, day(), stay);
     assert.equal(sheet.kind, 'PLANNED');
     assert.deepEqual(timeline, { kind: 'HOSPITAL', name: null });
+  });
+});
+
+describe('updateFailedBodyKey: 일정 갱신 실패 안내 본문 (docs/contracts.md 일정 502 upstream)', () => {
+  test('분류마다 정해진 본문 키, 분류가 없거나 모르는 값이면 일반 문구', () => {
+    assert.equal(updateFailedBodyKey('QUOTA'), 'today.updateFailedQuota');
+    for (const u of ['NETWORK', 'UPSTREAM_ERROR', 'PARSE']) assert.equal(updateFailedBodyKey(u), 'today.updateFailedTemporary', u);
+    for (const u of ['AUTH', 'SELF_LIMIT']) assert.equal(updateFailedBodyKey(u), 'today.updateFailedConnection', u);
+    for (const u of [null, undefined, '', 'quota', 'UNKNOWN']) assert.equal(updateFailedBodyKey(u), 'today.updateFailedBody', String(u));
+  });
+
+  test('네 본문 모두 저장 일정이 그대로라는 것을 알리고 단정 표현을 쓰지 않는다', () => {
+    for (const key of ['today.updateFailedQuota', 'today.updateFailedTemporary', 'today.updateFailedConnection']) {
+      const entry = UI_TEXT[key];
+      assert.ok(entry, key);
+      assert.match(entry.ko, /저장된 일정은 그대로예요\.$/, key);
+      for (const lang of ['ko', 'en', 'ja', 'zh']) {
+        assert.ok(!/안전/.test(entry[lang]) && !/\bsafe\b/i.test(entry[lang]), `${key}.${lang}`);
+      }
+    }
   });
 });

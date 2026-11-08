@@ -43,6 +43,7 @@ function jsonResponse(status, payload) {
  * - links: Map<code, plan | () => plan> — /api/plan/link 응답
  * - offline = true → 네트워크 오류(TypeError)
  * - failPlan = n → 다음 n 번의 일정 요청을 502 로 실패
+ * - failPlanUpstream = 'QUOTA' 등 → 그 502 본문에 관광공사 실패 분류(upstream)를 싣는다
  */
 export function createFakeServer({ clock, pool = (query) => tripPool(query?.lang ?? 'en', 60), forecast = fakeForecast() } = {}) {
   const loader = fakeLoader(pool);
@@ -60,6 +61,7 @@ export function createFakeServer({ clock, pool = (query) => tripPool(query?.lang
     links: new Map(),
     offline: false,
     failPlan: 0,
+    failPlanUpstream: null,
     forecast,
     get planCalls() {
       return server.calls.filter((c) => c.path === '/api/itinerary/plan');
@@ -77,7 +79,12 @@ export function createFakeServer({ clock, pool = (query) => tripPool(query?.lang
       if (path === '/api/itinerary/plan') {
         if (server.failPlan > 0) {
           server.failPlan -= 1;
-          return jsonResponse(502, { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', message: 'x' });
+          return jsonResponse(502, {
+            ok: false,
+            errorCode: 'SAFEHOUR_EXTERNAL_API',
+            message: 'x',
+            ...(server.failPlanUpstream ? { upstream: server.failPlanUpstream } : {}),
+          });
         }
         return handlers.plan(request());
       }

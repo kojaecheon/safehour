@@ -11,11 +11,13 @@ import { buildStay, fireDemoEvent, gapBetween, kstDate, linkDemoPlan, openDemoTo
 /**
  * 다음 재계획을 실패시킨다: 일정 API 를 503 으로 막고, 다른 탭에서 체류를 바꾼 것처럼 storage 이벤트를 보낸다
  * (같은 탭의 localStorage 쓰기는 이벤트가 나지 않는다). 출국을 하루 늦춰 영향 날짜가 생기게 한다.
+ * status·body 로 실패 응답을 고른다(기본 503 `{ ok:false }`). onRequest 는 막힌 일정 요청마다 불린다.
  */
-async function failNextSync(page) {
-  await page.route('**/api/itinerary/plan', (route) =>
-    route.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' }),
-  );
+async function failNextSync(page, { status = 503, body = { ok: false }, onRequest = () => {} } = {}) {
+  await page.route('**/api/itinerary/plan', (route) => {
+    onRequest();
+    return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  });
   await page.evaluate(async (stay) => {
     const { accountKey } = await (await fetch('/api/auth/session', { cache: 'no-store' })).json();
     const key = `safehour.v2.${accountKey}.stay`;
@@ -72,6 +74,37 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
       .toEqual({ 'background-color': 'rgb(255, 244, 217)' });
     expect((await styles(alert.locator('.trip-notice-title'), ['font-weight']))['font-weight']).toBe('700');
     await expect(alert.getByRole('button', { name: '다시 시도' })).toBeVisible();
+  });
+
+  test('갱신 실패(제공처 조회 한도): 원인별 안내와 다시 시도, 저장 일정은 그대로 보인다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    let blocked = 0;
+    await failNextSync(page, {
+      status: 502,
+      body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'QUOTA' },
+      onRequest: () => {
+        blocked += 1;
+      },
+    });
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText(
+      '오늘 장소 데이터 제공처의 조회 한도에 닿았어요. 자정(한국 시각) 이후 다시 시도해 주세요. 저장된 일정은 그대로예요.',
+    );
+    await expect(alert).not.toContainText('연결되면 다시 확인해요');
+    await expect(alert).not.toContainText('안전');
+    // 마지막으로 저장한 일정(날짜·상태)이 그대로 보인다
+    await expect(page.locator('main.today-page > .today-status-block .state-banner')).toBeVisible();
+
+    const retry = alert.getByRole('button', { name: '다시 시도' });
+    await expect(retry).toBeVisible();
+    const before = blocked;
+    await retry.click();
+    // 다시 시도는 기존 갱신 경로로 일정 요청을 한 번 더 보낸다(여전히 막혀 있으니 안내도 그대로)
+    await expect.poll(() => blocked).toBeGreaterThan(before);
+    await expect(alert).toContainText('조회 한도에 닿았어요');
   });
 
   for (const confirmToday of [true, false]) {

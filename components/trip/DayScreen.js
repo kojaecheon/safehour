@@ -519,7 +519,7 @@ export default function DayScreen() {
 
         {trip.updateFailed && (
           <div className="ui-block">
-            <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />
+            <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />
           </div>
         )}
 

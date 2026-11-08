@@ -14,6 +14,7 @@
 //   canEditDay / stopEditable  편집 가능 여부 (docs/business-rules.md '사용자 편집')
 //   returnTargetOf / overdueOutingOf  복귀 시트의 돌아갈 곳과 여유가 음수인 외출 (마감 지남 설계서 4.2·4.3)
 //   returnNoteKeyOf    복귀 시트 맺음말 키, 숙소만 한국어 복귀 카드를 안내한다 (findings 11)
+//   updateFailedBodyKey 일정 갱신 실패 안내 본문 키, 관광공사 실패 분류(upstream)에 따라 고른다 (docs/contracts.md 일정 502)
 //
 // Next 밖(node --test)에서도 읽히도록 상대 경로만 쓴다. React·브라우저 API 를 쓰지 않는다.
 // 문구 키는 화면에서 쓰는 키를 그대로 적는다(test/i18n.test.js 가 키 모양 문자열로 사용 여부를 확인한다).
@@ -623,5 +624,30 @@ export function demoEventFor(type, day, nowMin) {
       return { type };
     default:
       return null;
+  }
+}
+
+/**
+ * 일정 갱신 실패 안내 본문 키. 서버가 502 에 실은 관광공사 실패 분류(lib/trip 의 lastUpstream)로 고른다.
+ * 원인을 단정하지 않고 '지금 할 수 있는 일'만 알린다. 분류가 없으면(오프라인·다른 오류) 예전 일반 문구다.
+ *   QUOTA                          제공처 하루 한도, 자정(한국 시각) 이후 다시
+ *   NETWORK · UPSTREAM_ERROR · PARSE  잠시 뒤 다시
+ *   AUTH · SELF_LIMIT              운영자에게 알림 (사용자가 기다려도 풀리지 않는 쪽)
+ * @param {string|null|undefined} upstream
+ * @returns {string}
+ */
+export function updateFailedBodyKey(upstream) {
+  switch (upstream) {
+    case 'QUOTA':
+      return 'today.updateFailedQuota';
+    case 'NETWORK':
+    case 'UPSTREAM_ERROR':
+    case 'PARSE':
+      return 'today.updateFailedTemporary';
+    case 'AUTH':
+    case 'SELF_LIMIT':
+      return 'today.updateFailedConnection';
+    default:
+      return 'today.updateFailedBody';
   }
 }
