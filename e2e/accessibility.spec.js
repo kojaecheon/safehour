@@ -114,7 +114,7 @@ test.describe('시나리오 10 — axe WCAG 2.1 AA 위반 0건', () => {
     await scan(page, null, '/trip/[date] 빠진 장소 펼침');
     const stop = stopsOf(tripPlan.days[date])[0];
     await scan(page, `/place/${stop.candidateId}`, '/place/[id]');
-    for (const path of ['/cards', '/emergency', '/more', '/settings', '/privacy', '/guardian']) await scan(page, path);
+    for (const path of ['/cards', '/emergency', '/more', '/help', '/settings', '/privacy', '/guardian']) await scan(page, path);
 
     // 동의 철회 시트
     await page.goto('/settings');

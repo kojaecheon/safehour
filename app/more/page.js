@@ -7,6 +7,7 @@
 // SEED ③층(설계서 6.2 11번): 회색 바탕 위 흰 블록 두 개(도구 · 정보), 목록 행 + 화살표.
 
 import { useLang } from '@/components/LanguageProvider.js';
+import InstallCallout from '@/components/pwa/InstallCallout.js';
 import { Icon, ListGroup, ListHeader, ListItem, TopBar } from '@/components/ui/index.js';
 
 /** 메뉴 묶음: 머리 문구 키와 항목(이름·설명 문구 키, 아이콘) */
@@ -25,7 +26,10 @@ const GROUPS = Object.freeze([
   {
     id: 'more-info',
     label: 'settings.moreGroupInfo',
-    items: [{ href: '/privacy', icon: 'lock', label: 'privacy.link', desc: 'settings.morePrivacyDesc' }],
+    items: [
+      { href: '/help', icon: 'info', label: 'help.header', desc: 'help.moreDesc' },
+      { href: '/privacy', icon: 'lock', label: 'privacy.link', desc: 'settings.morePrivacyDesc' },
+    ],
   },
 ]);
 
@@ -55,6 +59,7 @@ export default function MorePage() {
             </section>
           ))}
         </nav>
+        <InstallCallout />
       </main>
     </>
   );

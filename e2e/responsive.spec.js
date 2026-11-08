@@ -27,6 +27,7 @@ test.describe('시나리오 9 — 가로 스크롤 없음과 위치 요청 0건'
       '/cards',
       '/emergency',
       '/more',
+      '/help',
       '/settings',
       '/privacy',
       '/guardian',

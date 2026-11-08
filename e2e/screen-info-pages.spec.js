@@ -2,7 +2,7 @@
 // 색: --surface-alt rgb(243, 244, 245), --ink rgb(26, 28, 32), --emergency rgb(200, 16, 46),
 //     --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0)
 import { test, expect } from './fixtures.js';
-import { expectNoAxeViolations, gapBetween, kstDate, linkDemoPlan, setClock, startTrip, styles } from './helpers.js';
+import { expectNoAxeViolations, expectNoHorizontalScroll, expectTouchTargets, gapBetween, kstDate, linkDemoPlan, setClock, startTrip, styles } from './helpers.js';
 
 test.describe('③층 개인정보 고지', () => {
   test('흰 바탕 한 장: 카드 없음, 소개는 info 아이콘 회색 Callout, 고지 글은 16/24, 항목은 띠 없는 점 목록', async ({ page }) => {
@@ -23,6 +23,54 @@ test.describe('③층 개인정보 고지', () => {
     // 내 정보 지우기 버튼은 본문과 같은 왼쪽 선에서 시작한다(공용 .clear-session 의 4px 여백을 쓰지 않는다)
     const clear = main.locator('.privacy-clear .clear-session');
     expect(await styles(clear, ['padding-left', 'padding-right'])).toEqual({ 'padding-left': '0px', 'padding-right': '0px' });
+  });
+});
+
+test.describe('도움말', () => {
+  test('다섯 구역 중 문의를 뺀 네 구역 제목이 있고, 문의는 환경변수가 없으면 나오지 않는다', async ({ page }) => {
+    await page.goto('/help');
+    await expect(page.getByRole('heading', { level: 1, name: '도움말' })).toBeVisible();
+    for (const name of ['이 앱이 하는 일과 하지 않는 일', '홈 화면에 추가하기', '알림이 오지 않을 때', '자주 묻는 질문']) {
+      await expect(page.getByRole('heading', { level: 2, name })).toBeVisible();
+    }
+    await expect(page.getByRole('heading', { name: '문의' })).toHaveCount(0);
+    // 앱이 하지 않는 일: 안전하다는 단정이 없고, 의료 판단·위치·병원 추천을 하지 않는다고 밝힌다
+    const about = page.locator('#help-about-h').locator('xpath=ancestor::section');
+    await expect(about).toContainText('"조건에 맞는다"는 "안전하다"는 뜻이 아니에요');
+    await expect(page.locator('main')).not.toContainText('안전합니다');
+    // 설치 구역은 #install 로 바로 닿는다
+    await expect(page.locator('section#install')).toHaveCount(1);
+    await expect(page.getByRole('heading', { level: 3 })).toHaveCount(2);
+  });
+
+  test('자주 묻는 질문 7개는 눌러서 열고, 질문 줄은 44px 이상, 본문은 16/24', async ({ page }) => {
+    await page.goto('/help');
+    const items = page.locator('.help-faq-item');
+    await expect(items).toHaveCount(7);
+    const first = items.first();
+    await first.locator('summary').click();
+    await expect(first).toHaveAttribute('open', '');
+    expect(await styles(first.locator('.help-faq-a'), ['font-size', 'line-height'])).toEqual({ 'font-size': '16px', 'line-height': '24px' });
+    expect((await first.locator('summary').boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expectTouchTargets(page, '/help');
+  });
+
+  test('320px 가로 스크롤이 없고, 질문을 모두 연 상태에서도 접근성 위반이 0건이다', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/help');
+    const summaries = page.locator('.help-faq-item > summary');
+    for (let i = 0; i < (await summaries.count()); i += 1) await summaries.nth(i).click();
+    await expect(page.locator('.help-faq-item[open]')).toHaveCount(7);
+    await expectNoHorizontalScroll(page, '/help @320px');
+    await expectNoAxeViolations(page, '/help');
+  });
+
+  test('더보기의 도움말 행으로 들어오고, 상단 바 뒤로 가기는 더보기다', async ({ page }) => {
+    await startTrip(page, {}, { path: '/more' });
+    await page.locator('main.more-page').getByRole('link', { name: /도움말/ }).click();
+    await expect(page).toHaveURL(/\/help$/);
+    await expect(page.getByRole('heading', { level: 1, name: '도움말' })).toBeVisible();
+    await expect(page.locator('.top-bar a[href="/more"]')).toHaveCount(1);
   });
 });
 
