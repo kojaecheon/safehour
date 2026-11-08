@@ -265,13 +265,15 @@ function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons,
     // 되살린 외출이 병원에서 끝나면 그 병원 일정 블록은 fresh 에 있다(hospitalTargetId 가 복귀 마감과 같은 시작으로 찾는다)
     blocks: [...(prevDay?.blocks ?? []), ...(adopt ? fresh.blocks : []), ...planned.blocks],
   };
+  // repairDay 를 두 번 돌릴 수 있어(보호자 다시 채우기) 버린 첫 결과의 기록이 섞이지 않게 새 기록에 돌리고 끝에서 합친다
   const run = (guardianOutings) =>
-    repairDay({ context, dayRef, outings: [...keptP, ...futureP], guardianOutings, nowMin, emptyReasons, log: adopt ? carryLog(log) : log });
+    repairDay({ context, dayRef, outings: [...keptP, ...futureP], guardianOutings, nowMin, emptyReasons, log: carryLog(log) });
   let repaired = run([...keptG, ...futureG]);
-  if (adopt && startMin !== null && emptyReasons.length === 0) {
-    // 보호자 외출을 다시 채운다: 남은 시간 일정(planned)은 하루 정거장 한도를 모르고 짜서 환자 외출이 뒤에서 잘리면
-    // 보호자 몫 장소가 비어 버린다. 원인 없는 하루(fresh)의 보호자 외출 중 지금 이후에 출발하고, 고친 하루의 장소·보호자
-    // 외출과 겹치지 않는 것을 더해 한 번 더 고친다(repairDay 가 환자 일정에 맞춰 다시 검증한다)
+  if (startMin !== null && emptyReasons.length === 0) {
+    // 보호자 외출을 다시 채운다(해제 흐름과 해제가 아닌 전체 재계획 모두, findings 9·14): 남은 시간 일정(planned)은 하루
+    // 정거장 한도를 모르고 짜서 환자 외출이 뒤에서 잘리면 보호자 몫 장소가 비어 버린다. 지금 입력으로 만든 전체 하루(fresh)의
+    // 보호자 외출 중 지금 이후에 출발하고, 고친 하루의 장소·보호자 외출과 겹치지 않는 것을 더해 한 번 더 고친다(repairDay 가
+    // 하루 남은 한도(perDay)와 환자 일정(patientBusy)에 맞춰 다시 검증한다). 이미 출발한 외출은 옮기지 않는다
     const placed = new Set([...repaired.outings, ...repaired.guardianOutings].flatMap((o) => o.stops.map((s) => String(s.contentId))));
     const span = (o) => [toMinutes(o.departAt), occupancyEnd(o)];
     const extra = fresh.guardianOutings.filter(
@@ -282,7 +284,7 @@ function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons,
     );
     if (extra.length > 0) repaired = run([...keptG, ...futureG, ...extra]);
   }
-  if (adopt) mergeLog(log, repaired.log);
+  mergeLog(log, repaired.log);
   return { ...repaired, planned };
 }
 

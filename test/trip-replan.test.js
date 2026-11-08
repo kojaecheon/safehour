@@ -9,7 +9,7 @@ import { createFallbackEstimator } from '../src/adapters/travelTime.js';
 import { REASON, STATE } from '../src/domain/states.js';
 import { SilentReplanError, computeDayDelta } from '../src/engine/dayDelta.js';
 import { foldDemoEvents } from '../src/engine/tripEvents.js';
-import { applyImmediateReturn, planTrip } from '../src/engine/tripPlan.js';
+import { applyImmediateReturn, planTrip, regenerate } from '../src/engine/tripPlan.js';
 import { CLINIC_POINT } from './day-plan-fixtures.js';
 import { hospitalPeriod } from './stay-fixtures.js';
 import {
@@ -558,5 +558,60 @@ describe('오늘 재계획 성질 — 시각·사건 조합 스윕 (재계획 �
         assert.deepEqual(r2.days, r1.days, `${tag} 멱등`);
       }
     }
+  });
+});
+
+// findings 14: 해제가 아닌 전체 재계획(다시 만들기 forceFresh, 고칠 외출이 없는 needsFresh)도 해제 흐름처럼 보호자 외출을
+// 다시 채운다. 남은 시간 일정은 하루 정거장 한도를 모르고 짜서 환자 외출이 뒤에서 잘리면 보호자 몫이 비던 문제
+describe('해제가 아닌 전체 재계획도 하루 정거장 한도 안에서 보호자 외출을 지킨다 (findings 14)', () => {
+  const withVisit = tripStay({}, {
+    pace: 'NORMAL',
+    appointments: [
+      { id: 'A-PROC', hospitalId: 'H1', type: 'PROCEDURE', date: '2026-10-04', start: '09:00', source: 'USER' },
+      { id: 'A-VISIT', hospitalId: 'H1', type: 'VISIT', date: TODAY, start: '15:00', source: 'USER' },
+    ],
+  });
+  const base = plan(withVisit);
+  const baseDay = base.days[TODAY];
+  const used = Object.entries(base.days)
+    .filter(([date]) => date !== TODAY)
+    .flatMap(([, d]) => contentIdsOf(d));
+  // 일정에 없는 장소의 휴무: 오늘 일정에 영향이 없는 사건
+  const harmless = [{ type: 'CLOSURE', closedIds: ['NOT-IN-PLAN'] }];
+  const evening = (d) => d.guardianOutings.filter((g) => mins(g.departAt) > mins('15:00'));
+  const stopCount = (list) => list.reduce((n, o) => n + o.stops.length, 0);
+
+  test('전제: 처음 일정에 보호자 저녁 외출이 있다', () => {
+    assert.ok(evening(baseDay).length > 0);
+  });
+
+  test('13:00 다시 만들기(사건은 영향 없는 휴무): 환자 일정은 그대로이고 보호자 저녁 외출이 처음 일정대로 남는다', () => {
+    const day = regenerate({
+      stay: withVisit,
+      candidatesByLodging: byLodging(tripPool('en')),
+      airportTravel: AIRPORT_TRAVEL,
+      lang: 'en',
+      now: at(TODAY, '13:00'),
+      previous: base.days,
+      usedContentIds: used,
+      events: harmless,
+      scope: 'DAY',
+      date: TODAY,
+    }).days[TODAY];
+    assert.deepEqual(day.outings, baseDay.outings, '환자 일정은 바뀌지 않는다');
+    assert.deepEqual(evening(day), evening(baseDay), '보호자 저녁 외출은 처음 일정 그대로다');
+    assert.ok(stopCount(day.guardianOutings) <= stopCount(baseDay.guardianOutings), '보호자 하루 정거장 수가 처음 일정을 넘지 않는다');
+  });
+
+  // 이 경로는 이어 받는 환자 외출이 없어(needsFresh 는 환자 외출이 없는 하루) 남은 시간 일정이 한도를 다 쓴다. 다시 채우기가
+  // 들어가도 이미 출발한 보호자 외출과 지금 이후 보호자 외출이 그대로인지 지킨다
+  test('13:00 고칠 외출이 없는 하루를 새로 짤 때(needsFresh): 출발한 보호자 외출은 그대로이고 보호자 저녁 외출이 있다', () => {
+    const gOnly = { ...base.days, [TODAY]: { ...baseDay, outings: [], guardianOutings: baseDay.guardianOutings.slice(0, 1), mealSlots: [] } };
+    const day = plan(withVisit, { dates: [TODAY], previous: gOnly, usedContentIds: used, now: at(TODAY, '13:00'), events: harmless }).days[TODAY];
+    assert.ok(day.outings.length > 0, '전제: 환자 외출을 새로 짰다');
+    assert.deepEqual(day.guardianOutings[0], baseDay.guardianOutings[0], '이미 출발한 보호자 외출은 그대로다');
+    assert.ok(evening(day).length > 0, '보호자 저녁 외출이 있다');
+    const placed = stopsOf(day).map((x) => x.contentId);
+    assert.equal(new Set(placed).size, placed.length, '같은 장소를 두 번 쓰지 않는다');
   });
 });
