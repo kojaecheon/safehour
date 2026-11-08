@@ -229,8 +229,9 @@ const needsFresh = (day, fresh) => !hasPatient(day) && (!hasGuardian(day) || has
 function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons, log, adopt = false }) {
   const departed = (o) => nowMin !== null && toMinutes(o.departAt) <= nowMin;
   // 원인이 풀렸을 때(adopt): 이미 출발한 외출이 원인 없는 하루(fresh)의 같은 외출이면(출발 시각이 같고 시작된 정거장이
-  // 그 앞부분) 그 외출의 남은 정거장을 되살린다. 시작된 정거장은 그대로이고 남은 정거장은 repairDay 가 다시 검증한다
-  const restore = (o, list) => {
+  // 그 앞부분) 그 외출의 남은 정거장을 되살린다. 시작된 정거장은 그대로이고 남은 정거장은 repairDay 가 다시 검증한다.
+  // 같은 외출이 없고 마감이 당겨진 환자 외출(remeasure)이면 '끝난 외출'이 아니라 '다시 잴 외출'로 본다
+  const restore = (o, list, role) => {
     if (!adopt) return o;
     const started = o.stops.filter((x) => toMinutes(x.arriveAt) <= nowMin);
     const same = list.find(
@@ -239,14 +240,16 @@ function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons,
         f.returnPlace === o.returnPlace &&
         started.every((x, i) => f.stops[i]?.id === x.id && f.stops[i].arriveAt === x.arriveAt && f.stops[i].leaveAt === x.leaveAt),
     );
-    return same ? { ...same, id: o.id, stops: [...started, ...same.stops.slice(started.length)] } : o;
+    if (same) return { ...same, id: o.id, stops: [...started, ...same.stops.slice(started.length)] };
+    return role === 'P' && pulledDeadline(o) ? remeasure(context, o, started, list, nowMin) : o;
   };
-  const keptP = (prevDay?.outings ?? []).filter(departed).map((o) => restore(o, fresh.outings));
-  const keptG = (prevDay?.guardianOutings ?? []).filter(departed).map((o) => restore(o, fresh.guardianOutings));
+  const keptP = (prevDay?.outings ?? []).filter(departed).map((o) => restore(o, fresh.outings, 'P'));
+  const keptG = (prevDay?.guardianOutings ?? []).filter(departed).map((o) => restore(o, fresh.guardianOutings, 'G'));
   const kept = [...keptP, ...keptG];
   let planned = fresh;
+  let startMin = null;
   if (nowMin !== null) {
-    const startMin = Math.max(nowMin, ...kept.map(occupancyEnd));
+    startMin = Math.max(nowMin, ...kept.map(occupancyEnd));
     const served = keptP.flatMap((o) => o.stops.map((s) => (s.isMeal ? mealSlotOf(prevDay, s) : null))).filter(Boolean);
     planned = freshFrom(context, common, startMin, served, kept.flatMap((o) => o.stops.map((s) => String(s.contentId))));
   }
@@ -262,8 +265,80 @@ function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons,
     // 되살린 외출이 병원에서 끝나면 그 병원 일정 블록은 fresh 에 있다(hospitalTargetId 가 복귀 마감과 같은 시작으로 찾는다)
     blocks: [...(prevDay?.blocks ?? []), ...(adopt ? fresh.blocks : []), ...planned.blocks],
   };
-  const repaired = repairDay({ context, dayRef, outings: [...keptP, ...futureP], guardianOutings: [...keptG, ...futureG], nowMin, emptyReasons, log });
+  const run = (guardianOutings) =>
+    repairDay({ context, dayRef, outings: [...keptP, ...futureP], guardianOutings, nowMin, emptyReasons, log: adopt ? carryLog(log) : log });
+  let repaired = run([...keptG, ...futureG]);
+  if (adopt && startMin !== null && emptyReasons.length === 0) {
+    // 보호자 외출을 다시 채운다: 남은 시간 일정(planned)은 하루 정거장 한도를 모르고 짜서 환자 외출이 뒤에서 잘리면
+    // 보호자 몫 장소가 비어 버린다. 원인 없는 하루(fresh)의 보호자 외출 중 지금 이후에 출발하고, 고친 하루의 장소·보호자
+    // 외출과 겹치지 않는 것을 더해 한 번 더 고친다(repairDay 가 환자 일정에 맞춰 다시 검증한다)
+    const placed = new Set([...repaired.outings, ...repaired.guardianOutings].flatMap((o) => o.stops.map((s) => String(s.contentId))));
+    const span = (o) => [toMinutes(o.departAt), occupancyEnd(o)];
+    const extra = fresh.guardianOutings.filter(
+      (g) =>
+        toMinutes(g.departAt) >= startMin &&
+        g.stops.every((s) => !placed.has(String(s.contentId))) &&
+        repaired.guardianOutings.every((r) => span(g)[1] <= span(r)[0] || span(r)[1] <= span(g)[0]),
+    );
+    if (extra.length > 0) repaired = run([...keptG, ...futureG, ...extra]);
+  }
+  if (adopt) mergeLog(log, repaired.log);
   return { ...repaired, planned };
+}
+
+/** 사유·사용자 편집·비운 칸만 이어 받은 새 기록. 해제 흐름은 repairDay 를 두 번 돌릴 수 있어 버린 첫 결과의 기록이 섞이지 않게 쓴다 */
+function carryLog(from) {
+  const to = newRepairLog();
+  from.reasons.forEach((r) => to.reasons.add(r));
+  from.userDriven.forEach((id) => to.userDriven.add(id));
+  from.clearedSlots.forEach((x) => to.clearedSlots.add(x));
+  return to;
+}
+
+function mergeLog(to, from) {
+  from.reasons.forEach((r) => to.reasons.add(r));
+  from.userDriven.forEach((id) => to.userDriven.add(id));
+  from.clearedSlots.forEach((x) => to.clearedSlots.add(x));
+  to.replacements.push(...from.replacements);
+  from.slotReasons.forEach((v, k) => to.slotReasons.set(k, v));
+}
+
+/**
+ * 마감이 복귀 도착보다 이른 외출: overdueSafe 가 마감을 출발·그때 시각으로 당긴 외출(정거장에 아직 머무는 중이었거나
+ * 이동 중에 정거장을 모두 비움)이다. 여유는 음수다.
+ */
+function pulledDeadline(o) {
+  return o.slackMin < 0 && toMinutes(o.returnBy) < toMinutes(o.plannedReturnAt ?? o.returnBy);
+}
+
+/**
+ * 해제할 때 마감이 당겨진 환자 외출을 다시 잰다 (findings 9).
+ * 시작된 정거장은 그대로 두고, 출발 시각이 든 지금 창의 마감(heldSlack 과 같은 patientDeadlineAt)으로 복귀 계산을
+ * 다시 한다. 아직 밖에 있으면(다시 잰 복귀 도착 전) 원인 없는 하루(fresh)에서 같은 정거장 id 를 든 외출을 찾아 그 뒤
+ * 정거장 중 지금 뒤에 도착하는 것을 되살린다(시각은 repairDay 가 다시 맞춘다). 출발 시각은 그대로다.
+ * 출발 시각을 둘 창이 없으면 그대로 둔다.
+ */
+function remeasure(context, o, started, list, nowMin) {
+  const at = context.patientAllowed ? patientDeadlineAt(context, toMinutes(o.departAt), o.returnPlace) : null;
+  if (!at) return o;
+  const original = new Map(o.stops.map((s) => [String(s.contentId), s]));
+  const exact = new Set(started.map((s) => String(s.contentId)));
+  const measured = assembleOuting(manualEvaluation(context, 'P', o, started, at.returnPoint), outingMeta(context, 'P', { id: o.id, deadline: at }), {
+    original,
+    exact,
+  });
+  if (nowMin >= toMinutes(measured.plannedReturnAt ?? measured.returnBy)) return measured;
+  const ids = started.map((s) => s.id);
+  const same = list.find((f) => {
+    if (f.returnPlace !== o.returnPlace) return false;
+    if (ids.length === 0) return f.departAt === o.departAt;
+    const at0 = f.stops.findIndex((s) => s.id === ids[0]);
+    return at0 >= 0 && ids.every((id, i) => f.stops[at0 + i]?.id === id);
+  });
+  if (!same) return measured;
+  const from = ids.length === 0 ? 0 : same.stops.findIndex((s) => s.id === ids[0]) + ids.length;
+  const rest = same.stops.slice(from).filter((s) => toMinutes(s.arriveAt) > nowMin);
+  return rest.length > 0 ? { ...measured, stops: [...measured.stops, ...rest] } : measured;
 }
 
 /**
@@ -384,13 +459,7 @@ function planDate({ stay, date, clock, prevDay, dayEdits, usedContentIds, fold, 
   };
   const markersFor = (lg) =>
     Object.keys(markerActive).filter((r) => markerActive[r] && (lg.reasons.has(r) || (prevDay?.reasons ?? []).includes(r)));
-  const carry = (from) => {
-    const to = newRepairLog();
-    from.reasons.forEach((r) => to.reasons.add(r));
-    from.userDriven.forEach((id) => to.userDriven.add(id));
-    from.clearedSlots.forEach((x) => to.clearedSlots.add(x));
-    return to;
-  };
+  const carry = carryLog;
 
   /** 즉시 복귀 원인(causes)으로 하루를 만든다 */
   const attempt = (causes) => {
