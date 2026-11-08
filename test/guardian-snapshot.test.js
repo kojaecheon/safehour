@@ -8,7 +8,9 @@ import {
   GUARDIAN_ERROR,
   GUARDIAN_SNAPSHOT_VERSION,
   HOSPITAL_RETURN_LABEL,
+  GUARDIAN_WINDOW_DAYS,
   buildGuardianSnapshot,
+  guardianCoverage,
   isSnapshotExpired,
   normalizeGuardianSnapshot,
 } from '../src/guardian/index.js';
@@ -69,30 +71,55 @@ describe('스냅샷 모양 (spec 5.4)', () => {
     assert.throws(() => build({ lang: 'fr' }), TypeError);
   });
 
-  test('입국일에 만들면 체류 날짜(입국일~출국일)를 날짜 순으로 모두 담는다', () => {
+  test('입국일에 만들면 입국일부터 7일을 날짜 순으로 담는다. 7박 체류의 출국일(8일째)은 범위 밖이다', () => {
     const s = build();
+    assert.equal(GUARDIAN_WINDOW_DAYS, 7);
     assert.deepEqual(
       s.days.map((d) => d.date),
-      ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'],
+      ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07'],
     );
     assert.equal(day(s, '2026-09-20'), undefined, '체류 밖 날짜는 담지 않는다');
+    assert.equal(day(s, '2026-10-08'), undefined, '7일 범위 밖 날짜는 담지 않는다');
+    assert.deepEqual(guardianCoverage(s), { from: '2026-10-01', to: '2026-10-07', more: true });
     for (const d of s.days) {
       assert.deepEqual(Object.keys(d).sort(), ['date', 'escortRequired', 'guardianOutings', 'guardianSoloAllowed', 'patientReturn']);
     }
   });
 
-  test('만든 날(KST)부터 출국일까지만 담는다 — 지난 날은 담지 않는다', () => {
+  test('7일 범위가 출국일을 넘으면 출국일에서 멈춘다. 지난 날은 담지 않는다', () => {
     const dates = (now) => build({ now }).days.map((d) => d.date);
     assert.deepEqual(dates('2026-10-04T08:00:00+09:00'), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
     assert.deepEqual(dates('2026-10-04T23:59:00+09:00'), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
     // UTC 로는 10-03 이지만 KST 로는 10-04 00:30 이다
     assert.deepEqual(dates('2026-10-03T15:30:00Z'), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
     assert.deepEqual(dates('2026-10-08T12:00:00+09:00'), ['2026-10-08']);
+    assert.deepEqual(guardianCoverage(build({ now: '2026-10-04T08:00:00+09:00' })), { from: '2026-10-04', to: '2026-10-08', more: false });
   });
 
-  test('입국 전에 만들면 모든 체류 날짜, 출국일이 지나서 만들면 날짜가 없다', () => {
-    assert.equal(build({ now: '2026-09-25T10:00:00+09:00' }).days.length, 8);
+  test('범위 시작은 KST 날짜로 정한다. UTC 날짜가 달라도 KST 자정을 기준으로 바뀐다', () => {
+    const first = (now) => build({ now }).days.map((d) => d.date);
+    // UTC 09-30 15:30 = KST 10-01 00:30 (입국일): 10-01~10-07
+    assert.deepEqual(first('2026-09-30T15:30:00Z'), ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07']);
+    // UTC 10-01 14:59 = KST 10-01 23:59: 아직 10-01 부터
+    assert.equal(first('2026-10-01T14:59:00Z')[0], '2026-10-01');
+    // UTC 10-01 15:00 = KST 10-02 00:00: 10-02~10-08 (출국일까지)
+    assert.deepEqual(first('2026-10-01T15:00:00Z'), ['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08']);
+  });
+
+  test('3박 체류는 4일(입국일~출국일)을 모두 담는다', () => {
+    const stay = makeGuardianStay({ departure: { date: '2026-10-04', time: '18:00', airport: 'ICN' } });
+    const s = buildGuardianSnapshot({ stay, tripPlan: makeTripPlan(), now: NOW });
+    assert.deepEqual(s.days.map((d) => d.date), ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04']);
+    assert.deepEqual(guardianCoverage(s), { from: '2026-10-01', to: '2026-10-04', more: false });
+  });
+
+  test('입국 전에 만들면 입국일부터 7일을 담고(며칠 전이든 같다), 출국일이 지나서 만들면 날짜가 없다', () => {
+    const fromArrival = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07'];
+    assert.deepEqual(build({ now: '2026-09-28T10:00:00+09:00' }).days.map((d) => d.date), fromArrival);
+    assert.deepEqual(build({ now: '2026-09-01T10:00:00+09:00' }).days.map((d) => d.date), fromArrival);
+    assert.deepEqual(guardianCoverage(build({ now: '2026-09-01T10:00:00+09:00' })), { from: '2026-10-01', to: '2026-10-07', more: true });
     assert.deepEqual(build({ now: '2026-10-09T10:00:00+09:00' }).days, []);
+    assert.equal(guardianCoverage(build({ now: '2026-10-09T10:00:00+09:00' })), null);
   });
 
   test('체류·일정이 없거나 형식이 틀리면 TypeError', () => {
@@ -290,8 +317,9 @@ describe('동행 필요 · 보호자 단독 외출 가능 (spec 4.7 보호자 �
 
   test('조건을 모르는 날(NEEDS_INPUT, 일정 없음)은 가장 엄격한 값이다 — 모르는 것을 허용으로 바꾸지 않는다', () => {
     const s = build();
-    for (const date of ['2026-10-02', '2026-10-03', '2026-10-07', '2026-10-08']) {
-      const d = day(s, date);
+    const late = build({ now: '2026-10-04T08:00:00+09:00' });
+    for (const [snap, date] of [[s, '2026-10-02'], [s, '2026-10-03'], [s, '2026-10-07'], [late, '2026-10-08']]) {
+      const d = day(snap, date);
       assert.equal(d.escortRequired, true, date);
       assert.equal(d.guardianSoloAllowed, false, date);
       assert.deepEqual(d.patientReturn, [], date);
@@ -420,12 +448,25 @@ describe('스냅샷 정규화 (암호화 전·복호화 후 허용 목록 재적
   });
 
   test('만든 날(KST)보다 이른 날짜는 정규화에서도 버린다', () => {
-    const s = build();
+    const s = build({ now: '2026-09-30T08:00:00+09:00' });
     s.createdAt = '2026-10-04T08:00:00+09:00';
-    assert.deepEqual(
-      normalizeGuardianSnapshot(s).days.map((d) => d.date),
-      ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08'],
-    );
+    assert.deepEqual(normalizeGuardianSnapshot(s).days.map((d) => d.date), ['2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07']);
+  });
+
+  test('입국 전에 만든 사본도 정규화는 스냅샷 자신의 날짜로 시작을 정해 7일을 넘기지 않는다', () => {
+    const s = build({ now: '2026-09-20T10:00:00+09:00' });
+    assert.equal(s.days.length, 7);
+    assert.deepEqual(normalizeGuardianSnapshot(s), s, '만든 스냅샷은 정규화해도 그대로다');
+    s.days.push({ ...s.days[1], date: '2026-10-08' });
+    assert.equal(normalizeGuardianSnapshot(s).days.at(-1).date, '2026-10-07');
+  });
+
+  test('만든 날부터 7일 뒤의 날짜는 정규화에서도 버린다. 손으로 늘린 사본도 범위를 넘지 않는다', () => {
+    const s = build();
+    s.days.push({ ...s.days[1], date: '2026-10-08' }, { ...s.days[1], date: '2026-11-30' });
+    const dates = normalizeGuardianSnapshot(s).days.map((d) => d.date);
+    assert.equal(dates.at(-1), '2026-10-07');
+    assert.ok(!dates.includes('2026-10-08') && !dates.includes('2026-11-30'));
   });
 
   test('동행 필요·단독 외출 값이 불리언이 아니면 엄격한 쪽으로 읽는다', () => {

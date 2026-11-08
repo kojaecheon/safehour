@@ -69,6 +69,7 @@ const EXPECTED_NAMESPACES = [
   'notifications',
   'errors',
   'aiIntro',
+  'help',
 ];
 
 /** 고지 본문의 모든 4개 언어 쌍 */
@@ -329,7 +330,7 @@ describe('규칙 43 — 화면에 보이는 안전 문구', () => {
 });
 
 describe('이름공간 등록', () => {
-  test('15개 이름공간이 모두 미리 만들어져 등록돼 있다', () => {
+  test('16개 이름공간이 모두 미리 만들어져 등록돼 있다', () => {
     assert.deepEqual([...NAMESPACE_NAMES].sort(), [...EXPECTED_NAMESPACES].sort());
     assert.deepEqual(Object.keys(NAMESPACES).sort(), [...EXPECTED_NAMESPACES].sort());
     for (const name of EXPECTED_NAMESPACES) {

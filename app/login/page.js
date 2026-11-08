@@ -8,7 +8,9 @@
 //     이것을 화면에 명시해 사용자가 오해하지 않게 한다.
 //   - 이름·이메일·프로필을 받지 않는다는 사실을 CTA 앞에 둔다.
 //   - 로그인은 기기 저장을 계정별로 나누는 데만 쓴다(spec 4.18–4.19). 서버에 체류를 저장하지 않는다.
-//   - 자격증명이 없는 공급자는 숨기지 않고 "준비 중" 으로 보여준다 — 사라진 버튼은 오히려 혼란스럽다.
+//   - 자격증명이 없는 공급자는 보여 주지 않는다(운영자 결정 2026-11-08). '준비 중' 버튼은 첫 사용자를 멈춰 세웠다.
+//     공급자 사용 가능 여부는 /api/auth/session 의 auth.providers[].configured 가 정한다(인증 흐름은 그대로).
+//     켜진 공급자가 없고 데모만 되면 데모 버튼이 주 버튼이 된다.
 //   - 기본 흐름은 로그인 → 체류 설정(/onboarding)이다(spec 3.2). returnTo 는 같은 출처 경로만 받는다.
 
 import { Suspense, useEffect, useState } from 'react';
@@ -34,30 +36,11 @@ const ERROR_KEY = {
 /** 로그인 뒤 기본 목적지 — 체류 설정 */
 const DEFAULT_RETURN = '/onboarding';
 
-/**
- * 자격증명이 없는 공급자는 **버튼**으로 렌더한다.
- * href 없는 `<a>` 는 link 롤을 잃어 보조기술에 노출되지 않는다 — 사라진 것과 같다.
- * 버튼으로 두면 초점을 받고 "사용 안 함" 으로 읽힌다.
- */
-function ProviderButton({ className, label, notConfiguredLabel, configured, href }) {
-  const content = (
-    <>
-      <span>{label}</span>
-      {!configured && <span className="badge">{notConfiguredLabel}</span>}
-    </>
-  );
-
-  if (!configured) {
-    return (
-      <button type="button" className={`btn ${className}`} aria-disabled="true" onClick={(e) => e.preventDefault()}>
-        {content}
-      </button>
-    );
-  }
-  // API 경로로 전체 이동한다(공급자로 넘어가는 리디렉션) — next/link 를 쓰지 않는다
+/** 켜진 공급자 버튼. API 경로로 전체 이동한다(공급자로 넘어가는 리디렉션): next/link 를 쓰지 않는다 */
+function ProviderButton({ className, label, href }) {
   return (
     <a className={`btn ${className}`} href={href}>
-      {content}
+      <span>{label}</span>
     </a>
   );
 }
@@ -87,6 +70,9 @@ function LoginScreen() {
   }, []);
 
   const providerState = (id) => auth?.auth?.providers?.find((p) => p.id === id)?.configured ?? false;
+  const anyProvider = providerState('google') || providerState('kakao');
+  const demoLogin = auth?.auth?.demoLogin === true;
+  const demoOnly = demoLogin && !anyProvider;
 
   const href = (provider) => `/api/auth/login?provider=${provider}&returnTo=${encodeURIComponent(returnTo)}`;
 
@@ -145,31 +131,25 @@ function LoginScreen() {
               {t('login.methodsTitle')}
             </h2>
             <div className="onboarding-stack">
-              {/* 환자의 주 경로는 Google 이다 — 카카오는 한국 서비스라 외국인 환자에게
-                  계정이 없을 가능성이 높다. 순서를 바꾸지 않는다 (ADR-0004). */}
-              <ProviderButton
-                className="btn-google"
-                label={t('login.google')}
-                notConfiguredLabel={t('login.notConfigured')}
-                configured={providerState('google')}
-                href={href('google')}
-              />
-              <ProviderButton
-                className="btn-kakao"
-                label={t('login.kakao')}
-                notConfiguredLabel={t('login.notConfigured')}
-                configured={providerState('kakao')}
-                href={href('kakao')}
-              />
-              {auth?.auth?.demoLogin && (
-                // 데모 설명은 데모 버튼에 붙는다(8px) — 목록 간격(12px)과 나눠 어느 버튼의 설명인지 보이게
+              {/* 환자의 주 경로는 Google 이다. 카카오는 한국 서비스라 외국인 환자에게
+                  계정이 없을 가능성이 높다. 순서를 바꾸지 않는다 (ADR-0004). 켜지지 않은 공급자는 그리지 않는다 */}
+              {providerState('google') && (
+                <ProviderButton className="btn-google" label={t('login.google')} href={href('google')} />
+              )}
+              {providerState('kakao') && (
+                <ProviderButton className="btn-kakao" label={t('login.kakao')} href={href('kakao')} />
+              )}
+              {demoLogin && (
+                // 데모 설명은 데모 버튼에 붙는다(8px): 목록 간격(12px)과 나눠 어느 버튼의 설명인지 보이게.
+                // 켜진 공급자가 없으면 데모가 유일한 길이라 주 버튼(코발트)으로 둔다
                 <div className="onboarding-login-demo">
-                  <a className="btn btn-secondary" href={href('demo')}>
+                  <a className={demoOnly ? 'btn' : 'btn btn-secondary'} href={href('demo')}>
                     {t('login.demo')}
                   </a>
                   <p className="onboarding-hint">{t('login.demoNote')}</p>
                 </div>
               )}
+              {!demoLogin && !anyProvider && <p className="onboarding-note">{t('login.noMethods')}</p>}
             </div>
           </section>
         )}

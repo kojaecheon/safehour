@@ -308,8 +308,10 @@ describe('POST /api/itinerary/plan — 200', () => {
     const res = await planPost(postJson('/api/itinerary/plan', { lang: 'en', stay: contractStay() }));
     assert.equal(res.status, 502);
     const data = await body(res);
-    assert.deepEqual(Object.keys(data).sort(), ['errorCode', 'message', 'ok']);
+    // 실패 분류(upstream)는 닫힌 목록 값만 붙는다. HTTP 500 은 제공처 장애다
+    assert.deepEqual(Object.keys(data).sort(), ['errorCode', 'message', 'ok', 'upstream']);
     assert.equal(data.errorCode, 'SAFEHOUR_EXTERNAL_API');
+    assert.equal(data.upstream, 'UPSTREAM_ERROR');
   });
 });
 

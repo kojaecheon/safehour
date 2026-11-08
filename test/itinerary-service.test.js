@@ -148,6 +148,48 @@ describe('후보 조회 — 숙소 기준점·10km·언어마다 한 번 (spec 4
     assert.equal(data.ok, false);
     assert.equal(data.errorCode, 'SAFEHOUR_EXTERNAL_API');
     assert.equal(JSON.stringify(data).includes('SERVICE_KEY'), false);
+    assert.equal('upstream' in data, false, '분류가 없는 오류는 upstream 을 싣지 않는다');
+  });
+
+  test('관광공사 실패 분류(upstream)는 닫힌 목록 값만 응답·서버 로그·판정 로그에 실린다', async () => {
+    const logged = [];
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args.join(' '));
+    try {
+      const failWith = (upstream) =>
+        createItineraryHandlers({
+          clock: () => new Date(NOW),
+          loadCandidates: async () => {
+            const error = new Error('TourAPI 오류 22: https://apis.data.go.kr/x?serviceKey=secret-key');
+            error.upstream = upstream;
+            throw error;
+          },
+          enrichIntros: fakeEnrich().enrich,
+          fetchForecast: fakeForecast().fetchForecast,
+          env: {},
+          killSwitch: () => false,
+          log: (entry) => logged.push(entry),
+        });
+
+      const res = await plan(failWith('QUOTA'), { lang: 'en', stay: planStay() });
+      assert.equal(res.status, 502);
+      const data = await body(res);
+      assert.equal(data.errorCode, 'SAFEHOUR_EXTERNAL_API');
+      assert.equal(data.upstream, 'QUOTA');
+      assert.equal(logged.at(-1).upstream, 'QUOTA');
+      assert.equal(errors.at(-1), '[itinerary.plan] candidate load failed: SAFEHOUR_EXTERNAL_API upstream=QUOTA');
+
+      // 목록 밖 값은 응답·판정 로그에서 빠지고 서버 로그에는 UNKNOWN 으로 남는다
+      const foreign = await body(await plan(failWith('https://apis.data.go.kr/?serviceKey=secret-key'), { lang: 'en', stay: planStay() }));
+      assert.equal('upstream' in foreign, false);
+      assert.equal('upstream' in logged.at(-1), false);
+      assert.equal(errors.at(-1), '[itinerary.plan] candidate load failed: SAFEHOUR_EXTERNAL_API upstream=UNKNOWN');
+      assert.ok(errors.every((line) => !line.includes('secret-key') && !line.includes('http')));
+      assert.ok(!JSON.stringify(foreign).includes('secret-key'));
+    } finally {
+      console.error = originalError;
+    }
   });
 });
 
@@ -470,5 +512,44 @@ describe('교체 후보 (spec 6장, 규칙 33)', () => {
     });
     assert.equal(res.status, 400);
     assert.equal((await body(res)).field, 'date');
+  });
+
+  test('후보 조회가 실패하면 502 에 upstream 분류를 싣고 서버 로그는 분류만 남긴다', async () => {
+    const { day, outing } = await planned();
+    const logged = [];
+    const errors = [];
+    const originalError = console.error;
+    console.error = (...args) => errors.push(args.join(' '));
+    try {
+      const handlers = createItineraryHandlers({
+        clock: () => new Date(NOW),
+        loadCandidates: async () => {
+          const error = new Error('TourAPI 오류 30: SERVICE_KEY_IS_NOT_REGISTERED_ERROR');
+          error.upstream = 'AUTH';
+          throw error;
+        },
+        enrichIntros: fakeEnrich().enrich,
+        fetchForecast: fakeForecast().fetchForecast,
+        env: {},
+        killSwitch: () => false,
+        log: (entry) => logged.push(entry),
+      });
+      const res = await alternatives(handlers, {
+        lang: 'en',
+        stay: planStay(),
+        date: day.date,
+        outingId: outing.id,
+        stopId: outing.stops[0].id,
+        day,
+      });
+      assert.equal(res.status, 502);
+      const data = await body(res);
+      assert.equal(data.upstream, 'AUTH');
+      assert.equal(JSON.stringify(data).includes('SERVICE_KEY'), false);
+      assert.equal(logged.at(-1).upstream, 'AUTH');
+      assert.equal(errors.at(-1), '[itinerary.alternatives] candidate load failed: SAFEHOUR_EXTERNAL_API upstream=AUTH');
+    } finally {
+      console.error = originalError;
+    }
   });
 });

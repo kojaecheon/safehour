@@ -27,6 +27,7 @@ import {
   computeShareFingerprint,
   fingerprintContent,
   isGuardianResendNeeded,
+  isGuardianWindowPassed,
   shareLang,
 } from '../components/guardian/share.js';
 import { copyIdFor, guardianErrorView, kstClock, kstDate } from '../components/guardian/errorView.js';
@@ -67,7 +68,8 @@ describe('일정 지문 내용 (spec 5.1 guardianShare.planFingerprint)', () => 
 
   test('fromDate 를 주면 그 날짜 이후만 담는다', () => {
     const { stay, tripPlan } = stayAndPlan();
-    const snapshot = buildGuardianSnapshot({ stay, tripPlan, now: '2026-09-25T09:00:00+09:00' });
+    // 09-28 에 만들면 7일 범위(09-28~10-04) 안의 체류 날짜 10-01~10-04 를 담는다
+    const snapshot = buildGuardianSnapshot({ stay, tripPlan, now: '2026-09-28T09:00:00+09:00' });
     const content = fingerprintContent(snapshot, { fromDate: '2026-10-04' });
     assert.ok(content.days.length > 0);
     assert.ok(content.days.every((d) => d.date >= '2026-10-04'));
@@ -344,5 +346,51 @@ describe('patientReturnStatus (받은 일정 마감 지남 표시)', () => {
   test('깨진 nowMs 나 date 는 null', () => {
     assert.equal(patientReturnStatus({ date: '2026-11-06', by: '10:00', nowMs: NaN }), null);
     assert.equal(patientReturnStatus({ date: 'x', by: '10:00', nowMs: now }), null);
+  });
+});
+
+describe("'다음 7일 링크 다시 보내기' 판단 (보낸 링크의 범위가 지남)", () => {
+  // 체류 10-01~10-08. 10-01 에 보내면 10-01~10-07 을 담고 10-08 은 범위 밖이다
+  const SENT = '2026-10-01T09:00:00+09:00';
+  const share = { lastSentAt: SENT, planFingerprint: 'a'.repeat(64) };
+  const passed = (now, s = share) => isGuardianWindowPassed({ ...stayAndPlan(), share: s, now });
+
+  test('범위 마지막 날까지는 false, 다음 날(KST)부터 true', () => {
+    assert.equal(passed('2026-10-06T12:00:00+09:00'), false);
+    assert.equal(passed('2026-10-07T23:59:00+09:00'), false, '마지막 날 당일');
+    assert.equal(passed('2026-10-07T14:59:00Z'), false, 'KST 10-07 23:59');
+    assert.equal(passed('2026-10-07T15:00:00Z'), true, 'KST 10-08 00:00');
+    assert.equal(passed('2026-10-08T10:00:00+09:00'), true);
+  });
+
+  test('체류가 끝났으면(출국일 지남) false', () => {
+    assert.equal(passed('2026-10-09T10:00:00+09:00'), false);
+  });
+
+  test('보낸 링크가 출국일까지 담았으면 범위가 지나도 false', () => {
+    const late = { lastSentAt: '2026-10-02T09:00:00+09:00', planFingerprint: 'a'.repeat(64) };
+    assert.equal(passed('2026-10-08T10:00:00+09:00', late), false);
+  });
+
+  test('입국 전에 보낸 링크는 입국일부터 7일 범위로 판단한다', () => {
+    const early = { lastSentAt: '2026-09-01T09:00:00+09:00', planFingerprint: 'a'.repeat(64) };
+    assert.equal(passed('2026-10-07T10:00:00+09:00', early), false);
+    assert.equal(passed('2026-10-08T10:00:00+09:00', early), true);
+  });
+
+  test('보낸 적 없음, 체류·일정 없음, 깨진 기록은 false', () => {
+    const { stay, tripPlan } = stayAndPlan();
+    const now = '2026-10-08T10:00:00+09:00';
+    assert.equal(isGuardianWindowPassed({ stay, tripPlan, share: null, now }), false);
+    assert.equal(isGuardianWindowPassed({ stay: null, tripPlan, share, now }), false);
+    assert.equal(isGuardianWindowPassed({ stay, tripPlan: null, share, now }), false);
+    assert.equal(isGuardianWindowPassed({ stay, tripPlan, share: { lastSentAt: 'x', planFingerprint: 'a'.repeat(64) }, now }), false);
+  });
+
+  test('일정 변화 판단(isGuardianResendNeeded)은 이 판단과 따로이고 지금 시각에 기대지 않는다', async () => {
+    const pair = stayAndPlan();
+    const sent = await sentShare(pair, SENT);
+    assert.equal(await isGuardianResendNeeded({ ...pair, share: sent }), false);
+    assert.equal(isGuardianWindowPassed({ ...pair, share: sent, now: '2026-10-08T10:00:00+09:00' }), true);
   });
 });

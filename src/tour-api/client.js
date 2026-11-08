@@ -9,8 +9,70 @@ import {
   TOUR_API_SERVICES,
   TOUR_API_WARNING_AT,
 } from "./config.js";
+import { TOUR_API_UPSTREAM, tourApiUpstreamClass } from "./upstream.js";
+
+export { TOUR_API_UPSTREAM, tourApiUpstreamClass };
 
 const DEFAULT_CACHE_TTL_MS = 15 * 60 * 1_000;
+
+// 공공데이터포털 공통 오류 코드(활용 가이드 '에러 코드')
+//   20 SERVICE_ACCESS_DENIED, 21 TEMPORARILY_DISABLE_THE_SERVICEKEY, 22 LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS,
+//   30 SERVICE_KEY_IS_NOT_REGISTERED, 31 DEADLINE_HAS_EXPIRED, 32 UNREGISTERED_IP, 33 UNSIGNED_CALL,
+//   12 NO_OPENAPI_SERVICE(활용 신청 전 서비스 포함)
+const QUOTA_RESULT_CODES = new Set([22]);
+const AUTH_RESULT_CODES = new Set([12, 20, 21, 30, 31, 32, 33]);
+const QUOTA_MESSAGE_RE = /LIMITED_NUMBER_OF_SERVICE_REQUESTS_EXCEEDS|rate limit exceeded/i;
+const AUTH_MESSAGE_RE =
+  /SERVICE_KEY_IS_NOT_REGISTERED|DEADLINE_HAS_EXPIRED|UNREGISTERED_IP|SERVICE_ACCESS_DENIED|TEMPORARILY_DISABLE_THE_SERVICEKEY|UNSIGNED_CALL|NO_OPENAPI_SERVICE/i;
+
+function numericResultCode(resultCode) {
+  if (resultCode === undefined || resultCode === null) return null;
+  const text = String(resultCode).trim();
+  return /^\d{1,4}$/.test(text) ? Number(text) : null;
+}
+
+/**
+ * 응답 하나를 분류한다. 순수 함수라 테스트가 가짜 응답으로 바로 검사한다.
+ * 성공(HTTP 2xx + resultCode 0000)이면 null.
+ *
+ * @param {object} args
+ * @param {number} [args.httpStatus]
+ * @param {string|number|null} [args.resultCode]  JSON 헤더 또는 XML 의 returnReasonCode
+ * @param {string|null} [args.resultMsg]
+ * @param {boolean} [args.parsed]  본문을 JSON 으로 읽었는지
+ * @param {string} [args.bodyText]  JSON 이 아닐 때 원인 코드를 찾기 위한 본문(저장·기록하지 않는다)
+ */
+export function classifyTourApiResponse({ httpStatus = 0, resultCode = null, resultMsg = null, parsed = true, bodyText = "" } = {}) {
+  let code = numericResultCode(resultCode);
+  let message = typeof resultMsg === "string" ? resultMsg : "";
+
+  // 게이트웨이 오류는 JSON 이 아니라 XML 로 온다(<returnReasonCode>30</returnReasonCode>).
+  if (!parsed && typeof bodyText === "string" && bodyText) {
+    const reason = /<returnReasonCode>\s*(\d{1,4})\s*<\/returnReasonCode>/i.exec(bodyText);
+    if (reason) code = Number(reason[1]);
+    message = bodyText.slice(0, 2_000);
+  }
+
+  const ok = httpStatus >= 200 && httpStatus < 300 && parsed && code === 0;
+  if (ok) return null;
+
+  if (httpStatus === 429 || (code !== null && QUOTA_RESULT_CODES.has(code)) || QUOTA_MESSAGE_RE.test(message)) {
+    return TOUR_API_UPSTREAM.QUOTA;
+  }
+  if (httpStatus === 401 || httpStatus === 403 || (code !== null && AUTH_RESULT_CODES.has(code)) || AUTH_MESSAGE_RE.test(message)) {
+    return TOUR_API_UPSTREAM.AUTH;
+  }
+  if (httpStatus >= 500) return TOUR_API_UPSTREAM.UPSTREAM_ERROR;
+  if (!parsed) return TOUR_API_UPSTREAM.PARSE;
+  return TOUR_API_UPSTREAM.UPSTREAM_ERROR;
+}
+
+/** 메시지는 그대로 두고 분류만 더한 오류 */
+function upstreamError(message, upstream) {
+  const error = new Error(message);
+  error.upstream = upstream;
+  return error;
+}
 
 function kstDate() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -218,7 +280,9 @@ export async function callTourApi({
 }) {
   const service = TOUR_API_SERVICES[serviceName];
   if (!service) throw new Error(`알 수 없는 TourAPI 서비스: ${serviceName}`);
-  if (!TOUR_API_KEY) throw new Error("TOUR_API_KEY가 설정되지 않았습니다.");
+  if (!TOUR_API_KEY) {
+    throw upstreamError("TOUR_API_KEY가 설정되지 않았습니다.", TOUR_API_UPSTREAM.AUTH);
+  }
 
   const operationKey = `${serviceName}.${operation}`;
   // 호출당 KST 날짜를 한 번만 정한다. 읽기·쓰기·로그가 각자 시계를 읽으면
@@ -246,8 +310,9 @@ export async function callTourApi({
   // operation별 1,000회 차단(D07-POL005)이 초과 호출을 허용하지 않는다.
   const dailyCount = reserveCallSlot(operationKey, day);
   if (dailyCount === null) {
-    throw new Error(
+    throw upstreamError(
       `TourAPI 일일 한도 초과: ${operationKey} (${TOUR_API_DAILY_LIMIT}/${TOUR_API_DAILY_LIMIT})`,
+      TOUR_API_UPSTREAM.SELF_LIMIT,
     );
   }
 
@@ -256,37 +321,54 @@ export async function callTourApi({
   let httpStatus = 0;
   let payload;
   let errorMessage = null;
+  let upstream = null;
 
   try {
-    const response = await fetchImpl(requestUrl, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "SafeHour/0.1 TourAPI client",
-      },
-      signal: AbortSignal.timeout(15_000),
-    });
-
-    httpStatus = response.status;
-    const responseText = await response.text();
+    let response;
+    let responseText;
+    try {
+      response = await fetchImpl(requestUrl, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "SafeHour/0.1 TourAPI client",
+        },
+        signal: AbortSignal.timeout(15_000),
+      });
+      httpStatus = response.status;
+      responseText = await response.text();
+    } catch (error) {
+      // 연결 실패·시간 초과. 원문(error.message)에는 URL 이 섞일 수 있어 이름만 남긴다.
+      throw upstreamError(
+        `TourAPI 요청이 닿지 않았습니다: ${error?.name ?? "Error"}`,
+        TOUR_API_UPSTREAM.NETWORK,
+      );
+    }
 
     try {
       payload = JSON.parse(responseText);
     } catch {
-      throw new Error(
+      throw upstreamError(
         `TourAPI가 JSON이 아닌 응답을 반환했습니다. HTTP ${httpStatus}`,
+        classifyTourApiResponse({ httpStatus, parsed: false, bodyText: responseText }),
       );
     }
 
     const header = tourApiResponseHeader(payload);
     if (!response.ok || header.resultCode !== "0000") {
-      throw new Error(
+      throw upstreamError(
         `TourAPI 오류 ${header.resultCode ?? httpStatus}: ${
           header.resultMsg ?? "알 수 없는 오류"
         }`,
+        classifyTourApiResponse({
+          httpStatus,
+          resultCode: header.resultCode ?? null,
+          resultMsg: header.resultMsg ?? null,
+        }) ?? TOUR_API_UPSTREAM.UPSTREAM_ERROR,
       );
     }
   } catch (error) {
     errorMessage = error.message;
+    upstream = tourApiUpstreamClass(error.upstream) ?? TOUR_API_UPSTREAM.UPSTREAM_ERROR;
   }
 
   const elapsedMs = Date.now() - startedAt;
@@ -306,9 +388,10 @@ export async function callTourApi({
     dailyCount,
     warning: dailyCount >= TOUR_API_WARNING_AT ? "DAILY_LIMIT_NEAR" : null,
     error: errorMessage,
+    upstream,
   });
 
-  if (errorMessage) throw new Error(errorMessage);
+  if (errorMessage) throw upstreamError(errorMessage, upstream);
 
   const result = {
     serviceName,

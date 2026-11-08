@@ -34,6 +34,7 @@ import * as designBoard from './designBoard.js';
 import * as notifications from './notifications.js';
 import * as errors from './errors.js';
 import * as aiIntro from './aiIntro.js';
+import * as help from './help.js';
 
 /** 등록된 이름공간 — 이름 → { messages, safety } */
 export const NAMESPACES = Object.freeze({
@@ -52,6 +53,7 @@ export const NAMESPACES = Object.freeze({
   notifications,
   errors,
   aiIntro,
+  help,
 });
 
 export const NAMESPACE_NAMES = Object.freeze(Object.keys(NAMESPACES));

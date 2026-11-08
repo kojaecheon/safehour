@@ -160,7 +160,7 @@ export default function TripPage() {
     <>
       <TopBar title={t('trip.header')} />
       <main className="page trip-page">
-        {trip.updateFailed && <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />}
+        {trip.updateFailed && <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />}
         {body}
       </main>
       {sheet && (

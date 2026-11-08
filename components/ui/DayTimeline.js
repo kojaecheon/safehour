@@ -15,6 +15,7 @@
 //   ]} />
 //
 // 항목 kind
+//   kindKey 가 있으면 종류 이름을 그 키로 바꾼다(복귀 마감이 하루 활동 종료면 '오늘 활동 종료', viewModel deadlineCopyOf).
 //   depart 출발(노선 시작) · stop 정거장 · meal 식사 칸 · return 복귀 마감(노선 끝)
 //   appointment 병원 일정 · medication 복약 · rest 숙소에서 휴식   ← 노선 밖
 //
@@ -96,7 +97,7 @@ export default function DayTimeline({ entries = [], label, person = 'patient' })
               {kind.key && (
                 <p className="ui-tl-kind">
                   {entry.kind === 'return' && <Icon name="flag" size={14} strokeWidth={2.4} />}
-                  {t(kind.key)}
+                  {t(entry.kindKey ?? kind.key)}
                 </p>
               )}
               {entry.title && <p className="ui-tl-title">{entry.title}</p>}

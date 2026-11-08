@@ -7,7 +7,7 @@
 // --emergency rgb(200, 16, 46) · --surface rgb(255, 255, 255) · --accent-strong rgb(0, 70, 209) · --line-strong rgb(220, 222, 227).
 
 import { test, expect } from './fixtures.js';
-import { gapBetween, kstDate, loginDemo, styles } from './helpers.js';
+import { gapBetween, kstDate, loginDemo, readRecord, styles } from './helpers.js';
 
 /** '다음'(마지막 단계는 '저장') — 하단 바의 제출 버튼 */
 const submit = (page) => page.locator('.onboarding-actions button[type="submit"]').click();
@@ -16,7 +16,7 @@ const submit = (page) => page.locator('.onboarding-actions button[type="submit"]
 async function fillTravel(page) {
   await page.fill('#ob-arrival-date', kstDate(0));
   await page.fill('#ob-arrival-time', '09:00');
-  await page.check('#ob-arrival-airport');
+  await page.check('#ob-arrival-airport'); // 인천은 미리 골라져 있다(다시 골라도 그대로)
   await page.fill('#ob-departure-date', kstDate(3));
   await page.fill('#ob-departure-time', '20:00');
   await page.check('#ob-departure-airport-GMP');
@@ -445,11 +445,9 @@ test.describe('③층 체류 설정 — 오류 표시', () => {
         'border-top-color': 'rgb(200, 16, 46)',
         'box-shadow': 'rgb(200, 16, 46) 0px 0px 0px 1px inset',
       });
-    // 라디오 점에는 네모 그림자가 없고, 선택지 칸 테두리가 빨갛다
-    expect((await styles(page.locator('#ob-arrival-airport'), ['box-shadow']))['box-shadow']).toBe('none');
-    expect((await styles(page.locator('label[for="ob-arrival-airport"]'), ['border-top-color']))['border-top-color']).toBe(
-      'rgb(200, 16, 46)',
-    );
+    // 공항은 인천이 미리 골라져 있어(운영자 결정 2026-11-08) 1단계 라디오에는 오류가 없다
+    await expect(page.locator('#ob-arrival-airport')).toBeChecked();
+    await expect(page.locator('label[for="ob-arrival-airport"]')).not.toHaveCSS('border-top-color', 'rgb(200, 16, 46)');
 
     // 오류 문장 = 왼쪽 띠 없이 16px 굵은 긴급 빨강 + 20px 경고 아이콘
     const error = page.locator('#ob-arrival-date-error');
@@ -461,6 +459,21 @@ test.describe('③층 체류 설정 — 오류 표시', () => {
       'font-weight': '700',
     });
     expect((await line.locator('svg').boundingBox()).width).toBe(20);
+
+    // 라디오 오류는 아직 기본 선택이 없는 동반 보호자(4단계)에서 본다:
+    // 라디오 점에는 네모 그림자가 없고, 선택지 칸 테두리가 빨갛다
+    await fillTravel(page);
+    await submit(page);
+    await fillLodging(page);
+    await submit(page);
+    await fillHospital(page);
+    await submit(page);
+    await submit(page);
+    await expect(page.locator('#ob-hasCompanion-error')).toBeVisible();
+    expect((await styles(page.locator('#ob-hasCompanion'), ['box-shadow']))['box-shadow']).toBe('none');
+    await expect
+      .poll(async () => (await styles(page.locator('label[for="ob-hasCompanion"]'), ['border-top-color']))['border-top-color'])
+      .toBe('rgb(200, 16, 46)');
   });
 
   // 운영자 결정(2026-10-30): 오류 요약은 조건 화면과 같은 상자 하나(흰 면 + 1px 긴급 빨강 테두리). 분홍 면·분홍 선은 없앤다
@@ -497,5 +510,43 @@ test.describe('③층 체류 설정 — 오류 표시', () => {
     expect((await title.locator('svg').boundingBox()).width).toBe(20);
     expect((await styles(title.locator('svg'), ['color'])).color).toBe('rgb(200, 16, 46)');
     expect((await styles(summary.locator('a strong').first(), ['color'])).color).toBe('rgb(0, 70, 209)');
+  });
+});
+
+// 운영자 결정(2026-11-08): 판정을 느슨하게 하지 않는 기본 선택(공항 인천·강도 느긋하게)과 선택 칸(숙소 이름·출발 시각)
+test.describe('체류 설정: 기본 선택과 선택 칸', () => {
+  test('공항·강도는 미리 골라져 있고, 숙소 이름·출발 시각을 비워도 저장된다', async ({ page }) => {
+    await loginDemo(page, '/onboarding');
+    await expect(page.locator('#ob-arrival-airport')).toBeChecked();
+    await expect(page.locator('#ob-departure-airport')).toBeChecked();
+    // 출발 시각은 선택이고, 비우면 어떻게 되는지 칸 아래에 적혀 있다
+    await expect(page.getByLabel('출발 시각 (선택)')).toBeVisible();
+    await expect(page.locator('#ob-departure-time-hint')).toContainText('출국일');
+    await page.fill('#ob-arrival-date', kstDate(0));
+    await page.fill('#ob-arrival-time', '09:00');
+    await page.fill('#ob-departure-date', kstDate(3));
+    await submit(page);
+
+    await expect(page.getByLabel('숙소 이름 (선택)')).toBeVisible();
+    await expect(page.locator('#ob-lodgings-0-name-hint')).toContainText('‘숙소’');
+    await page.fill('#ob-lodgings-0-address', '명동');
+    await page.locator('#ob-lodgings .onboarding-search-row button').click();
+    await page.locator('.onboarding-result').first().click();
+    await page.fill('#ob-lodgings-0-name', ''); // 건물 이름 제안을 지운다
+    await submit(page);
+    await fillHospital(page);
+    await submit(page);
+    await fillCompanion(page);
+    await submit(page);
+
+    await expect(page.locator('#ob-pace')).toBeChecked();
+    await expect(page.getByText('모르면 느긋하게를 그대로 두세요', { exact: false })).toBeVisible();
+    await submit(page);
+    await expect(page).toHaveURL(/\/conditions$/);
+    const stay = await readRecord(page, 'stay');
+    expect(stay.pace).toBe('RELAXED');
+    expect(stay.arrival.airport).toBe('ICN');
+    expect(stay.departure).toEqual({ date: kstDate(3), time: '00:00', airport: 'ICN', timeUnset: true });
+    expect('name' in stay.lodgings[0]).toBe(false);
   });
 });

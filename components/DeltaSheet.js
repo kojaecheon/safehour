@@ -11,7 +11,7 @@
 
 import { useLang } from './LanguageProvider.js';
 import { Sheet } from './ui/index.js';
-import { deltaSummary } from './trip/viewModel.js';
+import { deadlineCopyOf, deltaSummary } from './trip/viewModel.js';
 
 const TAG = {
   replaced: { key: 'delta.tagReplaced', className: 'delta-state' },
@@ -26,9 +26,10 @@ const TAG = {
  * @param {object} props
  * @param {object} props.day       변경이 기록된 DayPlan (delta 포함)
  * @param {string} [props.dateLabel]
+ * @param {boolean} [props.isToday]  새 마감이 하루 활동 종료면 오늘은 '오늘 활동 종료', 다른 날은 '활동 종료' (deadlineCopyOf)
  * @param {() => void} props.onClose
  */
-export default function DeltaSheet({ day, dateLabel, onClose }) {
+export default function DeltaSheet({ day, dateLabel, isToday = false, onClose }) {
   const { t, lang, safety, reasonText } = useLang();
   const summary = deltaSummary(day);
   const reasonLang = safety.primary === lang ? undefined : safety.primary;
@@ -87,7 +88,7 @@ export default function DeltaSheet({ day, dateLabel, onClose }) {
         return (
           <>
             {who(row.role)}
-            <span lang={reasonLang}>{t('return.deadline', { time: row.returnBy })}</span>
+            <span lang={reasonLang}>{t(deadlineCopyOf(row, { isToday }).timeKey, { time: row.returnBy })}</span>
           </>
         );
       default:

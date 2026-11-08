@@ -38,8 +38,11 @@ import {
   timelineEntries,
   todayFocus,
   tripDateRows,
+  updateFailedBodyKey,
+  welcomeNoticeReady,
 } from '../components/trip/viewModel.js';
 import { buildMapLinks } from '../lib/maps.js';
+import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { planTrip } from '../src/engine/tripPlan.js';
 import { AIRPORT_TRAVEL, SET, at, byLodging, tripPool, tripStay } from './trip-fixtures.js';
 
@@ -852,5 +855,42 @@ describe('returnPlaceOf: 타임라인과 복귀 시트가 같은 돌아갈 곳�
     const { timeline, sheet } = both(o, day(), stay);
     assert.equal(sheet.kind, 'PLANNED');
     assert.deepEqual(timeline, { kind: 'HOSPITAL', name: null });
+  });
+});
+
+describe('updateFailedBodyKey: 일정 갱신 실패 안내 본문 (docs/contracts.md 일정 502 upstream)', () => {
+  test('분류마다 정해진 본문 키, 분류가 없거나 모르는 값이면 일반 문구', () => {
+    assert.equal(updateFailedBodyKey('QUOTA'), 'today.updateFailedQuota');
+    for (const u of ['NETWORK', 'UPSTREAM_ERROR', 'PARSE']) assert.equal(updateFailedBodyKey(u), 'today.updateFailedTemporary', u);
+    for (const u of ['AUTH', 'SELF_LIMIT']) assert.equal(updateFailedBodyKey(u), 'today.updateFailedConnection', u);
+    for (const u of [null, undefined, '', 'quota', 'UNKNOWN']) assert.equal(updateFailedBodyKey(u), 'today.updateFailedBody', String(u));
+  });
+
+  test('네 본문 모두 저장 일정이 그대로라는 것을 알리고 단정 표현을 쓰지 않는다', () => {
+    for (const key of ['today.updateFailedQuota', 'today.updateFailedTemporary', 'today.updateFailedConnection']) {
+      const entry = UI_TEXT[key];
+      assert.ok(entry, key);
+      assert.match(entry.ko, /저장된 일정은 그대로예요\.$/, key);
+      for (const lang of ['ko', 'en', 'ja', 'zh']) {
+        assert.ok(!/안전/.test(entry[lang]) && !/\bsafe\b/i.test(entry[lang]), `${key}.${lang}`);
+      }
+    }
+  });
+});
+
+describe('welcomeNoticeReady: 첫 일정 알림은 다시 만드는 동기화가 성공해 끝난 뒤에만 (CLAUDE.md 선 5)', () => {
+  const base = { pending: true, hasPlan: true, syncing: false, updateFailed: false };
+  test('기다리는 표시가 있고 일정이 있으며 동기화가 끝났고 실패가 없으면 보인다', () => {
+    assert.equal(welcomeNoticeReady(base), true);
+  });
+  test('동기화 중에는 옛 일정이 그려져 있어도 보이지 않는다', () => {
+    assert.equal(welcomeNoticeReady({ ...base, syncing: true }), false);
+  });
+  test('갱신 실패 동안에는 보이지 않는다', () => {
+    assert.equal(welcomeNoticeReady({ ...base, updateFailed: true }), false);
+  });
+  test('일정이 없거나 기다리는 표시가 없으면 보이지 않는다', () => {
+    assert.equal(welcomeNoticeReady({ ...base, hasPlan: false }), false);
+    assert.equal(welcomeNoticeReady({ ...base, pending: false }), false);
   });
 });

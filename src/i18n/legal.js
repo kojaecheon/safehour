@@ -222,10 +222,11 @@ export const LEGAL_SECTIONS = [
         zh: '您可以随时在设置中撤回。撤回后将删除自查期间和医院关联指引的副本（包括关联代码）。',
       },
       {
-        ko: '동의 문구는 아직 법무 검토 전입니다.',
-        en: 'The consent text has not yet been reviewed by a lawyer.',
-        ja: '同意文はまだ法務の確認を受けていません。',
-        zh: '同意文本尚未经过法务审核。',
+        // 법률 검토가 끝날 때까지 사용자에게 알리는 문장 (ja·zh 검수 전). 동의 패널에도 같은 문장을 보인다.
+        ko: '이 동의 문구는 법률 검토를 거치는 중이에요. 검토가 끝나면 바뀔 수 있어요.',
+        en: 'This consent text is still under legal review and may change.',
+        ja: 'この同意文は法的な確認を受けている途中です。確認が終わると変わることがあります。',
+        zh: '本同意文本仍在法律审核中，审核结束后可能会有变更。',
       },
     ],
   },

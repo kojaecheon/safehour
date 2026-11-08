@@ -11,11 +11,13 @@ import { buildStay, fireDemoEvent, gapBetween, kstDate, linkDemoPlan, openDemoTo
 /**
  * 다음 재계획을 실패시킨다: 일정 API 를 503 으로 막고, 다른 탭에서 체류를 바꾼 것처럼 storage 이벤트를 보낸다
  * (같은 탭의 localStorage 쓰기는 이벤트가 나지 않는다). 출국을 하루 늦춰 영향 날짜가 생기게 한다.
+ * status·body 로 실패 응답을 고른다(기본 503 `{ ok:false }`). onRequest 는 막힌 일정 요청마다 불린다.
  */
-async function failNextSync(page) {
-  await page.route('**/api/itinerary/plan', (route) =>
-    route.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' }),
-  );
+async function failNextSync(page, { status = 503, body = { ok: false }, onRequest = () => {} } = {}) {
+  await page.route('**/api/itinerary/plan', (route) => {
+    onRequest();
+    return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+  });
   await page.evaluate(async (stay) => {
     const { accountKey } = await (await fetch('/api/auth/session', { cache: 'no-store' })).json();
     const key = `safehour.v2.${accountKey}.stay`;
@@ -72,6 +74,37 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
       .toEqual({ 'background-color': 'rgb(255, 244, 217)' });
     expect((await styles(alert.locator('.trip-notice-title'), ['font-weight']))['font-weight']).toBe('700');
     await expect(alert.getByRole('button', { name: '다시 시도' })).toBeVisible();
+  });
+
+  test('갱신 실패(제공처 조회 한도): 원인별 안내와 다시 시도, 저장 일정은 그대로 보인다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    let blocked = 0;
+    await failNextSync(page, {
+      status: 502,
+      body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'QUOTA' },
+      onRequest: () => {
+        blocked += 1;
+      },
+    });
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText(
+      '오늘 장소 데이터 제공처의 조회 한도에 닿았어요. 자정(한국 시각) 이후 다시 시도해 주세요. 저장된 일정은 그대로예요.',
+    );
+    await expect(alert).not.toContainText('연결되면 다시 확인해요');
+    await expect(alert).not.toContainText('안전');
+    // 마지막으로 저장한 일정(날짜·상태)이 그대로 보인다
+    await expect(page.locator('main.today-page > .today-status-block .state-banner')).toBeVisible();
+
+    const retry = alert.getByRole('button', { name: '다시 시도' });
+    await expect(retry).toBeVisible();
+    const before = blocked;
+    await retry.click();
+    // 다시 시도는 기존 갱신 경로로 일정 요청을 한 번 더 보낸다(여전히 막혀 있으니 안내도 그대로)
+    await expect.poll(() => blocked).toBeGreaterThan(before);
+    await expect(alert).toContainText('조회 한도에 닿았어요');
   });
 
   for (const confirmToday of [true, false]) {
@@ -238,5 +271,53 @@ test.describe('③층 오늘, 상태 블록과 안내 구역', () => {
       'padding-top': '14px',
     });
     await expect(deadline.locator('.today-deadline-main svg')).toHaveCount(1);
+  });
+});
+
+// 상태 상자의 사유별 행동 줄과 외출 있는 날 고정 줄 (사용성 점검 2026-11-08 A1·A2·A3, components/trip/viewModel.js dayActionKey)
+// 병원과 무관한 사유(시각·입력 누락·매일 확인 대기)에는 '병원 연락'·'병원 인근 대기'를 쓰지 않는다.
+test.describe('오늘 상태 상자의 행동 줄', () => {
+  const NOTE = '입력한 조건 안에서 짠 일정이에요. 몸 상태는 병원 안내를 따르세요.';
+
+  test('매일 확인 전(10:00): 행동 줄은 매일 확인 안내이고 병원 인근 대기를 말하지 않는다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page, {}, { confirmToday: false });
+    const action = page.locator('.today-status-block .state-banner .state-action');
+    await expect(action).toHaveText('오늘 일정은 매일 확인을 마치면 열려요. 위의 확인 항목을 눌러 주세요.');
+    await expect(page.locator('.today-status-block .state-banner')).not.toContainText('병원 인근 대기');
+  });
+
+  test('확인 마친 외출 있는 날(10:00): 상태 상자 바로 아래 고정 줄이 16px 보조 글자색으로 한 번 보인다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    const { tripPlan } = await startTrip(page);
+    const today = tripPlan.days[kstDate(0)];
+    test.skip(!today || (today.outings ?? []).length + (today.guardianOutings ?? []).length === 0, '오늘 외출이 없는 체류');
+    const note = page.locator('.today-status-block > .state-note');
+    await expect(note).toHaveText(NOTE);
+    await expect(note).toHaveCount(1);
+    expect(await styles(note, ['font-size', 'color'])).toEqual({ 'font-size': '16px', color: 'rgb(85, 93, 109)' });
+    // 상태 상자 바로 다음 형제다
+    expect(await note.evaluate((el) => el.previousElementSibling?.classList.contains('state-banner'))).toBe(true);
+  });
+
+  test('늦은 저녁(21:30): 시간 부족 행동 줄이고 병원 연락을 말하지 않으며 고정 줄이 없다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T21:30` });
+    await startTrip(page);
+    const banner = page.locator('.today-status-block .state-banner');
+    await expect(banner).toHaveClass(/state-NO_TOURISM/);
+    await expect(banner.locator('.state-action')).toHaveText('오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요.');
+    await expect(banner).not.toContainText('병원 연락');
+    await expect(page.locator('.today-status-block > .state-note')).toHaveCount(0);
+  });
+
+  test('조건 입력 필요(동의 없음): 조건 입력 행동 줄과 입력 버튼', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page, { consent: false });
+    const status = page.locator('.today-status-block');
+    await expect(status.locator('.state-banner .state-action')).toHaveText(
+      '아직 조건을 입력하지 않아 일정을 만들지 않았어요. 조건을 입력하면 일정이 생겨요.',
+    );
+    await expect(status.locator('.state-banner')).not.toContainText('병원 연락');
+    await expect(status.locator('.trip-fix a, .trip-fix button')).toHaveCount(1);
   });
 });

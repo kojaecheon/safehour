@@ -4,7 +4,7 @@
 // 기존 키 접두사 `link.`·`guide.` 을 그대로 쓴다. 새 키는 `conditions.` 으로 시작한다.
 // 병원 안내문 원문(채널 B)은 번역 대상이 아니다 — 여기에는 라벨만 둔다.
 // 질문 문장은 spec 4.4 표를 그대로 옮겼다. 앱은 답을 해석하지 않는다.
-// 동의 문구는 '법무 검토 전' 초안이다(버전은 components/conditions/consent.js).
+// 동의 문구는 '법무 검토 전' 초안이다(버전은 components/conditions/consent.js). 이 표시는 화면에 내지 않는다.
 // ja·zh: 검수 전 번역 — 사람 검수 필요
 
 /** 일반 화면 문구 */
@@ -46,26 +46,14 @@ export const messages = {
     ja: '要配慮情報の取り扱いへの同意',
     zh: '敏感信息处理同意',
   },
-  'conditions.consentReviewBadge': {
-    ko: '동의 문구 법무 검토 전',
-    en: 'Consent text not yet legally reviewed',
-    ja: '同意文は法務確認前',
-    zh: '同意文本尚未经法务审核',
-  },
-  'conditions.consentVersion': {
-    ko: '문구 버전 {version}',
-    en: 'Text version {version}',
-    ja: '文面バージョン {version}',
-    zh: '文本版本 {version}',
-  },
   'conditions.consentAgree': { ko: '동의합니다', en: 'I agree', ja: '同意します', zh: '我同意' },
   'conditions.consentRefuse': { ko: '동의하지 않습니다', en: 'I do not agree', ja: '同意しません', zh: '我不同意' },
   'conditions.consentReopen': { ko: '동의 다시 보기', en: 'Review consent again', ja: '同意をもう一度見る', zh: '重新查看同意事项' },
   'conditions.consentGranted': {
-    ko: '{at}에 동의함 · 문구 버전 {version}',
-    en: 'Agreed {at} · text version {version}',
-    ja: '{at}に同意済み · 文面バージョン {version}',
-    zh: '已于 {at} 同意 · 文本版本 {version}',
+    ko: '{at}에 동의함',
+    en: 'Agreed {at}',
+    ja: '{at}に同意済み',
+    zh: '已于 {at} 同意',
   },
   'conditions.consentFailed': {
     ko: '동의를 저장하지 못했어요. 다시 시도해 주세요.',
@@ -285,6 +273,37 @@ export const messages = {
   'conditions.groupGuardian': { ko: '보호자', en: 'Companion', ja: '付き添い', zh: '陪同者' },
   'conditions.groupMeal': { ko: '식사와 식이', en: 'Meals and diet', ja: '食事と食べ物', zh: '饮食' },
   'conditions.groupMedication': { ko: '복약', en: 'Medication', ja: '服薬', zh: '用药' },
+  'conditions.groupAnswered': {
+    ko: '{total}개 중 {done}개 답함',
+    en: '{done} of {total} answered',
+    ja: '{total}問中{done}問に回答',
+    zh: '已答 {done}/{total} 项',
+  },
+  'conditions.groupNone': {
+    ko: "제한 없음 (모두 '아니오')",
+    en: 'No restrictions (all “No”)',
+    ja: '制限なし（すべて「いいえ」）',
+    zh: '无限制（全部选“否”）',
+  },
+  // 법률 검토가 끝날 때까지 동의 버튼 옆에 둔다. 처리방침(src/i18n/legal.js) 동의 절과 같은 문장 (ja·zh 검수 전)
+  'conditions.consentLegalReview': {
+    ko: '이 동의 문구는 법률 검토를 거치는 중이에요. 검토가 끝나면 바뀔 수 있어요.',
+    en: 'This consent text is still under legal review and may change.',
+    ja: 'この同意文は法的な確認を受けている途中です。確認が終わると変わることがあります。',
+    zh: '本同意文本仍在法律审核中，审核结束后可能会有变更。',
+  },
+  'conditions.groupNoneRest': {
+    ko: "답하지 않은 {n}개만 '아니오'로",
+    en: 'Set only the {n} unanswered to “No”',
+    ja: '未回答の{n}問だけ「いいえ」にする',
+    zh: '仅将未回答的 {n} 项设为“否”',
+  },
+  'conditions.groupNoneDone': {
+    ko: '모두 답했어요',
+    en: 'All answered',
+    ja: 'すべて回答済み',
+    zh: '已全部作答',
+  },
 
   // 질문 (spec 4.4 표)
   'conditions.qOuting': { ko: '외출이 허용되나요?', en: 'Are you allowed to go out?', ja: '外出は許可されていますか？', zh: '是否允许外出？' },

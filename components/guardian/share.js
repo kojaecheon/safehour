@@ -6,13 +6,13 @@
 // 일정 지문(planFingerprint)의 내용
 //   - 보호자 스냅샷에서 만든 시각(createdAt)·만료 시각(expiresAt)을 뺀 것: { v, lang, days, emergency }.
 //     만든 시각은 부를 때마다 바뀌고, 만료 시각은 출국일에서 나오며 출국일 변화는 days 에 이미 드러난다.
-//   - 날짜는 **링크를 보낸 날(KST)부터** 출국일까지다. 보낼 때 스냅샷이 그날부터 담기 때문이다.
+//   - 날짜는 **링크를 보낸 날(KST)과 입국일 중 늦은 날부터 7일**(출국일에서 멈춤)이다. 보낼 때 스냅샷이 그 범위를 담기 때문이다.
 //     다시 판단할 때도 보낸 시각(lastSentAt)을 기준으로 스냅샷을 다시 만들어 같은 날짜 범위를 비교한다.
 //     그래서 날이 바뀌었다는 이유만으로 '다시 보내기'가 뜨지 않는다(지난 날짜의 일정은 바뀌지 않는다 — spec 7.2).
 //   - 스냅샷에 담기지 않는 값(병원 정보, 조건 세부, 마감 이유 등)이 바뀌어도 지문은 그대로다.
 
-import { GUARDIAN_LANGS, buildGuardianSnapshot } from '../../src/guardian/index.js';
-import { parseInstantMs } from '../../src/stay/index.js';
+import { GUARDIAN_LANGS, buildGuardianSnapshot, guardianCoverage } from '../../src/guardian/index.js';
+import { KST_OFFSET_MIN, parseInstantMs } from '../../src/stay/index.js';
 import { FINGERPRINT_PATTERN, planFingerprint } from '../../lib/store/fingerprint.js';
 
 const DEFAULT_SHARE_LANG = 'ko';
@@ -87,4 +87,37 @@ export async function isGuardianResendNeeded({ stay, tripPlan, share }) {
     return false;
   }
   return current !== share.planFingerprint;
+}
+
+/** ms → KST 날짜 'YYYY-MM-DD' */
+function kstDateOf(ms) {
+  return new Date(ms + KST_OFFSET_MIN * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/**
+ * 보낸 링크의 7일 범위가 지났고 체류가 이어지는가: '다음 7일 링크를 다시 보내 주세요' 안내.
+ * isGuardianResendNeeded(일정 변화, 지금 시각과 무관)와 따로 둔다. 이 판단은 날짜가 바뀌면 답이 바뀐다.
+ *   - 보낸 시각(lastSentAt)으로 스냅샷을 다시 만들어 그때 담은 범위(guardianCoverage)를 구한다
+ *   - 범위 뒤에 체류가 남았고(more) 오늘(KST)이 범위 끝을 지났으면 true
+ *   - 보낸 적 없음, 체류·일정 없음, 기록이 깨짐, 스냅샷을 만들 수 없음, 체류가 끝남 → false
+ *
+ * @param {{stay: object|null, tripPlan: object|null, share: {lastSentAt: string}|null, now?: Date|number|string}} args
+ * @returns {boolean}
+ */
+export function isGuardianWindowPassed({ stay, tripPlan, share, now = Date.now() }) {
+  if (!share || !stay || !tripPlan) return false;
+  const sentMs = typeof share.lastSentAt === 'string' ? parseInstantMs(share.lastSentAt) : null;
+  const nowMs = now instanceof Date ? now.getTime() : typeof now === 'string' ? parseInstantMs(now) : now;
+  if (sentMs === null || typeof nowMs !== 'number' || !Number.isFinite(nowMs)) return false;
+  let range;
+  try {
+    range = guardianCoverage(buildShareSnapshot({ stay, tripPlan, now: sentMs }));
+  } catch {
+    return false;
+  }
+  if (!range || !range.more) return false;
+  const today = kstDateOf(nowMs);
+  // 체류가 끝났으면(출국일 지남) 다시 보낼 것이 없다
+  if (typeof stay.departure?.date === 'string' && today > stay.departure.date) return false;
+  return today > range.to;
 }

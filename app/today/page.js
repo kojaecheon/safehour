@@ -14,7 +14,7 @@
 //   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
 //     '새로 고치는 중' 줄은 따로 블록을 두지 않고 날짜·상태 블록 안 날짜 줄 아래에 둔다(열 때마다 화면이 흔들리지 않게).
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CourseCard from '@/components/CourseCard.js';
@@ -28,7 +28,8 @@ import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
-import { DEADLINE_REASON_KEY, deltaSummary, formatDate, isDemoMode, needsInputFix, plannedReturnOf, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
+import { GUARDIAN_WINDOW_DAYS } from '@/src/guardian/index.js';
+import { dayActionKey, deadlineCopyOf, deltaSummary, formatDate, isDemoMode, needsInputFix, outingDayNote, plannedReturnOf, returnPlaceOf, todayFocus, welcomeNoticeReady } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
 import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
 import { isStayDate } from '@/src/stay/stay.js';
@@ -39,12 +40,12 @@ function nextDate(date) {
   return d.toISOString().slice(0, 10);
 }
 
-/** 복귀 마감 — 안전 문구 두 줄(주 언어 + 병기) */
+/** 복귀 마감: 안전 문구 두 줄(주 언어 + 병기). 하루 활동 종료(DAY_END)면 '오늘 활동 종료'로 부른다(viewModel deadlineCopyOf) */
 function Deadline({ outing, day, stay }) {
   const { t, pair } = useLang();
-  const deadline = pair('return.deadline', { time: outing.returnBy });
-  const reasonKey = DEADLINE_REASON_KEY[outing.deadlineReason];
-  const reason = reasonKey ? pair(reasonKey) : null;
+  const copy = deadlineCopyOf(outing, { isToday: true });
+  const deadline = pair(copy.timeKey, { time: outing.returnBy });
+  const reason = copy.reasonKey ? pair(copy.reasonKey) : null;
   const plannedAt = plannedReturnOf(outing);
   const planned = plannedAt ? pair('trip.plannedReturn', { time: plannedAt }) : null;
   const place = returnPlaceOf(outing, day, stay);
@@ -77,6 +78,36 @@ export default function TodayPage() {
   const [notice, setNotice] = useState(null);
   const dateRef = useRef(null);
 
+  // 첫 조건 기간을 저장하고 넘어온 경우(/today?welcome=1) 한 번만 알린다. 주소에서 바로 지워 새로 고쳐도 다시 뜨지 않는다.
+  // 주소를 읽은 뒤에는 기다리는 표시만 남긴다. 다시 만드는 동기화가 성공해 끝났을 때 보인다(viewModel welcomeNoticeReady).
+  // 저장 직후에는 체류만으로 만든 옛 일정이 먼저 그려지고, 다시 만들기가 실패하면 갱신 실패 안내가 대신 뜬다
+  const [welcomePending, setWelcomePending] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('welcome') !== '1') return undefined;
+    const timer = window.setTimeout(() => {
+      url.searchParams.delete('welcome');
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      setWelcomePending(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const welcomeReady = welcomeNoticeReady({
+    pending: welcomePending,
+    hasPlan: Boolean(trip.tripPlan),
+    syncing: trip.syncing,
+    updateFailed: trip.updateFailed,
+  });
+  useEffect(() => {
+    if (!welcomeReady) return undefined;
+    const timer = window.setTimeout(() => {
+      setWelcomePending(false);
+      setNotice('today.firstPlanReady');
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [welcomeReady]);
+
   const today = trip.todayDate;
   const stay = trip.stay;
   const day = trip.today.day;
@@ -106,6 +137,15 @@ export default function TodayPage() {
   }
 
   const top = <TopBar title={t('today.header')} />;
+  // 일정이 저장된 화면(도착 전·출국 뒤·그날 일정 없음·체류 중)에 알림 자리를 둔다.
+  // 첫 기간을 도착 전에 저장하면 여기로 와서 '첫 일정을 만들었어요'를 보여야 한다 (2026-11-08 검토 반영).
+  // 일정이 아직 없는 화면(만드는 중·만들지 못함)에는 두지 않는다: 아직 사실이 아닌 말을 하게 된다.
+  // 첫 일정 알림은 다시 만드는 동기화가 성공해 끝난 뒤에만 알림 상태에 들어온다(위 welcomeNoticeReady)
+  const noticeSlot = (
+    <TripNotice slot role="status">
+      {notice ? t(notice) : ''}
+    </TripNotice>
+  );
   let body;
 
   if (!today) {
@@ -148,6 +188,7 @@ export default function TodayPage() {
     const before = stay.arrival?.date && today < stay.arrival.date;
     body = (
       <div className="ui-block">
+        {noticeSlot}
         <EmptyState
           icon="navTrip"
           title={before ? t('today.beforeTripTitle') : t('today.afterTripTitle')}
@@ -159,6 +200,7 @@ export default function TodayPage() {
   } else if (!day) {
     body = (
       <div className="ui-block">
+        {noticeSlot}
         <EmptyState
           icon="navToday"
           title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
@@ -205,11 +247,15 @@ export default function TodayPage() {
             </p>
           )}
 
-          <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
+          <StateBanner
+            state={day.dayState}
+            reasons={day.reasons ?? []}
+            actionKey={dayActionKey(day, { isToday: true, screen: 'today' })}
+            outingNote={outingDayNote(day)}
+            live
+          />
 
-          <TripNotice slot role="status">
-            {notice ? t(notice) : ''}
-          </TripNotice>
+          {noticeSlot}
 
           {/* 변경됨 알림 (SEED Callout · actionable, 설계서 5.6): 누르면 전후 비교 시트 */}
           {delta?.unseen && (
@@ -304,10 +350,15 @@ export default function TodayPage() {
           </ListGroup>
         </div>
 
-        {trip.guardianResendNeeded && (
+        {(trip.guardianResendNeeded || trip.guardianWindowPassed) && (
           <section className="ui-block today-section" aria-labelledby="today-guardian-h">
-            <h2 id="today-guardian-h">{t('today.guardianResendTitle')}</h2>
-            <p>{t('today.guardianResendBody')}</p>
+            {/* 일정 변화가 있으면 그 안내가 앞선다. 없고 보낸 링크의 7일 범위만 지났으면 다음 7일 링크를 안내한다 */}
+            <h2 id="today-guardian-h">{t(trip.guardianResendNeeded ? 'today.guardianResendTitle' : 'today.guardianWindowTitle')}</h2>
+            <p>
+              {trip.guardianResendNeeded
+                ? t('today.guardianResendBody')
+                : t('today.guardianWindowBody', { n: GUARDIAN_WINDOW_DAYS })}
+            </p>
             <Button href={trip.readOnly ? undefined : '/guardian'} variant="secondary" disabled={trip.readOnly}>
               {t('today.guardianResendCta')}
             </Button>
@@ -340,7 +391,7 @@ export default function TodayPage() {
       <main className="page today-page is-basement">
         {trip.updateFailed && (
           <div className="ui-block today-sync-block">
-            <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />
+            <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />
           </div>
         )}
         {body}
@@ -350,7 +401,7 @@ export default function TodayPage() {
           </Link>
         </p>
       </main>
-      {sheet === 'delta' && day && <DeltaSheet day={day} dateLabel={formatDate(today, locale)} onClose={closeDelta} />}
+      {sheet === 'delta' && day && <DeltaSheet day={day} dateLabel={formatDate(today, locale)} isToday onClose={closeDelta} />}
       {sheet === 'return' && !trip.immediateReturn && (
         <ReturnSheet
           day={stored}

@@ -228,3 +228,120 @@
   display: inline-flex;
   align-items: center;
 }
+
+/* ── /more 설치 안내 상자(components/pwa/InstallCallout.js) ──
+   회색 바탕의 Callout 은 바탕과 같은 색이라 흰 블록 위에 올린다. 마지막 목록 블록 아래 8px 틈은 main 의 규칙이 지우므로 여기서 둔다 */
+.more-install {
+  margin: var(--gap-section) calc(var(--gutter) * -1) 0;
+  padding: var(--space-5) var(--gutter);
+  background: var(--layer-default);
+}
+.more-install-text {
+  display: grid;
+  gap: var(--space-2);
+}
+.more-install-text > p {
+  margin: 0;
+}
+.more-install-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── /help (S5): 흰 바탕 한 장, 구역 사이 32px, 본문 16/24 ── */
+.help-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+.help-section {
+  scroll-margin-top: calc(var(--space-12) + var(--space-6));
+}
+.help-title {
+  margin-bottom: var(--space-2);
+}
+.help-subtitle {
+  margin-top: var(--space-4);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}
+.help-lead,
+.help-items,
+.help-steps,
+.help-faq-a,
+.help-contact {
+  font-size: var(--text-body);
+  line-height: var(--lh-article);
+}
+.help-items,
+.help-steps {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding-left: var(--space-5);
+}
+.help-items {
+  list-style: disc;
+}
+.help-steps {
+  list-style: decimal;
+}
+.help-faq {
+  border-top: 1px solid var(--line);
+}
+.help-faq-item {
+  border-bottom: 1px solid var(--line);
+}
+.help-faq-q {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  padding: var(--space-3) 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  line-height: var(--lh-article);
+  cursor: pointer;
+}
+.help-faq-a {
+  padding-bottom: var(--space-4);
+}
+.help-contact-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap-min);
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+/* 질문 줄: flex 라 기본 펼침 표시가 사라진다. 오늘 화면(today.css)과 같은 꺾쇠를 직접 그린다 */
+.help-faq-q {
+  justify-content: space-between;
+  gap: var(--space-3);
+  list-style: none;
+}
+.help-faq-q::-webkit-details-marker {
+  display: none;
+}
+.help-faq-q::after {
+  content: '';
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+.help-faq-item[open] > .help-faq-q::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+.help-faq-q:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: 2px;
+}

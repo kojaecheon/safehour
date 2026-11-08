@@ -287,6 +287,36 @@ export const messages = {
     ja: 'このリンクは{date} {time}（韓国時間）に期限切れになります。',
     zh: '此链接将于{date} {time}（韩国时间）失效。',
   },
+  'guardian.rangeToday': {
+    ko: '오늘부터 {n}일({from}~{to})의 일정을 담아요.',
+    en: 'This link covers {n} days from today ({from} to {to}).',
+    ja: '今日から{n}日間（{from}～{to}）の予定を含みます。',
+    zh: '包含从今天起{n}天（{from}至{to}）的日程。',
+  },
+  'guardian.rangeFromArrival': {
+    ko: '입국일부터 {n}일({from}~{to})의 일정을 담아요.',
+    en: 'This link covers {n} days from your arrival date ({from} to {to}).',
+    ja: '入国日から{n}日間（{from}～{to}）の予定を含みます。',
+    zh: '包含从入境日起{n}天（{from}至{to}）的日程。',
+  },
+  'guardian.rangeNextWeek': {
+    ko: '한 링크는 {n}일까지만 담아요. 그다음 날짜의 일정은 다음 주에 새 링크를 만들어 다시 보내 주세요.',
+    en: 'A link covers up to {n} days. For the days after that, create a new link next week and send it again.',
+    ja: '1つのリンクに含まれるのは{n}日分までです。その後の予定は、来週新しいリンクを作成して送り直してください。',
+    zh: '一个链接最多包含{n}天。之后的日程请在下周创建新链接并重新发送。',
+  },
+  'guardian.windowPassedTitle': {
+    ko: '보낸 링크의 날짜가 지났어요',
+    en: 'The dates in your sent link have passed',
+    ja: '送ったリンクの日付が過ぎました',
+    zh: '已发送链接的日期已过',
+  },
+  'guardian.windowPassedBody': {
+    ko: '보호자는 지난 날짜의 일정만 가지고 있어요. 다음 {n}일 링크를 다시 보내 주세요.',
+    en: 'Your guardian only has plans for past dates. Please send a new link for the next {n} days.',
+    ja: '付き添い者は過ぎた日付の予定しか持っていません。次の{n}日間のリンクを送り直してください。',
+    zh: '陪同者只有已过日期的日程。请重新发送接下来{n}天的链接。',
+  },
   'guardian.newLink': {
     ko: '새 링크 만들기',
     en: 'Create a new link',
@@ -456,6 +486,24 @@ export const messages = {
     en: 'As of {date}, {time}',
     ja: '{date} {time} 時点',
     zh: '截至{date} {time}',
+  },
+  'guardian.coverage': {
+    ko: '담긴 일정: {from}~{to}',
+    en: 'Covers {from} to {to}',
+    ja: '含まれる予定：{from}～{to}',
+    zh: '包含日程：{from}至{to}',
+  },
+  'guardian.coverageMore': {
+    ko: '{to} 이후 일정은 이 사본에 없어요. 그 뒤 일정은 환자에게 새 링크를 받아 주세요.',
+    en: 'Plans after {to} are not in this copy. Ask the patient for a new link for the following days.',
+    ja: '{to}より後の予定はこのコピーにありません。その後の予定は患者から新しいリンクを受け取ってください。',
+    zh: '{to}之后的日程不在此副本中。之后的日程请向患者索取新链接。',
+  },
+  'guardian.coveragePassed': {
+    ko: '이 사본에 담긴 날짜({from}~{to})가 지났어요. 이후 일정은 환자에게 새 링크를 받아 주세요.',
+    en: 'The dates in this copy ({from} to {to}) have passed. Ask the patient for a new link for the days after.',
+    ja: 'このコピーに含まれる日付（{from}～{to}）は過ぎました。その後の予定は患者から新しいリンクを受け取ってください。',
+    zh: '此副本包含的日期（{from}至{to}）已过。之后的日程请向患者索取新链接。',
   },
   'guardian.expiresAt': {
     ko: '{date} {time}(한국 시각)에 만료돼요',

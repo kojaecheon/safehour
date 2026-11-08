@@ -122,6 +122,9 @@ export const messages = {
   // ── 하루 타임라인 ──
   'common.tlDepart': { ko: '출발', en: 'Leave', ja: '出発', zh: '出发' },
   'common.tlReturn': { ko: '복귀 마감', en: 'Return by', ja: '戻り期限', zh: '返回截止' },
+  // 마감 이유가 하루 활동 종료(DAY_END)인 복귀: 병원이 정한 마감이 아니라 앱 기본값이라 이름을 나눈다 (사용성 점검 2026-11-08 A4)
+  'common.tlDayEnd': { ko: '활동 종료', en: 'Activities end', ja: '活動終了', zh: '活动结束' },
+  'common.tlDayEndToday': { ko: '오늘 활동 종료', en: 'Today’s activities end', ja: '今日の活動終了', zh: '今日活动结束' },
   'common.tlAppointment': { ko: '병원 일정', en: 'Hospital appointment', ja: '病院の予定', zh: '医院预约' },
   'common.tlMedication': { ko: '복약', en: 'Medication', ja: '服薬', zh: '服药' },
   'common.tlRest': { ko: '숙소에서 휴식', en: 'Rest at your stay', ja: '宿泊先で休憩', zh: '在住处休息' },
@@ -183,4 +186,69 @@ export const safety = {
     zh: '仅陪同者就近',
   },
   'state.TOGETHER': { ko: '동행 가능', en: 'Together', ja: '一緒に外出可', zh: '可一同外出' },
+
+  // ── 상태 상자의 사유별 행동 줄 (사용성 점검 2026-11-08 A1·A2, components/trip/viewModel.js dayActionKey) ──
+  // 시각·입력 누락·확인 대기처럼 병원과 무관한 사유에 '병원 연락'·'병원 인근 대기'를 쓰지 않는다.
+  // 병원 지침 사유(외출 제한·복귀 요청·지침 철회·만료·외출 늦음 등)는 상태 기본 행동 줄(src/domain/states.js)을 그대로 쓴다.
+  'common.actionTimeShort': {
+    ko: '오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요.',
+    en: 'There is little time left today, so no outing was planned.',
+    ja: '今日は残り時間が少ないため、外出の予定を作っていません。',
+    zh: '今天剩余时间不多，因此没有安排外出。',
+  },
+  'common.actionTimeShortDay': {
+    ko: '이날은 남은 시간이 적어 외출 일정을 만들지 않았어요.',
+    en: 'No outing plan on this day because too little time is left.',
+    ja: 'この日は残り時間が少ないため、外出の予定を作っていません。',
+    zh: '这一天剩余时间不多，因此没有安排外出。',
+  },
+  'common.actionTravelDay': {
+    ko: '입국·출국 이동이 있는 날이라 외출 일정을 만들지 않았어요.',
+    en: 'No outing plan on this day because of arrival or departure travel.',
+    ja: '入国・出国の移動がある日のため、外出の予定を作っていません。',
+    zh: '这一天有入境或出境的行程，因此没有安排外出。',
+  },
+  'common.actionNoCandidate': {
+    ko: '조건에 맞는 장소를 아직 찾지 못했어요. 잠시 뒤 다시 확인해 주세요.',
+    en: 'No place that fits your conditions was found yet. Please check again later.',
+    ja: '条件に合う場所はまだ見つかっていません。しばらくしてからもう一度確認してください。',
+    zh: '暂时还没有找到符合条件的地点。请稍后再查看。',
+  },
+  'common.actionNeedsInput': {
+    ko: '아직 조건을 입력하지 않아 일정을 만들지 않았어요. 조건을 입력하면 일정이 생겨요.',
+    en: 'No plan was made because your conditions are not entered yet. Enter them and a plan will be made.',
+    ja: 'まだ条件を入力していないため、予定を作っていません。条件を入力すると予定ができます。',
+    zh: '还没有输入条件，因此没有安排行程。输入条件后就会生成行程。',
+  },
+  'common.actionNeedsInputOther': {
+    ko: '입력할 내용이 남아 있어 일정을 만들지 않았어요. 입력을 마치면 일정이 생겨요.',
+    en: 'Some details are still missing, so no plan was made. Finish entering them and a plan will be made.',
+    ja: '入力が必要な項目が残っているため、予定を作っていません。入力を終えると予定ができます。',
+    zh: '还有需要输入的内容，因此没有安排行程。输入完成后就会生成行程。',
+  },
+  'common.actionDailyCheck': {
+    ko: '오늘 일정은 매일 확인을 마치면 열려요. 위의 확인 항목을 눌러 주세요.',
+    en: 'Today’s plan opens once you finish today’s check. Please tap the check above.',
+    ja: '今日の予定は毎日の確認を終えると開きます。上の確認項目を押してください。',
+    zh: '完成每日确认后，今天的行程就会开放。请点击上方的确认项目。',
+  },
+  'common.actionDailyCheckElsewhere': {
+    ko: '오늘 일정은 매일 확인을 마치면 열려요. 오늘 화면에서 확인해 주세요.',
+    en: 'Today’s plan opens once you finish today’s check. Please check on the Today screen.',
+    ja: '今日の予定は毎日の確認を終えると開きます。「今日」の画面で確認してください。',
+    zh: '完成每日确认后，今天的行程就会开放。请在“今天”页面确认。',
+  },
+  'common.actionHospitalGuide': {
+    ko: '병원 안내를 먼저 확인해 주세요. 확인하면 오늘 일정이 열려요.',
+    en: 'Please review your hospital’s guidance first. Today’s plan opens once you do.',
+    ja: 'まず病院の案内を確認してください。確認すると今日の予定が開きます。',
+    zh: '请先确认医院的指引。确认后，今天的行程就会开放。',
+  },
+  // 외출이 있는 날 상태 상자 아래 고정 줄 (사용성 점검 A3): '동행 가능'이 몸 상태 판정으로 읽히지 않게
+  'common.outingDayNote': {
+    ko: '입력한 조건 안에서 짠 일정이에요. 몸 상태는 병원 안내를 따르세요.',
+    en: 'This plan was made within the conditions you entered. For how you feel, follow your hospital’s guidance.',
+    ja: '入力した条件の範囲で作った予定です。体の状態については病院の案内に従ってください。',
+    zh: '这是在你输入的条件范围内安排的行程。身体状况请遵循医院的指引。',
+  },
 };

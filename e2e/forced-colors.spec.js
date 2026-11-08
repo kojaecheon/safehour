@@ -212,7 +212,18 @@ test.describe('강제 색상 모드', () => {
     await page.goto('/login');
     const sys = await systemColors(page);
 
-    // 공급자 설정이 없는 소셜 로그인은 링크 대신 aria-disabled 버튼이다(disabled 속성이 없어 브라우저가 GrayText 로 바꾸지 않는다)
+    // 설정 안 된 소셜 로그인은 이제 그리지 않는다(운영자 결정 2026-11-08). 규칙(.btn[aria-disabled]) 자체는 비활성 링크
+    // (Button href + disabled)에 그대로 쓰이므로, 같은 마크업의 버튼 하나를 로그인 목록에 넣어 규칙을 본다.
+    // disabled 속성이 없어 브라우저가 GrayText 로 바꾸지 않는 경우다
+    await expect(page.getByRole('link', { name: '데모 계정으로 둘러보기' })).toBeVisible();
+    await page.evaluate(() => {
+      const probe = document.createElement('button');
+      probe.type = 'button';
+      probe.className = 'btn btn-secondary';
+      probe.setAttribute('aria-disabled', 'true');
+      probe.textContent = 'probe';
+      document.querySelector('.onboarding-login-methods .onboarding-stack').prepend(probe);
+    });
     const disabled = page.locator('.onboarding-login-methods button[aria-disabled="true"]').first();
     await expect(disabled).toBeVisible();
     await expect.poll(() => styles(disabled, ['color', 'border-top-color'])).toEqual({

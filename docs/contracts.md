@@ -112,6 +112,22 @@ PlanStay {
 만들지 않고 기존 일정도 바꾸지 않는다. 조회는 성공했는데 통과한 후보가 0개인 것은 **정상 결과**이고
 200에 `NO_CANDIDATE` 사유로 담긴다. 이 둘을 구분한다 — "후보 없음"과 "조회 못 함"은 다르다.
 
+502 본문에는 실패 분류 `upstream`이 **선택 필드**로 붙는다. 값은 아래 닫힌 목록 중 하나뿐이고, 분류를
+모르면 필드가 없다. 클라이언트는 이 값으로 안내 문구만 고르고 판정에는 쓰지 않는다.
+
+| `upstream` | 뜻 |
+| --- | --- |
+| `SELF_LIMIT` | 우리 operation별 일일 한도(`TOUR_API_DAILY_LIMIT`)에 걸려 호출하지 않았다 |
+| `QUOTA` | 공공데이터포털이 호출 한도 초과로 거절했다(resultCode 22, HTTP 429) |
+| `AUTH` | 인증키 문제(미등록·만료·IP·서비스 미신청, HTTP 401·403) 또는 키 미설정 |
+| `UPSTREAM_ERROR` | HTTP 5xx 또는 그 밖의 오류 resultCode |
+| `PARSE` | JSON이 아닌 응답이고 원인 코드를 찾지 못했다 |
+| `NETWORK` | 요청이 닿지 않았다(연결 실패·시간 초과) |
+
+```
+{ "ok": false, "errorCode": "SAFEHOUR_EXTERNAL_API", "message": "...", "upstream": "QUOTA" }
+```
+
 추천 중단 스위치가 켜져 있으면 200에 `servicePaused: true`와 함께 모든 날짜가 정거장 0개로 온다.
 
 ## `POST /api/itinerary/alternatives`
@@ -120,7 +136,7 @@ PlanStay {
 
 - 입력: `{ lang, stay, date, outingId, stopId, day, usedContentIds?, edits?, events? }`
 - 오류: 401, 체류 규칙 위반은 `SAFEHOUR_STAY_INVALID`, 본문 형식 오류는 `SAFEHOUR_BAD_REQUEST`
-  (`day.date`가 `date`와 다른 경우 포함), 관광공사 조회 실패는 502, 판정 실패는 500
+  (`day.date`가 `date`와 다른 경우 포함), 관광공사 조회 실패는 502(일정과 같은 선택 필드 `upstream`), 판정 실패는 500
 - 출력: `{ ok: true, alternatives: Array<{ stop, outingPreview }> }` — **최대 5개**
 - 돌려주는 후보는 모두 게이트와 외출 재검증(복귀 계산·보행 누적·이동 한도)을 통과한 것뿐이다.
   통과하지 못한 후보를 "넣어보고 실패하면 되돌리기"용으로 주지 않는다.
@@ -168,11 +184,17 @@ PlanStay {
 
 ## `GET /api/health`
 
-로그인 없이 열린다. `{ ok, service, checkedAt, config, flags }`를 준다.
+로그인 없이 열린다. `{ ok, service, checkedAt, config, flags, tourApiUsage }`를 준다.
 
 - `config`는 **키 값을 담지 않는다.** 키의 존재 여부(참/거짓)와, 기상 키를 어느 환경변수에서
   읽었는지 그 **변수 이름**만 알린다.
 - `flags`는 운영 스위치 상태다(추천 중단 등).
+- `tourApiUsage`는 관광공사 자체 호출 카운터의 오늘(KST) 요약이다:
+  `{ scope, date, dailyLimit, warningAt, counterReadable, operations: { "서비스.오퍼레이션": { used, limit, state } } }`.
+  `scope`는 늘 `"instance"`다: 응답한 서버 인스턴스의 카운터이고 **제공처에 남은 한도가 아니다**.
+  `state`는 `OK`·`WARNING`(경고 값 이상)·`BLOCKED`(차단 값 도달)다. 카운터 파일만 읽고 키·URL·매개변수는
+  담지 않는다. 카운터가 손상됐으면 `counterReadable: false`이고, 관광 모듈을 못 불러오면 `null`이다.
+  서버리스 배포에서는 카운터 파일이 실행 인스턴스마다 따로라 **응답한 인스턴스의 숫자**다(제공처 전체 호출 수가 아니다).
 - 배포 직후와 스위치를 켠 직후에 실제로 반영됐는지 확인하는 경로다.
 
 ## 더 이상 없는 경로

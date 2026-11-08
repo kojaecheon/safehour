@@ -7,6 +7,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { DEPARTURE_TIME_UNSET } from '../src/stay/defaults.js';
 import {
   NAME_MAX_LENGTH,
   STEPS,
@@ -34,6 +35,8 @@ import {
 } from '../components/onboarding/draft.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { validateStay } from '../src/stay/index.js';
+import { dayWindow } from '../src/stay/dayFrame.js';
+import { toPlanStay } from '../lib/trip/planStay.js';
 
 const DEMO_ADDRESS = Object.freeze({ roadAddress: '테스트로 1', lat: 37.5, lng: 127.0, source: 'DEMO' });
 
@@ -58,11 +61,59 @@ describe('초안 → 체류 (spec 5.1)', () => {
     assert.deepEqual(emptyDraft(), emptyDraft());
     const d = emptyDraft();
     assert.equal(d.appointments[0].hospitalId, d.hospitals[0].id);
-    // 숨은 기본값 없음: 공항·동반·강도·일정 유형은 사용자가 고른다
-    assert.equal(d.arrival.airport, null);
+    // 운영자 결정(2026-11-08): 판정을 느슨하게 하지 않는 기본 선택만 둔다. 공항은 인천, 강도는 느긋하게(덜 움직이는 쪽)
+    assert.equal(d.arrival.airport, 'ICN');
+    assert.equal(d.departure.airport, 'ICN');
+    assert.equal(d.pace, 'RELAXED');
+    // 그 밖의 선택은 사용자가 고른다: 동반 보호자·일정 유형
     assert.equal(d.hasCompanion, null);
-    assert.equal(d.pace, null);
     assert.equal(d.appointments[0].type, null);
+  });
+
+  test('숙소 이름은 선택이다: 비우면 저장하지 않고 검증을 통과한다', () => {
+    const draft = validDraft();
+    draft.lodgings[0].name = '   ';
+    const stay = stayFromDraft(draft);
+    assert.equal('name' in stay.lodgings[0], false);
+    assert.equal(validateStay(stay).ok, true);
+    assert.deepEqual(issuesFor(draftIssues(draft), 'lodgings[0].name'), []);
+    // 주소(좌표)는 그대로 필수다
+    draft.lodgings[0].address = null;
+    assert.equal(issuesFor(draftIssues(draft), 'lodgings[0].address').length, 1);
+  });
+
+  test('병원 이름은 그대로 필수다', () => {
+    const draft = validDraft();
+    draft.hospitals[0].name = '';
+    assert.equal(issuesFor(draftIssues(draft), 'hospitals[0].name').length, 1);
+  });
+
+  test('출발 시각을 비우면 출국일 가장 이른 시각으로 저장하고, 출국일에는 외출 창이 없다', () => {
+    const draft = validDraft();
+    draft.departure.time = '';
+    const stay = stayFromDraft(draft);
+    assert.equal(DEPARTURE_TIME_UNSET, '00:00');
+    assert.deepEqual(stay.departure, { date: '2026-10-10', time: '00:00', airport: 'GMP', timeUnset: true });
+    assert.equal(validateStay(stay).ok, true);
+    assert.deepEqual(draftIssues(draft), []);
+    // 가장 엄격한 쪽: 출국일 마감이 활동 시작보다 앞서 창이 없다
+    const frame = dayWindow(stay, '2026-10-10', { lodgingToAirportMin: 0 });
+    assert.equal(frame.window, null);
+    // 다시 열면 빈 칸으로 보인다(00:00 을 고른 값처럼 보이지 않게)
+    assert.equal(draftFromStay(stay).departure.time, '');
+    // 일정 요청에는 허용 목록(날짜·시각·공항)만 간다
+    assert.deepEqual(toPlanStay(stay).departure, { date: '2026-10-10', time: '00:00', airport: 'GMP' });
+    // 시각을 넣으면 표시를 남기지 않는다
+    assert.equal('timeUnset' in stayFromDraft(validDraft()).departure, false);
+  });
+
+  test('당일 출국(입국일 = 출국일)은 출발 시각을 비울 수 없다', () => {
+    const draft = validDraft();
+    draft.departure = { date: '2026-10-01', time: '', airport: 'ICN' };
+    draft.lodgings[0].checkOut = '2026-10-02';
+    const issues = issuesFor(draftIssues(draft), 'departure.time');
+    assert.equal(issues.length, 1);
+    assert.equal(issues[0].code, 'REQUIRED');
   });
 
   test('새 체류: schemaVersion 2, 일정 출처 USER, 동의 없음, 빈 조건·연동', () => {
@@ -206,7 +257,8 @@ describe('규칙 1–3 이 필드별 문구로 옮겨진다', () => {
   test('빈 초안은 모든 단계에 문제가 있고, 각 문제에 문구가 있다', () => {
     const issues = draftIssues(emptyDraft());
     const steps = new Set(issues.map((i) => stepOfField(i.field)));
-    assert.deepEqual([...steps].sort(), [0, 1, 2, 3, 4]);
+    // 5단계(관심사·강도)는 강도가 미리 골라져 있고 관심사는 선택이라 빈 초안에도 문제가 없다
+    assert.deepEqual([...steps].sort(), [0, 1, 2, 3]);
     for (const issue of issues) {
       const { key } = issueMessage(issue);
       assert.ok(UI_TEXT[key], `${issue.field} ${issue.code} → ${key} 문구 없음`);

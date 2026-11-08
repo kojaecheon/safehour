@@ -39,14 +39,16 @@ import TripNotice from './TripNotice.js';
 import UpdateFailedNotice from './UpdateFailedNotice.js';
 import useKstClock from './useKstClock.js';
 import {
-  DEADLINE_REASON_KEY,
   canEditDay,
+  dayActionKey,
+  deadlineCopyOf,
   deltaSummary,
   editErrorKey,
   formatDate,
   guardianTabInfo,
   isDemoMode,
   needsInputFix,
+  outingDayNote,
   stopEditable,
   timelineEntries,
 } from './viewModel.js';
@@ -210,12 +212,13 @@ export default function DayScreen() {
           return { id: entry.id, kind: 'depart', time: entry.time, title: entry.place?.name ?? t('trip.placeLodging') };
         case 'return': {
           const place = entry.place?.name ?? (entry.place?.kind === 'HOSPITAL' ? t('trip.placeHospital') : t('trip.placeLodging'));
+          const copy = deadlineCopyOf(entry, { isToday });
           const notes = [
             entry.plannedReturnAt ? t('trip.plannedReturn', { time: entry.plannedReturnAt }) : null,
-            t('return.deadline', { time: entry.returnBy }),
-            entry.deadlineReason && DEADLINE_REASON_KEY[entry.deadlineReason] ? t(DEADLINE_REASON_KEY[entry.deadlineReason]) : null,
+            t(copy.timeKey, { time: entry.returnBy }),
+            copy.reasonKey ? t(copy.reasonKey) : null,
           ].filter(Boolean);
-          return { id: entry.id, kind: 'return', time: entry.time, endTime: entry.endTime, title: place, note: notes.join(' · ') };
+          return { id: entry.id, kind: 'return', kindKey: copy.labelKey, time: entry.time, endTime: entry.endTime, title: place, note: notes.join(' · ') };
         }
         case 'appointment':
           return { id: entry.id, kind: 'appointment', time: entry.time, endTime: entry.endTime, title: entry.place?.name ?? t('trip.placeHospital') };
@@ -317,7 +320,13 @@ export default function DayScreen() {
     body = (
       <>
         <div className="ui-block trip-status-block">
-          <StateBanner state={day.dayState} reasons={day.reasons ?? []} live />
+          <StateBanner
+            state={day.dayState}
+            reasons={day.reasons ?? []}
+            actionKey={dayActionKey(day, { isToday, screen: 'day' })}
+            outingNote={outingDayNote(day)}
+            live
+          />
 
           {/* 변경됨 알림 (SEED Callout · actionable, 설계서 5.6): 누르면 전후 비교 시트 */}
           {delta?.unseen && (
@@ -519,7 +528,7 @@ export default function DayScreen() {
 
         {trip.updateFailed && (
           <div className="ui-block">
-            <UpdateFailedNotice readOnly={trip.readOnly} onRetry={() => trip.retry()} />
+            <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />
           </div>
         )}
 
@@ -537,7 +546,7 @@ export default function DayScreen() {
           onClose={() => setSheet(null)}
         />
       )}
-      {sheet?.kind === 'delta' && day && <DeltaSheet day={day} dateLabel={title} onClose={closeDelta} />}
+      {sheet?.kind === 'delta' && day && <DeltaSheet day={day} dateLabel={title} isToday={isToday} onClose={closeDelta} />}
       {sheet?.kind === 'regenerate' && (
         <RegenerateSheet
           date={date}

@@ -712,11 +712,39 @@ describe('네트워크·API 실패 — 확정 일정을 그대로 두고 업데�
     assert.deepEqual(store.readTripPlan(), before);
     assert.equal(sync.getState().updateFailed, true);
     assert.equal(sync.getState().lastErrorCode, 'SAFEHOUR_EXTERNAL_API');
+    assert.equal(sync.getState().lastUpstream, null, '분류가 없는 502 는 lastUpstream 이 없다');
 
     await sync.retry();
     assert.deepEqual(lastPlan().dates, ['2026-10-07']);
     assert.equal(sync.getState().updateFailed, false);
     assert.ok(store.readTripPlan().days['2026-10-07'].blocks.some((b) => b.appointmentId === 'A-V'));
+  });
+
+  test('502 에 실린 관광공사 실패 분류는 lastUpstream 으로 옮기고, 성공하면 지운다', async () => {
+    const { store, sync, server } = await setup({ stayValue: selfStay() });
+    const before = store.readTripPlan();
+    server.failPlan = 1;
+    server.failPlanUpstream = 'QUOTA';
+    store.updateStay((s) => ({ ...s, appointments: [...s.appointments, { id: 'A-Q', hospitalId: 'H1', type: 'VISIT', date: '2026-10-07', start: '14:00', source: 'USER' }] }));
+    await sync.idle();
+    assert.deepEqual(store.readTripPlan(), before);
+    assert.equal(sync.getState().updateFailed, true);
+    assert.equal(sync.getState().lastUpstream, 'QUOTA');
+
+    await sync.retry();
+    assert.equal(sync.getState().updateFailed, false);
+    assert.equal(sync.getState().lastUpstream, null);
+  });
+
+  test('API 클라이언트는 닫힌 목록 밖 upstream 값을 버린다', async () => {
+    const respond = (body) => async () => new Response(JSON.stringify(body), { status: 502, headers: { 'content-type': 'application/json' } });
+    const ok = await createTripApi({ fetchImpl: respond({ ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'AUTH' }) }).plan({});
+    assert.equal(ok.upstream, 'AUTH');
+    const odd = await createTripApi({
+      fetchImpl: respond({ ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: '<b>https://x?serviceKey=k</b>' }),
+    }).plan({});
+    assert.equal('upstream' in odd, false);
+    assert.equal(odd.errorCode, 'SAFEHOUR_EXTERNAL_API');
   });
 
   test('편집 요청이 실패하면 편집 기록도 저장하지 않는다', async () => {
@@ -809,5 +837,18 @@ describe('보호자 링크 다시 보내기 신호', () => {
     store.writeGuardianShare({ lastSentAt: sentAt, planFingerprint: fingerprint });
     await sync.idle();
     assert.equal(sync.getState().guardianResendNeeded, false);
+  });
+
+  test('보낸 링크의 7일 범위가 지나고 체류가 이어지면 guardianWindowPassed 가 켜진다(일정 변화 신호와 따로)', async () => {
+    const { store, sync, clock } = await setup({ stayValue: selfStay() });
+    const sentAt = new Date(kst('2026-10-02', '07:00')).toISOString();
+    const fingerprint = await computeShareFingerprint({ stay: store.readStay(), tripPlan: store.readTripPlan(), since: Date.parse(sentAt) });
+    store.writeGuardianShare({ lastSentAt: sentAt, planFingerprint: fingerprint });
+    await sync.idle();
+    assert.equal(sync.getState().guardianWindowPassed, false, '10-02 에 보낸 링크는 10-08 까지 담는다');
+    clock.set(kst('2026-10-09', '09:00'));
+    await sync.appOpen();
+    await sync.idle();
+    assert.equal(sync.getState().guardianWindowPassed, true);
   });
 });

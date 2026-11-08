@@ -71,6 +71,7 @@ test.describe('시나리오 6 — 보호자 링크', () => {
     const text = JSON.stringify(snapshot);
     expect(snapshot.emergency).toEqual(['119', '1330']);
     expect(snapshot.days.length).toBeGreaterThan(0);
+    expect(snapshot.days.length).toBeLessThanOrEqual(7); // 만든 날부터 7일만 담는다(findings 2)
     for (const forbidden of [HOSPITAL_NAME, HOSPITAL_PHONE, 'diet', 'medication', 'walkLimit', 'avoidUv', 'avoidHeat', 'avoidWater', 'deadlineReason', 'appointment', 'hospitalId']) {
       expect(text, `보호자 스냅샷에 '${forbidden}' 이 들어 있다`).not.toContain(forbidden);
     }
@@ -93,6 +94,7 @@ test.describe('시나리오 6 — 보호자 링크', () => {
       await enterPin(guardian.page, PIN);
       await expect(guardian.page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
       await expect(guardian.page.getByText(/기준$/).first()).toBeVisible(); // 'O월 O일 O시 기준' — 자동 갱신되지 않는 사본
+      await expect(guardian.page.getByText(/^담긴 일정: /)).toBeVisible(); // 기준 시각 옆의 담긴 날짜 범위
       await expect(guardian.page.getByText('이 안내는 받은 시점의 사본이라 자동으로 바뀌지 않아요.', { exact: false })).toBeVisible();
       await expect(guardian.page.getByRole('link', { name: /119/ }).first()).toHaveAttribute('href', 'tel:119');
       await expect(guardian.page.locator('main')).not.toContainText(HOSPITAL_NAME);

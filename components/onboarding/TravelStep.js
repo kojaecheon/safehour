@@ -3,6 +3,8 @@
 // 1단계 — 입국·출국 날짜·시각·공항 (spec 4.1)
 //
 // 규칙 1(출국 < 입국, 45박 초과)은 validateStay() 가 판정하고, 이 화면은 그 결과를 출국 칸에 붙인다.
+// 공항은 인천(ICN)이 미리 골라져 있다(바꿀 수 있다). 출발 시각은 선택이다: 비우면 출국일 가장 이른 시각을
+// 기준으로 삼아 출국일에는 외출을 만들지 않는다(src/stay/defaults.js DEPARTURE_TIME_UNSET). 그 뜻을 칸 아래에 적는다.
 
 import { useLang } from '../LanguageProvider.js';
 import { DEFAULTS } from '@/src/stay/defaults.js';
@@ -21,7 +23,8 @@ const ENDPOINTS = [
     which: 'departure',
     title: 'onboarding.departure',
     date: 'onboarding.departureDate',
-    time: 'onboarding.departureTime',
+    time: 'onboarding.departureTimeOptional',
+    timeHint: 'onboarding.departureTimeHint',
     airport: 'onboarding.departureAirport',
   },
 ];
@@ -55,6 +58,7 @@ export default function TravelStep({ draft, update, issues }) {
               issues={issues}
               type="time"
               label={t(endpoint.time)}
+              hint={endpoint.timeHint ? t(endpoint.timeHint) : undefined}
               value={draft[endpoint.which].time}
               onChange={(value) => setEndpoint(endpoint.which, 'time', value)}
             />

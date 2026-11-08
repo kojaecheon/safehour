@@ -4,10 +4,10 @@
 // 각 블록은 목록 머리 + 목록 행(앞 아이콘 · 제목 · 설명 · 화살표).
 
 import { test, expect } from './fixtures.js';
-import { gapBetween, startTrip, styles } from './helpers.js';
+import { expectNoAxeViolations, gapBetween, startTrip, styles } from './helpers.js';
 
 test.describe('③층 더보기, 목록 묶음 두 개', () => {
-  test('회색 바탕 위 흰 블록 두 개: 도구(5행) · 정보(1행), 첫 블록이 상단 바 바로 아래, 블록 사이 8px', async ({ page }) => {
+  test('회색 바탕 위 흰 블록 두 개: 도구(5행) · 정보(2행), 첫 블록이 상단 바 바로 아래, 블록 사이 8px', async ({ page }) => {
     await startTrip(page, {}, { path: '/more' });
     const main = page.locator('main.more-page');
     expect((await styles(main, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
@@ -16,7 +16,7 @@ test.describe('③층 더보기, 목록 묶음 두 개', () => {
     await expect(blocks.nth(0).getByRole('heading', { name: '도구' })).toBeVisible();
     await expect(blocks.nth(1).getByRole('heading', { name: '정보' })).toBeVisible();
     await expect(blocks.nth(0).locator('.ui-list > li')).toHaveCount(5);
-    await expect(blocks.nth(1).locator('.ui-list > li')).toHaveCount(1);
+    await expect(blocks.nth(1).locator('.ui-list > li')).toHaveCount(2);
     expect(gapBetween(await page.locator('.top-bar').boundingBox(), await blocks.nth(0).boundingBox())).toBe(0);
     expect(gapBetween(await blocks.nth(0).boundingBox(), await blocks.nth(1).boundingBox())).toBe(8);
   });
@@ -27,6 +27,7 @@ test.describe('③층 더보기, 목록 묶음 두 개', () => {
       ['한국어 안내 카드', '/cards'],
       ['보호자 링크', '/guardian'],
       ['조건', '/conditions'],
+      ['도움말', '/help'],
       ['개인정보와 면책 안내', '/privacy'],
     ];
     for (const [name, href] of expected) {
@@ -46,6 +47,7 @@ test.describe('③층 더보기, 목록 묶음 두 개', () => {
       ['/conditions', '조건', '본인 체크 기간과 병원 연동'],
       ['/onboarding?edit=1', '체류 정보 수정', '입국·출국, 숙소, 병원과 병원 일정'],
       ['/settings', '설정', '언어·알림·동의 철회·내 정보 지우기'],
+      ['/help', '도움말', '앱이 하는 일, 홈 화면에 추가하기, 자주 묻는 질문'],
       ['/privacy', '개인정보와 면책 안내', '무엇을 받고 어디에 남기는지'],
     ];
     for (const [href, title, description] of rows) {
@@ -76,5 +78,25 @@ test.describe('③층 더보기, 목록 묶음 두 개', () => {
     await startTrip(page, {}, { path: '/more' });
     await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
+  });
+
+  test('설치 안내 상자: 설치되지 않은 브라우저에서는 도움말 설치 안내로 잇고, 설치된 앱(standalone)에서는 보이지 않는다', async ({ page }) => {
+    await startTrip(page, {}, { path: '/more' });
+    const callout = page.locator('main.more-page .more-install');
+    await expect(callout).toBeVisible();
+    const link = callout.getByRole('link', { name: '설치 방법 보기' });
+    await expect(link).toHaveAttribute('href', '/help#install');
+    expect((await link.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    // 안내 상자는 목록 블록(.ui-block) 수를 늘리지 않는다
+    await expect(page.locator('main.more-page .ui-block')).toHaveCount(2);
+    await expectNoAxeViolations(page, '/more 설치 안내 상자');
+
+    // iOS 홈 화면 앱은 navigator.standalone 이 true 다
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, 'standalone', { value: true, configurable: true });
+    });
+    await page.goto('/more');
+    await expect(page.locator('main.more-page .ui-block').first()).toBeVisible();
+    await expect(page.locator('main.more-page .more-install')).toHaveCount(0);
   });
 });

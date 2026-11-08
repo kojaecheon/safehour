@@ -9,11 +9,15 @@
 //   - 동행 필수=예 이면 '보호자가 곁을 지켜야 하나요?'는 '예'로 고정해 보여주고, 저장도 '예'로 한다.
 //   - 복약 시각마다 '숙소에서 복용'(기본 예)을 고른다.
 //   - 제한 없음 기간을 켜면 항목을 묻지 않는다.
+//   - 외출·복귀(필수) 다음 항목은 묶음(ITEM_GROUPS)으로 접어 둔다(운영자 결정 2026-11-08). 묶음 머리에 답한 수를 보이고,
+//     '제한 없음' 버튼이 그 묶음에서 답하지 않은 항목만 '아니오'로 채운다(이미 고른 답은 바꾸지 않는다).
+//     이미 답한 항목이 있으면 버튼 이름이 '답하지 않은 N개만'으로 바뀌고, 남은 항목이 없으면 버튼을 끈다. 저장하려다 막히면 문제가 있는 묶음은 저절로 펼친다.
+//     '모르겠음'은 그대로 가장 엄격한 기본값이다. 외출·복귀는 묶음에 넣지 않고 늘 보인다.
 // 저장은 validatePeriodForm(도메인 검증) → 부모의 onSave(기간). 오류는 항목마다 붙이고 맨 위에 모아 보여준다.
 // 기기 저장이 실패하면 부모가 saveErrorKey 로 알려 준다. 그 문장은 저장 버튼 곁(하단 바 안 맨 앞)에 보인다(설계서 6.1,
 // 체류 설정·보호자와 같은 자리).
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
 import { AnswerInput, Button, Icon, PeriodEditor } from '@/components/ui/index.js';
 import { postProcedureBoundary } from '@/src/stay/stay.js';
@@ -22,8 +26,13 @@ import ChoiceInput from './ChoiceInput.js';
 import { ITEM_LABEL_KEY } from './values.js';
 import {
   ANSWER,
+  ITEM_GROUPS,
+  LIMIT_KEYS,
   emptyMedicationRow,
   emptyPeriodForm,
+  fillGroupNone,
+  formAnswerOf,
+  unansweredFields,
   periodToForm,
   returnHospitalId,
   validatePeriodForm,
@@ -95,11 +104,7 @@ const MEAL_OPTIONS = [
   { value: 'UNTIL', key: 'conditions.mealUNTIL' },
 ];
 
-const GROUPS = [
-  { key: 'conditions.groupExposure', items: ['avoidUv', 'avoidHeat', 'avoidWater'] },
-];
 const DATE_FIELDS = ['startDate', 'endDate'];
-const DIET_ITEMS = ['diet.spicy', 'diet.alcohol', 'diet.hard', 'diet.hot', 'diet.raw'];
 
 /** 검증 문제 → 문구 키 */
 function errorKey(field, code) {
@@ -149,6 +154,8 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
   const base = `pf${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [form, setForm] = useState(() => initialForm(period, stay));
   const [showErrors, setShowErrors] = useState(false);
+  // 사용자가 펼친 묶음 id. 새 기간은 모두 접힌 채 시작한다
+  const [openGroups, setOpenGroups] = useState(() => new Set());
   const summaryRef = useRef(null);
   const [focusSummary, setFocusSummary] = useState(0);
   const hospitals = useMemo(() => stay?.hospitals ?? [], [stay]);
@@ -187,6 +194,15 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
         times: prev.medication.times.map((row, i) => (i === index ? { ...row, ...patch } : row)),
       },
     }));
+  }
+
+  function toggleGroup(id) {
+    setOpenGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   function submit(event) {
@@ -264,6 +280,139 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
   const escortFixed = form.yesNo.escortRequired === ANSWER.YES;
   const autoHospital = hospitals.length === 1 ? hospitals[0] : null;
   const chosenHospitalId = returnHospitalId(form.returnTime, hospitals);
+
+  function renderMeal() {
+    return (
+      <div className="conditions-item" id={fieldId('mealRestriction')} tabIndex={-1}>
+        <AnswerInput
+          legend={t('conditions.qMealRestriction')}
+          value={form.mealRestriction.answer}
+          onChange={(answer) => updateNested('mealRestriction', { answer })}
+          disabled={readOnly}
+        />
+        {form.mealRestriction.answer === ANSWER.YES && (
+          <div className="conditions-subfield">
+            <ChoiceInput
+              legend={t('conditions.mealModeLegend')}
+              value={form.mealRestriction.mode}
+              options={MEAL_OPTIONS.map((o) => ({ value: o.value, label: t(o.key) }))}
+              onChange={(mode) => updateNested('mealRestriction', { mode })}
+              disabled={readOnly}
+            />
+            {form.mealRestriction.mode === 'UNTIL' && (
+              <div className="field">
+                <label htmlFor={`${fieldId('mealRestriction')}-until`}>{t('conditions.mealUntilLabel')}</label>
+                <input
+                  id={`${fieldId('mealRestriction')}-until`}
+                  type="time"
+                  value={form.mealRestriction.until}
+                  disabled={readOnly}
+                  aria-invalid={errors.mealRestriction ? 'true' : undefined}
+                  aria-describedby={describedBy('mealRestriction')}
+                  onChange={(e) => updateNested('mealRestriction', { until: e.target.value })}
+                />
+              </div>
+            )}
+          </div>
+        )}
+        {renderError('mealRestriction')}
+      </div>
+    );
+  }
+
+  function renderMedication() {
+    return (
+      <div className="conditions-item" id={fieldId('medication')} tabIndex={-1}>
+        <AnswerInput
+          legend={t('conditions.qMedication')}
+          value={form.medication.answer}
+          onChange={(answer) => updateNested('medication', { answer })}
+          disabled={readOnly}
+        />
+        {form.medication.answer === ANSWER.YES && (
+          <div className="conditions-subfield">
+            <ol className="conditions-med-list">
+              {form.medication.times.map((row, index) => {
+                const n = index + 1;
+                const timeId = `${fieldId('medication')}-t${index}`;
+                return (
+                  <li key={index} className="conditions-med-row">
+                    <div className="field">
+                      <label htmlFor={timeId}>{t('conditions.medTimeLabel', { n })}</label>
+                      <input
+                        id={timeId}
+                        type="time"
+                        value={row.time}
+                        disabled={readOnly}
+                        aria-invalid={errors.medication && !row.time ? 'true' : undefined}
+                        aria-describedby={describedBy('medication')}
+                        onChange={(e) => updateMedicationRow(index, { time: e.target.value })}
+                      />
+                    </div>
+                    <label className="toggle-row conditions-toggle">
+                      <span>
+                        <span className="label">{t('conditions.medAtLodging')}</span>
+                        <span className="sub">{t('conditions.medAtLodgingSub')}</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={row.atLodging !== false}
+                        disabled={readOnly}
+                        onChange={(e) => updateMedicationRow(index, { atLodging: e.target.checked })}
+                      />
+                    </label>
+                    {form.medication.times.length > 1 && (
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        disabled={readOnly}
+                        onClick={() =>
+                          updateNested('medication', {
+                            times: form.medication.times.filter((_, i) => i !== index),
+                          })
+                        }
+                      >
+                        {t('conditions.medRemove', { n })}
+                      </Button>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            <Button
+              variant="secondary"
+              size="small"
+              icon="plus"
+              disabled={readOnly}
+              onClick={() =>
+                updateNested('medication', { times: [...form.medication.times, emptyMedicationRow()] })
+              }
+            >
+              {t('conditions.medAdd')}
+            </Button>
+          </div>
+        )}
+        {renderError('medication')}
+      </div>
+    );
+  }
+
+  /** 묶음 안 한 항목 */
+  function renderField(field) {
+    if (LIMIT_KEYS.includes(field)) {
+      return renderLimit({ field, hint: field === 'walkLimit' ? t('conditions.walkHint') : undefined });
+    }
+    if (field === 'guardianMustStay') {
+      return renderYesNo({
+        field,
+        hint: escortFixed ? t('conditions.guardianFixedHint') : t('conditions.guardianHint'),
+        fixed: escortFixed,
+      });
+    }
+    if (field === 'mealRestriction') return renderMeal();
+    if (field === 'medication') return renderMedication();
+    return renderYesNo({ field });
+  }
 
   return (
     <form className="conditions-form" onSubmit={submit} noValidate>
@@ -401,139 +550,55 @@ export default function PeriodForm({ stay, period, periodId, readOnly, onSave, o
               </div>
             )}
 
-            <h4 className="conditions-group-title">{t('conditions.groupLimits')}</h4>
-            {renderLimit({ field: 'walkLimit', hint: t('conditions.walkHint') })}
-            {renderLimit({ field: 'travelLimit' })}
-
-            {GROUPS.map((group) => (
-              <div key={group.key}>
-                <h4 className="conditions-group-title">{t(group.key)}</h4>
-                {group.items.map((field) => (
-                  <div key={field}>{renderYesNo({ field })}</div>
-                ))}
-              </div>
-            ))}
-
-            <h4 className="conditions-group-title">{t('conditions.groupGuardian')}</h4>
-            {renderYesNo({ field: 'escortRequired' })}
-            {renderYesNo({
-              field: 'guardianMustStay',
-              hint: escortFixed ? t('conditions.guardianFixedHint') : t('conditions.guardianHint'),
-              fixed: escortFixed,
-            })}
-
-            <h4 className="conditions-group-title">{t('conditions.groupMeal')}</h4>
-            <div className="conditions-item" id={fieldId('mealRestriction')} tabIndex={-1}>
-              <AnswerInput
-                legend={t('conditions.qMealRestriction')}
-                value={form.mealRestriction.answer}
-                onChange={(answer) => updateNested('mealRestriction', { answer })}
-                disabled={readOnly}
-              />
-              {form.mealRestriction.answer === ANSWER.YES && (
-                <div className="conditions-subfield">
-                  <ChoiceInput
-                    legend={t('conditions.mealModeLegend')}
-                    value={form.mealRestriction.mode}
-                    options={MEAL_OPTIONS.map((o) => ({ value: o.value, label: t(o.key) }))}
-                    onChange={(mode) => updateNested('mealRestriction', { mode })}
-                    disabled={readOnly}
-                  />
-                  {form.mealRestriction.mode === 'UNTIL' && (
-                    <div className="field">
-                      <label htmlFor={`${fieldId('mealRestriction')}-until`}>{t('conditions.mealUntilLabel')}</label>
-                      <input
-                        id={`${fieldId('mealRestriction')}-until`}
-                        type="time"
-                        value={form.mealRestriction.until}
-                        disabled={readOnly}
-                        aria-invalid={errors.mealRestriction ? 'true' : undefined}
-                        aria-describedby={describedBy('mealRestriction')}
-                        onChange={(e) => updateNested('mealRestriction', { until: e.target.value })}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-              {renderError('mealRestriction')}
-            </div>
-            {DIET_ITEMS.map((field) => (
-              <div key={field}>{renderYesNo({ field })}</div>
-            ))}
-
-            <h4 className="conditions-group-title">{t('conditions.groupMedication')}</h4>
-            <div className="conditions-item" id={fieldId('medication')} tabIndex={-1}>
-              <AnswerInput
-                legend={t('conditions.qMedication')}
-                value={form.medication.answer}
-                onChange={(answer) => updateNested('medication', { answer })}
-                disabled={readOnly}
-              />
-              {form.medication.answer === ANSWER.YES && (
-                <div className="conditions-subfield">
-                  <ol className="conditions-med-list">
-                    {form.medication.times.map((row, index) => {
-                      const n = index + 1;
-                      const timeId = `${fieldId('medication')}-t${index}`;
-                      return (
-                        <li key={index} className="conditions-med-row">
-                          <div className="field">
-                            <label htmlFor={timeId}>{t('conditions.medTimeLabel', { n })}</label>
-                            <input
-                              id={timeId}
-                              type="time"
-                              value={row.time}
-                              disabled={readOnly}
-                              aria-invalid={errors.medication && !row.time ? 'true' : undefined}
-                              aria-describedby={describedBy('medication')}
-                              onChange={(e) => updateMedicationRow(index, { time: e.target.value })}
-                            />
-                          </div>
-                          <label className="toggle-row conditions-toggle">
-                            <span>
-                              <span className="label">{t('conditions.medAtLodging')}</span>
-                              <span className="sub">{t('conditions.medAtLodgingSub')}</span>
-                            </span>
-                            <input
-                              type="checkbox"
-                              checked={row.atLodging !== false}
-                              disabled={readOnly}
-                              onChange={(e) => updateMedicationRow(index, { atLodging: e.target.checked })}
-                            />
-                          </label>
-                          {form.medication.times.length > 1 && (
-                            <Button
-                              variant="secondary"
-                              size="small"
-                              disabled={readOnly}
-                              onClick={() =>
-                                updateNested('medication', {
-                                  times: form.medication.times.filter((_, i) => i !== index),
-                                })
-                              }
-                            >
-                              {t('conditions.medRemove', { n })}
-                            </Button>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ol>
+            {ITEM_GROUPS.map((group) => {
+              const panelId = `${base}-g-${group.id}`;
+              const titleId = `${panelId}-title`;
+              const hasError = group.fields.some((field) => field in errors);
+              const open = openGroups.has(group.id) || hasError;
+              const done = group.fields.filter((field) => formAnswerOf(form, field) !== null).length;
+              const left = unansweredFields(form, group.fields).length;
+              const noneLabel =
+                left === 0
+                  ? t('conditions.groupNoneDone')
+                  : done === 0
+                    ? t('conditions.groupNone')
+                    : t('conditions.groupNoneRest', { n: left });
+              return (
+                <section key={group.id} className="conditions-group" aria-labelledby={titleId}>
+                  <h4 className="conditions-group-title">
+                    <button
+                      type="button"
+                      id={titleId}
+                      className="conditions-group-toggle"
+                      aria-expanded={open ? 'true' : 'false'}
+                      aria-controls={panelId}
+                      onClick={() => toggleGroup(group.id)}
+                    >
+                      <span className="conditions-group-name">{t(group.titleKey)}</span>
+                      <span className="conditions-group-count">
+                        {t('conditions.groupAnswered', { done, total: group.fields.length })}
+                      </span>
+                      <Icon name="chevronDown" size={20} className="conditions-group-chevron" />
+                    </button>
+                  </h4>
                   <Button
                     variant="secondary"
                     size="small"
-                    icon="plus"
-                    disabled={readOnly}
-                    onClick={() =>
-                      updateNested('medication', { times: [...form.medication.times, emptyMedicationRow()] })
-                    }
+                    className="conditions-group-none"
+                    disabled={readOnly || left === 0}
+                    aria-describedby={titleId}
+                    onClick={() => setForm((prev) => fillGroupNone(prev, group.fields))}
                   >
-                    {t('conditions.medAdd')}
+                    {noneLabel}
                   </Button>
-                </div>
-              )}
-              {renderError('medication')}
-            </div>
+                  <div id={panelId} className="conditions-group-body" hidden={!open}>
+                    {group.fields.map((field) => (
+                      <Fragment key={field}>{renderField(field)}</Fragment>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
           </>
         )}
       </PeriodEditor>

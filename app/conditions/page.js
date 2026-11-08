@@ -9,9 +9,12 @@
 //   - 날짜별 분류와 합성 결과(출처: 병원 발행 / 본인 체크 / 기본값 적용)를 보여준다(spec 4.5).
 //   - 이 화면은 저장소에만 쓴다. 일정 API 를 부르지 않는다 — 재계획은 저장소를 구독하는 동기화 작업(AX-316)이 한다.
 //   - 보기 전용(로그인 만료·오프라인)에서는 동의·입력·삭제를 모두 막는다.
+//   - 첫 조건 기간을 저장하면(저장 전 기간 0개) 오늘 화면으로 데려가 '첫 일정을 만들었어요'를 한 번 보인다
+//     (운영자 결정 2026-11-08). 기간을 고치거나 두 번째 기간을 더할 때는 지금처럼 이 화면에 남는다.
 //   - SEED ③층(설계서 6.2 4번): 회색 바탕 위 흰 블록. 안내·동의 / 조건 기간 / 날짜별 적용 조건 / 동의 철회 / 체류 정보 고치기.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useLang } from '@/components/LanguageProvider.js';
 import { Button, EmptyState, Icon, ListGroup, ListItem, TopBar, useStoreStatus } from '@/components/ui/index.js';
 import ConsentPanel from '@/components/conditions/ConsentPanel.js';
@@ -41,7 +44,11 @@ function sortPeriods(periods) {
   );
 }
 
+/** 첫 기간 저장 뒤 가는 곳. welcome=1 은 오늘 화면이 한 번 읽고 지운다(개인 값은 싣지 않는다) */
+const FIRST_PLAN_HREF = '/today?welcome=1';
+
 export default function ConditionsPage() {
+  const router = useRouter();
   const { t } = useLang();
   const hydrated = useHydrated();
   const stay = useStay();
@@ -107,10 +114,15 @@ export default function ConditionsPage() {
   function save(period) {
     const current = getStore().readPeriods();
     const exists = current.some((p) => p.id === period.id);
+    const first = current.length === 0 && !exists;
     const next = exists ? current.map((p) => (p.id === period.id ? period : p)) : [...current, period];
     const result = getStore().writePeriods(next);
     if (!result.ok) {
       setSaveErrorKey(SAVE_ERROR_KEY[result.code] ?? 'conditions.errSave');
+      return;
+    }
+    if (first) {
+      router.push(FIRST_PLAN_HREF);
       return;
     }
     setNotice({ key: 'conditions.saved', error: false });

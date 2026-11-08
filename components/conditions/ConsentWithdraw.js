@@ -52,7 +52,7 @@ export default function ConsentWithdraw({ headingLevel = 2, onWithdrawn }) {
       {sensitive ? (
         <>
           <p>
-            {t('conditions.consentGranted', { at: fmtDateTime(sensitive.agreedAt, locale), version: sensitive.version })}
+            {t('conditions.consentGranted', { at: fmtDateTime(sensitive.agreedAt, locale) })}
           </p>
           <SafetyText k={'conditions.withdrawEffect'} className="ui-callout conditions-callout" />
           <div className="conditions-actions">

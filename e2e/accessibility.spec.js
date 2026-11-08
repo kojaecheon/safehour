@@ -81,6 +81,8 @@ test.describe('시나리오 10 — axe WCAG 2.1 AA 위반 0건', () => {
     await page.getByRole('button', { name: '동의 다시 보기' }).click();
     await page.getByRole('button', { name: '동의합니다' }).click();
     await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    // 외출·복귀 다음 항목은 묶음으로 접혀 있다: 묶음 하나를 펼친 상태도 본다
+    await page.locator('.conditions-group-toggle').filter({ hasText: '걷기와 이동' }).click();
     await page.getByRole('group', { name: '걷는 시간 제한이 있나요?' }).getByRole('radio', { name: '예', exact: true }).check();
     await scan(page, null, '/conditions (본인 체크 편집기)');
     await page.getByRole('button', { name: '저장', exact: true }).click();
@@ -114,7 +116,7 @@ test.describe('시나리오 10 — axe WCAG 2.1 AA 위반 0건', () => {
     await scan(page, null, '/trip/[date] 빠진 장소 펼침');
     const stop = stopsOf(tripPlan.days[date])[0];
     await scan(page, `/place/${stop.candidateId}`, '/place/[id]');
-    for (const path of ['/cards', '/emergency', '/more', '/settings', '/privacy', '/guardian']) await scan(page, path);
+    for (const path of ['/cards', '/emergency', '/more', '/help', '/settings', '/privacy', '/guardian']) await scan(page, path);
 
     // 동의 철회 시트
     await page.goto('/settings');

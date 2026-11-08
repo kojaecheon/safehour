@@ -376,6 +376,163 @@ test.describe('③층 조건 화면, 편집기', () => {
     expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingBottom)).toBe('272px');
   });
 
+  // 운영자 결정(2026-11-08): 외출·복귀 다음 항목은 묶음으로 접고, 묶음마다 '제한 없음' 버튼을 둔다.
+  // 첫 기간을 저장하면 오늘 화면으로 가서 '첫 일정을 만들었어요'를 한 번 보인다
+  test("묶음은 접혀 있고 '제한 없음'이 답하지 않은 항목만 '아니오'로 채운다. 첫 저장은 오늘 화면으로 간다", async ({ page }) => {
+    await startTrip(page, { periods: [] }, { path: '/conditions' });
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+
+    // 외출·복귀는 늘 보이고 '모르겠음'이 없다
+    await expect(page.getByRole('group', { name: '외출이 허용되나요?' })).toBeVisible();
+    await expect(page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '모르겠음' })).toHaveCount(0);
+    const toggles = page.locator('.conditions-group-toggle');
+    await expect(toggles).toHaveCount(5);
+    for (const toggle of await toggles.all()) {
+      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect((await toggle.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    }
+    const noneButtons = page.locator('.conditions-group-none');
+    await expect(noneButtons).toHaveCount(5);
+    for (const button of await noneButtons.all()) expect((await button.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expect(page.getByRole('group', { name: '자외선을 피해야 하나요?' })).toHaveCount(0);
+    await expect(noneButtons.first()).toHaveText("제한 없음 (모두 '아니오')");
+
+    // '피해야 할 환경' 묶음: 제한 없음 → 3개 중 3개 답함, 펼치면 모두 '아니오'
+    const exposure = page.locator('.conditions-group').filter({ has: page.locator('.conditions-group-toggle', { hasText: '피해야 할 환경' }) });
+    await expect(exposure.locator('.conditions-group-count')).toHaveText('3개 중 0개 답함');
+    await exposure.locator('.conditions-group-none').click();
+    await expect(exposure.locator('.conditions-group-count')).toHaveText('3개 중 3개 답함');
+    // 남은 항목이 없으면 버튼을 끈다
+    await expect(exposure.locator('.conditions-group-none')).toBeDisabled();
+    await expect(exposure.locator('.conditions-group-none')).toHaveText('모두 답했어요');
+    await exposure.locator('.conditions-group-toggle').click();
+    await expect(exposure.locator('.conditions-group-toggle')).toHaveAttribute('aria-expanded', 'true');
+    for (const q of ['자외선을 피해야 하나요?', '사우나·찜질 등 열을 피해야 하나요?', '수영·온천 등 물에 들어가면 안 되나요?']) {
+      await expect(page.getByRole('group', { name: q }).getByRole('radio', { name: '아니오', exact: true })).toBeChecked();
+    }
+    // 묶음 안에서 하나를 '모르겠음'으로 바꿀 수 있다(가장 엄격한 기본값 뜻 그대로)
+    await page.getByRole('group', { name: '사우나·찜질 등 열을 피해야 하나요?' }).getByRole('radio', { name: '모르겠음', exact: true }).check();
+    // 이미 답한 항목이 있는 묶음: 버튼 이름이 '답하지 않은 N개만'으로 바뀌고, 누른 뒤에도 '모르겠음'은 그대로다
+    const limits = page.locator('.conditions-group').filter({ has: page.locator('.conditions-group-toggle', { hasText: '걷기와 이동' }) });
+    await limits.locator('.conditions-group-toggle').click();
+    const walk = page.getByRole('group', { name: '걷는 시간 제한이 있나요?' });
+    await walk.getByRole('radio', { name: '모르겠음', exact: true }).check();
+    await expect(limits.locator('.conditions-group-none')).toHaveText("답하지 않은 1개만 '아니오'로");
+    await limits.locator('.conditions-group-none').click();
+    await expect(walk.getByRole('radio', { name: '모르겠음', exact: true })).toBeChecked();
+    await expect(
+      page.getByRole('group', { name: '한 번 이동하는 시간 제한이 있나요?' }).getByRole('radio', { name: '아니오', exact: true }),
+    ).toBeChecked();
+    await expect(limits.locator('.conditions-group-none')).toBeDisabled();
+    // 외출·복귀를 고르지 않으면 묶음을 다 채워도 저장되지 않는다
+    for (const button of await noneButtons.all()) if (await button.isEnabled()) await button.click();
+    await expect(page.getByText('가장 엄격한 기본값을 적용해요').first()).toBeVisible();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    const summary = page.locator('.conditions-error-summary');
+    await expect(summary).toBeVisible();
+    await expect(summary.locator('li')).toHaveCount(2);
+
+    await page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '허용', exact: true }).check();
+    await page
+      .getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' })
+      .getByRole('radio', { name: '아니오', exact: true })
+      .check();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.locator('.trip-notice, [role="status"]').filter({ hasText: '첫 일정을 만들었어요.' }).first()).toBeVisible();
+    const period = (await readRecord(page, 'stay')).periods[0];
+    expect(period.items.avoidHeat).toEqual({ kind: 'UNKNOWN' });
+    expect(period.items.avoidUv).toEqual({ kind: 'NONE' });
+    expect(period.items.walkLimit).toEqual({ kind: 'UNKNOWN' });
+    // 새로 고쳐도 다시 뜨지 않는다
+    await page.reload();
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(0);
+
+    // 두 번째 기간은 지금처럼 조건 화면에 남는다
+    await page.goto('/conditions');
+    await page.getByRole('button', { name: '고치기' }).first().click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page.getByText('기간을 저장했어요.')).toBeVisible();
+    await expect(page).toHaveURL(/\/conditions$/);
+  });
+
+  // 검토 지적(2026-11-08): 도착 전에 첫 기간을 저장하면 오늘 화면은 '여행 시작 전' 빈 상태다. 그 화면에도 알림이 떠야 한다
+  test("도착 전에 첫 기간을 저장해도 오늘 화면에 '첫 일정을 만들었어요'가 보인다", async ({ page }) => {
+    await startTrip(page, { arrival: 1, departure: 4, procedure: 2, visit: 3, periods: [] }, { path: '/conditions' });
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '허용', exact: true }).check();
+    await page
+      .getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' })
+      .getByRole('radio', { name: '아니오', exact: true })
+      .check();
+    for (const button of await page.locator('.conditions-group-none').all()) await button.click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.getByText('여행 시작 전이에요')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('status').filter({ hasText: '첫 일정을 만들었어요.' })).toBeVisible();
+  });
+
+  // 재검토 지적(2026-11-08): 일정이 아직 없으면(만드는 중·만들지 못함) '첫 일정을 만들었어요'를 보이지 않는다(선 5).
+  // 일정이 처음 그려질 때 한 번 보인다
+  test("일정을 만들지 못한 동안에는 '첫 일정을 만들었어요'가 없고, 일정이 그려지면 그때 보인다", async ({ page }) => {
+    await startTrip(page, { arrival: 1, departure: 4, procedure: 2, visit: 3, periods: [] }, { path: '/conditions' });
+    await page.evaluate(() => {
+      for (const key of Object.keys(localStorage)) if (key.endsWith('.tripPlan')) localStorage.removeItem(key);
+    });
+    await page.route('**/api/itinerary/plan', (route) =>
+      route.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' }),
+    );
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '허용', exact: true }).check();
+    await page
+      .getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' })
+      .getByRole('radio', { name: '아니오', exact: true })
+      .check();
+    for (const button of await page.locator('.conditions-group-none').all()) await button.click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.getByText('일정을 만들지 못했어요', { exact: false })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(0);
+
+    await page.unroute('**/api/itinerary/plan');
+    await page.locator('.empty-state, section').getByRole('button', { name: '다시 시도' }).last().click();
+    await expect(page.getByText('여행 시작 전이에요')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('status').filter({ hasText: '첫 일정을 만들었어요.' })).toBeVisible();
+  });
+
+  // 전체 브랜치 검토(2026-11-09): 체류만으로 만든 일정이 이미 있으면 저장 직후 옛 일정이 먼저 그려진다.
+  // 다시 만들기가 실패하면(조회 한도) 갱신 실패 안내만 보이고 '첫 일정을 만들었어요'는 없다(선 5). 다시 시도가 성공하면 그때 한 번 보인다
+  test("저장된 일정이 있는데 다시 만들기가 실패하면 '첫 일정을 만들었어요'가 없고, 다시 시도가 성공하면 한 번 보인다", async ({ page }) => {
+    // 입국일이 오늘이라 새 기간(기본 시작일 = 입국일)이 오늘을 덮고, 저장하면 오늘을 다시 만든다
+    await startTrip(page, { arrival: 0, procedure: 1, visit: 2, periods: [] }, { path: '/conditions' });
+    await page.route('**/api/itinerary/plan', (route) =>
+      route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'QUOTA' }),
+      }),
+    );
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '허용', exact: true }).check();
+    await page
+      .getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' })
+      .getByRole('radio', { name: '아니오', exact: true })
+      .check();
+    for (const button of await page.locator('.conditions-group-none').all()) await button.click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText('조회 한도에 닿았어요');
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(0);
+
+    await page.unroute('**/api/itinerary/plan');
+    await alert.getByRole('button', { name: '다시 시도' }).click();
+    await expect(page.getByRole('status').filter({ hasText: '첫 일정을 만들었어요.' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(1);
+    await expect(alert).toHaveCount(0);
+  });
+
   test('편집 중에는 체류 정보 고치기 행이 없다: 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다', async ({ page }) => {
     await startTrip(page, { periods: [] }, { path: '/conditions' });
     await expect(page.getByRole('link', { name: '체류 정보 고치기' })).toHaveCount(1);
