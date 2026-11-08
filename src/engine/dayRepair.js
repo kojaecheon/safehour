@@ -11,6 +11,7 @@
 //      그래도 안 되면 일반 정거장부터 뒤에서 빼고, 남은 것이 없으면 외출을 취소한다.
 //      단, 이미 출발한 외출은 시작된 정거장이 없어도 취소하지 않는다. 정거장 0개로 남기고 복귀 마감과 여유를
 //      다시 계산한다(밖에 있는 사람의 복귀 마감을 지우지 않는다. 여유가 음수면 tripPlan.js 경우 2 가 즉시 복귀를 켠다).
+//      지금 창의 마감이 출발보다 일러 당겨졌으면(overdueSafe) 정거장 0개 환자 외출의 마감은 출발 시각이다(findings 13).
 //   5. 외출·하루 정거장 한도(식사 정거장 포함)를 넘지 않는다.
 // 판정은 planDay 와 같은 함수(rolePool·evaluateOuting·selectBest)로 한다. 바꾼 것마다 사유를 기록한다(전후 비교 사유).
 
@@ -258,8 +259,13 @@ export function repairOuting({ context, role, outing, loc, nowMin, nextDepart, b
   let repaired;
   if (ev) repaired = assembleOuting(ev, meta, { original, exact });
   if (!ev && (frozen.length > 0 || departed)) {
-    // 시작된 정거장만(이동 중이었으면 정거장 0개로) 남긴다
-    repaired = assembleOuting(manualEvaluation(context, role, outing, frozen, loc.deadline.returnPoint), meta, { original, exact });
+    // 시작된 정거장만(이동 중이었으면 정거장 0개로) 남긴다.
+    // 정거장 0개 환자 외출의 마감이 출발보다 이른 창에서 당겨졌으면(overdueSafe 의 pulled) 마감을 출발 시각에 고정한다.
+    // 지금으로 두면 이동한 시간만큼 여유가 늘어 약 40분 뒤에는 늦은 환자의 여유가 0 이상이 된다(findings 13).
+    // 마감이 출발 뒤에 남아 있는 창(휴무로 비웠지만 바로 돌아가면 맞출 수 있음)은 그 마감 그대로다
+    const pin = role === 'P' && departed && frozen.length === 0 && loc.deadline.pulled === true;
+    const zeroMeta = pin ? outingMeta(context, role, { id: outing.id, deadline: { ...loc.deadline, deadlineMin: departMin } }) : meta;
+    repaired = assembleOuting(manualEvaluation(context, role, outing, frozen, loc.deadline.returnPoint), zeroMeta, { original, exact });
   }
   if (!repaired) return null;
   // 이미 출발한 외출의 출발 시각은 옮기지 않는다. 시작된 정거장이 없으면 새 시간표가 더 늦게 출발할 수 있다

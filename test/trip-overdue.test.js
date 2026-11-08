@@ -273,6 +273,65 @@ describe('경우 2: 이동 중(첫 장소 도착 전)인 외출도 즉시 복귀
     assert.ok(patientStopsAfter(day, T).length > 0, '지금 뒤 환자 정거장이 다시 생긴다');
   });
 
+  test('마감은 출발 시각에 고정된다: 출발 뒤 언제 켜져도 여유가 같다 (findings 13)', () => {
+    const slacks = [1, 7, 13].map((m) => {
+      const t = plus(outing.departAt, m);
+      const day = replanToday(withVisit, base, { now: at(TODAY, t), events });
+      const same = day.outings.find((o) => o.id === outing.id);
+      assert.equal(day.returnNow, true, t);
+      assert.equal(same.stops.length, 0, t);
+      assert.equal(same.returnBy, outing.departAt, `${t} 마감은 출발 시각이다`);
+      return same.slackMin;
+    });
+    assert.ok(slacks[0] < 0);
+    assert.deepEqual(slacks, [slacks[0], slacks[0], slacks[0]], '이동한 시간과 상관없이 여유가 같다');
+  });
+
+  test('휴무로 정거장을 모두 비운 이동 중 외출은 마감을 출발 시각에 고정하지 않고 켜지지 않는다 (findings 13)', () => {
+    const day = replanToday(withVisit, base, { now, events: [{ type: 'CLOSURE', closedIds: outing.stops.map((s) => s.contentId) }] });
+    const same = day.outings.find((o) => o.id === outing.id && o.departAt === outing.departAt);
+    assert.equal(day.returnNow, false);
+    assert.ok(!day.reasons.includes(REASON.OUTING_OVERDUE));
+    assert.equal(same.stops.length, 0, '전제: 대체 장소가 없어 정거장 0개로 남는다');
+    assert.equal(same.returnBy, outing.returnBy, '마감은 지금 창 그대로다');
+    assert.ok(same.slackMin >= 0);
+  });
+
+  describe('첫 이동 구간이 긴 외출: 출발 45분·60분 뒤에 늦어져도 켜진다 (findings 13)', () => {
+    // 저장된 일정에서 그 외출의 첫 정거장 도착을 70분 늦춘다(첫 이동 구간이 긴 외출). 출발 45·60분 뒤에도 이동 중이다
+    const LONG = 70;
+    const shift = (st) => ({ ...st, arriveAt: plus(st.arriveAt, LONG), leaveAt: plus(st.leaveAt, LONG), legIn: { ...st.legIn, min: st.legIn.min + LONG } });
+    const longDay = {
+      ...base.days[TODAY],
+      outings: base.days[TODAY].outings.map((o) => (o.id === outing.id ? { ...o, stops: o.stops.map(shift) } : o)),
+    };
+    const longBase = withToday(base, longDay);
+
+    for (const m of [45, 60]) {
+      const t = plus(outing.departAt, m);
+      test(`출발 ${m}분 뒤 병원 일정이 앞당겨지면 켜지고, 그대로면 유지되고, 초기화하면 풀린다`, () => {
+        assert.ok(mins(t) < mins(longDay.outings.find((o) => o.id === outing.id).stops[0].arriveAt), '전제: 아직 이동 중이다');
+        const day = replanToday(withVisit, longBase, { now: at(TODAY, t), events });
+        const same = day.outings.find((o) => o.id === outing.id);
+        assert.equal(day.returnNow, true, t);
+        assert.ok(day.reasons.includes(REASON.OUTING_OVERDUE), t);
+        assert.equal(same.stops.length, 0, t);
+        assert.equal(same.returnBy, outing.departAt, t);
+        assert.ok(same.slackMin < 0, `${t} 여유가 음수로 남는다`);
+
+        const later = plus(t, 30);
+        const kept = replanToday(withVisit, withToday(longBase, day), { now: at(TODAY, later), events });
+        assert.equal(kept.returnNow, true, `${later} 유지`);
+        assert.ok(kept.outings.find((o) => o.id === outing.id).slackMin < 0, `${later} 유지`);
+
+        const reset = replanToday(withVisit, withToday(longBase, day), { now: at(TODAY, later), events: [] });
+        assert.equal(reset.returnNow, false, `${later} 해제`);
+        assert.ok(!reset.reasons.includes(REASON.OUTING_OVERDUE), `${later} 해제`);
+        assert.ok(reset.outings.every((o) => o.slackMin >= 0), `${later} 해제 뒤 여유는 0 이상이다`);
+      });
+    }
+  });
+
   test('바뀐 것에 영향받지 않은 이동 중 외출은 취소하지도, 즉시 복귀를 켜지도 않는다', () => {
     const day = replanToday(withVisit, base, { now, events: [{ type: 'TRAFFIC_SURGE', extraMin: 5 }] });
     assert.equal(day.returnNow, false);
