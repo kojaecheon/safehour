@@ -1,9 +1,9 @@
-// help 이름공간 — 도움말(/help)과 더보기의 설치 안내 (S5)
+// 도움말 (help): /help 화면과 더보기의 설치 안내 (S5)
 //
 // 형식과 쓰기 규칙은 ./index.js 머리 주석을 따른다.
 // 안전 문구(safety)는 앱이 하지 않는 일, 알림이 오지 않을 수 있는 경우, "지금 돌아가세요" 안내다.
 // 알림 문구 중 설정 화면이 이미 갖고 있는 것(settings.notifyDenied · settings.notifyDisclosure)은 다시 쓰지 않고 가져다 쓴다.
-// ja·zh: 검수 전 번역 — 사람 검수 필요
+// ja·zh: 검수 전 번역, 사람 검수 필요
 
 /** 일반 화면 문구 */
 export const messages = {
@@ -39,10 +39,10 @@ export const messages = {
     zh: '用 Safari 打开 SafeHour。',
   },
   'help.installIos2': {
-    ko: '화면 아래의 공유 버튼(네모에서 위로 향한 화살표 모양)을 눌러요.',
-    en: 'Tap the Share button at the bottom of the screen (a square with an arrow pointing up).',
-    ja: '画面下の共有ボタン（四角から上向きの矢印が出ているマーク）をタップします。',
-    zh: '点按屏幕下方的“分享”按钮（方框加向上箭头的图标）。',
+    ko: '공유 버튼(또는 ⋯ 메뉴의 공유)을 눌러요. 네모에서 위로 향한 화살표 모양이에요.',
+    en: 'Tap the Share button (or Share in the ⋯ menu), the square with an arrow pointing up.',
+    ja: '共有ボタン（または「⋯」メニューの共有）をタップします。四角から上向きの矢印が出ているマークです。',
+    zh: '点按“分享”按钮（或“⋯”菜单中的分享）。图标是方框加向上箭头。',
   },
   'help.installIos3': {
     ko: '"홈 화면에 추가"를 누르고, 오른쪽 위의 "추가"를 눌러요.',
@@ -89,11 +89,17 @@ export const messages = {
     ja: '設定画面で「帰着・服薬・病院の予定の通知を受け取る」スイッチがオンになっているか確認します。',
     zh: '在设置页面确认“接收返回、服药和医院预约提醒”开关已打开。',
   },
+  'help.notify2': {
+    ko: '브라우저 알림 권한이 꺼져 있으면 알림이 오지 않아요. 설정에서 다시 켤 수 있어요.',
+    en: 'If notification permission is off in your browser, no notifications arrive. You can turn it back on in the browser settings.',
+    ja: 'ブラウザの通知権限がオフだと、通知は届きません。設定からオンに戻せます。',
+    zh: '如果浏览器的通知权限已关闭，就收不到通知。可以在设置中重新开启。',
+  },
   'help.notify3': {
-    ko: 'iPhone은 홈 화면에 추가한 앱에서만 알림을 받을 수 있어요. 위의 설치 방법을 따라 주세요.',
-    en: 'On iPhone, notifications work only in the app you added to the home screen. Follow the steps above.',
-    ja: 'iPhoneでは、ホーム画面に追加したアプリでのみ通知を受け取れます。上の手順に従ってください。',
-    zh: '在 iPhone 上，只有添加到主屏幕的应用才能收到通知。请按上面的步骤操作。',
+    ko: 'iPhone은 iOS 16.4 이상에서, 홈 화면에 추가한 앱에서만 알림을 받을 수 있어요. 위의 설치 방법을 따라 주세요.',
+    en: 'On iPhone, notifications work only on iOS 16.4 or later, in the app you added to the home screen. Follow the steps above.',
+    ja: 'iPhoneでは、iOS 16.4以降で、ホーム画面に追加したアプリでのみ通知を受け取れます。上の手順に従ってください。',
+    zh: '在 iPhone 上，需要 iOS 16.4 或更高版本，且只有添加到主屏幕的应用才能收到通知。请按上面的步骤操作。',
   },
   'help.notify5': {
     ko: '보호자가 받은 사본은 자동으로 갱신되지 않아요. 일정이 바뀌면 새 링크를 만들어 다시 보내 주세요.',

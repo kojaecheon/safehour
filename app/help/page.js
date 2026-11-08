@@ -1,6 +1,6 @@
 'use client';
 
-// /help — 도움말 (S5)
+// /help: 도움말 (S5)
 //
 // 정적 안내 화면이다. 저장소를 읽지 않고 판정·일정 흐름에 영향을 주지 않는다. 더보기(/more)에서 들어온다.
 // 구성: 앱이 하는 일과 하지 않는 일 · 홈 화면에 추가하기(#install) · 알림이 오지 않을 때 · 자주 묻는 질문 · 문의.
@@ -14,8 +14,8 @@ import { TopBar } from '@/components/ui/index.js';
 const ABOUT_KEYS = ['help.about1', 'help.about2', 'help.about3', 'help.about4', 'help.about5', 'help.about6'];
 const IOS_KEYS = ['help.installIos1', 'help.installIos2', 'help.installIos3', 'help.installIos4'];
 const ANDROID_KEYS = ['help.installAndroid1', 'help.installAndroid2', 'help.installAndroid3'];
-// 설정 화면이 이미 갖고 있는 두 문장(settings.notifyDenied · settings.notifyDisclosure)을 그대로 쓴다
-const NOTIFY_KEYS = ['help.notify1', 'settings.notifyDenied', 'help.notify3', 'settings.notifyDisclosure', 'help.notify5'];
+// 설정 화면이 이미 갖고 있는 문장(settings.notifyDisclosure)은 그대로 쓴다
+const NOTIFY_KEYS = ['help.notify1', 'help.notify2', 'help.notify3', 'settings.notifyDisclosure', 'help.notify5'];
 const FAQ = [
   ['help.faq1Q', 'help.faq1A'],
   ['help.faq2Q', 'help.faq2A'],

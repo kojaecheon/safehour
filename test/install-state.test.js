@@ -1,5 +1,5 @@
 // 설치된 앱 판별과 문의 링크 (S5)
-// 화면은 읽은 값만 순수 함수에 넘긴다 — 여기서는 신호 조합을 그대로 고정한다.
+// 화면은 읽은 값만 순수 함수에 넘긴다. 여기서는 신호 조합을 그대로 고정한다.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
