@@ -305,7 +305,7 @@ test.describe('오늘 상태 상자의 행동 줄', () => {
     await startTrip(page);
     const banner = page.locator('.today-status-block .state-banner');
     await expect(banner).toHaveClass(/state-NO_TOURISM/);
-    await expect(banner.locator('.state-action')).toHaveText('오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요. 내일 일정은 그대로예요.');
+    await expect(banner.locator('.state-action')).toHaveText('오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요.');
     await expect(banner).not.toContainText('병원 연락');
     await expect(page.locator('.today-status-block > .state-note')).toHaveCount(0);
   });

@@ -500,6 +500,39 @@ test.describe('③층 조건 화면, 편집기', () => {
     await expect(page.getByRole('status').filter({ hasText: '첫 일정을 만들었어요.' })).toBeVisible();
   });
 
+  // 전체 브랜치 검토(2026-11-09): 체류만으로 만든 일정이 이미 있으면 저장 직후 옛 일정이 먼저 그려진다.
+  // 다시 만들기가 실패하면(조회 한도) 갱신 실패 안내만 보이고 '첫 일정을 만들었어요'는 없다(선 5). 다시 시도가 성공하면 그때 한 번 보인다
+  test("저장된 일정이 있는데 다시 만들기가 실패하면 '첫 일정을 만들었어요'가 없고, 다시 시도가 성공하면 한 번 보인다", async ({ page }) => {
+    // 입국일이 오늘이라 새 기간(기본 시작일 = 입국일)이 오늘을 덮고, 저장하면 오늘을 다시 만든다
+    await startTrip(page, { arrival: 0, procedure: 1, visit: 2, periods: [] }, { path: '/conditions' });
+    await page.route('**/api/itinerary/plan', (route) =>
+      route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify({ ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'QUOTA' }),
+      }),
+    );
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '허용', exact: true }).check();
+    await page
+      .getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' })
+      .getByRole('radio', { name: '아니오', exact: true })
+      .check();
+    for (const button of await page.locator('.conditions-group-none').all()) await button.click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText('조회 한도에 닿았어요');
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(0);
+
+    await page.unroute('**/api/itinerary/plan');
+    await alert.getByRole('button', { name: '다시 시도' }).click();
+    await expect(page.getByRole('status').filter({ hasText: '첫 일정을 만들었어요.' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(1);
+    await expect(alert).toHaveCount(0);
+  });
+
   test('편집 중에는 체류 정보 고치기 행이 없다: 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다', async ({ page }) => {
     await startTrip(page, { periods: [] }, { path: '/conditions' });
     await expect(page.getByRole('link', { name: '체류 정보 고치기' })).toHaveCount(1);

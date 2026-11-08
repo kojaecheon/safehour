@@ -191,10 +191,10 @@ export const safety = {
   // 시각·입력 누락·확인 대기처럼 병원과 무관한 사유에 '병원 연락'·'병원 인근 대기'를 쓰지 않는다.
   // 병원 지침 사유(외출 제한·복귀 요청·지침 철회·만료·외출 늦음 등)는 상태 기본 행동 줄(src/domain/states.js)을 그대로 쓴다.
   'common.actionTimeShort': {
-    ko: '오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요. 내일 일정은 그대로예요.',
-    en: 'There is little time left today, so no outing was planned. Tomorrow’s plan stays the same.',
-    ja: '今日は残り時間が少ないため、外出の予定を作っていません。明日の予定はそのままです。',
-    zh: '今天剩余时间不多，因此没有安排外出。明天的行程不变。',
+    ko: '오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요.',
+    en: 'There is little time left today, so no outing was planned.',
+    ja: '今日は残り時間が少ないため、外出の予定を作っていません。',
+    zh: '今天剩余时间不多，因此没有安排外出。',
   },
   'common.actionTimeShortDay': {
     ko: '이날은 남은 시간이 적어 외출 일정을 만들지 않았어요.',

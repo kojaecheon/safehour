@@ -39,6 +39,7 @@ import {
   todayFocus,
   tripDateRows,
   updateFailedBodyKey,
+  welcomeNoticeReady,
 } from '../components/trip/viewModel.js';
 import { buildMapLinks } from '../lib/maps.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
@@ -874,5 +875,22 @@ describe('updateFailedBodyKey: 일정 갱신 실패 안내 본문 (docs/contract
         assert.ok(!/안전/.test(entry[lang]) && !/\bsafe\b/i.test(entry[lang]), `${key}.${lang}`);
       }
     }
+  });
+});
+
+describe('welcomeNoticeReady: 첫 일정 알림은 다시 만드는 동기화가 성공해 끝난 뒤에만 (CLAUDE.md 선 5)', () => {
+  const base = { pending: true, hasPlan: true, syncing: false, updateFailed: false };
+  test('기다리는 표시가 있고 일정이 있으며 동기화가 끝났고 실패가 없으면 보인다', () => {
+    assert.equal(welcomeNoticeReady(base), true);
+  });
+  test('동기화 중에는 옛 일정이 그려져 있어도 보이지 않는다', () => {
+    assert.equal(welcomeNoticeReady({ ...base, syncing: true }), false);
+  });
+  test('갱신 실패 동안에는 보이지 않는다', () => {
+    assert.equal(welcomeNoticeReady({ ...base, updateFailed: true }), false);
+  });
+  test('일정이 없거나 기다리는 표시가 없으면 보이지 않는다', () => {
+    assert.equal(welcomeNoticeReady({ ...base, hasPlan: false }), false);
+    assert.equal(welcomeNoticeReady({ ...base, pending: false }), false);
   });
 });

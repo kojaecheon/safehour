@@ -29,7 +29,7 @@ import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
 import { GUARDIAN_WINDOW_DAYS } from '@/src/guardian/index.js';
-import { dayActionKey, deadlineCopyOf, deltaSummary, formatDate, isDemoMode, needsInputFix, outingDayNote, plannedReturnOf, returnPlaceOf, todayFocus } from '@/components/trip/viewModel.js';
+import { dayActionKey, deadlineCopyOf, deltaSummary, formatDate, isDemoMode, needsInputFix, outingDayNote, plannedReturnOf, returnPlaceOf, todayFocus, welcomeNoticeReady } from '@/components/trip/viewModel.js';
 import useTrip from '@/lib/trip/useTrip.js';
 import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
 import { isStayDate } from '@/src/stay/stay.js';
@@ -78,17 +78,35 @@ export default function TodayPage() {
   const [notice, setNotice] = useState(null);
   const dateRef = useRef(null);
 
-  // 첫 조건 기간을 저장하고 넘어온 경우(/today?welcome=1) 한 번만 알린다. 주소에서 바로 지워 새로 고쳐도 다시 뜨지 않는다
+  // 첫 조건 기간을 저장하고 넘어온 경우(/today?welcome=1) 한 번만 알린다. 주소에서 바로 지워 새로 고쳐도 다시 뜨지 않는다.
+  // 주소를 읽은 뒤에는 기다리는 표시만 남긴다. 다시 만드는 동기화가 성공해 끝났을 때 보인다(viewModel welcomeNoticeReady).
+  // 저장 직후에는 체류만으로 만든 옛 일정이 먼저 그려지고, 다시 만들기가 실패하면 갱신 실패 안내가 대신 뜬다
+  const [welcomePending, setWelcomePending] = useState(false);
   useEffect(() => {
     const url = new URL(window.location.href);
     if (url.searchParams.get('welcome') !== '1') return undefined;
     const timer = window.setTimeout(() => {
       url.searchParams.delete('welcome');
       window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
-      setNotice('today.firstPlanReady');
+      setWelcomePending(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  const welcomeReady = welcomeNoticeReady({
+    pending: welcomePending,
+    hasPlan: Boolean(trip.tripPlan),
+    syncing: trip.syncing,
+    updateFailed: trip.updateFailed,
+  });
+  useEffect(() => {
+    if (!welcomeReady) return undefined;
+    const timer = window.setTimeout(() => {
+      setWelcomePending(false);
+      setNotice('today.firstPlanReady');
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [welcomeReady]);
 
   const today = trip.todayDate;
   const stay = trip.stay;
@@ -122,7 +140,7 @@ export default function TodayPage() {
   // 일정이 저장된 화면(도착 전·출국 뒤·그날 일정 없음·체류 중)에 알림 자리를 둔다.
   // 첫 기간을 도착 전에 저장하면 여기로 와서 '첫 일정을 만들었어요'를 보여야 한다 (2026-11-08 검토 반영).
   // 일정이 아직 없는 화면(만드는 중·만들지 못함)에는 두지 않는다: 아직 사실이 아닌 말을 하게 된다.
-  // 알림 상태는 그대로 남아, 일정이 처음 그려질 때 한 번 보인다
+  // 첫 일정 알림은 다시 만드는 동기화가 성공해 끝난 뒤에만 알림 상태에 들어온다(위 welcomeNoticeReady)
   const noticeSlot = (
     <TripNotice slot role="status">
       {notice ? t(notice) : ''}

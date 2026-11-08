@@ -149,7 +149,7 @@ describe('행동 줄 문구', () => {
   });
 
   test('운영자가 정한 한국어 문장 그대로다', () => {
-    assert.equal(UI_TEXT[DAY_ACTION_KEY.TIME_SHORT].ko, '오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요. 내일 일정은 그대로예요.');
+    assert.equal(UI_TEXT[DAY_ACTION_KEY.TIME_SHORT].ko, '오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요.');
     assert.equal(UI_TEXT[DAY_ACTION_KEY.NEEDS_INPUT].ko, '아직 조건을 입력하지 않아 일정을 만들지 않았어요. 조건을 입력하면 일정이 생겨요.');
     assert.equal(UI_TEXT[DAY_ACTION_KEY.DAILY_CHECK].ko, '오늘 일정은 매일 확인을 마치면 열려요. 위의 확인 항목을 눌러 주세요.');
     assert.equal(UI_TEXT[DAY_ACTION_KEY.HOSPITAL_GUIDE].ko, '병원 안내를 먼저 확인해 주세요. 확인하면 오늘 일정이 열려요.');

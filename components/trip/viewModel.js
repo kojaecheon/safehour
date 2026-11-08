@@ -765,3 +765,15 @@ export function updateFailedBodyKey(upstream) {
       return 'today.updateFailedBody';
   }
 }
+
+/**
+ * 첫 조건 기간을 저장하고 넘어온 오늘 화면(/today?welcome=1)에서 '첫 일정을 만들었어요'를 지금 보여도 되는가.
+ * 체류만으로 만든 일정이 이미 있으면 저장 직후 그 옛 일정이 먼저 그려진다. 다시 만드는 동기화가 끝나기 전이나
+ * 실패한 동안(updateFailed)에는 사실이 아니므로 보이지 않는다(CLAUDE.md 선 5). 실패 뒤 다시 시도가 성공하면 그때 보인다.
+ * 첫 기간 저장은 저장소 구독에서 바로 동기화를 대기열에 넣으므로, 화면이 열릴 때 이미 끝나 있으면 곧바로 보여도 된다.
+ * @param {{ pending: boolean, hasPlan: boolean, syncing: boolean, updateFailed: boolean }} signal
+ * @returns {boolean}
+ */
+export function welcomeNoticeReady({ pending, hasPlan, syncing, updateFailed }) {
+  return Boolean(pending && hasPlan && !syncing && !updateFailed);
+}

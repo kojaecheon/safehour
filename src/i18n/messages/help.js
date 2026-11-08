@@ -102,10 +102,10 @@ export const messages = {
     zh: '在 iPhone 上，需要 iOS 16.4 或更高版本，且只有添加到主屏幕的应用才能收到通知。请按上面的步骤操作。',
   },
   'help.notify5': {
-    ko: '보호자가 받은 사본은 자동으로 갱신되지 않아요. 일정이 바뀌면 새 링크를 만들어 다시 보내 주세요.',
-    en: 'The copy your guardian received does not update by itself. If the schedule changes, create a new link and send it again.',
-    ja: '付き添い者が受け取ったコピーは自動では更新されません。予定が変わったら、新しいリンクを作成して送り直してください。',
-    zh: '陪同者收到的副本不会自动更新。日程有变时，请创建新链接并重新发送。',
+    ko: '보호자가 받은 사본은 자동으로 갱신되지 않아요. 일정이 바뀌면 새 링크를 만들어 다시 보내 주세요. 한 링크는 7일까지 담아요. 그 뒤 날짜도 새 링크로 보내 주세요.',
+    en: 'The copy your guardian received does not update by itself. If the schedule changes, create a new link and send it again. One link holds up to 7 days, so send a new link for the days after that.',
+    ja: '付き添い者が受け取ったコピーは自動では更新されません。予定が変わったら、新しいリンクを作成して送り直してください。1つのリンクには7日分まで入ります。その後の日程も新しいリンクで送ってください。',
+    zh: '陪同者收到的副本不会自动更新。日程有变时，请创建新链接并重新发送。一个链接最多包含 7 天，之后的日期也请用新链接发送。',
   },
 
   // ── 자주 묻는 질문 ──
@@ -153,10 +153,10 @@ export const messages = {
     zh: '陪同者链接打不开',
   },
   'help.faq4A': {
-    ko: '세 가지를 확인해 주세요. 첫째, 링크가 중간에 잘리지 않았는지. 일부 메신저는 긴 링크를 자르니 "링크 복사"로 다시 받아 주세요. 둘째, 만료되지 않았는지. 출국일 23:59 이후에는 열리지 않아요. 셋째, PIN을 5번 틀려 잠기지 않았는지. 잠기면 그 기기에서 1시간 뒤에 다시 시도할 수 있어요. 그래도 안 되면 환자에게 새 링크를 받아 주세요.',
-    en: 'Check three things. First, the link may have been cut short. Some messengers cut long links, so ask for it again using “Copy link”. Second, it may have expired: links stop opening after 23:59 on the departure date. Third, the PIN may be locked after 5 wrong tries; you can try again on that device after 1 hour. If it still fails, ask the patient for a new link.',
-    ja: '次の3点を確認してください。1つ目は、リンクが途中で切れていないか。一部のメッセンジャーは長いリンクを切るので、「リンクをコピー」でもう一度受け取ってください。2つ目は、期限切れでないか。出国日の23:59を過ぎると開けません。3つ目は、PINを5回間違えてロックされていないか。ロックされた場合、その端末では1時間後に再試行できます。それでも開けないときは、患者から新しいリンクを受け取ってください。',
-    zh: '请确认三点。第一，链接是否被截断。部分聊天软件会截断长链接，请让对方用“复制链接”重新发送。第二，链接是否已失效。离境日 23:59 之后将无法打开。第三，PIN 是否因输错 5 次而被锁定。锁定后，该设备 1 小时后可再试。仍然打不开时，请向患者索取新链接。',
+    ko: '세 가지를 확인해 주세요. 첫째, 링크가 중간에 잘리지 않았는지. 일부 메신저는 긴 링크를 자르니 "링크 복사"로 다시 받아 주세요. 둘째, 만료되지 않았는지. 출국일 23:59 이후에는 열리지 않아요. 한 링크는 7일까지 담으니, 그 뒤 날짜는 새 링크로 받아 주세요. 셋째, PIN을 5번 틀려 잠기지 않았는지. 잠기면 그 기기에서 1시간 뒤에 다시 시도할 수 있어요. 그래도 안 되면 환자에게 새 링크를 받아 주세요.',
+    en: 'Check three things. First, the link may have been cut short. Some messengers cut long links, so ask for it again using “Copy link”. Second, it may have expired: links stop opening after 23:59 on the departure date. One link holds up to 7 days, so ask for a new link for later days. Third, the PIN may be locked after 5 wrong tries; you can try again on that device after 1 hour. If it still fails, ask the patient for a new link.',
+    ja: '次の3点を確認してください。1つ目は、リンクが途中で切れていないか。一部のメッセンジャーは長いリンクを切るので、「リンクをコピー」でもう一度受け取ってください。2つ目は、期限切れでないか。出国日の23:59を過ぎると開けません。1つのリンクには7日分まで入るため、それ以降の日程は新しいリンクで受け取ってください。3つ目は、PINを5回間違えてロックされていないか。ロックされた場合、その端末では1時間後に再試行できます。それでも開けないときは、患者から新しいリンクを受け取ってください。',
+    zh: '请确认三点。第一，链接是否被截断。部分聊天软件会截断长链接，请让对方用“复制链接”重新发送。第二，链接是否已失效。离境日 23:59 之后将无法打开。一个链接最多包含 7 天，之后的日期请索取新链接。第三，PIN 是否因输错 5 次而被锁定。锁定后，该设备 1 小时后可再试。仍然打不开时，请向患者索取新链接。',
   },
   'help.faq6Q': {
     ko: '데이터를 지우고 싶어요',
