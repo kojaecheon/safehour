@@ -101,7 +101,7 @@ operation별 `used/limit`, `warningAt`, `dailyLimit`)를 한 번에 보여준다
 | `AUTH` | 인증키 미설정·미등록·만료, 서비스 활용 신청 여부 |
 | `UPSTREAM_ERROR` · `PARSE` · `NETWORK` | 제공처 장애나 일시 오류. 잠시 뒤 다시 확인한다 |
 
-HTTP 429 → `QUOTA`, HTTP 401·403 → `AUTH` 분류는 실제 게이트웨이 응답으로 확인하지 않았다(`docs/tracking/findings.md` 14).
+HTTP 429 → `QUOTA`, HTTP 401·403 → `AUTH` 분류는 실제 게이트웨이 응답으로 확인하지 않았다(`docs/tracking/findings.md` 16).
 
 ## 배포
 
