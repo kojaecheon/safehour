@@ -513,10 +513,13 @@ export function locatePatient(context, outing, { lower, departed, dayRef, nowMin
 /**
  * 이미 출발한 외출의 마감은 출발 시각보다 이르지 않다. 새 마감이 출발보다 이르면(블록이 옮겨 와 덮음) 이미 늦은 것이므로
  * 마감을 지금(없으면 출발 시각)으로 둔다 — 여유가 음수가 되어 '시간 부족'으로 드러난다.
+ * 당긴 마감에는 pulled 를 붙인다. 정거장 0개로 남는 환자 외출은 마감을 출발 시각에 고정한다(dayRepair.js, findings 13).
+ * pulled 는 outingMeta 가 골라 쓰지 않아 저장되지 않는다. 저장된 외출에서 당긴 마감을 알아볼 때는 tripPlan.js 의
+ * pulledDeadline(여유 음수이고 마감이 예상 귀가보다 이름)이 같은 사실을 다시 추정한다. 한쪽 기준을 바꾸면 다른 쪽도 본다.
  */
 function overdueSafe(deadline, departMin, nowMin) {
   if (deadline.deadlineMin >= departMin) return deadline;
-  return { ...deadline, deadlineMin: Math.max(departMin, nowMin ?? departMin) };
+  return { ...deadline, deadlineMin: Math.max(departMin, nowMin ?? departMin), pulled: true };
 }
 
 /**
