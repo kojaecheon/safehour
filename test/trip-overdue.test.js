@@ -482,12 +482,17 @@ describe('즉시 복귀가 풀린 뒤: 마감이 당겨진 외출은 다시 잰�
     });
   });
 
-  test('보통의 해제(환자 호출 초기화)는 환자 일정이 그대로이고 보호자 저녁 외출도 돌아온다', () => {
+  // 보호자 다시 채우기는 OUTING_OVERDUE 만이 아니라 모든 해제 원인(LIFTABLE_CAUSES)에 적용한다. 의도한 범위라 고정한다
+  test('보통의 해제(환자 호출 초기화)도 환자 일정이 그대로이고 보호자 저녁 외출이 처음 일정대로 돌아온다', () => {
     const recalled = replanToday(withVisit, base, { now: at(TODAY, '13:40'), events: [{ type: 'PATIENT_RECALL' }] });
+    assert.ok(!recalled.guardianOutings.some((g) => mins(g.departAt) > mins('15:00')), '전제: 환자 호출로 보호자 저녁 외출이 비었다');
     const day = replanToday(withVisit, withToday(base, recalled), { now: at(TODAY, '13:58'), events: [] });
     assert.equal(day.returnNow, false);
+    assert.ok(!day.reasons.includes(REASON.PATIENT_RECALLED));
     assert.deepEqual(day.outings, baseDay.outings, '환자 일정은 바뀌기 전으로 돌아간다');
-    assert.ok(day.guardianOutings.some((g) => mins(g.departAt) > mins('15:00')), '보호자 저녁 외출이 있다');
+    const evening = (d) => d.guardianOutings.filter((g) => mins(g.departAt) > mins('15:00'));
+    assert.ok(evening(day).length > 0, '보호자 저녁 외출이 있다');
+    assert.deepEqual(evening(day), evening(baseDay), '보호자 저녁 외출은 처음 일정 그대로다');
   });
 });
 

@@ -306,6 +306,8 @@ function mergeLog(to, from) {
 /**
  * 마감이 복귀 도착보다 이른 외출: overdueSafe 가 마감을 출발·그때 시각으로 당긴 외출(정거장에 아직 머무는 중이었거나
  * 이동 중에 정거장을 모두 비움)이다. 여유는 음수다.
+ * dayContext.js 의 overdueSafe 가 붙이는 pulled 는 저장되지 않으므로(outingMeta 가 버림) 저장된 외출에서는 이 식으로 다시
+ * 추정한다. 한쪽 기준을 바꾸면 다른 쪽도 본다.
  */
 function pulledDeadline(o) {
   return o.slackMin < 0 && toMinutes(o.returnBy) < toMinutes(o.plannedReturnAt ?? o.returnBy);
