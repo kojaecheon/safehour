@@ -102,6 +102,12 @@ export const DEFAULTS = deepFreeze({
   /** 보호자 링크 PIN 잠금 */
   guardianPin: { maxAttempts: 5, lockMin: 60 },
 
+  /**
+   * 보호자 링크가 담는 날짜 수. 만든 날(KST)부터 이 일수만큼, 출국일에서 멈춘다.
+   * 7일 최악 크기 일정의 링크가 메신저 기준(8 KB) 안에 드는 길이다. 늘리면 링크가 길어진다.
+   */
+  guardianLink: { windowDays: 7 },
+
   /** AI 소개 문장 */
   ai: { timeoutMs: 3000, maxChars: 200 },
 

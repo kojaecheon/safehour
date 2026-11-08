@@ -67,7 +67,8 @@ describe('일정 지문 내용 (spec 5.1 guardianShare.planFingerprint)', () => 
 
   test('fromDate 를 주면 그 날짜 이후만 담는다', () => {
     const { stay, tripPlan } = stayAndPlan();
-    const snapshot = buildGuardianSnapshot({ stay, tripPlan, now: '2026-09-25T09:00:00+09:00' });
+    // 09-28 에 만들면 7일 범위(09-28~10-04) 안의 체류 날짜 10-01~10-04 를 담는다
+    const snapshot = buildGuardianSnapshot({ stay, tripPlan, now: '2026-09-28T09:00:00+09:00' });
     const content = fingerprintContent(snapshot, { fromDate: '2026-10-04' });
     assert.ok(content.days.length > 0);
     assert.ok(content.days.every((d) => d.date >= '2026-10-04'));

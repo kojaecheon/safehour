@@ -4,7 +4,9 @@
 //
 // 흐름
 //   1. 체류·전체 일정이 있어야 한다. 없으면 무엇이 없는지와 어디서 넣는지 안내한다.
-//   2. 공유 동의 — **링크를 만들 때마다** 받는다. 담기는 것·담기지 않는 것, 병원 복귀는 '병원'으로만 보인다는 고지,
+//   2. 담는 범위: 링크는 오늘(KST)부터 7일만 담는다(출국일에서 멈춤). 범위와, 체류가 더 길면 다음 주에 새 링크가
+//      필요하다는 문장을 동의 앞에 둔다.
+//      공유 동의: **링크를 만들 때마다** 받는다. 담기는 것·담기지 않는 것, 병원 복귀는 '병원'으로만 보인다는 고지,
 //      PIN 잠금이 우연한 열람을 막는 수준이라는 고지를 동의 앞에 둔다. 동의는 저장하지 않는다.
 //   3. PIN 6자리 + 확인 입력.
 //   4. 스냅샷(허용 목록) → 크기 재기(메신저 기준을 넘으면 안내) → PIN 암호화 → 링크(<origin>/g#<암호문>).
@@ -24,10 +26,11 @@ import {
   GUARDIAN_LINK_BUDGET_CHARS,
   buildGuardianLink,
   encryptSnapshot,
+  guardianCoverage,
   isValidPin,
   measureGuardianLink,
 } from '@/src/guardian/index.js';
-import { parseInstantMs } from '@/src/stay/index.js';
+import { diffDays, parseInstantMs } from '@/src/stay/index.js';
 import { dateLabel, kstClock, kstDate } from './errorView.js';
 import { ErrorText, WarningNote } from './Feedback.js';
 import { useGuardianResendNeeded, useHydrated, useStoreRecord } from './hooks.js';
@@ -45,6 +48,33 @@ function kstLabel(iso, locale) {
   const ms = typeof iso === 'string' ? parseInstantMs(iso) : null;
   if (ms === null) return null;
   return { date: dateLabel(kstDate(ms), locale), time: kstClock(ms) };
+}
+
+/**
+ * 스냅샷이 담는 범위 → 화면 문구 재료. 날짜가 없으면 null
+ * @returns {{today: boolean, n: number, from: string, to: string, more: boolean} | null}
+ */
+export function coverageView(snapshot, locale, nowMs) {
+  const range = guardianCoverage(snapshot);
+  if (!range) return null;
+  return {
+    today: range.from === kstDate(nowMs),
+    n: diffDays(range.from, range.to) + 1,
+    from: dateLabel(range.from, locale),
+    to: dateLabel(range.to, locale),
+    more: range.more,
+  };
+}
+
+function CoverageNote({ view }) {
+  const { t } = useLang();
+  if (!view) return null;
+  return (
+    <div className="guardian-coverage">
+      <p className="guardian-meta">{t(view.today ? 'guardian.rangeToday' : 'guardian.rangeDays', view)}</p>
+      {view.more && <p className="guardian-meta">{t('guardian.rangeNextWeek')}</p>}
+    </div>
+  );
 }
 
 const onlyDigits = (value) => value.replace(/[^0-9]/g, '').slice(0, 6);
@@ -149,6 +179,7 @@ function LinkResult({ result, onNewLink, headingRef }) {
         {feedback ? t(feedback) : ''}
       </p>
       {result.overBudget && <WarningNote>{t('guardian.longLink', { n: result.linkChars })}</WarningNote>}
+      <CoverageNote view={result.coverage} />
       <p className="guardian-pin-reminder">{t('guardian.pinReminder')}</p>
       {expires && <p className="guardian-meta">{t('guardian.expiresNote', expires)}</p>}
       {!result.shareSaved && <WarningNote>{t('guardian.saveShareFailed')}</WarningNote>}
@@ -159,8 +190,18 @@ function LinkResult({ result, onNewLink, headingRef }) {
   );
 }
 
+function previewCoverage(stay, tripPlan, locale) {
+  try {
+    const nowMs = Date.now();
+    return coverageView(buildShareSnapshot({ stay, tripPlan, now: nowMs }), locale, nowMs);
+  } catch {
+    return null;
+  }
+}
+
 function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consentHeadingRef }) {
-  const { t } = useLang();
+  const { t, locale } = useLang();
+  const coverage = previewCoverage(stay, tripPlan, locale);
   const ids = {
     consent: useId(),
     consentError: useId(),
@@ -194,7 +235,8 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
     setBusy(true);
     try {
       const origin = window.location.origin;
-      const snapshot = buildShareSnapshot({ stay, tripPlan, now: Date.now() });
+      const nowMs = Date.now();
+      const snapshot = buildShareSnapshot({ stay, tripPlan, now: nowMs });
       const size = await measureGuardianLink(snapshot, { origin });
       const fragment = await encryptSnapshot(snapshot, pin);
       const link = buildGuardianLink(origin, fragment);
@@ -208,6 +250,7 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
         linkChars: size.linkChars ?? link.length,
         overBudget: (size.linkChars ?? link.length) > GUARDIAN_LINK_BUDGET_CHARS,
         expiresAt: snapshot.expiresAt,
+        coverage: coverageView(snapshot, locale, nowMs),
         shareSaved: saved?.ok === true,
       });
     } catch (err) {
@@ -233,6 +276,7 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
         <h2 id="guardian-consent-title" ref={consentHeadingRef} tabIndex={-1}>
           {t('guardian.consentTitle')}
         </h2>
+        <CoverageNote view={coverage} />
         <h3 className="guardian-list-title">{t('guardian.includedTitle')}</h3>
         <ul className="guardian-list guardian-list-in" role="list">
           {INCLUDED_KEYS.map((key) => (
