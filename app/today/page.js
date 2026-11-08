@@ -362,7 +362,7 @@ export default function TodayPage() {
           </Link>
         </p>
       </main>
-      {sheet === 'delta' && day && <DeltaSheet day={day} dateLabel={formatDate(today, locale)} onClose={closeDelta} />}
+      {sheet === 'delta' && day && <DeltaSheet day={day} dateLabel={formatDate(today, locale)} isToday onClose={closeDelta} />}
       {sheet === 'return' && !trip.immediateReturn && (
         <ReturnSheet
           day={stored}

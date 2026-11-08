@@ -3,14 +3,15 @@
 // 이 파일이 고정하는 것 (components/trip/viewModel.js dayActionKey · outingDayNote · deadlineCopyOf):
 //   - 병원과 무관한 사유(오늘 남은 시간 부족, 조건 입력 필요, 매일 확인 대기, 병원 안내 미확인)에는
 //     '병원 연락 또는 숙소 대기'·'병원 인근 대기 후 재확인' 대신 사유별 행동 줄 하나를 고른다.
-//   - 병원 지침 사유(외출 제한, 복귀 요청, 지침 철회·만료, 외출 늦음)는 상태 기본 행동 줄을 그대로 둔다(null).
+//   - 입국·출국 이동 날, 다른 날의 시간 부족, 후보 없음 STANDBY 도 각자의 줄이다.
+//   - 병원 지침 사유(외출 제한, 복귀 요청, 지침 철회·만료, 외출 늦음 등)는 상태 기본 행동 줄을 그대로 둔다(null).
 //   - 외출이 있는 날만 상태 상자 아래 고정 줄을 둔다.
 //   - 마감 이유가 하루 활동 종료(DAY_END)면 '오늘 활동 종료'로 부르고, 병원이 정한 마감은 '복귀 마감'이다.
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 
-import { DAY_ACTION_KEY, DEADLINE_REASON_KEY, dayActionKey, deadlineCopyOf, outingDayNote } from '../components/trip/viewModel.js';
+import { DAY_ACTION_KEY, DEADLINE_REASON_KEY, dayActionKey, deadlineCopyOf, deltaSummary, outingDayNote } from '../components/trip/viewModel.js';
 import { REASON, STATE } from '../src/domain/states.js';
 import { overlayTodayGate } from '../src/stay/todayGate.js';
 import { UI_TEXT, SAFETY_KEYS } from '../src/i18n/messages/index.js';
@@ -32,9 +33,27 @@ describe('dayActionKey: 사유별 행동 줄', () => {
     assert.equal(dayActionKey(short, { isToday: true }), DAY_ACTION_KEY.TIME_SHORT);
   });
 
-  test('시간 부족 줄은 오늘만이다. 다른 날짜는 상태 기본 줄을 둔다', () => {
-    const other = day({ dayState: STATE.NO_TOURISM, outings: [], reasons: [REASON.DEPARTURE_WINDOW_TOO_SHORT] });
-    assert.equal(dayActionKey(other, { isToday: false }), null);
+  test('오늘이 아닌 날의 시간 부족은 날짜를 말하지 않는 시간 부족 줄이다', () => {
+    for (const reason of [REASON.DEPARTURE_WINDOW_TOO_SHORT, REASON.SLA_INSUFFICIENT]) {
+      const other = day({ dayState: STATE.NO_TOURISM, outings: [], reasons: [reason] });
+      assert.equal(dayActionKey(other, { isToday: false }), DAY_ACTION_KEY.TIME_SHORT_DAY, reason);
+    }
+  });
+
+  test('입국·출국 창 밖(OUTSIDE_STAY_WINDOW)은 이동 날 줄이다. 오늘이어도 같다', () => {
+    const travel = day({ dayState: STATE.NO_TOURISM, outings: [], reasons: [REASON.OUTSIDE_STAY_WINDOW] });
+    assert.equal(dayActionKey(travel, { isToday: true }), DAY_ACTION_KEY.TRAVEL_DAY);
+    assert.equal(dayActionKey(travel, { isToday: false }), DAY_ACTION_KEY.TRAVEL_DAY);
+  });
+
+  test('후보 없음 STANDBY 는 장소를 아직 찾지 못했다는 줄이다. 오늘이 아니어도 같다', () => {
+    const none = day({ dayState: STATE.STANDBY, outings: [], reasons: [REASON.NO_CANDIDATE] });
+    assert.equal(dayActionKey(none, { isToday: true }), DAY_ACTION_KEY.NO_CANDIDATE);
+    assert.equal(dayActionKey(none, { isToday: false }), DAY_ACTION_KEY.NO_CANDIDATE);
+    // 병원 사유가 함께 있으면 병원 줄이 이긴다
+    assert.equal(dayActionKey({ ...none, reasons: [REASON.RISK_SIGNAL, REASON.NO_CANDIDATE] }, { isToday: true }), null);
+    // 매일 확인 대기가 덧씌워지면 확인 줄이 먼저다
+    assert.equal(dayActionKey(overlayTodayGate(none, { dailyCheckPending: true }), { isToday: true }), DAY_ACTION_KEY.DAILY_CHECK);
   });
 
   test('조건 입력 필요(NEEDS_INPUT)는 조건 입력 줄이다. 오늘이 아니어도 같다', () => {
@@ -64,9 +83,10 @@ describe('dayActionKey: 사유별 행동 줄', () => {
     assert.equal(dayActionKey(shown, { isToday: true }), DAY_ACTION_KEY.HOSPITAL_GUIDE);
   });
 
-  test('둘 다 대기면 맨 위 매일 확인부터 안내한다', () => {
+  test('둘 다 대기면 병원 안내 확인이 먼저다(바뀐 안내를 읽기 전에 그대로예요를 누르지 않게)', () => {
     const shown = overlayTodayGate(day(), { dailyCheckPending: true, unconfirmedHospitalUpdate: true });
-    assert.equal(dayActionKey(shown, { isToday: true }), DAY_ACTION_KEY.DAILY_CHECK);
+    assert.equal(dayActionKey(shown, { isToday: true }), DAY_ACTION_KEY.HOSPITAL_GUIDE);
+    assert.equal(dayActionKey(shown, { isToday: true, screen: 'day' }), DAY_ACTION_KEY.HOSPITAL_GUIDE);
   });
 
   test('외출이 없는 날에 덧씌운 확인 대기는 확인 줄을 고르지 않는다(확인해도 외출이 열리지 않는다)', () => {
@@ -103,10 +123,11 @@ describe('dayActionKey: 사유별 행동 줄', () => {
     assert.equal(dayActionKey(day({ dayState: STATE.NO_TOURISM, returnNow: true, reasons: [REASON.SLA_INSUFFICIENT] }), { isToday: true }), null);
   });
 
-  test('외출이 있는 보통 날과 후보가 없는 날은 상태 기본 줄이다', () => {
+  test('외출이 있는 보통 날과 보호자만 나가는 날, 동행 필요 미충족 날은 상태 기본 줄이다', () => {
     assert.equal(dayActionKey(day(), { isToday: true }), null);
     assert.equal(dayActionKey(day({ dayState: STATE.SPLIT_NEARBY, outings: [], guardianOutings: [OUTING] }), { isToday: true }), null);
-    assert.equal(dayActionKey(day({ dayState: STATE.STANDBY, outings: [], reasons: [REASON.NO_CANDIDATE] }), { isToday: true }), null);
+    assert.equal(dayActionKey(day({ dayState: STATE.NO_TOURISM, outings: [], reasons: [REASON.ESCORT_REQUIRED] }), { isToday: true }), null);
+    assert.equal(dayActionKey(day({ dayState: STATE.NO_TOURISM, outings: [], reasons: [REASON.WEATHER_BLOCKED] }), { isToday: true }), null);
     assert.equal(dayActionKey(null), null);
   });
 });
@@ -121,7 +142,7 @@ describe('행동 줄 문구', () => {
   });
 
   test('병원과 무관한 사유의 줄은 병원 연락·병원 인근 대기를 말하지 않는다', () => {
-    for (const key of [DAY_ACTION_KEY.TIME_SHORT, DAY_ACTION_KEY.NEEDS_INPUT, DAY_ACTION_KEY.NEEDS_INPUT_OTHER, DAY_ACTION_KEY.DAILY_CHECK, DAY_ACTION_KEY.DAILY_CHECK_ELSEWHERE]) {
+    for (const key of Object.values(DAY_ACTION_KEY).filter((k) => k !== DAY_ACTION_KEY.HOSPITAL_GUIDE)) {
       assert.doesNotMatch(UI_TEXT[key].ko, /병원/, key);
       assert.doesNotMatch(UI_TEXT[key].en, /hospital/i, key);
     }
@@ -132,6 +153,12 @@ describe('행동 줄 문구', () => {
     assert.equal(UI_TEXT[DAY_ACTION_KEY.NEEDS_INPUT].ko, '아직 조건을 입력하지 않아 일정을 만들지 않았어요. 조건을 입력하면 일정이 생겨요.');
     assert.equal(UI_TEXT[DAY_ACTION_KEY.DAILY_CHECK].ko, '오늘 일정은 매일 확인을 마치면 열려요. 위의 확인 항목을 눌러 주세요.');
     assert.equal(UI_TEXT[DAY_ACTION_KEY.HOSPITAL_GUIDE].ko, '병원 안내를 먼저 확인해 주세요. 확인하면 오늘 일정이 열려요.');
+    assert.equal(UI_TEXT[DAY_ACTION_KEY.TRAVEL_DAY].ko, '입국·출국 이동이 있는 날이라 외출 일정을 만들지 않았어요.');
+    assert.equal(UI_TEXT[DAY_ACTION_KEY.TRAVEL_DAY].en, 'No outing plan on this day because of arrival or departure travel.');
+    assert.equal(UI_TEXT[DAY_ACTION_KEY.TIME_SHORT_DAY].ko, '이날은 남은 시간이 적어 외출 일정을 만들지 않았어요.');
+    assert.equal(UI_TEXT[DAY_ACTION_KEY.TIME_SHORT_DAY].en, 'No outing plan on this day because too little time is left.');
+    assert.equal(UI_TEXT[DAY_ACTION_KEY.NO_CANDIDATE].ko, '조건에 맞는 장소를 아직 찾지 못했어요. 잠시 뒤 다시 확인해 주세요.');
+    assert.equal(UI_TEXT[DAY_ACTION_KEY.NO_CANDIDATE].en, 'No place that fits your conditions was found yet. Please check again later.');
     assert.equal(UI_TEXT['common.outingDayNote'].ko, '입력한 조건 안에서 짠 일정이에요. 몸 상태는 병원 안내를 따르세요.');
   });
 });
@@ -145,6 +172,14 @@ describe('outingDayNote: 외출 있는 날의 고정 줄', () => {
   test('외출이 없는 날은 보이지 않는다', () => {
     assert.equal(outingDayNote(day({ dayState: STATE.NO_TOURISM, outings: [] })), false);
     assert.equal(outingDayNote(null), false);
+  });
+
+  test('즉시 복귀 날은 시작된 외출이 남아 있어도 보이지 않는다', () => {
+    const started = { ...OUTING, stops: [] };
+    assert.equal(outingDayNote(day({ dayState: STATE.NO_TOURISM, returnNow: true, outings: [started], reasons: [REASON.OUTING_OVERDUE] })), false);
+    assert.equal(outingDayNote(day({ dayState: STATE.NO_TOURISM, returnNow: true, outings: [OUTING], reasons: [REASON.PATIENT_RECALLED] })), false);
+    // returnNow 표시만 있어도 같다
+    assert.equal(outingDayNote(day({ returnNow: true })), false);
   });
 });
 
@@ -178,5 +213,19 @@ describe('deadlineCopyOf: 하루 활동 종료와 복귀 마감의 이름', () =
     }
     assert.equal(deadlineCopyOf({}).reasonKey, null);
     assert.equal(deadlineCopyOf(null).labelKey, 'common.tlReturn');
+  });
+});
+
+describe('전후 비교의 새 마감 줄도 같은 이름 규칙을 쓴다', () => {
+  test('새 마감 줄에 지금 일정의 마감 이유를 싣는다', () => {
+    const d = day({
+      outings: [{ ...OUTING, id: '2026-11-08:P:1', deadlineReason: 'DAY_END', returnBy: '21:00' }],
+      delta: { newDeadlines: [{ outingId: '2026-11-08:P:1', returnBy: '21:00' }, { outingId: 'gone', returnBy: '15:00' }], hasVisibleChange: true },
+    });
+    const rows = deltaSummary(d).rows.filter((r) => r.kind === 'deadline');
+    assert.equal(rows[0].deadlineReason, 'DAY_END');
+    assert.equal(deadlineCopyOf(rows[0], { isToday: true }).timeKey, 'return.dayEnd');
+    assert.equal(rows[1].deadlineReason, null);
+    assert.equal(deadlineCopyOf(rows[1], { isToday: true }).timeKey, 'return.deadline');
   });
 });

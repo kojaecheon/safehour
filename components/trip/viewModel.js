@@ -47,6 +47,9 @@ export const DEADLINE_REASON_KEY = Object.freeze({
  */
 export const DAY_ACTION_KEY = Object.freeze({
   TIME_SHORT: 'common.actionTimeShort',
+  TIME_SHORT_DAY: 'common.actionTimeShortDay',
+  TRAVEL_DAY: 'common.actionTravelDay',
+  NO_CANDIDATE: 'common.actionNoCandidate',
   NEEDS_INPUT: 'common.actionNeedsInput',
   NEEDS_INPUT_OTHER: 'common.actionNeedsInputOther',
   DAILY_CHECK: 'common.actionDailyCheck',
@@ -75,9 +78,11 @@ const NEEDS_OTHER_INPUT = Object.freeze([REASON.LODGING_REQUIRED, REASON.HOSPITA
  *
  *   병원 지침 사유가 있거나 즉시 복귀 중          → null (기본 줄, NO_TOURISM 이면 '병원 연락 또는 숙소 대기')
  *   NO_TOURISM + 입력 필요(coverage NEEDS_INPUT)   → 조건 입력 줄 (숙소 없음·지침 만료는 입력 줄)
- *   NO_TOURISM + 오늘 + 시간 부족(DEPARTURE_WINDOW_TOO_SHORT · SLA_INSUFFICIENT) → 시간 부족 줄
+ *   NO_TOURISM + 입국·출국 창 밖(OUTSIDE_STAY_WINDOW) → 이동 날 줄
+ *   NO_TOURISM + 시간 부족(DEPARTURE_WINDOW_TOO_SHORT · SLA_INSUFFICIENT) → 오늘이면 '오늘은', 다른 날이면 '이날은' 시간 부족 줄
+ *   STANDBY + 오늘 + 확인하지 않은 병원 중요 안내   → 병원 안내 확인 줄 (매일 확인보다 먼저: 바뀐 안내를 읽기 전에 '그대로예요'를 누르면 안 된다)
  *   STANDBY + 오늘 + 매일 확인 대기                 → 매일 확인 줄 (오늘 화면은 '위의 확인 항목', 하루 일정 화면은 '오늘 화면에서')
- *   STANDBY + 오늘 + 확인하지 않은 병원 중요 안내   → 병원 안내 확인 줄
+ *   STANDBY + 후보 없음(NO_CANDIDATE)               → 장소를 아직 찾지 못했다는 줄
  *
  * NO_TOURISM 날에 덧씌운 확인 대기는 고르지 않는다. 확인해도 외출이 열리지 않기 때문이다.
  *
@@ -93,26 +98,28 @@ export function dayActionKey(day, { isToday = false, screen = 'today' } = {}) {
     if (day.coverage === 'NEEDS_INPUT') {
       return reasons.some((r) => NEEDS_OTHER_INPUT.includes(r)) ? DAY_ACTION_KEY.NEEDS_INPUT_OTHER : DAY_ACTION_KEY.NEEDS_INPUT;
     }
-    if (isToday && (reasons.includes(REASON.DEPARTURE_WINDOW_TOO_SHORT) || reasons.includes(REASON.SLA_INSUFFICIENT))) {
-      return DAY_ACTION_KEY.TIME_SHORT;
+    if (reasons.includes(REASON.OUTSIDE_STAY_WINDOW)) return DAY_ACTION_KEY.TRAVEL_DAY;
+    if (reasons.includes(REASON.DEPARTURE_WINDOW_TOO_SHORT) || reasons.includes(REASON.SLA_INSUFFICIENT)) {
+      return isToday ? DAY_ACTION_KEY.TIME_SHORT : DAY_ACTION_KEY.TIME_SHORT_DAY;
     }
     return null;
   }
-  if (isToday && day.dayState === STATE.STANDBY) {
-    if (reasons.includes(REASON.DAILY_CHECK_PENDING)) {
-      return screen === 'day' ? DAY_ACTION_KEY.DAILY_CHECK_ELSEWHERE : DAY_ACTION_KEY.DAILY_CHECK;
-    }
-    if (reasons.includes(REASON.PLAN_UNCONFIRMED_UPDATE)) return DAY_ACTION_KEY.HOSPITAL_GUIDE;
+  if (day.dayState !== STATE.STANDBY) return null;
+  if (isToday && reasons.includes(REASON.PLAN_UNCONFIRMED_UPDATE)) return DAY_ACTION_KEY.HOSPITAL_GUIDE;
+  if (isToday && reasons.includes(REASON.DAILY_CHECK_PENDING)) {
+    return screen === 'day' ? DAY_ACTION_KEY.DAILY_CHECK_ELSEWHERE : DAY_ACTION_KEY.DAILY_CHECK;
   }
+  if (reasons.includes(REASON.NO_CANDIDATE)) return DAY_ACTION_KEY.NO_CANDIDATE;
   return null;
 }
 
 /**
  * 외출이 있는 날인가. 상태 상자 아래 고정 줄 'common.outingDayNote'를 보일지 정한다 (사용성 점검 A3).
- * 환자 외출이나 보호자 외출이 하나라도 있으면 참이다.
+ * 환자 외출이나 보호자 외출이 하나라도 있으면 참이다. 단, 즉시 복귀 중이거나 NO_TOURISM 인 날은 거짓이다:
+ * 즉시 복귀(외출 늦음 포함)는 시작된 외출·정거장 0개 외출을 남기지만 '짠 일정'을 안내할 날이 아니다.
  */
 export function outingDayNote(day) {
-  if (!isObject(day)) return false;
+  if (!isObject(day) || day.returnNow === true || day.dayState === STATE.NO_TOURISM) return false;
   return outingsOf(day, 'P').length + outingsOf(day, 'G').length > 0;
 }
 
@@ -420,6 +427,7 @@ export function deltaSummary(day) {
   if (!isObject(delta)) return null;
   const stops = new Map(allStops(day).map((s) => [s.id, s]));
   const excluded = new Map(list(day.excluded).map((e) => [String(e?.candidateId), e]));
+  const deadlineReasons = new Map([...outingsOf(day, 'P'), ...outingsOf(day, 'G')].map((o) => [o.id, o.deadlineReason ?? null]));
   const place = (stopId) => {
     const { role, contentId } = parseStopId(stopId);
     const stop = stops.get(stopId);
@@ -432,7 +440,14 @@ export function deltaSummary(day) {
     ...list(delta.added).map((id) => ({ kind: 'added', ...place(id) })),
     ...list(delta.shortened).map((id) => ({ kind: 'shortened', ...place(id), stayMin: stops.get(id)?.stayMin ?? null })),
     ...list(delta.cancelledOutings).map((outingId) => ({ kind: 'cancelled', outingId, role: parseStopId(outingId).role })),
-    ...list(delta.newDeadlines).map((d) => ({ kind: 'deadline', outingId: d?.outingId, returnBy: d?.returnBy, role: parseStopId(d?.outingId).role })),
+    ...list(delta.newDeadlines).map((d) => ({
+      kind: 'deadline',
+      outingId: d?.outingId,
+      returnBy: d?.returnBy,
+      // 마감 이름(하루 활동 종료면 '오늘 활동 종료')을 고르려고 지금 일정의 그 외출에서 이유를 읽는다
+      deadlineReason: deadlineReasons.get(d?.outingId) ?? null,
+      role: parseStopId(d?.outingId).role,
+    })),
   ];
   const visible = delta.hasVisibleChange === true;
   return {

@@ -189,12 +189,30 @@ export const safety = {
 
   // ── 상태 상자의 사유별 행동 줄 (사용성 점검 2026-11-08 A1·A2, components/trip/viewModel.js dayActionKey) ──
   // 시각·입력 누락·확인 대기처럼 병원과 무관한 사유에 '병원 연락'·'병원 인근 대기'를 쓰지 않는다.
-  // 병원 지침 사유(외출 제한·복귀 요청·지침 철회·만료·외출 늦음)는 상태 기본 행동 줄(src/domain/states.js)을 그대로 쓴다.
+  // 병원 지침 사유(외출 제한·복귀 요청·지침 철회·만료·외출 늦음 등)는 상태 기본 행동 줄(src/domain/states.js)을 그대로 쓴다.
   'common.actionTimeShort': {
     ko: '오늘은 남은 시간이 적어 외출 일정을 만들지 않았어요. 내일 일정은 그대로예요.',
     en: 'There is little time left today, so no outing was planned. Tomorrow’s plan stays the same.',
     ja: '今日は残り時間が少ないため、外出の予定を作っていません。明日の予定はそのままです。',
     zh: '今天剩余时间不多，因此没有安排外出。明天的行程不变。',
+  },
+  'common.actionTimeShortDay': {
+    ko: '이날은 남은 시간이 적어 외출 일정을 만들지 않았어요.',
+    en: 'No outing plan on this day because too little time is left.',
+    ja: 'この日は残り時間が少ないため、外出の予定を作っていません。',
+    zh: '这一天剩余时间不多，因此没有安排外出。',
+  },
+  'common.actionTravelDay': {
+    ko: '입국·출국 이동이 있는 날이라 외출 일정을 만들지 않았어요.',
+    en: 'No outing plan on this day because of arrival or departure travel.',
+    ja: '入国・出国の移動がある日のため、外出の予定を作っていません。',
+    zh: '这一天有入境或出境的行程，因此没有安排外出。',
+  },
+  'common.actionNoCandidate': {
+    ko: '조건에 맞는 장소를 아직 찾지 못했어요. 잠시 뒤 다시 확인해 주세요.',
+    en: 'No place that fits your conditions was found yet. Please check again later.',
+    ja: '条件に合う場所はまだ見つかっていません。しばらくしてからもう一度確認してください。',
+    zh: '暂时还没有找到符合条件的地点。请稍后再查看。',
   },
   'common.actionNeedsInput': {
     ko: '아직 조건을 입력하지 않아 일정을 만들지 않았어요. 조건을 입력하면 일정이 생겨요.',

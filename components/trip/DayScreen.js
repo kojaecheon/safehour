@@ -546,7 +546,7 @@ export default function DayScreen() {
           onClose={() => setSheet(null)}
         />
       )}
-      {sheet?.kind === 'delta' && day && <DeltaSheet day={day} dateLabel={title} onClose={closeDelta} />}
+      {sheet?.kind === 'delta' && day && <DeltaSheet day={day} dateLabel={title} isToday={isToday} onClose={closeDelta} />}
       {sheet?.kind === 'regenerate' && (
         <RegenerateSheet
           date={date}
