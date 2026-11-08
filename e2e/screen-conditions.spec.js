@@ -472,6 +472,34 @@ test.describe('③층 조건 화면, 편집기', () => {
     await expect(page.getByRole('status').filter({ hasText: '첫 일정을 만들었어요.' })).toBeVisible();
   });
 
+  // 재검토 지적(2026-11-08): 일정이 아직 없으면(만드는 중·만들지 못함) '첫 일정을 만들었어요'를 보이지 않는다(선 5).
+  // 일정이 처음 그려질 때 한 번 보인다
+  test("일정을 만들지 못한 동안에는 '첫 일정을 만들었어요'가 없고, 일정이 그려지면 그때 보인다", async ({ page }) => {
+    await startTrip(page, { arrival: 1, departure: 4, procedure: 2, visit: 3, periods: [] }, { path: '/conditions' });
+    await page.evaluate(() => {
+      for (const key of Object.keys(localStorage)) if (key.endsWith('.tripPlan')) localStorage.removeItem(key);
+    });
+    await page.route('**/api/itinerary/plan', (route) =>
+      route.fulfill({ status: 503, contentType: 'application/json', body: '{"ok":false}' }),
+    );
+    await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
+    await page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '허용', exact: true }).check();
+    await page
+      .getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' })
+      .getByRole('radio', { name: '아니오', exact: true })
+      .check();
+    for (const button of await page.locator('.conditions-group-none').all()) await button.click();
+    await page.getByRole('button', { name: '저장', exact: true }).click();
+    await expect(page).toHaveURL(/\/today$/);
+    await expect(page.getByText('일정을 만들지 못했어요', { exact: false })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(0);
+
+    await page.unroute('**/api/itinerary/plan');
+    await page.locator('.empty-state, section').getByRole('button', { name: '다시 시도' }).last().click();
+    await expect(page.getByText('여행 시작 전이에요')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('status').filter({ hasText: '첫 일정을 만들었어요.' })).toBeVisible();
+  });
+
   test('편집 중에는 체류 정보 고치기 행이 없다: 고정 바 뒤에 와 Tab 순서가 거꾸로 가고, 누르면 입력이 사라진다', async ({ page }) => {
     await startTrip(page, { periods: [] }, { path: '/conditions' });
     await expect(page.getByRole('link', { name: '체류 정보 고치기' })).toHaveCount(1);

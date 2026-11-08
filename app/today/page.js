@@ -119,8 +119,10 @@ export default function TodayPage() {
   }
 
   const top = <TopBar title={t('today.header')} />;
-  // 체류 중이 아닌 화면(일정 만드는 중·도착 전·출국 뒤·그날 일정 없음)에도 알림 자리를 둔다.
-  // 첫 기간을 도착 전에 저장하면 여기로 와서 '첫 일정을 만들었어요'를 보여야 한다 (2026-11-08 검토 반영)
+  // 일정이 저장된 화면(도착 전·출국 뒤·그날 일정 없음·체류 중)에 알림 자리를 둔다.
+  // 첫 기간을 도착 전에 저장하면 여기로 와서 '첫 일정을 만들었어요'를 보여야 한다 (2026-11-08 검토 반영).
+  // 일정이 아직 없는 화면(만드는 중·만들지 못함)에는 두지 않는다: 아직 사실이 아닌 말을 하게 된다.
+  // 알림 상태는 그대로 남아, 일정이 처음 그려질 때 한 번 보인다
   const noticeSlot = (
     <TripNotice slot role="status">
       {notice ? t(notice) : ''}
@@ -150,7 +152,6 @@ export default function TodayPage() {
   } else if (!trip.tripPlan) {
     body = (
       <div className="ui-block">
-        {noticeSlot}
         <EmptyState
           icon="navToday"
           title={trip.syncing ? t('today.generatingTitle') : t('today.noPlanTitle')}
