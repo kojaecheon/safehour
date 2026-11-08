@@ -7,7 +7,7 @@
 // - 병원 안내문 원문은 번역·요약하지 않고, 일정 요청에 실리지 않는다.
 
 import { test, expect } from './fixtures.js';
-import { HOSPITAL_NAME, acknowledgeGuide, evidenceShot, expectTodayGateBanner, kstDate, linkDemoPlan, readRecord, startTrip } from './helpers.js';
+import { HOSPITAL_NAME, acknowledgeGuide, evidenceShot, expectTodayGateBanner, kstDate, linkDemoPlan, readRecord, setClock, startTrip } from './helpers.js';
 
 const DEMO_BADGE = '병원 연동 데모';
 
@@ -17,6 +17,8 @@ async function coverageOf(page, date) {
 
 test.describe('시나리오 5 — 데모 병원 연동', () => {
   test('A: 정상 지침을 연결하면 병원 발행 기간이 적용되고, 중요 안내를 확인하기 전에는 오늘이 대기다', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const planBodies = [];
     page.on('request', (request) => {
       if (request.url().endsWith('/api/itinerary/plan')) planBodies.push(request.postData() ?? '');
@@ -79,6 +81,8 @@ test.describe('시나리오 5 — 데모 병원 연동', () => {
   });
 
   test('B: 외출 불가 지침이면 오늘은 외출이 없는 날이고, 오류가 아니라 정상 결과로 보인다', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const today = kstDate(0);
     await startTrip(page, { periods: [], hasCompanion: true }, { path: '/conditions' });
     await linkDemoPlan(page, 'B');
@@ -102,6 +106,8 @@ test.describe('시나리오 5 — 데모 병원 연동', () => {
   });
 
   test('C: 이미 만료된 지침은 저장하되 적용하지 않고, 수술 후 날짜는 새 지침 또는 본인 체크를 안내한다 (규칙 12)', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const today = kstDate(0);
     await startTrip(page, { periods: [] }, { path: '/conditions' });
     await linkDemoPlan(page, 'C');

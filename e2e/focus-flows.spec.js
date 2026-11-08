@@ -7,7 +7,7 @@
 //   - 체류 설정 하단 바에 보기 전용 문장이 들어가도 마지막 입력칸이 바에 가리지 않는다
 
 import { test, expect } from './fixtures.js';
-import { linkDemoPlan, startTrip } from './helpers.js';
+import { kstDate, linkDemoPlan, setClock, startTrip } from './helpers.js';
 
 const outlineStyleOf = (locator) => () => locator.evaluate((el) => getComputedStyle(el).outlineStyle);
 
@@ -67,6 +67,8 @@ test.describe('프로그램 초점 제목의 링', () => {
 
 test.describe('확인 대화상자 뒤 초점', () => {
   test('연결 해제 확인 뒤 초점은 body 가 아니다 (조건 화면 기간 삭제·동의 철회도 같다)', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     await startTrip(page);
     await linkDemoPlan(page, 'A');
     await linkDemoPlan(page, 'B');

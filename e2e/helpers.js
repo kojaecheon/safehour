@@ -494,6 +494,8 @@ export const DEMO_PLAN_LABEL = Object.freeze({
 
 /**
  * /link 에서 데모 지침을 받아 체류의 병원(기본: 등록한 병원)에 연결한다.
+ * 호출 전에 setClock 으로 시계를 아침(예: 10:00)에 고정해야 한다. 저녁에 오늘 일정에 연결하면 진행 중인 외출이 복귀 마감을 못 지켜
+ * OUTING_OVERDUE 가 켜지고 "지금 돌아가세요" 시트가 화면을 덮어 뒤따르는 클릭이 막힌다.
  * @param {'A'|'B'|'C'} which
  */
 export async function linkDemoPlan(page, which, { hospitalName = HOSPITAL_NAME } = {}) {
@@ -516,6 +518,7 @@ export async function acknowledgeGuide(page) {
  * 데모 사건 패널이 있는 오늘 일정(/trip/오늘)을 연다.
  * 데모 지침 A 를 연결하고 병원 안내를 확인한 뒤, 오늘 일정에 병원 발행 출처가 실리면 연다
  * (demo-events·screen-day·screen-today spec 이 함께 쓴다).
+ * linkDemoPlan 과 같은 이유로 호출 전에 setClock 으로 시계를 아침(예: 10:00)에 고정해야 한다.
  * @returns {Promise<import('@playwright/test').Locator>} 데모 사건 패널 region
  */
 export async function openDemoToday(page) {

@@ -16,6 +16,7 @@ import {
   kstDate,
   linkDemoPlan,
   readRecord,
+  setClock,
   startTrip,
   stopsOf,
 } from './helpers.js';
@@ -146,6 +147,8 @@ test.describe('시나리오 10 — axe WCAG 2.1 AA 위반 0건', () => {
   });
 
   test('시트: 바꾸기·다시 만들기·복귀·전후 비교 — 열린 상태로 검사', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const { tripPlan } = await startTrip(page);
     const editable = findEditableStop(tripPlan);
     expect(editable, '오늘 이후에 식사가 아닌 정거장이 있어야 한다').toBeTruthy();

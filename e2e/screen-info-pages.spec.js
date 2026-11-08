@@ -2,7 +2,7 @@
 // 색: --surface-alt rgb(243, 244, 245), --ink rgb(26, 28, 32), --emergency rgb(200, 16, 46),
 //     --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0)
 import { test, expect } from './fixtures.js';
-import { expectNoAxeViolations, gapBetween, linkDemoPlan, startTrip, styles } from './helpers.js';
+import { expectNoAxeViolations, gapBetween, kstDate, linkDemoPlan, setClock, startTrip, styles } from './helpers.js';
 
 test.describe('③층 개인정보 고지', () => {
   test('흰 바탕 한 장: 카드 없음, 소개는 info 아이콘 회색 Callout, 고지 글은 16/24, 항목은 띠 없는 점 목록', async ({ page }) => {
@@ -28,6 +28,8 @@ test.describe('③층 개인정보 고지', () => {
 
 test.describe('③층 병원 회복 안내', () => {
   test('카드 없는 행: 항목 사이 1px 선, 병원 원문 상자는 왼쪽 띠 그대로, 원문은 16/24', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     await startTrip(page);
     await linkDemoPlan(page, 'A');
     await page.goto('/guide');
@@ -41,6 +43,8 @@ test.describe('③층 병원 회복 안내', () => {
   });
 
   test('확인 수 안내는 Callout(모서리 10, 선 없음, 글자 먹색, 아이콘만 대기 색)', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     await startTrip(page);
     await linkDemoPlan(page, 'A');
     await page.goto('/guide');
@@ -110,6 +114,8 @@ test.describe('③층 병원 연결', () => {
   });
 
   test('연결 뒤: 주 버튼은 조건 보기 하나, 연결된 지침은 카드 없는 행 + 병원 발행 출처 표시', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     await startTrip(page);
     await linkDemoPlan(page, 'A');
     const primary = page.locator('main .btn:not(.btn-secondary):not(.btn-quiet):not(.btn-critical)');
@@ -123,6 +129,8 @@ test.describe('③층 병원 연결', () => {
   });
 
   test('연결 해제는 확인 대화상자: 확인 버튼 긴급 빨강, 취소하면 그대로, 확인하면 목록에서 사라진다', async ({ page }) => {
+    // 저녁에 데모 지침을 연결하면 외출이 복귀 마감을 못 지켜 "지금 돌아가세요" 시트가 덮는다. 아침으로 고정
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     await startTrip(page);
     await linkDemoPlan(page, 'A');
     await page.getByRole('button', { name: '연결 해제' }).click();
