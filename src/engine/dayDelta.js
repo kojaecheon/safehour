@@ -14,6 +14,8 @@
 //
 // **알림만 하는 재계산 금지** (기존 원칙, 규칙 31): 바뀌어야 하는 정거장(requiredStopIds)이 있는데
 // 그 정거장이 after 에 그대로 있거나 hasVisibleChange 가 false 이면 SilentReplanError 를 던진다.
+// 바뀌어야 하는 정거장이 있으면 userEditOnly 로 변화를 숨기지 않는다: 그 정거장이 빠진 것 자체가 원인 있는 변화다(findings 15).
+// 대체 없이 모두 빠지면 빠진 곳·취소된 외출로 하루를 비운 것을 적는다.
 
 import { REASON } from '../domain/states.js';
 import { toMinutes } from '../stay/time.js';
@@ -79,7 +81,8 @@ function overlaps(a, b) {
  * @param {string[]} [opts.requiredStopIds]  게이트를 더는 통과하지 못해 반드시 바뀌어야 하는 before 정거장
  * @param {Iterable<string>} [opts.userDrivenIds]  사용자 편집으로 빠지거나 들어온 정거장 — 변화로 세지 않는다
  * @param {Array<{from: string, to: string}>} [opts.replacements]  재계획이 같은 자리에 넣은 대체 짝
- * @param {boolean} [opts.userEditOnly]  이번 변화의 원인이 사용자 편집뿐이다 — 보이는 변화로 알리지 않는다
+ * @param {boolean} [opts.userEditOnly]  이번 변화의 원인이 사용자 편집뿐이다. 보이는 변화로 알리지 않는다.
+ *   requiredStopIds 가 있으면 쓰지 않는다(바뀌어야 하는 정거장이 곧 원인이다)
  * @returns {DayDelta}
  * @throws {SilentReplanError} 바뀌어야 하는 정거장이 남아 있거나, 변화가 필요한데 보이는 변화가 없을 때
  */
@@ -195,7 +198,10 @@ export function computeDayDelta(before, after, { reasons = [], requiredStopIds =
     replaced.length > 0 ||
     shortened.length > 0 ||
     cancelledOutings.length > 0;
-  const hasVisibleChange = !userEditOnly && (stopOrStateChange || (newDeadlines.length > 0 && deltaReasons.length > 0));
+  // 반드시 바뀌어야 하는 정거장(게이트 실패)이 있으면 원인이 사용자 편집만은 아니다(findings 15). 다시 만들기는 닫힌 장소를
+  // 고치지 않고 새로 짜서 수리 기록에 사유가 없고, 한도로 자른 기록만 남아 userEditOnly 로 넘어올 수 있다
+  const editOnly = userEditOnly && requiredStopIds.length === 0;
+  const hasVisibleChange = !editOnly && (stopOrStateChange || (newDeadlines.length > 0 && deltaReasons.length > 0));
 
   // 보이는 변화에 원인을 찾지 못하면 그날 사유를 쓴다(사유를 지어내지 않는다)
   if (hasVisibleChange && deltaReasons.length === 0) deltaReasons = [...afterReasons];

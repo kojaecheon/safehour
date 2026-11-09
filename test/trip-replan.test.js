@@ -615,3 +615,101 @@ describe('해제가 아닌 전체 재계획도 하루 정거장 한도 안에서
     assert.equal(new Set(placed).size, placed.length, '같은 장소를 두 번 쓰지 않는다');
   });
 });
+
+// findings 15: 다시 만들기(regenerate, forceFresh)는 닫힌 정거장을 고치지 않고 새로 짜서 수리 기록에 휴무 사유가 남지 않는다.
+// 이때 하루 정거장 한도로 새 일정 끝을 자른 기록(사용자 입력 몫)만 남으면 '사용자 편집만이 원인'으로 읽혀, 닫힌 장소가 빠진
+// 실제 변화가 보이지 않는 변화로 바뀌고 SilentReplanError 가 났다. 반드시 바뀌어야 하는 정거장이 있으면 사용자 편집만의 변화가 아니다
+describe('다시 만들기는 오늘 계획된 장소가 닫혀도 예외 없이 빠진 곳을 전후 비교에 적는다 (findings 15)', () => {
+  const s = tripStay({}, { pace: 'NORMAL' });
+
+  /** 오늘만 다시 만들기: 다른 날짜의 배치는 usedContentIds 로 싣는다 */
+  function regenerateToday(base, { pool, now, closedIds }) {
+    const used = Object.entries(base.days)
+      .filter(([date]) => date !== TODAY)
+      .flatMap(([, d]) => contentIdsOf(d));
+    const input = {
+      stay: s,
+      candidatesByLodging: byLodging(pool),
+      airportTravel: AIRPORT_TRAVEL,
+      lang: 'en',
+      now,
+      previous: base.days,
+      usedContentIds: used,
+      events: [{ type: 'CLOSURE', closedIds }],
+    };
+    return {
+      regen: regenerate({ ...input, scope: 'DAY', date: TODAY }).days[TODAY],
+      server: planTrip({ ...input, dates: [TODAY] }).days[TODAY],
+    };
+  }
+
+  /** 닫힌 정거장이 모두 빠졌고, 빠진 곳(또는 대체된 곳)으로 전후 비교에 적혔다 */
+  function assertClosedStopsReported(day, closedStops) {
+    const placed = new Set(stopsOf(day).map((x) => x.id));
+    const d = day.delta;
+    assert.ok(d, '전후 비교가 있다');
+    assert.equal(d.hasVisibleChange, true);
+    assert.ok(d.reasons.includes(REASON.CLOSED), '빠진 원인(휴무)을 적는다');
+    const reported = new Set([...d.removed, ...d.replaced.map((r) => r.from)]);
+    for (const x of closedStops) {
+      assert.ok(!placed.has(x.id), `닫힌 정거장 ${x.id} 은 남지 않는다`);
+      assert.ok(reported.has(x.id), `닫힌 정거장 ${x.id} 이 빠진 곳으로 적힌다`);
+    }
+  }
+
+  test('09:30 오늘 첫 환자 외출의 세 곳이 닫히면: 예외 없이 그 세 곳이 빠진 곳으로 적힌다', () => {
+    const pool = tripPool('en');
+    const base = plan(s, { pool, dates: [TODAY] });
+    const closed = base.days[TODAY].outings[0].stops;
+    assert.equal(closed.length, 3, '전제: 첫 외출은 세 곳이다');
+    const { regen, server } = regenerateToday(base, { pool, now: at(TODAY, '09:30'), closedIds: closed.map((x) => x.contentId) });
+    assertClosedStopsReported(regen, closed);
+    assertClosedStopsReported(server, closed);
+  });
+
+  test('13:00 오늘 계획된 장소가 모두 닫히면: 아직 도착하지 않은 곳은 모두 빠진 곳으로 적힌다', () => {
+    const pool = tripPool('en');
+    const base = plan(s, { pool, dates: [TODAY] });
+    const all = stopsOf(base.days[TODAY]);
+    const pending = all.filter((x) => mins(x.arriveAt) > mins('13:00'));
+    assert.ok(pending.length > 0, '전제: 13:00 이후 도착할 곳이 있다');
+    const { regen } = regenerateToday(base, { pool, now: at(TODAY, '13:00'), closedIds: all.map((x) => x.contentId) });
+    assertClosedStopsReported(regen, pending);
+  });
+
+  test('대체할 곳이 하나도 없으면: 지어낸 정거장 없이 하루를 비운 것으로 적는다(빠진 곳·취소된 외출, 들어온 곳 없음)', () => {
+    const pool = tripPool('en', 3);
+    const base = plan(s, { pool, dates: [TODAY] });
+    const closed = stopsOf(base.days[TODAY]);
+    assert.equal(closed.length, 3, '전제: 오늘 계획된 장소는 세 곳뿐이다');
+    for (const now of ['09:30', '10:00']) {
+      const { regen, server } = regenerateToday(base, { pool, now: at(TODAY, now), closedIds: closed.map((x) => x.contentId) });
+      for (const day of [regen, server]) {
+        assert.deepEqual(day.outings, []);
+        assert.deepEqual(day.guardianOutings, []);
+        assert.deepEqual(day.delta.added, []);
+        assert.deepEqual(day.delta.replaced, []);
+        assert.deepEqual(new Set(day.delta.removed), new Set(closed.map((x) => x.id)));
+        assert.deepEqual(day.delta.cancelledOutings, base.days[TODAY].outings.map((o) => o.id));
+        assertClosedStopsReported(day, closed);
+      }
+    }
+  });
+
+  test('computeDayDelta: 반드시 바뀌어야 하는 정거장이 빠졌으면 userEditOnly 여도 보이는 변화다. 남았거나 아무것도 바뀌지 않았으면 그대로 예외다', () => {
+    const base = plan(s);
+    const day = base.days[TODAY];
+    const target = day.outings[0].stops[0];
+    const after = structuredClone(day);
+    after.outings[0].stops = after.outings[0].stops.slice(1);
+    const d = computeDayDelta(day, after, { requiredStopIds: [target.id], userEditOnly: true, userDrivenIds: ['X:G:1'] });
+    assert.equal(d.hasVisibleChange, true);
+    assert.deepEqual(d.removed, [target.id]);
+    // 결함은 그대로 예외: 바뀌어야 하는 정거장이 남음, 바뀌어야 하는데 아무것도 바뀌지 않음
+    assert.throws(() => computeDayDelta(day, structuredClone(day), { requiredStopIds: [target.id], userEditOnly: true }), SilentReplanError);
+    const ghost = `${TODAY}:P:NOT-IN-PLAN`;
+    assert.throws(() => computeDayDelta(day, structuredClone(day), { requiredStopIds: [ghost], userEditOnly: true }), SilentReplanError);
+    // 원인 없는 사용자 편집만이면 여전히 보이는 변화가 아니다
+    assert.equal(computeDayDelta(day, after, { userEditOnly: true, userDrivenIds: [target.id] }).hasVisibleChange, false);
+  });
+});
