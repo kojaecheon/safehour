@@ -226,7 +226,7 @@ test.describe('복귀 마감이 지난 외출', () => {
       await expect(todayDay.locator('.guardian-return')).toHaveCount(distinct.size);
 
       // 맨 위 '오늘 환자 복귀 마감' 카드: 머리 바로 아래, 알림 스위치보다 앞. 아직 지나지 않은 가장 가까운 마감 = 첫 '예정' 줄
-      const card = g.locator('a.guardian-today');
+      const card = g.locator('button.guardian-today');
       await expect(card).toHaveCount(1);
       await expect(card.getByRole('heading', { name: '오늘 환자 복귀 마감' })).toBeVisible();
       await expect(card).toContainText(`${second}까지`);
@@ -236,8 +236,8 @@ test.describe('복귀 마감이 지난 외출', () => {
       expect(await card.locator('.guardian-today-time time').innerText()).toBe(await firstUpcoming.locator('.guardian-return-time time').innerText());
       expect((await card.boundingBox()).y).toBeLessThan(toggleBox.y);
       expect((await card.boundingBox()).height).toBeGreaterThanOrEqual(44);
-      await expect(card).toHaveAttribute('href', `#guardian-day-${today}`);
-      // 카드를 누르면 오늘 일정 제목으로 옮겨 가 초점이 거기 간다. 주소 해시는 남기지 않는다(/g 는 해시를 보호자 링크로 읽는다, 리뷰 I1)
+      await expect(card).toHaveAttribute('type', 'button');
+      // 카드(버튼)를 누르면 오늘 일정 제목으로 옮겨 가 초점이 거기 간다. 주소 해시는 생기지 않는다(/g 는 해시를 보호자 링크로 읽는다, 리뷰 I1)
       await card.click();
       const todayHeading = todayDay.locator('h3.guardian-day-title');
       await expect(todayHeading).toBeFocused();

@@ -404,17 +404,22 @@
 
 /* ───────────────────────── 오늘 환자 복귀 마감 카드 · 접힌 날짜 (사용성 점검 D3) ───────────────────────── */
 /* 흰 면 + 카드 테두리 · 모서리 16(누르는 카드). 페이지도 흰 바탕이라 선으로 구분한다. 읽을 것은 마감 시각이라 시각을 가장 크게 둔다.
-   통째로 오늘 날짜 제목으로 가는 링크다(44px 이상) */
+   통째로 오늘 날짜 제목으로 옮겨 가는 버튼이다(44px 이상). 링크가 아니라 버튼인 이유는 GuardianCopyView.js TodayReturnCard 주석 */
 .guardian-today {
   display: grid;
   gap: var(--space-2);
+  width: 100%;
   min-height: var(--tap-min);
   padding: var(--space-4);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-16);
   background: var(--surface);
   color: var(--ink);
+  font: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
+  appearance: none;
 }
 .guardian-today:active {
   background: var(--pressed);

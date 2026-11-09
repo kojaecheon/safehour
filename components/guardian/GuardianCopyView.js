@@ -113,17 +113,17 @@ function ReturnPlace({ entry }) {
 function TodayReturnCard({ summary }) {
   const { t } = useLang();
   const targetId = `guardian-day-${summary.date}`;
-  // 오늘 일정 제목으로 옮겨 가고 초점을 거기 둔다. 주소 해시는 남기지 않는다: /g 는 주소 해시를 보호자 링크 암호문으로
-  // 읽으므로(hooks.js useIncomingLink) '#guardian-day-…'가 남으면 '링크가 올바르지 않아요'가 뜬다(2026-11-10 리뷰 I1).
-  function jump(event) {
-    event.preventDefault();
+  // 오늘 일정 제목으로 옮겨 가고 초점을 거기 둔다. 링크가 아니라 버튼이다: /g 는 주소 해시를 보호자 링크 암호문으로
+  // 읽으므로(hooks.js useIncomingLink) '#guardian-day-…' 해시가 주소에 남거나 새 탭으로 열리면 '링크가 올바르지 않아요'가
+  // 뜬다(2026-11-10 리뷰 I1). 이 부품은 사본을 푼 뒤 브라우저에서만 그려지므로 자바스크립트 없는 경우는 없다.
+  function jump() {
     const heading = document.getElementById(targetId);
     if (!heading) return;
     heading.scrollIntoView({ block: 'start' });
     heading.focus();
   }
   return (
-    <a className="guardian-today" href={`#${targetId}`} onClick={jump}>
+    <button type="button" className="guardian-today" onClick={jump}>
       <h3 className="guardian-today-title">{t('guardian.todayReturnTitle')}</h3>
       {summary.none ? (
         <span className="guardian-today-none">{t('guardian.noPatientOutings')}</span>
@@ -138,7 +138,7 @@ function TodayReturnCard({ summary }) {
           {summary.total > 1 && <span className="guardian-today-more">{t('guardian.todayReturnMore', { count: summary.total })}</span>}
         </>
       )}
-    </a>
+    </button>
   );
 }
 
@@ -233,8 +233,6 @@ function GuardianDay({ day, nowMs, folded = false }) {
     </article>
   );
 }
-
-/** 오늘을 맨 앞에, 나머지는 날짜 순서 그대로. 오늘이 없으면 원래 순서 */
 
 /**
  * @param {object} props
