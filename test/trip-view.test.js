@@ -42,6 +42,7 @@ import {
   todayFocus,
   tripDateRows,
   updateFailedBodyKey,
+  upstreamKind,
   welcomeNoticeReady,
 } from '../components/trip/viewModel.js';
 import { buildMapLinks } from '../lib/maps.js';
@@ -919,8 +920,27 @@ describe('noPlanBodyKey: 저장 일정이 없을 때 첫 일정 실패 안내 �
     assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanTourism');
     assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: null }), 'today.noPlanTourism');
     assert.equal(noPlanBodyKey({ errorCode: 'NETWORK_ERROR' }), 'today.noPlanNetwork');
-    for (const code of ['SAFEHOUR_RECALCULATION_FAILED', 'HTTP_500', 'HTTP_503', 'BAD_RESPONSE', 'CLIENT_ERROR', 'LINK_FAILED', 'READ_ONLY']) {
+    // 세션 만료(401)는 다시 시도로 풀리지 않는다: 로그인 안내(보기 전용 문구)로 보낸다
+    assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_AUTH_REQUIRED' }), 'today.noPlanReadOnly');
+    // '계산하지 못했다'는 서버가 계산에 실패했을 때(500대·재계산 실패)만 말한다
+    for (const code of ['SAFEHOUR_RECALCULATION_FAILED', 'HTTP_500', 'HTTP_502', 'HTTP_503']) {
       assert.equal(noPlanBodyKey({ errorCode: code }), 'today.noPlanEngine', code);
+    }
+    // 그 밖(요청 거부 400대, 응답 모양 오류, 기기 저장 실패, 연동 실패)은 원인을 단정하지 않는 일반 실패 문구다
+    for (const code of ['SAFEHOUR_BAD_REQUEST', 'SAFEHOUR_STAY_INVALID', 'HTTP_400', 'BAD_RESPONSE', 'CLIENT_ERROR', 'LINK_FAILED', 'READ_ONLY', 'STORAGE_FAILED', 'ACCOUNT_CHANGED']) {
+      assert.equal(noPlanBodyKey({ errorCode: code }), 'today.noPlanGeneric', code);
+    }
+  });
+
+  test('upstreamKind: 갱신 실패 안내와 첫 일정 실패 안내가 같은 분류 표를 쓴다(표 하나)', () => {
+    assert.equal(upstreamKind('QUOTA'), 'QUOTA');
+    for (const u of ['AUTH', 'SELF_LIMIT']) assert.equal(upstreamKind(u), 'CONTACT', u);
+    for (const u of ['NETWORK', 'UPSTREAM_ERROR', 'PARSE']) assert.equal(upstreamKind(u), 'TEMPORARY', u);
+    for (const u of [null, undefined, '', 'UNKNOWN', 'quota']) assert.equal(upstreamKind(u), null, String(u));
+    const pair = { QUOTA: ['today.updateFailedQuota', 'today.noPlanQuota'], AUTH: ['today.updateFailedConnection', 'today.noPlanConnection'], PARSE: ['today.updateFailedTemporary', 'today.noPlanTourism'] };
+    for (const [u, [notice, empty]] of Object.entries(pair)) {
+      assert.equal(updateFailedBodyKey(u), notice, u);
+      assert.equal(noPlanBodyKey({ upstream: u }), empty, u);
     }
   });
 
@@ -932,7 +952,7 @@ describe('noPlanBodyKey: 저장 일정이 없을 때 첫 일정 실패 안내 �
   });
 
   test('본문은 네 언어로 있고, 저장 일정이 그대로라고 말하지 않으며 단정 표현을 쓰지 않는다', () => {
-    for (const key of ['today.noPlanQuota', 'today.noPlanConnection', 'today.noPlanTourism', 'today.noPlanNetwork', 'today.noPlanEngine']) {
+    for (const key of ['today.noPlanQuota', 'today.noPlanConnection', 'today.noPlanTourism', 'today.noPlanNetwork', 'today.noPlanEngine', 'today.noPlanGeneric']) {
       const entry = UI_TEXT[key];
       assert.ok(entry, key);
       for (const lang of ['ko', 'en', 'ja', 'zh']) {

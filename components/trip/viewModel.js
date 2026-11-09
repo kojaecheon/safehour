@@ -752,23 +752,35 @@ export function needsOperatorContact(upstream) {
 }
 
 /**
- * 일정 갱신 실패 안내 본문 키. 서버가 502 에 실은 관광공사 실패 분류(lib/trip 의 lastUpstream)로 고른다.
+ * 관광공사 실패 분류(upstream)를 안내 갈래로 묶는다. 갱신 실패 안내와 첫 일정 실패 안내가 같은 표를 쓴다(표가 둘이면 어긋난다).
+ *   QUOTA                              'QUOTA'      제공처 하루 한도, 자정(한국 시각) 이후 다시
+ *   AUTH · SELF_LIMIT                  'CONTACT'    운영자에게 알림 (needsOperatorContact)
+ *   NETWORK · UPSTREAM_ERROR · PARSE   'TEMPORARY'  잠시 뒤 다시
+ *   그 밖(없음·모르는 값)                null
+ * @param {string|null|undefined} upstream  서버가 502 에 실은 분류(lib/trip 의 lastUpstream)
+ * @returns {'QUOTA'|'CONTACT'|'TEMPORARY'|null}
+ */
+export function upstreamKind(upstream) {
+  if (upstream === 'QUOTA') return 'QUOTA';
+  if (needsOperatorContact(upstream)) return 'CONTACT';
+  if (upstream === 'NETWORK' || upstream === 'UPSTREAM_ERROR' || upstream === 'PARSE') return 'TEMPORARY';
+  return null;
+}
+
+/**
+ * 일정 갱신 실패 안내 본문 키. 서버가 502 에 실은 관광공사 실패 분류(lib/trip 의 lastUpstream)로 고른다(upstreamKind).
  * 저장 일정이 있을 때만 쓴다(없으면 noPlanBodyKey). 원인을 단정하지 않고 '지금 할 수 있는 일'만 알린다.
  * 분류가 없으면(오프라인·다른 오류) 예전 일반 문구다.
- *   QUOTA                          제공처 하루 한도, 자정(한국 시각) 이후 다시
- *   NETWORK · UPSTREAM_ERROR · PARSE  잠시 뒤 다시
- *   AUTH · SELF_LIMIT              운영자에게 알림 (needsOperatorContact)
  * @param {string|null|undefined} upstream
  * @returns {string}
  */
 export function updateFailedBodyKey(upstream) {
-  if (needsOperatorContact(upstream)) return 'today.updateFailedConnection';
-  switch (upstream) {
+  switch (upstreamKind(upstream)) {
+    case 'CONTACT':
+      return 'today.updateFailedConnection';
     case 'QUOTA':
       return 'today.updateFailedQuota';
-    case 'NETWORK':
-    case 'UPSTREAM_ERROR':
-    case 'PARSE':
+    case 'TEMPORARY':
       return 'today.updateFailedTemporary';
     default:
       return 'today.updateFailedBody';
@@ -777,26 +789,37 @@ export function updateFailedBodyKey(upstream) {
 
 /**
  * 저장 일정이 없을 때 첫 일정 만들기 실패 안내 본문 키(usability 2026-11-08 C1). 실패 원인별로 하나만 고른다.
- * 저장 일정이 없으므로 '저장된 일정은 그대로'라고 말하지 않는다. 인터넷 연결 탓은 요청이 서버에 닿지 않았을 때만 한다.
- * 관광공사 분류(upstream)가 있으면 분류가 앞선다.
+ * 저장 일정이 없으므로 '저장된 일정은 그대로'라고 말하지 않는다. 원인을 아는 만큼만 말한다: 요청이 서버에 닿지 않은 것
+ * (NETWORK_ERROR)은 끊김·시간 초과·주소 오류를 가르지 못하므로 '연결하지 못했다'고만 하고 인터넷 확인을 권한다.
+ * 관광공사 분류(upstream)가 있으면 분류가 앞선다(upstreamKind).
  *   upstream QUOTA                                  noPlanQuota       자정(한국 시각) 이후 다시
  *   upstream AUTH · SELF_LIMIT                      noPlanConnection  운영자에게 알림 (needsOperatorContact)
  *   upstream NETWORK · UPSTREAM_ERROR · PARSE,
  *     또는 errorCode SAFEHOUR_EXTERNAL_API           noPlanTourism     관광 정보를 못 불러옴, 잠시 뒤 다시
- *   errorCode NETWORK_ERROR                         noPlanNetwork     인터넷 연결 확인
- *   그 밖의 errorCode                                noPlanEngine      일정 계산 실패, 다시 시도
+ *   errorCode NETWORK_ERROR                         noPlanNetwork     서버에 연결하지 못함, 인터넷 확인
+ *   errorCode SAFEHOUR_AUTH_REQUIRED                noPlanReadOnly    로그인하면 만든다(세션 만료가 보기 전용보다 먼저 보일 때)
+ *   errorCode SAFEHOUR_RECALCULATION_FAILED, HTTP_5xx noPlanEngine     일정 계산 실패, 다시 시도
+ *   그 밖의 errorCode(400대, 기기 저장 실패 등)       noPlanGeneric     만들지 못함, 다시 시도 (원인을 단정하지 않는다)
  *   둘 다 없음                                       noPlanBody        예전 일반 문구
  * @param {{ errorCode?: string|null, upstream?: string|null }} [failure]  lib/trip 의 lastErrorCode · lastUpstream
  * @returns {string}
  */
 export function noPlanBodyKey({ errorCode = null, upstream = null } = {}) {
-  if (upstream === 'QUOTA') return 'today.noPlanQuota';
-  if (needsOperatorContact(upstream)) return 'today.noPlanConnection';
-  if (upstream === 'NETWORK' || upstream === 'UPSTREAM_ERROR' || upstream === 'PARSE' || errorCode === 'SAFEHOUR_EXTERNAL_API') {
-    return 'today.noPlanTourism';
+  switch (upstreamKind(upstream)) {
+    case 'QUOTA':
+      return 'today.noPlanQuota';
+    case 'CONTACT':
+      return 'today.noPlanConnection';
+    case 'TEMPORARY':
+      return 'today.noPlanTourism';
+    default:
+      break;
   }
+  if (errorCode === 'SAFEHOUR_EXTERNAL_API') return 'today.noPlanTourism';
   if (errorCode === 'NETWORK_ERROR') return 'today.noPlanNetwork';
-  if (errorCode) return 'today.noPlanEngine';
+  if (errorCode === 'SAFEHOUR_AUTH_REQUIRED') return 'today.noPlanReadOnly';
+  if (errorCode === 'SAFEHOUR_RECALCULATION_FAILED' || /^HTTP_5\d\d$/.test(errorCode ?? '')) return 'today.noPlanEngine';
+  if (errorCode) return 'today.noPlanGeneric';
   return 'today.noPlanBody';
 }
 

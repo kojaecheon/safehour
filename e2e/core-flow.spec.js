@@ -20,6 +20,7 @@ import {
   startTrip,
   stopsOf,
   waitForTripPlan,
+  setClock,
 } from './helpers.js';
 
 /** 본인 체크 한 항목에 답한다 (fieldset legend = 질문) */
@@ -39,6 +40,8 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
     page.on('request', (request) => {
       if (request.url().endsWith('/api/itinerary/plan')) planBodies.push(request.postData() ?? '');
     });
+    // 자정 근처에 Node 의 날짜와 브라우저의 날짜가 갈리지 않게 오늘 10:00(한국 시각)으로 고정한다
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
     const arrival = kstDate(-1);
     const departure = kstDate(3);
 

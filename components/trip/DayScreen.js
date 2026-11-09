@@ -320,7 +320,8 @@ export default function DayScreen() {
           title={trip.syncing ? t('today.generatingTitle') : t('trip.noDayTitle')}
           body={trip.syncing ? t('today.generatingBody') : t('trip.noDayBody')}
           action={
-            !trip.syncing && !trip.readOnly ? (
+            // 갱신 실패 알림 상자(위)가 이미 다시 시도를 들고 있으면 여기서는 두 번째 버튼을 두지 않는다 (usability C1)
+            !trip.syncing && !trip.readOnly && !trip.updateFailed ? (
               <Button variant="secondary" onClick={() => trip.retry()}>
                 {t('today.retry')}
               </Button>

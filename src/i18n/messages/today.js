@@ -84,16 +84,23 @@ export const messages = {
     zh: '未能加载旅游信息，因此未能生成行程。请稍后重试。',
   },
   'today.noPlanNetwork': {
-    ko: '인터넷에 연결되어 있지 않아 일정을 만들지 못했어요. 연결을 확인하고 다시 시도해 주세요.',
-    en: 'We could not build the plan because you are not connected to the internet. Check your connection and try again.',
-    ja: 'インターネットに接続されていないため、予定を作成できませんでした。接続を確認して、もう一度お試しください。',
-    zh: '未连接到互联网，未能生成行程。请检查网络连接后重试。',
+    ko: '서버에 연결하지 못해 일정을 만들지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.',
+    en: 'We could not reach the server, so the plan was not built. Check your internet connection and try again.',
+    ja: 'サーバーに接続できなかったため、予定を作成できませんでした。インターネット接続を確認して、もう一度お試しください。',
+    zh: '无法连接到服务器，未能生成行程。请检查网络连接后重试。',
   },
   'today.noPlanEngine': {
     ko: '일정을 계산하지 못했어요. 다시 시도해 주세요.',
     en: 'We could not calculate the plan. Please try again.',
     ja: '予定を計算できませんでした。もう一度お試しください。',
     zh: '未能计算行程。请重试。',
+  },
+  // 원인을 가리지 못하는 그 밖의 실패(요청 거부, 기기 저장 실패 등): 원인을 단정하지 않는다
+  'today.noPlanGeneric': {
+    ko: '일정을 만들지 못했어요. 다시 시도해 주세요.',
+    en: 'We could not build the plan. Please try again.',
+    ja: '予定を作成できませんでした。もう一度お試しください。',
+    zh: '未能生成行程。请重试。',
   },
   'today.noPlanReadOnly': {
     ko: '로그인하고 인터넷에 연결되면 일정을 만들어요.',
