@@ -71,6 +71,25 @@ test.describe('③층 더보기, 목록 묶음 두 개', () => {
     }
   });
 
+  test('하이드레이션 전(서버 그림)에는 흰 블록 두 개만 자리를 잡고 행은 숨긴다: 사본이 있는 기기에서 행이 뒤늦게 끼어 밀리지 않게 (리뷰 M3)', async ({ browser }, testInfo) => {
+    const { baseURL, viewport, locale, timezoneId } = testInfo.project.use;
+    const context = await browser.newContext({ baseURL, viewport, locale, timezoneId, javaScriptEnabled: false });
+    try {
+      const page = await context.newPage();
+      await page.goto('/more');
+      const nav = page.locator('main.more-page > nav');
+      await expect(nav).toHaveClass(/more-menu-pending/);
+      const blocks = nav.locator('.ui-block');
+      await expect(blocks).toHaveCount(2);
+      expect((await styles(blocks.nth(0), ['background-color']))['background-color']).toBe('rgb(255, 255, 255)');
+      await expect(blocks.nth(0).locator('.ui-list > li')).toHaveCount(5);
+      await expect(blocks.nth(0).locator('.ui-list')).toBeHidden();
+      await expect(blocks.nth(0).getByRole('heading', { name: '도구' })).toBeHidden();
+    } finally {
+      await context.close();
+    }
+  });
+
   test('보호자 사본이 있으면 도구 맨 위에 받은 일정(/g) 행, 누르면 받은 일정 화면', async ({ page }) => {
     await importGuardianCopy(page);
     await page.goto('/more');
