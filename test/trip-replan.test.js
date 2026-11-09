@@ -677,7 +677,8 @@ describe('다시 만들기는 오늘 계획된 장소가 닫혀도 예외 없이
     assertClosedStopsReported(regen, pending);
   });
 
-  test('대체할 곳이 하나도 없으면: 지어낸 정거장 없이 하루를 비운 것으로 적는다(빠진 곳·취소된 외출, 들어온 곳 없음)', () => {
+  // 이 경우는 수정 전에도 예외가 없었다(3곳 풀이라 한도로 자르는 기록이 없어 userEditOnly 가 거짓). 비운 하루를 어떻게 적는지 지키는 가드다.
+  test('대체할 곳이 하나도 없으면(수정 전에도 통과, 기존 동작 가드): 지어낸 정거장 없이 하루를 비운 것으로 적는다(빠진 곳·취소된 외출, 들어온 곳 없음)', () => {
     const pool = tripPool('en', 3);
     const base = plan(s, { pool, dates: [TODAY] });
     const closed = stopsOf(base.days[TODAY]);
