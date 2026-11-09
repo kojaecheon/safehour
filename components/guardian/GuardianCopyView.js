@@ -124,7 +124,8 @@ function TodayReturnCard({ summary }) {
   }
   return (
     <button type="button" className="guardian-today" onClick={jump}>
-      <h3 className="guardian-today-title">{t('guardian.todayReturnTitle')}</h3>
+      {/* 버튼 안이라 제목 요소를 쓰지 않는다(버튼 안의 내용은 모두 버튼 이름으로 읽힌다). 글자 모양은 클래스가 준다 */}
+      <span className="guardian-today-title">{t('guardian.todayReturnTitle')}</span>
       {summary.none ? (
         <span className="guardian-today-none">{t('guardian.noPatientOutings')}</span>
       ) : (

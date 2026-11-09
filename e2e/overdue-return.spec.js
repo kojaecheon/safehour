@@ -228,7 +228,8 @@ test.describe('복귀 마감이 지난 외출', () => {
       // 맨 위 '오늘 환자 복귀 마감' 카드: 머리 바로 아래, 알림 스위치보다 앞. 아직 지나지 않은 가장 가까운 마감 = 첫 '예정' 줄
       const card = g.locator('button.guardian-today');
       await expect(card).toHaveCount(1);
-      await expect(card.getByRole('heading', { name: '오늘 환자 복귀 마감' })).toBeVisible();
+      await expect(card).toContainText('오늘 환자 복귀 마감');
+      await expect(card.getByRole('heading')).toHaveCount(0);
       await expect(card).toContainText(`${second}까지`);
       await expect(card).toContainText('예정');
       await expect(card).toContainText(`오늘 마감 ${distinct.size}건`);
