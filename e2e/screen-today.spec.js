@@ -9,6 +9,8 @@ import { test, expect } from './fixtures.js';
 import {
   buildStay,
   expectNoAxeViolations,
+  expectNoHorizontalScroll,
+  expectStackedMapButtons,
   fireDemoEvent,
   gapBetween,
   importGuardianCopy,
@@ -257,6 +259,21 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
       expect(texts.every((n) => n > 0), `빈 블록: ${JSON.stringify(texts)}`).toBe(true);
     });
   }
+
+  test('320px 日本語: 다음 외출의 지도 버튼은 세로로 쌓이고 글자가 단어 중간에서 끊기지 않는다 (사용성 점검 G1)', async ({ page }) => {
+    // 하루 중 언제 돌려도 오늘 남은 외출이 있게 오전 10시로 서버·브라우저 시계를 함께 맞춘다
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await page.setViewportSize({ width: 320, height: 720 });
+    await page.goto('/');
+    await page.getByRole('button', { name: '日本語', exact: true }).click();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'ja');
+    await startTrip(page);
+    const row = page.locator('main.today-page .trip-map-row').first();
+    await expect(row.getByRole('link', { name: /Googleマップ/ })).toBeVisible();
+    await expect(row.getByRole('link', { name: /カカオマップ/ })).toBeVisible();
+    await expectStackedMapButtons(row, '오늘 320px ja');
+    await expectNoHorizontalScroll(page, '오늘 320px ja');
+  });
 
   test('320px English, 매일 확인 전: 오늘 화면에 가로 스크롤이 없다', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 720 });

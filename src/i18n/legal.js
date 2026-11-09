@@ -272,8 +272,8 @@ export const LEGAL_SECTIONS = [
     lead: {
       ko: '장소의 “구글 지도로 열기”·“카카오맵으로 열기”는 목적지 장소의 이름과 좌표만 담은 링크입니다. 누를 때만 열립니다.',
       en: 'The “Open in Google Maps” and “Open in Kakao Map” links for a place carry only that destination’s name and coordinates. They open only when you tap them.',
-      ja: '場所の「Googleマップで開く」「カカオマップで開く」は、目的地の名前と座標だけを含むリンクです。押したときだけ開きます。',
-      zh: '地点的“在 Google 地图中打开”“在 Kakao 地图中打开”是只包含目的地名称和坐标的链接，只有点击时才会打开。',
+      ja: '場所の「Googleマップ」「カカオマップ」ボタンは、目的地の名前と座標だけを含むリンクです。押したときだけ開きます。',
+      zh: '地点的“Google 地图”“Kakao 地图”按钮是只包含目的地名称和坐标的链接，只有点击时才会打开。',
     },
     items: [
       {
