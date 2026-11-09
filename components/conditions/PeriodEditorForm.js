@@ -20,7 +20,7 @@
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
 import { AnswerInput, Button, Icon, PeriodEditor } from '@/components/ui/index.js';
-import { postProcedureBoundary } from '@/src/stay/stay.js';
+import { todayKst } from '@/lib/store/index.js';
 import { VALIDATION_ISSUE } from '@/src/stay/errorCodes.js';
 import ChoiceInput from './ChoiceInput.js';
 import { ITEM_LABEL_KEY } from './values.js';
@@ -32,6 +32,7 @@ import {
   emptyPeriodForm,
   fillGroupNone,
   formAnswerOf,
+  newPeriodDates,
   unansweredFields,
   periodToForm,
   returnHospitalId,
@@ -132,10 +133,10 @@ function errorKey(field, code) {
   }
 }
 
+/** 고칠 기간은 그대로, 새 기간은 기본 날짜(경계일·입국일 중 기준, 지났으면 오늘)로 시작한다 */
 function initialForm(period, stay) {
   if (period) return periodToForm(period);
-  const start = postProcedureBoundary(stay) ?? stay?.arrival?.date ?? '';
-  return emptyPeriodForm({ startDate: start, endDate: start });
+  return emptyPeriodForm(newPeriodDates(stay, todayKst(Date.now())));
 }
 
 /**

@@ -122,7 +122,8 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
     await page.getByRole('button', { name: '본인 체크 기간 추가' }).click();
     await expect(page.getByRole('heading', { name: '본인 체크 기간 추가', level: 2 })).toBeVisible();
     await expect(page.locator('.conditions-form textarea')).toHaveCount(0);
-    await expect(page.getByLabel('시작일')).toHaveValue(arrival); // 수술 후 경계일
+    // 수술 후 경계일(어제)이 이미 지났으니 기본 시작일은 오늘이다 (components/conditions/periodFormModel.js newPeriodDates)
+    await expect(page.getByLabel('시작일')).toHaveValue(kstDate(0));
     await page.getByLabel('종료일 (포함)').fill(departure);
     // 필수 항목은 '모르겠음'을 고를 수 없다 (규칙 6)
     await expect(page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '모르겠음' })).toHaveCount(0);
