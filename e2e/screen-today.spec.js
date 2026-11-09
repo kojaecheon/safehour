@@ -1,6 +1,6 @@
 // ③층 오늘(/today): SEED 화면 배치 (설계서 6.2 7번)
 //
-// 회색 바탕 위 흰 블록: 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 목록 / 보호자·동반 안내.
+// 회색 바탕 위 흰 블록: 갱신 실패(저장 일정이 있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 목록 / 보호자·동반 안내.
 // 체류는 e2e 도우미 startTrip 으로 심는다(기본: 어제 입국 → 4일 뒤 출국, 동의 있음, 오늘 매일 확인 마침).
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245),
 // --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
@@ -203,6 +203,48 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
       await expect(trip.getByRole('button', { name: '다시 시도' })).toHaveCount(1);
     });
   }
+
+  // findings 16: 운영자에게 알려야 하는 실패(AUTH)에는 도움말로 가는 링크. e2e 빌드에는 문의 값이 없어 '도움말 보기'(/help)다
+  test('저장 일정 없이 첫 일정 실패(장소 데이터 연결 AUTH): 운영자 안내와 도움말 보기 링크, 다시 시도 하나', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTripWithoutPlan(page, { status: 502, body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'AUTH' } });
+    const main = page.locator('main.today-page');
+    await expect(main.getByText('장소 데이터 연결에 문제가 있어 일정을 만들지 못했어요. 운영자에게 알려 주세요.')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: '다시 시도' })).toHaveCount(1);
+    const help = main.locator('.ui-empty').getByRole('link', { name: '도움말 보기' });
+    await expect(help).toHaveAttribute('href', '/help');
+    expect((await help.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expect(main.getByRole('link', { name: '문의하기' })).toHaveCount(0);
+    await expectNoAxeViolations(page, '/today (첫 일정 실패 · AUTH)');
+    await help.click();
+    await expect(page).toHaveURL(/\/help$/);
+  });
+
+  test('갱신 실패(장소 데이터 연결 AUTH): 알림 상자 안에 도움말 보기 링크, 다시 시도 위', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    await failNextSync(page, { status: 502, body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'AUTH' } });
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText('운영자에게 알려 주세요');
+    const help = alert.getByRole('link', { name: '도움말 보기' });
+    await expect(help).toHaveAttribute('href', '/help');
+    const retry = alert.getByRole('button', { name: '다시 시도' });
+    expect((await help.boundingBox()).y).toBeLessThan((await retry.boundingBox()).y);
+    expect((await help.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('갱신 실패(조회 한도 QUOTA)에는 도움말 링크가 없다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    await failNextSync(page, { status: 502, body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'QUOTA' } });
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert.getByRole('link')).toHaveCount(0);
+  });
 
   for (const confirmToday of [true, false]) {
     test(`빈 흰 블록이 없다: ${confirmToday ? '확인 마친 오늘' : '매일 확인 전 오늘'}`, async ({ page }) => {

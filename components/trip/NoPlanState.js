@@ -4,10 +4,12 @@
 //
 // 첫 일정을 만드는 중이면 만드는 중 문구, 보기 전용이면 로그인·연결 뒤에 만든다는 문구, 만들기가 실패했으면
 // 원인별 문구 하나(noPlanBodyKey)를 보인다. 저장 일정이 없으므로 위쪽 갱신 실패 알림은 화면이 띄우지 않는다.
-// 다시 시도 버튼은 이 빈 상태에 하나만 둔다. 부품은 표시만 한다: 동기화 상태는 부르는 쪽이 속성으로 넘긴다.
+// 다시 시도 버튼은 이 빈 상태에 하나만 둔다. 운영자에게 알려야 하는 실패(AUTH · SELF_LIMIT)면 그 아래에
+// 도움말·문의 링크를 둔다(HelpContactLink, findings 16). 부품은 표시만 한다: 동기화 상태는 부르는 쪽이 속성으로 넘긴다.
 
 import { useLang } from '../LanguageProvider.js';
 import { Button, EmptyState } from '../ui/index.js';
+import HelpContactLink from './HelpContactLink.js';
 import { noPlanBodyKey } from './viewModel.js';
 
 /**
@@ -36,9 +38,12 @@ export default function NoPlanState({ icon = 'navToday', syncing, readOnly, upda
       body={t(bodyKey)}
       action={
         !syncing && !readOnly ? (
-          <Button variant="secondary" onClick={onRetry}>
-            {t('today.retry')}
-          </Button>
+          <div className="trip-empty-actions">
+            <Button variant="secondary" onClick={onRetry}>
+              {t('today.retry')}
+            </Button>
+            {updateFailed && <HelpContactLink upstream={upstream} />}
+          </div>
         ) : null
       }
     />

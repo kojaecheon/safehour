@@ -30,7 +30,9 @@
   '오늘 활동 종료')은 `deadlineCopyOf` 한곳이 고른다. 오늘 화면·하루 일정·시안 보드가 같은 함수를 쓴다.
 - 일정 갱신 실패 알림(`trip/UpdateFailedNotice.js`)은 **저장 일정이 있을 때만** 띄운다. 저장 일정이 없으면 빈 상태
   (`trip/NoPlanState.js`) 하나만 두고, 실패 원인별 문구(`viewModel.js` `noPlanBodyKey`)와 다시 시도 하나를 보인다.
-  운영자에게 알려야 하는 실패(`AUTH`·`SELF_LIMIT`)인지는 `needsOperatorContact` 한곳이 판단한다.
+  운영자에게 알려야 하는 실패(`AUTH`·`SELF_LIMIT`)인지는 `needsOperatorContact` 한곳이 판단하고, 그때 알림과 빈 상태에
+  도움말·문의 링크(`trip/HelpContactLink.js`)를 둔다. 문의 값(`NEXT_PUBLIC_SAFEHOUR_CONTACT`)이 빌드에 있으면 '문의하기'(`/help#contact`),
+  없으면 '도움말 보기'(`/help`)다.
 - 안전 문구는 병기 규칙이 고른 두 언어로 보여준다. 부품 안에서 언어 조건문을 따로 만들지 않는다.
 - 문구는 기능별 이름공간 파일에서 가져온다. 부품 파일에 문자열을 직접 쓰지 않는다.
 - 색·크기·간격·모서리·그림자는 **토큰만** 쓴다. 값을 직접 쓰면 디자인이 화면마다 갈라진다.

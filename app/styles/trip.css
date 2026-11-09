@@ -36,6 +36,14 @@
   text-underline-offset: 4px;
   text-decoration-thickness: 1px;
 }
+/* 저장 일정이 없을 때의 빈 상태 행동(NoPlanState): 다시 시도 아래에 도움말·문의 링크(있을 때만), 링크는 가운데 */
+.trip-empty-actions {
+  display: grid;
+  gap: var(--space-2);
+}
+.trip-empty-actions > .trip-inline-link {
+  justify-self: center;
+}
 .trip-pair-secondary {
   font-size: var(--text-body);
   color: var(--ink-soft);

@@ -227,6 +227,9 @@ export const messages = {
     ja: '場所データの接続に問題があります。運営者にお知らせください。保存した予定はそのままです。',
     zh: '地点数据连接出现问题。请告知运营方。已保存的行程保持不变。',
   },
+  // 운영자에게 알려야 하는 실패(AUTH · SELF_LIMIT)에 붙는 링크(components/trip/HelpContactLink.js, findings 16)
+  'today.contactLink': { ko: '문의하기', en: 'Contact us', ja: 'お問い合わせ', zh: '联系我们' },
+  'today.helpLink': { ko: '도움말 보기', en: 'View help', ja: 'ヘルプを見る', zh: '查看帮助' },
   'today.syncing': { ko: '일정을 확인하는 중이에요…', en: 'Checking your plan…', ja: '予定を確認しています…', zh: '正在检查行程…' },
   'today.guardianResendTitle': {
     ko: '보호자에게 보낸 링크가 예전 일정이에요',

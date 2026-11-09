@@ -13,6 +13,7 @@
 //   - 복귀 시트의 돌아갈 곳: 숙소·병원(hospitalId 로만)·정해 둔 장소, 첫 병원으로 추측하지 않는다 (마감 지남 설계서 4.2·4.3)
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';
 
 import {
@@ -886,6 +887,13 @@ describe('needsOperatorContact: 사용자가 기다려도 풀리지 않는 관�
     for (const u of ['QUOTA', 'NETWORK', 'UPSTREAM_ERROR', 'PARSE', null, undefined, '', 'auth', 'UNKNOWN']) {
       assert.equal(needsOperatorContact(u), false, String(u));
     }
+  });
+
+  test('도움말·문의 링크 부품은 같은 판단을 쓰고, 문의 값은 빌드 때 새겨지도록 process.env.<이름> 을 글자 그대로 읽는다', () => {
+    const source = readFileSync(new URL('../components/trip/HelpContactLink.js', import.meta.url), 'utf8');
+    assert.ok(source.includes('process.env.NEXT_PUBLIC_SAFEHOUR_CONTACT'));
+    assert.ok(source.includes('needsOperatorContact(upstream)'));
+    assert.ok(source.includes("'/help#contact'") && source.includes("'/help'"));
   });
 
   test('갱신 실패 안내의 연결 문구와 같은 판단이다(판단 경로 하나)', () => {
