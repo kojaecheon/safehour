@@ -54,11 +54,20 @@ export const messages = {
     ja: 'ログインの有効期限が切れました。この端末に保存された控えだけを表示しています。',
     zh: '登录已过期。目前只显示保存在本设备上的副本。',
   },
-  'common.readOnlyOffline': {
-    ko: '인터넷에 연결되어 있지 않습니다. 이 기기에 저장된 사본만 보여 줍니다.',
-    en: 'You are offline. You are seeing the copy saved on this device.',
-    ja: 'インターネットに接続されていません。この端末に保存された控えだけを表示しています。',
-    zh: '当前未连接网络。目前只显示保存在本设备上的副本。',
+  // 오프라인은 로그인 문제가 아니다(사용성 점검 C2): 제목부터 연결 없음으로 쓴다. 로그인 링크는 두지 않는다.
+  // 둘째 문장은 코드가 하는 일만 적는다: 'online' 이벤트에 저장소가 보기 전용을 풀고(로그인이 유지돼 있을 때),
+  // 일정 실행기가 미뤄 둔 앱 열기 확인(병원 지침 재확인·기상·남은 재계획)을 이어서 한다(lib/store/store.js setOnline, lib/trip/runtime.js onStatus)
+  'common.readOnlyOfflineTitle': {
+    ko: '인터넷 연결 없음, 저장된 일정만 보여 줘요',
+    en: 'No internet connection. Showing your saved plan only',
+    ja: 'インターネット未接続、保存済みの予定だけを表示しています',
+    zh: '未连接网络，仅显示已保存的日程',
+  },
+  'common.readOnlyOfflineBody': {
+    ko: '이 기기에 저장된 사본이에요. 다시 연결되면 편집이 자동으로 다시 켜지고 일정을 새로 확인해요.',
+    en: 'This is the copy saved on this device. When you reconnect, editing turns back on and your plan is checked again automatically.',
+    ja: 'この端末に保存された控えです。再接続すると編集が自動で再開され、予定も確認し直します。',
+    zh: '这是保存在本设备上的副本。重新连接后会自动恢复编辑，并重新检查日程。',
   },
   'common.readOnlyLogin': { ko: '로그인하기', en: 'Sign in', ja: 'ログインする', zh: '去登录' },
   'common.close': { ko: '닫기', en: 'Close', ja: '閉じる', zh: '关闭' },

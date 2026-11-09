@@ -3,6 +3,7 @@
 // - 로그인 만료(서버 세션 없음): 이 기기에 마지막으로 로그인한 계정의 사본을 **보기 전용**으로 보여 준다.
 //   '보기 전용 — 로그인이 필요합니다'를 표시하고 확인·편집·연동·공유를 막는다.
 // - 오프라인: 서비스 워커가 앱 셸과 보기 전용 화면(오늘·일정·긴급·카드·고지)을 캐시에서 연다.
+//   배너 제목은 '인터넷 연결 없음'이고 로그인을 말하지 않는다(사용성 점검 C2). 로그인 링크도 없다.
 //   API 응답은 서비스 워커 캐시에 넣지 않는다.
 // - 긴급 연락 버튼은 모든 상태에서 보인다.
 
@@ -10,6 +11,7 @@ import { test, expect } from './fixtures.js';
 import { HOSPITAL_NAME, evidenceShot, kstDate, readRecord, startTrip } from './helpers.js';
 
 const READ_ONLY = '보기 전용 — 로그인이 필요합니다';
+const OFFLINE_TITLE = '인터넷 연결 없음, 저장된 일정만 보여 줘요';
 
 async function expectEmergencyButton(page) {
   await expect(page.getByRole('link', { name: '긴급 연락' }).first()).toBeVisible();
@@ -94,8 +96,12 @@ test.describe('시나리오 7 — 로그인 만료·오프라인', () => {
     await context.setOffline(true);
     try {
       await page.goto('/today');
-      await expect(page.getByText(READ_ONLY)).toBeVisible();
-      await expect(page.getByText('인터넷에 연결되어 있지 않습니다.', { exact: false })).toBeVisible();
+      const banner = page.locator('.ui-readonly');
+      await expect(banner.locator('.ui-readonly-title')).toHaveText(OFFLINE_TITLE);
+      await expect(banner.locator('.ui-readonly-title')).not.toContainText('로그인');
+      await expect(banner).toContainText('다시 연결되면 편집이 자동으로 다시 켜지고 일정을 새로 확인해요.');
+      await expect(banner.getByRole('link', { name: '로그인하기' })).toHaveCount(0);
+      await expect(page.getByText(READ_ONLY)).toHaveCount(0);
       await expect(page.locator('.state-banner')).toBeVisible();
       await expectEmergencyButton(page);
       await evidenceShot(page, '18-offline-today');
