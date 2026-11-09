@@ -1,12 +1,28 @@
 // ③층 오늘(/today): SEED 화면 배치 (설계서 6.2 7번)
 //
-// 회색 바탕 위 흰 블록: 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 목록 / 보호자·동반 안내.
+// 회색 바탕 위 흰 블록: 갱신 실패(저장 일정이 있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 목록 / 보호자·동반 안내.
 // 체류는 e2e 도우미 startTrip 으로 심는다(기본: 어제 입국 → 4일 뒤 출국, 동의 있음, 오늘 매일 확인 마침).
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245),
 // --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
 
 import { test, expect } from './fixtures.js';
-import { buildStay, fireDemoEvent, gapBetween, kstDate, linkDemoPlan, openDemoToday, setClock, startTrip, styles } from './helpers.js';
+import {
+  buildStay,
+  expectNoAxeViolations,
+  fireDemoEvent,
+  gapBetween,
+  importGuardianCopy,
+  kstDate,
+  linkDemoPlan,
+  loginDemo,
+  openDemoToday,
+  readRecord,
+  removeStayAndPlan,
+  seedStay,
+  setClock,
+  startTrip,
+  styles,
+} from './helpers.js';
 
 /**
  * 다음 재계획을 실패시킨다: 일정 API 를 503 으로 막고, 다른 탭에서 체류를 바꾼 것처럼 storage 이벤트를 보낸다
@@ -26,6 +42,19 @@ async function failNextSync(page, { status = 503, body = { ok: false }, onReques
     localStorage.setItem(key, newValue);
     window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue, storageArea: localStorage }));
   }, buildStay({ departure: 5 }));
+}
+
+/**
+ * 저장 일정이 없는 채로 첫 일정 만들기를 실패시킨다: 일정 API 를 처음부터 막고 체류만 심은 뒤 path 를 연다.
+ * startTrip 은 일정이 저장될 때까지 기다리므로 쓰지 않는다. 시계는 부르는 쪽이 첫 이동 전에 고정한다.
+ */
+async function startTripWithoutPlan(page, { status, body, path = '/today' }) {
+  await page.route('**/api/itinerary/plan', (route) =>
+    route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) }),
+  );
+  await loginDemo(page, '/privacy');
+  await seedStay(page, buildStay(), { confirmToday: true });
+  await page.goto(path);
 }
 
 test.describe('③층 오늘, 회색 바탕과 블록', () => {
@@ -105,6 +134,116 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
     // 다시 시도는 기존 갱신 경로로 일정 요청을 한 번 더 보낸다(여전히 막혀 있으니 안내도 그대로)
     await expect.poll(() => blocked).toBeGreaterThan(before);
     await expect(alert).toContainText('조회 한도에 닿았어요');
+  });
+
+  test('체류 없이 보호자 사본만 있으면 받은 일정 보기가 먼저, 체류 정보 넣기는 둘째 버튼', async ({ page }) => {
+    await importGuardianCopy(page);
+    await removeStayAndPlan(page);
+    await page.goto('/today');
+    await expect(page.getByRole('heading', { name: '보호자로 받은 일정이 있어요' })).toBeVisible();
+    expect(await readRecord(page, 'stay')).toBeNull();
+    await expect(page.getByRole('heading', { name: '아직 체류 정보가 없어요' })).toHaveCount(0);
+    await expect(page.getByText('보호자는 체류 정보를 따로 넣지 않아도 돼요.', { exact: false })).toBeVisible();
+    const empty = page.locator('main.today-page .ui-empty');
+    const links = empty.getByRole('link');
+    await expect(links).toHaveCount(2);
+    await expect(links.nth(0)).toHaveText('받은 일정 보기');
+    await expect(links.nth(0)).toHaveAttribute('href', '/g');
+    await expect(links.nth(1)).toHaveText('체류 정보 넣기');
+    await expect(links.nth(1)).toHaveAttribute('href', '/onboarding');
+    for (const i of [0, 1]) expect((await links.nth(i).boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expectNoAxeViolations(page, '/today (체류 없음 · 보호자 사본 있음)');
+
+    await links.nth(0).click();
+    await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+  });
+
+  test('체류도 보호자 사본도 없으면 체류 정보 넣기 안내 그대로', async ({ page }) => {
+    await loginDemo(page, '/today');
+    await expect(page.getByRole('heading', { name: '아직 체류 정보가 없어요' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '받은 일정 보기' })).toHaveCount(0);
+    await expect(page.locator('main.today-page .ui-empty').getByRole('link', { name: '체류 정보 넣기' })).toHaveAttribute('href', '/onboarding');
+  });
+
+  // 저장 일정이 없을 때 첫 일정 만들기 실패: 위쪽 갱신 실패 알림 없이 빈 상태 하나, 원인별 문구, 다시 시도 하나 (usability C1)
+  const firstPlanFailures = [
+    {
+      name: '관광 정보 502',
+      status: 502,
+      body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'UPSTREAM_ERROR' },
+      text: '관광 정보를 불러오지 못해 일정을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+    },
+    {
+      name: '일정 계산 500',
+      status: 500,
+      body: { ok: false, errorCode: 'SAFEHOUR_RECALCULATION_FAILED' },
+      text: '일정을 계산하지 못했어요. 다시 시도해 주세요.',
+    },
+  ];
+  for (const failure of firstPlanFailures) {
+    test(`저장 일정 없이 첫 일정 실패(${failure.name}): 빈 상태 하나에 원인별 문구, 다시 시도 하나`, async ({ page }) => {
+      await setClock(page, { kst: `${kstDate(0)}T10:00` });
+      await startTripWithoutPlan(page, failure);
+      const main = page.locator('main.today-page');
+      await expect(main.getByRole('heading', { name: '아직 일정이 없어요' })).toBeVisible({ timeout: 30_000 });
+      await expect(main.getByText(failure.text)).toBeVisible();
+      await expect(main.getByText('인터넷 연결을 확인', { exact: false })).toHaveCount(0);
+      await expect(main.getByText('저장된 일정은 그대로', { exact: false })).toHaveCount(0);
+      await expect(page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' })).toHaveCount(0);
+      await expect(main.locator('.today-sync-block')).toHaveCount(0);
+      await expect(main.getByRole('button', { name: '다시 시도' })).toHaveCount(1);
+      expect(await readRecord(page, 'tripPlan')).toBeNull();
+      await expectNoAxeViolations(page, `/today (첫 일정 실패 · ${failure.name})`);
+
+      // 전체 일정 화면도 같은 빈 상태 하나다
+      await page.goto('/trip');
+      const trip = page.locator('main.trip-page');
+      await expect(trip.getByText(failure.text)).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' })).toHaveCount(0);
+      await expect(trip.getByRole('button', { name: '다시 시도' })).toHaveCount(1);
+    });
+  }
+
+  // findings 16: 운영자에게 알려야 하는 실패(AUTH)에는 도움말로 가는 링크. e2e 빌드에는 문의 값이 없어 '도움말 보기'(/help)다
+  test('저장 일정 없이 첫 일정 실패(장소 데이터 연결 AUTH): 운영자 안내와 도움말 보기 링크, 다시 시도 하나', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTripWithoutPlan(page, { status: 502, body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'AUTH' } });
+    const main = page.locator('main.today-page');
+    await expect(main.getByText('장소 데이터 연결에 문제가 있어 일정을 만들지 못했어요. 운영자에게 알려 주세요.')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: '다시 시도' })).toHaveCount(1);
+    const help = main.locator('.ui-empty').getByRole('link', { name: '도움말 보기' });
+    await expect(help).toHaveAttribute('href', '/help');
+    expect((await help.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expect(main.getByRole('link', { name: '문의하기' })).toHaveCount(0);
+    await expectNoAxeViolations(page, '/today (첫 일정 실패 · AUTH)');
+    await help.click();
+    await expect(page).toHaveURL(/\/help$/);
+  });
+
+  test('갱신 실패(장소 데이터 연결 AUTH): 알림 상자 안에 도움말 보기 링크, 다시 시도 위', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    await failNextSync(page, { status: 502, body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'AUTH' } });
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert).toContainText('운영자에게 알려 주세요');
+    const help = alert.getByRole('link', { name: '도움말 보기' });
+    await expect(help).toHaveAttribute('href', '/help');
+    const retry = alert.getByRole('button', { name: '다시 시도' });
+    expect((await help.boundingBox()).y).toBeLessThan((await retry.boundingBox()).y);
+    expect((await help.boundingBox()).height).toBeGreaterThanOrEqual(44);
+  });
+
+  test('갱신 실패(조회 한도 QUOTA)에는 도움말 링크가 없다', async ({ page }) => {
+    await setClock(page, { kst: `${kstDate(0)}T10:00` });
+    await startTrip(page);
+    await expect(page.locator('.state-banner')).toBeVisible();
+    await failNextSync(page, { status: 502, body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'QUOTA' } });
+    const alert = page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' });
+    await expect(alert).toBeVisible({ timeout: 30_000 });
+    await expect(alert.getByRole('link')).toHaveCount(0);
   });
 
   for (const confirmToday of [true, false]) {

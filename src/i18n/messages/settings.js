@@ -161,6 +161,14 @@ export const messages = {
     ja: '飲食店やタクシーで見せる韓国語の文',
     zh: '在餐厅和出租车上出示的韩语句子',
   },
+  // 보호자 사본이 이 기기에 있을 때만 도구 맨 위에 보인다(components/settings/moreMenu.js)
+  'settings.moreReceived': { ko: '받은 일정 (보호자)', en: 'Received schedule (companion)', ja: '受け取った予定（同行者）', zh: '收到的日程（陪同者）' },
+  'settings.moreReceivedDesc': {
+    ko: '환자에게 받은 일정을 다시 열어요',
+    en: 'Open the schedule you received from the patient again',
+    ja: '患者から受け取った予定をもう一度開きます',
+    zh: '再次打开从患者那里收到的日程',
+  },
   'settings.moreGuardian': { ko: '보호자 링크', en: 'Companion link', ja: '同行者リンク', zh: '陪同者链接' },
   'settings.moreGuardianDesc': {
     ko: '일정 사본을 PIN으로 잠가 보호자에게 보내요',

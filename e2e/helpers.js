@@ -593,3 +593,28 @@ export async function createGuardianLink(page, { pin, open = false, verify = fal
   await expect(page.getByText('PIN은 링크와 함께 보내지 말고 따로 알려 주세요.')).toBeVisible();
   return link;
 }
+
+/**
+ * 보호자 사본을 이 기기에 가져온다: 동반 보호자 체류로 링크를 만들고, 같은 기기에서 링크를 열어 PIN 을 넣는다.
+ * 끝나면 /g 의 '받은 일정' 화면이다. 환자와 보호자가 같은 데모 계정이므로 체류도 함께 남아 있다.
+ * @param {import('@playwright/test').Page} page
+ * @param {{pin?: string}} [options]
+ */
+export async function importGuardianCopy(page, { pin = '135790' } = {}) {
+  await startTrip(page, { hasCompanion: true }, { path: '/guardian' });
+  const link = await createGuardianLink(page, { pin });
+  await page.goto(link);
+  await page.getByLabel('환자에게 받은 PIN (숫자 6자리)').fill(pin);
+  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+  await expect.poll(async () => Object.keys((await readRecord(page, 'guardianCopies')) ?? {}).length).toBe(1);
+}
+
+/** 이 계정의 체류와 전체 일정을 기기에서 지운다(보호자 사본은 남는다). 보호자만 쓰는 기기를 흉내 낸다 */
+export async function removeStayAndPlan(page) {
+  const key = await accountKeyOf(page);
+  await page.evaluate((key) => {
+    localStorage.removeItem(`safehour.v2.${key}.stay`);
+    localStorage.removeItem(`safehour.v2.${key}.tripPlan`);
+  }, key);
+}

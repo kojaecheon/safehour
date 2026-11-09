@@ -5,6 +5,7 @@
 //   const stay = useStay();                    // 체류(없으면 null)
 //   const { today } = useTodayTomorrow() ?? {}; // 오늘·내일(KST) 하루 일정
 //   const prefs = usePrefs();                  // { lang, notifications, dailyCheck }
+//   const received = useHasGuardianCopies();   // 이 기기에 만료 전 보호자 사본이 있는가(오늘·더보기)
 //
 // - **읽기만 한다.** 로그인 만료·오프라인에서도 이 기기에 마지막으로 로그인한 계정의 사본을 읽는다
 //   (저장소가 보기 전용에서 읽을 계정을 정한다). 네트워크를 쓰지 않는다.
@@ -26,11 +27,14 @@ function subscriber(topics) {
 const subscribeStay = subscriber(['stay']);
 const subscribeTripPlan = subscriber(['tripPlan']);
 const subscribePrefs = subscriber(['prefs']);
+const subscribeGuardianCopies = subscriber(['guardianCopies']);
 
 const readStay = () => getStore().readStay();
 const readTodayTomorrow = () => getStore().readTodayTomorrow();
 const readPrefs = () => getStore().readPrefs();
+const readHasGuardianCopies = () => getStore().readGuardianCopies().length > 0;
 const serverNull = () => null;
+const serverFalse = () => false;
 
 /** 이 기기의 체류 (spec 5.1 Stay) — 없으면 null */
 export function useStay() {
@@ -45,6 +49,14 @@ export function useTodayTomorrow() {
 /** 설정 { lang, notifications, dailyCheck } — 첫 그림은 null */
 export function usePrefs() {
   return useSyncExternalStore(subscribePrefs, readPrefs, serverNull);
+}
+
+/**
+ * 이 기기(지금 계정)에 만료 전 보호자 사본이 있는가. 읽기만 한다(사본 내용은 꺼내지 않는다).
+ * 서버 렌더·하이드레이션 첫 그림은 false(사본 없음)다. 화면은 사본이 없을 때의 모습을 먼저 그리고, 있으면 바꾼다.
+ */
+export function useHasGuardianCopies() {
+  return useSyncExternalStore(subscribeGuardianCopies, readHasGuardianCopies, serverFalse);
 }
 
 const subscribeNothing = () => () => {};

@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useLang } from '@/components/LanguageProvider.js';
 import { Button, DateChip, EmptyState, Icon, TopBar } from '@/components/ui/index.js';
 import CoverageTag from '@/components/conditions/CoverageTag.js';
+import NoPlanState from '@/components/trip/NoPlanState.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
@@ -58,18 +59,16 @@ export default function TripPage() {
       />
     );
   } else if (!trip.tripPlan) {
+    // 저장 일정이 없으면 갱신 실패 알림 없이 이 빈 상태 하나만 둔다(usability C1)
     body = (
-      <EmptyState
+      <NoPlanState
         icon="navTrip"
-        title={trip.syncing ? t('today.generatingTitle') : t('today.noPlanTitle')}
-        body={trip.syncing ? t('today.generatingBody') : trip.readOnly ? t('today.noPlanReadOnly') : t('today.noPlanBody')}
-        action={
-          !trip.syncing && !trip.readOnly ? (
-            <Button variant="secondary" onClick={() => trip.retry()}>
-              {t('today.retry')}
-            </Button>
-          ) : null
-        }
+        syncing={trip.syncing}
+        readOnly={trip.readOnly}
+        updateFailed={trip.updateFailed}
+        errorCode={trip.lastErrorCode}
+        upstream={trip.lastUpstream}
+        onRetry={() => trip.retry()}
       />
     );
   } else {
@@ -160,7 +159,7 @@ export default function TripPage() {
     <>
       <TopBar title={t('trip.header')} />
       <main className="page trip-page">
-        {trip.updateFailed && <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />}
+        {trip.updateFailed && trip.tripPlan && <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />}
         {body}
       </main>
       {sheet && (

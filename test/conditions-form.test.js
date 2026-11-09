@@ -17,6 +17,7 @@ import {
   formAnswerOf,
   formToPeriod,
   makeSelfPeriodId,
+  newPeriodDates,
   unansweredFields,
   periodToForm,
   returnHospitalId,
@@ -479,5 +480,36 @@ describe('본인 체크 묶음과 제한 없음 버튼 (운영자 결정 2026-11
     const limits = ITEM_GROUPS.find((g) => g.id === 'limits');
     assert.equal(unansweredFields(form, limits.fields).length, 0);
     assert.equal(fillGroupNone(form, limits.fields), form);
+  });
+});
+
+describe('새 기간의 기본 날짜 (newPeriodDates)', () => {
+  const stay = {
+    arrival: { date: '2026-11-01' },
+    departure: { date: '2026-11-10' },
+    appointments: [{ id: 'a1', type: 'PROCEDURE', date: '2026-11-03', start: '14:00' }],
+  };
+
+  test('오늘이 수술 후 경계일보다 앞이면 경계일로 시작한다(출국 전 미리 넣는 경우)', () => {
+    assert.deepEqual(newPeriodDates(stay, '2026-10-20'), { startDate: '2026-11-03', endDate: '2026-11-03' });
+  });
+
+  test('경계일이 이미 지났으면 오늘로 당긴다(체류 중에 기간을 더하는 경우)', () => {
+    assert.deepEqual(newPeriodDates(stay, '2026-11-06'), { startDate: '2026-11-06', endDate: '2026-11-06' });
+  });
+
+  test('오늘이 출국일을 넘었으면 출국일에서 멈춘다', () => {
+    assert.deepEqual(newPeriodDates(stay, '2026-11-20'), { startDate: '2026-11-10', endDate: '2026-11-10' });
+  });
+
+  test('수술 일정이 없으면 입국일이 기준이고, 같은 규칙으로 오늘로 당긴다', () => {
+    const noProcedure = { ...stay, appointments: [] };
+    assert.deepEqual(newPeriodDates(noProcedure, '2026-10-20'), { startDate: '2026-11-01', endDate: '2026-11-01' });
+    assert.deepEqual(newPeriodDates(noProcedure, '2026-11-04'), { startDate: '2026-11-04', endDate: '2026-11-04' });
+  });
+
+  test('오늘을 모르면(null) 기준일 그대로이고, 체류가 비어 있으면 빈 값이다', () => {
+    assert.deepEqual(newPeriodDates(stay, null), { startDate: '2026-11-03', endDate: '2026-11-03' });
+    assert.deepEqual(newPeriodDates(null, '2026-11-04'), { startDate: '', endDate: '' });
   });
 });

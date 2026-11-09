@@ -31,6 +31,20 @@ export const messages = {
     zh: '填写入境和出境日期、住处以及医院预约后，我们会为每一天生成行程。',
   },
   'today.noStayAction': { ko: '체류 정보 넣기', en: 'Add trip details', ja: '滞在情報を入れる', zh: '填写行程信息' },
+  // 체류가 없고 이 기기에 보호자 사본이 있을 때 (usability 2026-11-08 D1)
+  'today.receivedTitle': {
+    ko: '보호자로 받은 일정이 있어요',
+    en: 'You have a schedule received as a companion',
+    ja: '同行者として受け取った予定があります',
+    zh: '你有一份作为陪同者收到的日程',
+  },
+  'today.receivedBody': {
+    ko: '환자에게 받은 일정은 받은 일정 화면에서 볼 수 있어요. 보호자는 체류 정보를 따로 넣지 않아도 돼요.',
+    en: 'You can see the schedule from the patient on the Received schedule screen. Companions do not need to add their own trip details.',
+    ja: '患者から受け取った予定は「受け取った予定」画面で見られます。同行者は滞在情報を別に入れる必要はありません。',
+    zh: '从患者那里收到的日程可以在“收到的日程”页面查看。陪同者不需要另外填写行程信息。',
+  },
+  'today.receivedAction': { ko: '받은 일정 보기', en: 'View received schedule', ja: '受け取った予定を見る', zh: '查看收到的日程' },
   'today.generatingTitle': {
     ko: '전체 일정을 만드는 중이에요',
     en: 'Building your whole trip plan',
@@ -49,6 +63,44 @@ export const messages = {
     en: 'We could not build the plan. Check your connection and try again.',
     ja: '予定を作成できませんでした。接続を確認して、もう一度お試しください。',
     zh: '未能生成行程。请检查网络连接后重试。',
+  },
+  // 저장 일정이 없을 때 첫 일정 만들기 실패 원인별 본문(components/trip/viewModel.js noPlanBodyKey, usability 2026-11-08 C1)
+  'today.noPlanQuota': {
+    ko: '오늘 장소 데이터 제공처의 조회 한도에 닿아 일정을 만들지 못했어요. 자정(한국 시각) 이후 다시 시도해 주세요.',
+    en: 'We could not build the plan because the place data provider has reached today’s lookup limit. Please try again after midnight (Korea time).',
+    ja: '本日、場所データ提供元の照会上限に達したため、予定を作成できませんでした。韓国時間の午前0時以降にもう一度お試しください。',
+    zh: '今天地点数据提供方的查询次数已达上限，未能生成行程。请在韩国时间午夜之后重试。',
+  },
+  'today.noPlanConnection': {
+    ko: '장소 데이터 연결에 문제가 있어 일정을 만들지 못했어요. 운영자에게 알려 주세요.',
+    en: 'We could not build the plan because there is a problem with the place data connection. Please let the operator know.',
+    ja: '場所データの接続に問題があるため、予定を作成できませんでした。運営者にお知らせください。',
+    zh: '地点数据连接出现问题，未能生成行程。请告知运营方。',
+  },
+  'today.noPlanTourism': {
+    ko: '관광 정보를 불러오지 못해 일정을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+    en: 'We could not build the plan because tourism data could not be loaded. Please try again in a moment.',
+    ja: '観光情報を読み込めなかったため、予定を作成できませんでした。しばらくしてからもう一度お試しください。',
+    zh: '未能加载旅游信息，因此未能生成行程。请稍后重试。',
+  },
+  'today.noPlanNetwork': {
+    ko: '서버에 연결하지 못해 일정을 만들지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.',
+    en: 'We could not reach the server, so the plan was not built. Check your internet connection and try again.',
+    ja: 'サーバーに接続できなかったため、予定を作成できませんでした。インターネット接続を確認して、もう一度お試しください。',
+    zh: '无法连接到服务器，未能生成行程。请检查网络连接后重试。',
+  },
+  'today.noPlanEngine': {
+    ko: '일정을 계산하지 못했어요. 다시 시도해 주세요.',
+    en: 'We could not calculate the plan. Please try again.',
+    ja: '予定を計算できませんでした。もう一度お試しください。',
+    zh: '未能计算行程。请重试。',
+  },
+  // 원인을 가리지 못하는 그 밖의 실패(요청 거부, 기기 저장 실패 등): 원인을 단정하지 않는다
+  'today.noPlanGeneric': {
+    ko: '일정을 만들지 못했어요. 다시 시도해 주세요.',
+    en: 'We could not build the plan. Please try again.',
+    ja: '予定を作成できませんでした。もう一度お試しください。',
+    zh: '未能生成行程。请重试。',
   },
   'today.noPlanReadOnly': {
     ko: '로그인하고 인터넷에 연결되면 일정을 만들어요.',
@@ -182,6 +234,9 @@ export const messages = {
     ja: '場所データの接続に問題があります。運営者にお知らせください。保存した予定はそのままです。',
     zh: '地点数据连接出现问题。请告知运营方。已保存的行程保持不变。',
   },
+  // 운영자에게 알려야 하는 실패(AUTH · SELF_LIMIT)에 붙는 링크(components/trip/HelpContactLink.js, findings 16)
+  'today.contactLink': { ko: '문의하기', en: 'Contact us', ja: 'お問い合わせ', zh: '联系我们' },
+  'today.helpLink': { ko: '도움말 보기', en: 'View help', ja: 'ヘルプを見る', zh: '查看帮助' },
   'today.syncing': { ko: '일정을 확인하는 중이에요…', en: 'Checking your plan…', ja: '予定を確認しています…', zh: '正在检查行程…' },
   'today.guardianResendTitle': {
     ko: '보호자에게 보낸 링크가 예전 일정이에요',

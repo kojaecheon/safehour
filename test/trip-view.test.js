@@ -13,6 +13,7 @@
 //   - 복귀 시트의 돌아갈 곳: 숙소·병원(hospitalId 로만)·정해 둔 장소, 첫 병원으로 추측하지 않는다 (마감 지남 설계서 4.2·4.3)
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { describe, test } from 'node:test';
 
 import {
@@ -27,6 +28,9 @@ import {
   introRequestFor,
   isDemoMode,
   needsInputFix,
+  needsOperatorContact,
+  noPlanBodyKey,
+  noPlanRetryable,
   overdueOutingOf,
   placeDetailRequest,
   plannedReturnOf,
@@ -39,6 +43,7 @@ import {
   todayFocus,
   tripDateRows,
   updateFailedBodyKey,
+  upstreamKind,
   welcomeNoticeReady,
 } from '../components/trip/viewModel.js';
 import { buildMapLinks } from '../lib/maps.js';
@@ -875,6 +880,101 @@ describe('updateFailedBodyKey: 일정 갱신 실패 안내 본문 (docs/contract
         assert.ok(!/안전/.test(entry[lang]) && !/\bsafe\b/i.test(entry[lang]), `${key}.${lang}`);
       }
     }
+  });
+});
+
+describe('needsOperatorContact: 사용자가 기다려도 풀리지 않는 관광공사 실패 (findings 16)', () => {
+  test('AUTH · SELF_LIMIT 만 운영자 연락이 필요하다', () => {
+    for (const u of ['AUTH', 'SELF_LIMIT']) assert.equal(needsOperatorContact(u), true, u);
+    for (const u of ['QUOTA', 'NETWORK', 'UPSTREAM_ERROR', 'PARSE', null, undefined, '', 'auth', 'UNKNOWN']) {
+      assert.equal(needsOperatorContact(u), false, String(u));
+    }
+  });
+
+  test('도움말·문의 링크 부품은 같은 판단을 쓰고, 문의 값은 빌드 때 새겨지도록 process.env.<이름> 을 글자 그대로 읽는다', () => {
+    const source = readFileSync(new URL('../components/trip/HelpContactLink.js', import.meta.url), 'utf8');
+    assert.ok(source.includes('process.env.NEXT_PUBLIC_SAFEHOUR_CONTACT'));
+    assert.ok(source.includes('needsOperatorContact(upstream)'));
+    assert.ok(source.includes("'/help#contact'") && source.includes("'/help'"));
+  });
+
+  test('갱신 실패 안내의 연결 문구와 같은 판단이다(판단 경로 하나)', () => {
+    for (const u of ['AUTH', 'SELF_LIMIT', 'QUOTA', 'NETWORK', 'UPSTREAM_ERROR', 'PARSE', null, 'UNKNOWN']) {
+      assert.equal(updateFailedBodyKey(u) === 'today.updateFailedConnection', needsOperatorContact(u), String(u));
+    }
+  });
+});
+
+describe('noPlanBodyKey: 저장 일정이 없을 때 첫 일정 실패 안내 본문 (usability 2026-11-08 C1)', () => {
+  test('관광공사 분류가 있으면 분류로 고른다(오류 코드보다 앞선다)', () => {
+    assert.equal(noPlanBodyKey({ upstream: 'QUOTA', errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanQuota');
+    for (const u of ['AUTH', 'SELF_LIMIT']) {
+      assert.equal(noPlanBodyKey({ upstream: u, errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanConnection', u);
+    }
+    for (const u of ['NETWORK', 'UPSTREAM_ERROR', 'PARSE']) {
+      assert.equal(noPlanBodyKey({ upstream: u, errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanTourism', u);
+      assert.equal(noPlanBodyKey({ upstream: u }), 'today.noPlanTourism', `${u} (오류 코드 없음)`);
+    }
+  });
+
+  test('분류가 없으면 오류 코드로 고른다', () => {
+    assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanTourism');
+    assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: null }), 'today.noPlanTourism');
+    assert.equal(noPlanBodyKey({ errorCode: 'NETWORK_ERROR' }), 'today.noPlanNetwork');
+    // 세션 만료(401)는 다시 시도로 풀리지 않는다: 로그인 안내(보기 전용 문구)로 보낸다
+    assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_AUTH_REQUIRED' }), 'today.noPlanReadOnly');
+    // '계산하지 못했다'는 서버가 계산에 실패했을 때(500대·재계산 실패)만 말한다
+    for (const code of ['SAFEHOUR_RECALCULATION_FAILED', 'HTTP_500']) {
+      assert.equal(noPlanBodyKey({ errorCode: code }), 'today.noPlanEngine', code);
+    }
+    // 그 밖(요청 거부 400대, 게이트웨이·플랫폼 5xx, 응답 모양 오류, 기기 저장 실패, 연동 실패)은 원인을 단정하지 않는 일반 실패 문구다
+    for (const code of ['SAFEHOUR_BAD_REQUEST', 'SAFEHOUR_STAY_INVALID', 'HTTP_400', 'HTTP_502', 'HTTP_503', 'HTTP_504', 'BAD_RESPONSE', 'CLIENT_ERROR', 'LINK_FAILED', 'READ_ONLY', 'STORAGE_FAILED', 'ACCOUNT_CHANGED']) {
+      assert.equal(noPlanBodyKey({ errorCode: code }), 'today.noPlanGeneric', code);
+    }
+  });
+
+  test('noPlanRetryable: 세션 만료만 다시 시도 버튼을 두지 않는다', () => {
+    assert.equal(noPlanRetryable('SAFEHOUR_AUTH_REQUIRED'), false);
+    for (const code of ['NETWORK_ERROR', 'SAFEHOUR_EXTERNAL_API', 'HTTP_500', 'HTTP_503', 'BAD_RESPONSE', null, undefined]) {
+      assert.equal(noPlanRetryable(code), true, String(code));
+    }
+  });
+
+  test('upstreamKind: 갱신 실패 안내와 첫 일정 실패 안내가 같은 분류 표를 쓴다(표 하나)', () => {
+    assert.equal(upstreamKind('QUOTA'), 'QUOTA');
+    for (const u of ['AUTH', 'SELF_LIMIT']) assert.equal(upstreamKind(u), 'CONTACT', u);
+    for (const u of ['NETWORK', 'UPSTREAM_ERROR', 'PARSE']) assert.equal(upstreamKind(u), 'TEMPORARY', u);
+    for (const u of [null, undefined, '', 'UNKNOWN', 'quota']) assert.equal(upstreamKind(u), null, String(u));
+    const pair = { QUOTA: ['today.updateFailedQuota', 'today.noPlanQuota'], AUTH: ['today.updateFailedConnection', 'today.noPlanConnection'], PARSE: ['today.updateFailedTemporary', 'today.noPlanTourism'] };
+    for (const [u, [notice, empty]] of Object.entries(pair)) {
+      assert.equal(updateFailedBodyKey(u), notice, u);
+      assert.equal(noPlanBodyKey({ upstream: u }), empty, u);
+    }
+  });
+
+  test('오류 코드도 분류도 없으면 예전 일반 문구다', () => {
+    assert.equal(noPlanBodyKey({}), 'today.noPlanBody');
+    assert.equal(noPlanBodyKey({ errorCode: null, upstream: null }), 'today.noPlanBody');
+    assert.equal(noPlanBodyKey({ errorCode: '', upstream: '' }), 'today.noPlanBody');
+    assert.equal(noPlanBodyKey(), 'today.noPlanBody');
+  });
+
+  test('본문은 네 언어로 있고, 저장 일정이 그대로라고 말하지 않으며 단정 표현을 쓰지 않는다', () => {
+    for (const key of ['today.noPlanQuota', 'today.noPlanConnection', 'today.noPlanTourism', 'today.noPlanNetwork', 'today.noPlanEngine', 'today.noPlanGeneric']) {
+      const entry = UI_TEXT[key];
+      assert.ok(entry, key);
+      for (const lang of ['ko', 'en', 'ja', 'zh']) {
+        assert.ok(entry[lang], `${key}.${lang}`);
+        assert.ok(!/안전/.test(entry[lang]) && !/\bsafe\b/i.test(entry[lang]), `${key}.${lang}`);
+        assert.ok(!/[\u2013\u2014]/.test(entry[lang]), `${key}.${lang}: 대시`);
+      }
+      assert.ok(!/저장된 일정/.test(entry.ko), `${key}: 저장 일정이 없는 상태다`);
+    }
+    // 인터넷 연결 탓은 네트워크 실패 문구에만 쓴다
+    for (const key of ['today.noPlanQuota', 'today.noPlanConnection', 'today.noPlanTourism', 'today.noPlanEngine']) {
+      assert.ok(!/인터넷/.test(UI_TEXT[key].ko), key);
+    }
+    assert.match(UI_TEXT['today.noPlanNetwork'].ko, /인터넷/);
   });
 });
 

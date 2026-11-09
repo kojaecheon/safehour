@@ -9,21 +9,24 @@
 //     길찾기·장소 이동과 편집을 막는다(docs/business-rules.md '매일 확인'·'사용자 편집').
 //   - 상태·사유는 늘 보인다(안전 문구 병기). 복귀 마감은 마감 이유·예상 귀가와 함께, 두 언어로 보인다.
 //   - '변경됨'은 전후 비교 시트로 연다(닫으면 본 것으로 기록). 즉시 복귀 시트는 앱 셸 옆 TripRuntime 이 자동으로 연다.
-//   - 업데이트 실패·보호자 링크 다시 보내기·동반 보호자 '다시 만들기' 안내를 보인다.
+//   - 업데이트 실패(저장 일정이 있을 때만 위쪽 알림, 없으면 빈 상태 하나에 원인별 문구)·보호자 링크 다시 보내기·동반 보호자 '다시 만들기' 안내를 보인다.
+//   - 체류가 없고 이 기기에 보호자 사본이 있으면 '받은 일정 보기'를 먼저 둔다(보호자 사본은 읽기만 한다, usability D1).
 //   - 로그인 만료·오프라인에서는 보기 전용이다 — 오늘 일정과 복귀 마감은 보이고, 확인·편집은 막는다.
-//   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 갱신 실패(있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
+//   - SEED ③층(설계서 6.2 7번): 회색 바탕 위 흰 블록. 갱신 실패(저장 일정이 있을 때만) / 매일 확인 / 날짜·상태 / 병원 안내 / 다음 외출 / 바로가기 / 보호자·동반 안내.
 //     '새로 고치는 중' 줄은 따로 블록을 두지 않고 날짜·상태 블록 안 날짜 줄 아래에 둔다(열 때마다 화면이 흔들리지 않게).
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CourseCard from '@/components/CourseCard.js';
+import { useHasGuardianCopies } from '@/components/cards/useDeviceData.js';
 import DeltaSheet from '@/components/DeltaSheet.js';
 import ReturnSheet from '@/components/ReturnSheet.js';
 import { useLang } from '@/components/LanguageProvider.js';
 import { Badge, Button, EmptyState, Icon, ListGroup, ListItem, StateBanner, TopBar } from '@/components/ui/index.js';
 import DailyCheckCard from '@/components/trip/DailyCheckCard.js';
 import MapLinks from '@/components/trip/MapLinks.js';
+import NoPlanState from '@/components/trip/NoPlanState.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
 import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
@@ -74,6 +77,8 @@ export default function TodayPage() {
   const { t, locale, pair } = useLang();
   const trip = useTrip();
   const clock = useKstClock();
+  // 보호자 사본이 있는지만 읽는다(읽기 전용). 서버·첫 그림은 false 라 체류 없음 안내가 먼저 그려질 수 있다
+  const hasGuardianCopies = useHasGuardianCopies();
   const [sheet, setSheet] = useState(null);
   const [notice, setNotice] = useState(null);
   const dateRef = useRef(null);
@@ -156,6 +161,26 @@ export default function TodayPage() {
         </p>
       </div>
     );
+  } else if (!stay && hasGuardianCopies) {
+    // 보호자로 받은 일정이 이 기기에 있으면 받은 일정으로 먼저 안내한다(usability 2026-11-08 D1).
+    // 보호자가 환자 일정을 새로 만들어야 하는 줄 알지 않게 한다. 체류 넣기는 둘째 버튼으로 남긴다
+    body = (
+      <div className="ui-block">
+        <EmptyState
+          icon="navTrip"
+          title={t('today.receivedTitle')}
+          body={t('today.receivedBody')}
+          action={
+            <div className="today-empty-actions">
+              <Button href="/g">{t('today.receivedAction')}</Button>
+              <Button href="/onboarding" variant="secondary">
+                {t('today.noStayAction')}
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    );
   } else if (!stay) {
     body = (
       <div className="ui-block">
@@ -168,19 +193,16 @@ export default function TodayPage() {
       </div>
     );
   } else if (!trip.tripPlan) {
+    // 저장 일정이 없으면 위쪽 갱신 실패 알림 없이 이 빈 상태 하나만 둔다. 실패면 원인별 문구 하나, 다시 시도 하나
     body = (
       <div className="ui-block">
-        <EmptyState
-          icon="navToday"
-          title={trip.syncing ? t('today.generatingTitle') : t('today.noPlanTitle')}
-          body={trip.syncing ? t('today.generatingBody') : trip.readOnly ? t('today.noPlanReadOnly') : t('today.noPlanBody')}
-          action={
-            !trip.syncing && !trip.readOnly ? (
-              <Button variant="secondary" onClick={() => trip.retry()}>
-                {t('today.retry')}
-              </Button>
-            ) : null
-          }
+        <NoPlanState
+          syncing={trip.syncing}
+          readOnly={trip.readOnly}
+          updateFailed={trip.updateFailed}
+          errorCode={trip.lastErrorCode}
+          upstream={trip.lastUpstream}
+          onRetry={() => trip.retry()}
         />
       </div>
     );
@@ -389,7 +411,8 @@ export default function TodayPage() {
     <>
       {top}
       <main className="page today-page is-basement">
-        {trip.updateFailed && (
+        {/* 갱신 실패 알림은 보여 줄 저장 일정이 있을 때만. 없으면 아래 빈 상태가 원인을 알린다(usability C1) */}
+        {trip.updateFailed && trip.tripPlan && (
           <div className="ui-block today-sync-block">
             <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />
           </div>

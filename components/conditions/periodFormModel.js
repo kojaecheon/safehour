@@ -34,6 +34,7 @@ import {
   validateConditionPeriod,
   withItem,
 } from '../../src/stay/conditions.js';
+import { isDateString, postProcedureBoundary } from '../../src/stay/index.js';
 
 export const ANSWER = Object.freeze({ YES: 'YES', NO: 'NO', UNKNOWN: 'UNKNOWN' });
 
@@ -64,6 +65,25 @@ export function emptyPeriodForm({ startDate = '', endDate = '' } = {}) {
     mealRestriction: { answer: null, mode: 'ALL_DAY', until: '' },
     medication: { answer: null, times: [newMedicationRow()] },
   };
+}
+
+/**
+ * 새 본인 체크 기간의 기본 날짜(시작일 = 종료일).
+ * 기준일은 수술 후 경계일(가장 이른 수술·시술 날짜), 없으면 입국일이다. 기준일이 이미 지났으면 오늘(한국 날짜)로
+ * 당긴다: 체류 중에 기간을 더하는 사람에게 지난 날짜를 기본으로 보이지 않기 위해서다(2026-11-08 첫 5분 검토).
+ * 출국일을 넘지 않는다. 오늘을 모르면(null) 기준일 그대로다. 판정 규칙이 아니라 입력 편의일 뿐이고,
+ * 사용자는 어느 날짜로든 고칠 수 있다.
+ * @param {object|null} stay
+ * @param {string|null} today  'YYYY-MM-DD' (한국 날짜, lib/store todayKst)
+ * @returns {{ startDate: string, endDate: string }}
+ */
+export function newPeriodDates(stay, today) {
+  const base = postProcedureBoundary(stay) ?? stay?.arrival?.date ?? '';
+  let start = isDateString(base) ? base : '';
+  if (start && isDateString(today) && today > start) start = today;
+  const departure = stay?.departure?.date;
+  if (start && isDateString(departure) && start > departure) start = departure;
+  return { startDate: start, endDate: start };
 }
 
 /** 복약 시각 한 줄 추가용 — '숙소에서 복용' 기본 예 */
