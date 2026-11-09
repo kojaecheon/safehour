@@ -21,3 +21,23 @@ export function guardianExpiryDelay(copies, nowMs) {
   if (times.length === 0) return null;
   return Math.min(Math.max(Math.min(...times) - nowMs + GRACE_MS, GRACE_MS), MAX_TIMER_MS);
 }
+
+/**
+ * 아직 만료되지 않은 사본만 남긴다. 만료 시각을 읽을 수 없는 사본은 남긴다(사본이 없다고 단정하지 않는다).
+ * 저장소가 만료 사본을 지우지 못한 채(쓰기 실패) 돌려줘도 화면은 이 결과로 판단한다(2026-11-10 리뷰 M5).
+ * @param {Array<{ expiresAt?: string }>} copies
+ * @param {number} nowMs
+ * @returns {Array<object>}
+ */
+export function liveGuardianCopies(copies, nowMs) {
+  if (!Array.isArray(copies)) return [];
+  return copies.filter((c) => {
+    const ms = typeof c?.expiresAt === 'string' ? parseInstantMs(c.expiresAt) : null;
+    return ms === null || ms > nowMs;
+  });
+}
+
+/** 살아 있는 사본이 하나라도 있는가 */
+export function hasLiveGuardianCopy(copies, nowMs) {
+  return liveGuardianCopies(copies, nowMs).length > 0;
+}

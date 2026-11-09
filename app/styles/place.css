@@ -59,7 +59,7 @@
 .place-block > .btn {
   margin-top: var(--space-1);
 }
-/* 지도 버튼 [구글][카카오] (설계서 6.2 8번): 회색 작은 버튼을 늘 한 줄 반반으로. 글자가 길면 버튼 안에서 줄을 바꾼다 */
+/* 지도 버튼 [구글][카카오] (설계서 6.2 8번): 회색 작은 버튼을 360px 이상에서는 한 줄 반반으로. 360px 미만은 공용 규칙대로 세로로 쌓는다(사용성 점검 G1) */
 .place-maps .trip-map-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);

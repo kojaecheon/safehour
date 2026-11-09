@@ -23,7 +23,7 @@ import { EMERGENCY_NUMBERS, HOSPITAL_RETURN_LABEL, guardianCoverage } from '@/sr
 import { parseInstantMs } from '@/src/stay/index.js';
 import { dateLabel, kstClock, kstDate } from './errorView.js';
 import { patientReturnStatus } from './returnStatus.js';
-import { dedupePatientReturns, todayReturnSummary } from './copyView.js';
+import { dedupePatientReturns, orderDaysForView, todayReturnSummary } from './copyView.js';
 import { WarningNote } from './Feedback.js';
 import SafetyNote from './SafetyNote.js';
 
@@ -112,8 +112,18 @@ function ReturnPlace({ entry }) {
 /** 맨 위 '오늘 환자 복귀 마감' 카드. 누르면 오늘 날짜 제목으로 내려간다 */
 function TodayReturnCard({ summary }) {
   const { t } = useLang();
+  const targetId = `guardian-day-${summary.date}`;
+  // 오늘 일정 제목으로 옮겨 가고 초점을 거기 둔다. 주소 해시는 남기지 않는다: /g 는 주소 해시를 보호자 링크 암호문으로
+  // 읽으므로(hooks.js useIncomingLink) '#guardian-day-…'가 남으면 '링크가 올바르지 않아요'가 뜬다(2026-11-10 리뷰 I1).
+  function jump(event) {
+    event.preventDefault();
+    const heading = document.getElementById(targetId);
+    if (!heading) return;
+    heading.scrollIntoView({ block: 'start' });
+    heading.focus();
+  }
   return (
-    <a className="guardian-today" href={`#guardian-day-${summary.date}`}>
+    <a className="guardian-today" href={`#${targetId}`} onClick={jump}>
       <h3 className="guardian-today-title">{t('guardian.todayReturnTitle')}</h3>
       {summary.none ? (
         <span className="guardian-today-none">{t('guardian.noPatientOutings')}</span>
@@ -188,7 +198,7 @@ function GuardianDay({ day, nowMs, folded = false }) {
     ));
   }
   const title = (
-    <h3 id={headingId} className="guardian-day-title">
+    <h3 id={headingId} className="guardian-day-title" tabIndex={-1}>
       {label}
     </h3>
   );
@@ -225,11 +235,6 @@ function GuardianDay({ day, nowMs, folded = false }) {
 }
 
 /** 오늘을 맨 앞에, 나머지는 날짜 순서 그대로. 오늘이 없으면 원래 순서 */
-function orderDays(days, today) {
-  const todayDay = days.find((d) => d.date === today);
-  if (!todayDay) return { todayDay: null, days };
-  return { todayDay, days: [todayDay, ...days.filter((d) => d !== todayDay)] };
-}
 
 /**
  * @param {object} props
@@ -252,7 +257,7 @@ export default function GuardianCopyView({ snapshot, headingRef, notice, alerts,
   const coverage = range && { from: dateLabel(range.from, locale), to: dateLabel(range.to, locale) };
   const passed = range !== null && kstDate(nowMs) > range.to;
   const summary = todayReturnSummary(snapshot, nowMs);
-  const { todayDay, days } = orderDays(snapshot.days, kstDate(nowMs));
+  const { todayDay, days } = orderDaysForView(snapshot.days, kstDate(nowMs));
 
   return (
     <section className="guardian-copy" aria-labelledby="guardian-copy-title">

@@ -15,7 +15,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { getStore } from '@/lib/store/index.js';
-import { guardianExpiryDelay } from '@/components/guardian/expiry.js';
+import { guardianExpiryDelay, hasLiveGuardianCopy, liveGuardianCopies } from '@/components/guardian/expiry.js';
 
 function subscriber(topics) {
   return (onChange) => {
@@ -42,7 +42,11 @@ function subscribeGuardianCopies(onChange) {
   };
   const schedule = () => {
     clear();
-    const delay = guardianExpiryDelay(store.readGuardianCopies(), Date.now());
+    // 살아 있는 사본만 센다: 저장소가 만료 사본을 지우지 못해(쓰기 실패) 남겨 두어도 1초마다 다시 돌지 않는다(리뷰 M5)
+    const now = Date.now();
+    const live = liveGuardianCopies(store.readGuardianCopies(), now);
+    if (live.length === 0) return;
+    const delay = guardianExpiryDelay(live, now);
     if (delay === null) return;
     timer = window.setTimeout(() => {
       timer = null;
@@ -64,7 +68,7 @@ function subscribeGuardianCopies(onChange) {
 const readStay = () => getStore().readStay();
 const readTodayTomorrow = () => getStore().readTodayTomorrow();
 const readPrefs = () => getStore().readPrefs();
-const readHasGuardianCopies = () => getStore().readGuardianCopies().length > 0;
+const readHasGuardianCopies = () => hasLiveGuardianCopy(getStore().readGuardianCopies(), Date.now());
 const serverNull = () => null;
 const serverFalse = () => false;
 

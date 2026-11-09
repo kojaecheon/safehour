@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import { moreMenuGroups } from '../components/settings/moreMenu.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
-import { guardianExpiryDelay, MAX_TIMER_MS } from '../components/guardian/expiry.js';
+import { MAX_TIMER_MS, guardianExpiryDelay, hasLiveGuardianCopy, liveGuardianCopies } from '../components/guardian/expiry.js';
 
 describe('moreMenuGroups: 더보기 메뉴 묶음', () => {
   test('보호자 사본이 없으면 도구 5행, 정보 2행 그대로다', () => {
@@ -75,5 +75,25 @@ describe('guardianExpiryDelay: 가장 이른 사본 만료까지 기다릴 시�
     assert.equal(guardianExpiryDelay(undefined, now), null);
     assert.equal(guardianExpiryDelay([{ expiresAt: 'x' }, {}], now), null);
     assert.equal(guardianExpiryDelay([{ expiresAt: '2026-11-09T11:00:00+09:00' }], NaN), null);
+  });
+});
+
+describe('liveGuardianCopies / hasLiveGuardianCopy: 만료되지 않은 사본만 센다 (리뷰 M5)', () => {
+  const now = Date.UTC(2026, 10, 6, 1, 0);
+  test('만료 시각이 지난 사본은 빼고, 지나지 않았거나 읽을 수 없는 사본은 남긴다', () => {
+    const copies = [
+      { id: 'a', expiresAt: new Date(now - 1000).toISOString() },
+      { id: 'b', expiresAt: new Date(now + 60_000).toISOString() },
+      { id: 'c', expiresAt: 'nonsense' },
+      { id: 'd' },
+    ];
+    assert.deepEqual(liveGuardianCopies(copies, now).map((c) => c.id), ['b', 'c', 'd']);
+    assert.equal(hasLiveGuardianCopy(copies, now), true);
+    assert.equal(hasLiveGuardianCopy([copies[0]], now), false, '만료 사본만 남아 있으면 없음');
+    assert.deepEqual(liveGuardianCopies(null, now), []);
+  });
+  test('살아 있는 사본만으로 만료 지연을 재면 지난 사본 때문에 1초로 눌리지 않는다', () => {
+    const copies = [{ expiresAt: new Date(now - 1000).toISOString() }, { expiresAt: new Date(now + 120_000).toISOString() }];
+    assert.equal(guardianExpiryDelay(liveGuardianCopies(copies, now), now), 121_000);
   });
 });

@@ -237,6 +237,13 @@ test.describe('복귀 마감이 지난 외출', () => {
       expect((await card.boundingBox()).y).toBeLessThan(toggleBox.y);
       expect((await card.boundingBox()).height).toBeGreaterThanOrEqual(44);
       await expect(card).toHaveAttribute('href', `#guardian-day-${today}`);
+      // 카드를 누르면 오늘 일정 제목으로 옮겨 가 초점이 거기 간다. 주소 해시는 남기지 않는다(/g 는 해시를 보호자 링크로 읽는다, 리뷰 I1)
+      await card.click();
+      const todayHeading = todayDay.locator('h3.guardian-day-title');
+      await expect(todayHeading).toBeFocused();
+      await expect(todayHeading).toBeInViewport();
+      expect(g.url()).not.toContain('#guardian-day');
+      await expect(g.getByText('링크가 올바르지 않아요', { exact: false })).toHaveCount(0);
 
       // 오늘은 맨 앞에 펼쳐 두고, 다른 날짜는 접혀 있다가 누르면 펼쳐진다
       await expect(todayDay).toHaveAttribute('aria-labelledby', `guardian-day-${today}`);
@@ -266,10 +273,9 @@ test.describe('복귀 마감이 지난 외출', () => {
       await expect(upcomingRow.first()).not.toContainText('예정');
       await expect(upcomingRow.first().locator('a[href="tel:119"]')).toBeVisible();
       // 오늘 마감이 모두 지나면(시드는 11:00·21:00 둘) 카드는 가장 늦게 지난 마감을 '마감 지남'으로 보인다
-      if (bys.length === 2) {
-        await expect(card).toContainText(`${second}까지`);
-        await expect(card).toContainText('마감 지남');
-      }
+      expect(bys.length, '시드의 오늘 마감은 둘(11:00·21:00)이어야 카드의 마감 지남 전환을 본다').toBe(2);
+      await expect(card).toContainText(`${second}까지`);
+      await expect(card).toContainText('마감 지남');
       expectGuardClean(guardian.record, '보호자 기기: ');
     } finally {
       await guardian.context.close();

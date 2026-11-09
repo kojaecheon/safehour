@@ -41,10 +41,12 @@ export function todayReturnSummary(snapshot, nowMs) {
   const date = kstDate(nowMs);
   const day = snapshot.days.find((d) => d?.date === date);
   if (!day) return null;
-  const entries = dedupePatientReturns(day.patientReturn)
+  const deduped = dedupePatientReturns(day.patientReturn);
+  const entries = deduped
     .map((entry) => ({ entry, status: patientReturnStatus({ date, by: entry.by, nowMs }) }))
     .filter((item) => item.status !== null);
-  if (entries.length === 0) return { date, none: true };
+  // 마감이 하나도 없으면 '오늘 환자 외출 없음'. 마감은 있는데 시각을 읽을 수 없으면 카드를 그리지 않는다(아래 줄과 어긋나게 말하지 않는다)
+  if (entries.length === 0) return deduped.length > 0 ? null : { date, none: true };
 
   const upcoming = entries.filter((item) => item.status === 'UPCOMING');
   const pool = upcoming.length > 0 ? upcoming : entries;
@@ -54,4 +56,20 @@ export function todayReturnSummary(snapshot, nowMs) {
   });
   const { by, placeName, placeAddress } = pick.entry;
   return { date, by, placeName: placeName ?? null, placeAddress: placeAddress ?? null, status: pick.status, total: entries.length };
+}
+
+/**
+ * 받은 일정 화면의 날짜 순서. 오늘이 있으면 오늘을 맨 앞에 두고, 그다음 앞으로 올 날짜(원래 순서), 마지막에 지난 날짜(원래 순서)다.
+ * 오늘이 범위 밖이면 순서를 바꾸지 않는다(모두 펼친 채 그대로 보인다).
+ * @param {Array<{date: string}>} days
+ * @param {string} today  'YYYY-MM-DD'(한국 날짜)
+ * @returns {{ todayDay: object|null, days: Array<object> }}
+ */
+export function orderDaysForView(days, today) {
+  const list = Array.isArray(days) ? days : [];
+  const todayDay = list.find((d) => d?.date === today) ?? null;
+  if (!todayDay) return { todayDay: null, days: list };
+  const future = list.filter((d) => d !== todayDay && typeof d?.date === 'string' && d.date > today);
+  const past = list.filter((d) => d !== todayDay && !(typeof d?.date === 'string' && d.date > today));
+  return { todayDay, days: [todayDay, ...future, ...past] };
 }

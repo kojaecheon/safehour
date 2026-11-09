@@ -99,7 +99,7 @@ test.describe('시나리오 7 — 로그인 만료·오프라인', () => {
       const banner = page.locator('.ui-readonly');
       await expect(banner.locator('.ui-readonly-title')).toHaveText(OFFLINE_TITLE);
       await expect(banner.locator('.ui-readonly-title')).not.toContainText('로그인');
-      await expect(banner).toContainText('다시 연결되면 편집이 자동으로 다시 켜지고 일정을 새로 확인해요.');
+      await expect(banner).toContainText('다시 연결되면 로그인 상태를 확인하고, 로그인돼 있으면 편집이 다시 켜지고 일정을 새로 확인해요.');
       await expect(banner.getByRole('link', { name: '로그인하기' })).toHaveCount(0);
       await expect(page.getByText(READ_ONLY)).toHaveCount(0);
       await expect(page.locator('.state-banner')).toBeVisible();

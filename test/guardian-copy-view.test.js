@@ -7,7 +7,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { dedupePatientReturns, todayReturnSummary } from '../components/guardian/copyView.js';
+import { dedupePatientReturns, orderDaysForView, todayReturnSummary } from '../components/guardian/copyView.js';
 
 const HOSPITAL = { by: '17:00', placeName: '병원', placeAddress: null };
 const LODGING_21 = { by: '21:00', placeName: '숙소 A', placeAddress: '서울 중구 1' };
@@ -87,5 +87,30 @@ describe('todayReturnSummary', () => {
     assert.equal(todayReturnSummary(null, NOW), null);
     assert.equal(todayReturnSummary({ days: 'x' }, NOW), null);
     assert.equal(todayReturnSummary(snapshotOf([{ date: '2026-11-06', patientReturn: [HOSPITAL] }]), NaN), null);
+  });
+});
+
+describe('todayReturnSummary: 마감은 있는데 시각을 읽을 수 없으면', () => {
+  test('카드를 그리지 않는다(null). 아래 줄과 어긋나게 「외출 없음」이라 말하지 않는다', () => {
+    const nowMs = Date.UTC(2026, 10, 6, 1, 0); // 2026-11-06 10:00 KST
+    const snapshot = { days: [{ date: '2026-11-06', patientReturn: [{ by: 'late', placeName: '숙소', placeAddress: null }] }] };
+    assert.equal(todayReturnSummary(snapshot, nowMs), null);
+  });
+});
+
+describe('orderDaysForView: 받은 일정의 날짜 순서', () => {
+  const days = [{ date: '2026-11-05' }, { date: '2026-11-06' }, { date: '2026-11-07' }, { date: '2026-11-08' }];
+  test('오늘, 앞으로 올 날짜(원래 순서), 지난 날짜 순이다', () => {
+    const out = orderDaysForView(days, '2026-11-06');
+    assert.equal(out.todayDay.date, '2026-11-06');
+    assert.deepEqual(out.days.map((d) => d.date), ['2026-11-06', '2026-11-07', '2026-11-08', '2026-11-05']);
+  });
+  test('오늘이 범위 밖이면 순서를 바꾸지 않는다', () => {
+    const out = orderDaysForView(days, '2026-11-20');
+    assert.equal(out.todayDay, null);
+    assert.deepEqual(out.days.map((d) => d.date), ['2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08']);
+  });
+  test('목록이 아니면 빈 목록', () => {
+    assert.deepEqual(orderDaysForView(null, '2026-11-06'), { todayDay: null, days: [] });
   });
 });
