@@ -27,6 +27,8 @@ import {
   introRequestFor,
   isDemoMode,
   needsInputFix,
+  needsOperatorContact,
+  noPlanBodyKey,
   overdueOutingOf,
   placeDetailRequest,
   plannedReturnOf,
@@ -875,6 +877,68 @@ describe('updateFailedBodyKey: 일정 갱신 실패 안내 본문 (docs/contract
         assert.ok(!/안전/.test(entry[lang]) && !/\bsafe\b/i.test(entry[lang]), `${key}.${lang}`);
       }
     }
+  });
+});
+
+describe('needsOperatorContact: 사용자가 기다려도 풀리지 않는 관광공사 실패 (findings 16)', () => {
+  test('AUTH · SELF_LIMIT 만 운영자 연락이 필요하다', () => {
+    for (const u of ['AUTH', 'SELF_LIMIT']) assert.equal(needsOperatorContact(u), true, u);
+    for (const u of ['QUOTA', 'NETWORK', 'UPSTREAM_ERROR', 'PARSE', null, undefined, '', 'auth', 'UNKNOWN']) {
+      assert.equal(needsOperatorContact(u), false, String(u));
+    }
+  });
+
+  test('갱신 실패 안내의 연결 문구와 같은 판단이다(판단 경로 하나)', () => {
+    for (const u of ['AUTH', 'SELF_LIMIT', 'QUOTA', 'NETWORK', 'UPSTREAM_ERROR', 'PARSE', null, 'UNKNOWN']) {
+      assert.equal(updateFailedBodyKey(u) === 'today.updateFailedConnection', needsOperatorContact(u), String(u));
+    }
+  });
+});
+
+describe('noPlanBodyKey: 저장 일정이 없을 때 첫 일정 실패 안내 본문 (usability 2026-11-08 C1)', () => {
+  test('관광공사 분류가 있으면 분류로 고른다(오류 코드보다 앞선다)', () => {
+    assert.equal(noPlanBodyKey({ upstream: 'QUOTA', errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanQuota');
+    for (const u of ['AUTH', 'SELF_LIMIT']) {
+      assert.equal(noPlanBodyKey({ upstream: u, errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanConnection', u);
+    }
+    for (const u of ['NETWORK', 'UPSTREAM_ERROR', 'PARSE']) {
+      assert.equal(noPlanBodyKey({ upstream: u, errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanTourism', u);
+      assert.equal(noPlanBodyKey({ upstream: u }), 'today.noPlanTourism', `${u} (오류 코드 없음)`);
+    }
+  });
+
+  test('분류가 없으면 오류 코드로 고른다', () => {
+    assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_EXTERNAL_API' }), 'today.noPlanTourism');
+    assert.equal(noPlanBodyKey({ errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: null }), 'today.noPlanTourism');
+    assert.equal(noPlanBodyKey({ errorCode: 'NETWORK_ERROR' }), 'today.noPlanNetwork');
+    for (const code of ['SAFEHOUR_RECALCULATION_FAILED', 'HTTP_500', 'HTTP_503', 'BAD_RESPONSE', 'CLIENT_ERROR', 'LINK_FAILED', 'READ_ONLY']) {
+      assert.equal(noPlanBodyKey({ errorCode: code }), 'today.noPlanEngine', code);
+    }
+  });
+
+  test('오류 코드도 분류도 없으면 예전 일반 문구다', () => {
+    assert.equal(noPlanBodyKey({}), 'today.noPlanBody');
+    assert.equal(noPlanBodyKey({ errorCode: null, upstream: null }), 'today.noPlanBody');
+    assert.equal(noPlanBodyKey({ errorCode: '', upstream: '' }), 'today.noPlanBody');
+    assert.equal(noPlanBodyKey(), 'today.noPlanBody');
+  });
+
+  test('본문은 네 언어로 있고, 저장 일정이 그대로라고 말하지 않으며 단정 표현을 쓰지 않는다', () => {
+    for (const key of ['today.noPlanQuota', 'today.noPlanConnection', 'today.noPlanTourism', 'today.noPlanNetwork', 'today.noPlanEngine']) {
+      const entry = UI_TEXT[key];
+      assert.ok(entry, key);
+      for (const lang of ['ko', 'en', 'ja', 'zh']) {
+        assert.ok(entry[lang], `${key}.${lang}`);
+        assert.ok(!/안전/.test(entry[lang]) && !/\bsafe\b/i.test(entry[lang]), `${key}.${lang}`);
+        assert.ok(!/[\u2013\u2014]/.test(entry[lang]), `${key}.${lang}: 대시`);
+      }
+      assert.ok(!/저장된 일정/.test(entry.ko), `${key}: 저장 일정이 없는 상태다`);
+    }
+    // 인터넷 연결 탓은 네트워크 실패 문구에만 쓴다
+    for (const key of ['today.noPlanQuota', 'today.noPlanConnection', 'today.noPlanTourism', 'today.noPlanEngine']) {
+      assert.ok(!/인터넷/.test(UI_TEXT[key].ko), key);
+    }
+    assert.match(UI_TEXT['today.noPlanNetwork'].ko, /인터넷/);
   });
 });
 

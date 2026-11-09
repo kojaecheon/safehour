@@ -33,6 +33,7 @@ import { RETURN_NOW_CAUSES } from '@/src/domain/states.js';
 import { isStayDate } from '@/src/stay/stay.js';
 import { AppliedConditions, ExcludedList } from './DayFacts.js';
 import IntroArea from './IntroArea.js';
+import NoPlanState from './NoPlanState.js';
 import RegenerateSheet from './RegenerateSheet.js';
 import SwapSheet from './SwapSheet.js';
 import TripNotice from './TripNotice.js';
@@ -296,6 +297,21 @@ export default function DayScreen() {
         />
       </div>
     );
+  } else if (!trip.tripPlan) {
+    // 저장 일정이 아직 없다: 갱신 실패 알림 없이 첫 일정 빈 상태 하나만 둔다(/today · /trip 과 같은 부품, usability C1)
+    body = (
+      <div className="ui-block">
+        <NoPlanState
+          icon="navTrip"
+          syncing={trip.syncing}
+          readOnly={trip.readOnly}
+          updateFailed={trip.updateFailed}
+          errorCode={trip.lastErrorCode}
+          upstream={trip.lastUpstream}
+          onRetry={() => trip.retry()}
+        />
+      </div>
+    );
   } else if (!day) {
     body = (
       <div className="ui-block">
@@ -526,7 +542,7 @@ export default function DayScreen() {
           </nav>
         )}
 
-        {trip.updateFailed && (
+        {trip.updateFailed && trip.tripPlan && (
           <div className="ui-block">
             <UpdateFailedNotice readOnly={trip.readOnly} upstream={trip.lastUpstream} onRetry={() => trip.retry()} />
           </div>

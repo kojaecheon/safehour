@@ -64,6 +64,37 @@ export const messages = {
     ja: '予定を作成できませんでした。接続を確認して、もう一度お試しください。',
     zh: '未能生成行程。请检查网络连接后重试。',
   },
+  // 저장 일정이 없을 때 첫 일정 만들기 실패 원인별 본문(components/trip/viewModel.js noPlanBodyKey, usability 2026-11-08 C1)
+  'today.noPlanQuota': {
+    ko: '오늘 장소 데이터 제공처의 조회 한도에 닿아 일정을 만들지 못했어요. 자정(한국 시각) 이후 다시 시도해 주세요.',
+    en: 'We could not build the plan because the place data provider has reached today’s lookup limit. Please try again after midnight (Korea time).',
+    ja: '本日、場所データ提供元の照会上限に達したため、予定を作成できませんでした。韓国時間の午前0時以降にもう一度お試しください。',
+    zh: '今天地点数据提供方的查询次数已达上限，未能生成行程。请在韩国时间午夜之后重试。',
+  },
+  'today.noPlanConnection': {
+    ko: '장소 데이터 연결에 문제가 있어 일정을 만들지 못했어요. 운영자에게 알려 주세요.',
+    en: 'We could not build the plan because there is a problem with the place data connection. Please let the operator know.',
+    ja: '場所データの接続に問題があるため、予定を作成できませんでした。運営者にお知らせください。',
+    zh: '地点数据连接出现问题，未能生成行程。请告知运营方。',
+  },
+  'today.noPlanTourism': {
+    ko: '관광 정보를 불러오지 못해 일정을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+    en: 'We could not build the plan because tourism data could not be loaded. Please try again in a moment.',
+    ja: '観光情報を読み込めなかったため、予定を作成できませんでした。しばらくしてからもう一度お試しください。',
+    zh: '未能加载旅游信息，因此未能生成行程。请稍后重试。',
+  },
+  'today.noPlanNetwork': {
+    ko: '인터넷에 연결되어 있지 않아 일정을 만들지 못했어요. 연결을 확인하고 다시 시도해 주세요.',
+    en: 'We could not build the plan because you are not connected to the internet. Check your connection and try again.',
+    ja: 'インターネットに接続されていないため、予定を作成できませんでした。接続を確認して、もう一度お試しください。',
+    zh: '未连接到互联网，未能生成行程。请检查网络连接后重试。',
+  },
+  'today.noPlanEngine': {
+    ko: '일정을 계산하지 못했어요. 다시 시도해 주세요.',
+    en: 'We could not calculate the plan. Please try again.',
+    ja: '予定を計算できませんでした。もう一度お試しください。',
+    zh: '未能计算行程。请重试。',
+  },
   'today.noPlanReadOnly': {
     ko: '로그인하고 인터넷에 연결되면 일정을 만들어요.',
     en: 'We will build the plan once you are signed in and online.',

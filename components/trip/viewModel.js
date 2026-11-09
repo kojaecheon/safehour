@@ -742,15 +742,27 @@ export function demoEventFor(type, day, nowMin) {
 }
 
 /**
+ * 사용자가 기다려도 풀리지 않는 관광공사 실패인가: 키 오류(AUTH)·서버 자체 한도(SELF_LIMIT). 이때만 운영자에게 알리라고 하고
+ * 도움말·문의로 가는 길을 붙인다(findings 16). 갱신 실패 안내·첫 일정 실패 안내·연락 링크가 모두 이 함수 하나로 판단한다.
+ * @param {string|null|undefined} upstream  서버가 502 에 실은 분류(lib/trip 의 lastUpstream)
+ * @returns {boolean}
+ */
+export function needsOperatorContact(upstream) {
+  return upstream === 'AUTH' || upstream === 'SELF_LIMIT';
+}
+
+/**
  * 일정 갱신 실패 안내 본문 키. 서버가 502 에 실은 관광공사 실패 분류(lib/trip 의 lastUpstream)로 고른다.
- * 원인을 단정하지 않고 '지금 할 수 있는 일'만 알린다. 분류가 없으면(오프라인·다른 오류) 예전 일반 문구다.
+ * 저장 일정이 있을 때만 쓴다(없으면 noPlanBodyKey). 원인을 단정하지 않고 '지금 할 수 있는 일'만 알린다.
+ * 분류가 없으면(오프라인·다른 오류) 예전 일반 문구다.
  *   QUOTA                          제공처 하루 한도, 자정(한국 시각) 이후 다시
  *   NETWORK · UPSTREAM_ERROR · PARSE  잠시 뒤 다시
- *   AUTH · SELF_LIMIT              운영자에게 알림 (사용자가 기다려도 풀리지 않는 쪽)
+ *   AUTH · SELF_LIMIT              운영자에게 알림 (needsOperatorContact)
  * @param {string|null|undefined} upstream
  * @returns {string}
  */
 export function updateFailedBodyKey(upstream) {
+  if (needsOperatorContact(upstream)) return 'today.updateFailedConnection';
   switch (upstream) {
     case 'QUOTA':
       return 'today.updateFailedQuota';
@@ -758,12 +770,34 @@ export function updateFailedBodyKey(upstream) {
     case 'UPSTREAM_ERROR':
     case 'PARSE':
       return 'today.updateFailedTemporary';
-    case 'AUTH':
-    case 'SELF_LIMIT':
-      return 'today.updateFailedConnection';
     default:
       return 'today.updateFailedBody';
   }
+}
+
+/**
+ * 저장 일정이 없을 때 첫 일정 만들기 실패 안내 본문 키(usability 2026-11-08 C1). 실패 원인별로 하나만 고른다.
+ * 저장 일정이 없으므로 '저장된 일정은 그대로'라고 말하지 않는다. 인터넷 연결 탓은 요청이 서버에 닿지 않았을 때만 한다.
+ * 관광공사 분류(upstream)가 있으면 분류가 앞선다.
+ *   upstream QUOTA                                  noPlanQuota       자정(한국 시각) 이후 다시
+ *   upstream AUTH · SELF_LIMIT                      noPlanConnection  운영자에게 알림 (needsOperatorContact)
+ *   upstream NETWORK · UPSTREAM_ERROR · PARSE,
+ *     또는 errorCode SAFEHOUR_EXTERNAL_API           noPlanTourism     관광 정보를 못 불러옴, 잠시 뒤 다시
+ *   errorCode NETWORK_ERROR                         noPlanNetwork     인터넷 연결 확인
+ *   그 밖의 errorCode                                noPlanEngine      일정 계산 실패, 다시 시도
+ *   둘 다 없음                                       noPlanBody        예전 일반 문구
+ * @param {{ errorCode?: string|null, upstream?: string|null }} [failure]  lib/trip 의 lastErrorCode · lastUpstream
+ * @returns {string}
+ */
+export function noPlanBodyKey({ errorCode = null, upstream = null } = {}) {
+  if (upstream === 'QUOTA') return 'today.noPlanQuota';
+  if (needsOperatorContact(upstream)) return 'today.noPlanConnection';
+  if (upstream === 'NETWORK' || upstream === 'UPSTREAM_ERROR' || upstream === 'PARSE' || errorCode === 'SAFEHOUR_EXTERNAL_API') {
+    return 'today.noPlanTourism';
+  }
+  if (errorCode === 'NETWORK_ERROR') return 'today.noPlanNetwork';
+  if (errorCode) return 'today.noPlanEngine';
+  return 'today.noPlanBody';
 }
 
 /**

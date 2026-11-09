@@ -18,6 +18,7 @@ import {
   openDemoToday,
   readRecord,
   removeStayAndPlan,
+  seedStay,
   setClock,
   startTrip,
   styles,
@@ -41,6 +42,19 @@ async function failNextSync(page, { status = 503, body = { ok: false }, onReques
     localStorage.setItem(key, newValue);
     window.dispatchEvent(new StorageEvent('storage', { key, oldValue, newValue, storageArea: localStorage }));
   }, buildStay({ departure: 5 }));
+}
+
+/**
+ * 저장 일정이 없는 채로 첫 일정 만들기를 실패시킨다: 일정 API 를 처음부터 막고 체류만 심은 뒤 path 를 연다.
+ * startTrip 은 일정이 저장될 때까지 기다리므로 쓰지 않는다. 시계는 부르는 쪽이 첫 이동 전에 고정한다.
+ */
+async function startTripWithoutPlan(page, { status, body, path = '/today' }) {
+  await page.route('**/api/itinerary/plan', (route) =>
+    route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) }),
+  );
+  await loginDemo(page, '/privacy');
+  await seedStay(page, buildStay(), { confirmToday: true });
+  await page.goto(path);
 }
 
 test.describe('③층 오늘, 회색 바탕과 블록', () => {
@@ -150,6 +164,45 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
     await expect(page.getByRole('link', { name: '받은 일정 보기' })).toHaveCount(0);
     await expect(page.locator('main.today-page .ui-empty').getByRole('link', { name: '체류 정보 넣기' })).toHaveAttribute('href', '/onboarding');
   });
+
+  // 저장 일정이 없을 때 첫 일정 만들기 실패: 위쪽 갱신 실패 알림 없이 빈 상태 하나, 원인별 문구, 다시 시도 하나 (usability C1)
+  const firstPlanFailures = [
+    {
+      name: '관광 정보 502',
+      status: 502,
+      body: { ok: false, errorCode: 'SAFEHOUR_EXTERNAL_API', upstream: 'UPSTREAM_ERROR' },
+      text: '관광 정보를 불러오지 못해 일정을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+    },
+    {
+      name: '일정 계산 500',
+      status: 500,
+      body: { ok: false, errorCode: 'SAFEHOUR_RECALCULATION_FAILED' },
+      text: '일정을 계산하지 못했어요. 다시 시도해 주세요.',
+    },
+  ];
+  for (const failure of firstPlanFailures) {
+    test(`저장 일정 없이 첫 일정 실패(${failure.name}): 빈 상태 하나에 원인별 문구, 다시 시도 하나`, async ({ page }) => {
+      await setClock(page, { kst: `${kstDate(0)}T10:00` });
+      await startTripWithoutPlan(page, failure);
+      const main = page.locator('main.today-page');
+      await expect(main.getByRole('heading', { name: '아직 일정이 없어요' })).toBeVisible({ timeout: 30_000 });
+      await expect(main.getByText(failure.text)).toBeVisible();
+      await expect(main.getByText('인터넷 연결을 확인', { exact: false })).toHaveCount(0);
+      await expect(main.getByText('저장된 일정은 그대로', { exact: false })).toHaveCount(0);
+      await expect(page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' })).toHaveCount(0);
+      await expect(main.locator('.today-sync-block')).toHaveCount(0);
+      await expect(main.getByRole('button', { name: '다시 시도' })).toHaveCount(1);
+      expect(await readRecord(page, 'tripPlan')).toBeNull();
+      await expectNoAxeViolations(page, `/today (첫 일정 실패 · ${failure.name})`);
+
+      // 전체 일정 화면도 같은 빈 상태 하나다
+      await page.goto('/trip');
+      const trip = page.locator('main.trip-page');
+      await expect(trip.getByText(failure.text)).toBeVisible({ timeout: 30_000 });
+      await expect(page.getByRole('alert').filter({ hasText: '일정을 새로 고치지 못했어요' })).toHaveCount(0);
+      await expect(trip.getByRole('button', { name: '다시 시도' })).toHaveCount(1);
+    });
+  }
 
   for (const confirmToday of [true, false]) {
     test(`빈 흰 블록이 없다: ${confirmToday ? '확인 마친 오늘' : '매일 확인 전 오늘'}`, async ({ page }) => {
