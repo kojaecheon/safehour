@@ -2,9 +2,10 @@
 //
 // 회색 바탕 위 흰 블록 두 개: 도구(한국어 안내 카드·보호자 링크·조건·체류 수정·설정) / 정보(개인정보와 면책 안내).
 // 각 블록은 목록 머리 + 목록 행(앞 아이콘 · 제목 · 설명 · 화살표).
+// 이 기기에 보호자 사본이 있으면 도구 맨 위에 '받은 일정 (보호자)'(/g)가 붙어 6행이 된다(usability 2026-11-08 D1).
 
 import { test, expect } from './fixtures.js';
-import { expectNoAxeViolations, gapBetween, startTrip, styles } from './helpers.js';
+import { expectNoAxeViolations, gapBetween, importGuardianCopy, startTrip, styles } from './helpers.js';
 
 test.describe('③층 더보기, 목록 묶음 두 개', () => {
   test('회색 바탕 위 흰 블록 두 개: 도구(5행) · 정보(2행), 첫 블록이 상단 바 바로 아래, 블록 사이 8px', async ({ page }) => {
@@ -68,6 +69,26 @@ test.describe('③층 더보기, 목록 묶음 두 개', () => {
         'line-height': '19px',
       });
     }
+  });
+
+  test('보호자 사본이 있으면 도구 맨 위에 받은 일정(/g) 행, 누르면 받은 일정 화면', async ({ page }) => {
+    await importGuardianCopy(page);
+    await page.goto('/more');
+    const tools = page.locator('main.more-page .ui-block').nth(0);
+    await expect(tools.locator('.ui-list > li')).toHaveCount(6);
+    const first = tools.locator('.ui-list > li').first().getByRole('link');
+    await expect(first).toHaveAttribute('href', '/g');
+    await expect(first.locator('.ui-list-item-title')).toHaveText('받은 일정 (보호자)');
+    await expect(first.locator('.ui-list-item-desc')).toHaveText('환자에게 받은 일정을 다시 열어요');
+    expect((await first.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    // 나머지 도구 행은 예전 순서 그대로다
+    await expect(tools.locator('.ui-list > li').nth(1).getByRole('link')).toHaveAttribute('href', '/cards');
+    await expect(page.locator('main.more-page .ui-block').nth(1).locator('.ui-list > li')).toHaveCount(2);
+    await expectNoAxeViolations(page, '/more (받은 일정 있음)');
+
+    await first.click();
+    await expect(page).toHaveURL(/\/g$/);
+    await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
   });
 
   test('320px English: 더보기에 가로 스크롤이 없다', async ({ page }) => {

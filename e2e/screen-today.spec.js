@@ -6,7 +6,22 @@
 // --state-standby-bg rgb(255, 244, 217), --state-standby-ink rgb(122, 74, 0), --ink rgb(26, 28, 32).
 
 import { test, expect } from './fixtures.js';
-import { buildStay, fireDemoEvent, gapBetween, kstDate, linkDemoPlan, openDemoToday, setClock, startTrip, styles } from './helpers.js';
+import {
+  buildStay,
+  expectNoAxeViolations,
+  fireDemoEvent,
+  gapBetween,
+  importGuardianCopy,
+  kstDate,
+  linkDemoPlan,
+  loginDemo,
+  openDemoToday,
+  readRecord,
+  removeStayAndPlan,
+  setClock,
+  startTrip,
+  styles,
+} from './helpers.js';
 
 /**
  * 다음 재계획을 실패시킨다: 일정 API 를 503 으로 막고, 다른 탭에서 체류를 바꾼 것처럼 storage 이벤트를 보낸다
@@ -105,6 +120,35 @@ test.describe('③층 오늘, 회색 바탕과 블록', () => {
     // 다시 시도는 기존 갱신 경로로 일정 요청을 한 번 더 보낸다(여전히 막혀 있으니 안내도 그대로)
     await expect.poll(() => blocked).toBeGreaterThan(before);
     await expect(alert).toContainText('조회 한도에 닿았어요');
+  });
+
+  test('체류 없이 보호자 사본만 있으면 받은 일정 보기가 먼저, 체류 정보 넣기는 둘째 버튼', async ({ page }) => {
+    await importGuardianCopy(page);
+    await removeStayAndPlan(page);
+    await page.goto('/today');
+    await expect(page.getByRole('heading', { name: '보호자로 받은 일정이 있어요' })).toBeVisible();
+    expect(await readRecord(page, 'stay')).toBeNull();
+    await expect(page.getByRole('heading', { name: '아직 체류 정보가 없어요' })).toHaveCount(0);
+    await expect(page.getByText('보호자는 체류 정보를 따로 넣지 않아도 돼요.', { exact: false })).toBeVisible();
+    const empty = page.locator('main.today-page .ui-empty');
+    const links = empty.getByRole('link');
+    await expect(links).toHaveCount(2);
+    await expect(links.nth(0)).toHaveText('받은 일정 보기');
+    await expect(links.nth(0)).toHaveAttribute('href', '/g');
+    await expect(links.nth(1)).toHaveText('체류 정보 넣기');
+    await expect(links.nth(1)).toHaveAttribute('href', '/onboarding');
+    for (const i of [0, 1]) expect((await links.nth(i).boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expectNoAxeViolations(page, '/today (체류 없음 · 보호자 사본 있음)');
+
+    await links.nth(0).click();
+    await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+  });
+
+  test('체류도 보호자 사본도 없으면 체류 정보 넣기 안내 그대로', async ({ page }) => {
+    await loginDemo(page, '/today');
+    await expect(page.getByRole('heading', { name: '아직 체류 정보가 없어요' })).toBeVisible();
+    await expect(page.getByRole('link', { name: '받은 일정 보기' })).toHaveCount(0);
+    await expect(page.locator('main.today-page .ui-empty').getByRole('link', { name: '체류 정보 넣기' })).toHaveAttribute('href', '/onboarding');
   });
 
   for (const confirmToday of [true, false]) {

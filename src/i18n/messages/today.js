@@ -31,6 +31,20 @@ export const messages = {
     zh: '填写入境和出境日期、住处以及医院预约后，我们会为每一天生成行程。',
   },
   'today.noStayAction': { ko: '체류 정보 넣기', en: 'Add trip details', ja: '滞在情報を入れる', zh: '填写行程信息' },
+  // 체류가 없고 이 기기에 보호자 사본이 있을 때 (usability 2026-11-08 D1)
+  'today.receivedTitle': {
+    ko: '보호자로 받은 일정이 있어요',
+    en: 'You have a schedule received as a companion',
+    ja: '同行者として受け取った予定があります',
+    zh: '你有一份作为陪同者收到的日程',
+  },
+  'today.receivedBody': {
+    ko: '환자에게 받은 일정은 받은 일정 화면에서 볼 수 있어요. 보호자는 체류 정보를 따로 넣지 않아도 돼요.',
+    en: 'You can see the schedule from the patient on the Received schedule screen. Companions do not need to add their own trip details.',
+    ja: '患者から受け取った予定は「受け取った予定」画面で見られます。同行者は滞在情報を別に入れる必要はありません。',
+    zh: '从患者那里收到的日程可以在“收到的日程”页面查看。陪同者不需要另外填写行程信息。',
+  },
+  'today.receivedAction': { ko: '받은 일정 보기', en: 'View received schedule', ja: '受け取った予定を見る', zh: '查看收到的日程' },
   'today.generatingTitle': {
     ko: '전체 일정을 만드는 중이에요',
     en: 'Building your whole trip plan',
