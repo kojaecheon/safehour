@@ -17,10 +17,10 @@ import {
   firstDayWithStops,
   kstDate,
   readRecord,
+  setClock,
   startTrip,
   stopsOf,
   waitForTripPlan,
-  setClock,
 } from './helpers.js';
 
 /** 본인 체크 한 항목에 답한다 (fieldset legend = 질문) */

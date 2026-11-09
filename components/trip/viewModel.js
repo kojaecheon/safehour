@@ -798,8 +798,9 @@ export function updateFailedBodyKey(upstream) {
  *     또는 errorCode SAFEHOUR_EXTERNAL_API           noPlanTourism     관광 정보를 못 불러옴, 잠시 뒤 다시
  *   errorCode NETWORK_ERROR                         noPlanNetwork     서버에 연결하지 못함, 인터넷 확인
  *   errorCode SAFEHOUR_AUTH_REQUIRED                noPlanReadOnly    로그인하면 만든다(세션 만료가 보기 전용보다 먼저 보일 때)
- *   errorCode SAFEHOUR_RECALCULATION_FAILED, HTTP_5xx noPlanEngine     일정 계산 실패, 다시 시도
- *   그 밖의 errorCode(400대, 기기 저장 실패 등)       noPlanGeneric     만들지 못함, 다시 시도 (원인을 단정하지 않는다)
+ *   errorCode SAFEHOUR_RECALCULATION_FAILED, HTTP_500 noPlanEngine     일정 계산 실패, 다시 시도
+ *   그 밖의 errorCode(400대, HTTP_502·503·504 같은
+ *     게이트웨이·플랫폼 오류, 기기 저장 실패 등)       noPlanGeneric     만들지 못함, 다시 시도 (원인을 단정하지 않는다)
  *   둘 다 없음                                       noPlanBody        예전 일반 문구
  * @param {{ errorCode?: string|null, upstream?: string|null }} [failure]  lib/trip 의 lastErrorCode · lastUpstream
  * @returns {string}
@@ -818,9 +819,19 @@ export function noPlanBodyKey({ errorCode = null, upstream = null } = {}) {
   if (errorCode === 'SAFEHOUR_EXTERNAL_API') return 'today.noPlanTourism';
   if (errorCode === 'NETWORK_ERROR') return 'today.noPlanNetwork';
   if (errorCode === 'SAFEHOUR_AUTH_REQUIRED') return 'today.noPlanReadOnly';
-  if (errorCode === 'SAFEHOUR_RECALCULATION_FAILED' || /^HTTP_5\d\d$/.test(errorCode ?? '')) return 'today.noPlanEngine';
+  if (errorCode === 'SAFEHOUR_RECALCULATION_FAILED' || errorCode === 'HTTP_500') return 'today.noPlanEngine';
   if (errorCode) return 'today.noPlanGeneric';
   return 'today.noPlanBody';
+}
+
+/**
+ * 첫 일정 실패 뒤 '다시 시도'가 뜻이 있는가. 세션 만료(SAFEHOUR_AUTH_REQUIRED)는 다시 보내도 같은 401 이라
+ * 버튼을 두지 않는다(본문은 noPlanReadOnly 의 로그인 안내다). 그 밖의 실패는 다시 시도할 수 있다.
+ * @param {string|null|undefined} errorCode  lib/trip 의 lastErrorCode
+ * @returns {boolean}
+ */
+export function noPlanRetryable(errorCode) {
+  return errorCode !== 'SAFEHOUR_AUTH_REQUIRED';
 }
 
 /**
