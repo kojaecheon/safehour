@@ -217,8 +217,43 @@ test.describe('복귀 마감이 지난 외출', () => {
       await expect(upcomingRow.first()).toContainText('예정');
       await expect(upcomingRow.first()).not.toContainText('마감 지남');
       await expect(g.locator('main')).not.toContainText('안전합니다');
+
+      // 같은 시각·같은 장소 마감은 한 줄 (시드의 외출 2·3 은 둘 다 21:00 숙소 복귀다, 사용성 점검 D3)
+      const todayOutings = tripPlan.days[today].outings.filter((o) => o.returnBy);
+      const distinct = new Set(todayOutings.map((o) => `${o.returnBy}|${o.returnPlace}`));
+      expect(todayOutings.length, '시드에 같은 시각·장소 마감이 겹쳐야 합치기를 볼 수 있다').toBeGreaterThan(distinct.size);
+      const todayDay = g.locator('.guardian-day').first();
+      await expect(todayDay.locator('.guardian-return')).toHaveCount(distinct.size);
+
+      // 맨 위 '오늘 환자 복귀 마감' 카드: 머리 바로 아래, 알림 스위치보다 앞. 아직 지나지 않은 가장 가까운 마감 = 첫 '예정' 줄
+      const card = g.locator('a.guardian-today');
+      await expect(card).toHaveCount(1);
+      await expect(card.getByRole('heading', { name: '오늘 환자 복귀 마감' })).toBeVisible();
+      await expect(card).toContainText(`${second}까지`);
+      await expect(card).toContainText('예정');
+      await expect(card).toContainText(`오늘 마감 ${distinct.size}건`);
+      const firstUpcoming = todayDay.locator('.guardian-return').filter({ hasText: '예정' }).first();
+      expect(await card.locator('.guardian-today-time time').innerText()).toBe(await firstUpcoming.locator('.guardian-return-time time').innerText());
+      expect((await card.boundingBox()).y).toBeLessThan(toggleBox.y);
+      expect((await card.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      await expect(card).toHaveAttribute('href', `#guardian-day-${today}`);
+
+      // 오늘은 맨 앞에 펼쳐 두고, 다른 날짜는 접혀 있다가 누르면 펼쳐진다
+      await expect(todayDay).toHaveAttribute('aria-labelledby', `guardian-day-${today}`);
+      await expect(todayDay.locator('details')).toHaveCount(0);
+      const folded = g.locator('.guardian-day.is-folded');
+      expect(await folded.count(), '사본에 오늘 말고 다른 날짜가 있어야 한다').toBeGreaterThan(0);
+      const firstFold = folded.first().locator('details');
+      await expect(firstFold).not.toHaveAttribute('open', /.*/);
+      await expect(folded.first().getByRole('heading', { name: '환자 복귀 마감' })).toBeHidden();
+      const summary = folded.first().locator('summary');
+      expect((await summary.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      await summary.click();
+      await expect(firstFold).toHaveAttribute('open', '');
+      await expect(folded.first().getByRole('heading', { name: '환자 복귀 마감' })).toBeVisible();
+
       await evidenceShot(g, 'overdue-03-guardian-copy', { fullPage: false });
-      await expectNoAxeViolations(g, '보호자 받은 일정(마감 지남·예정)');
+      await expectNoAxeViolations(g, '보호자 받은 일정(마감 지남·예정, 오늘 카드, 접힌 날짜 하나 펼침)');
       await g.setViewportSize({ width: 320, height: 700 });
       await expectNoHorizontalScroll(g, '보호자 받은 일정 320px');
       await g.setViewportSize({ width: 360, height: 780 });
@@ -230,6 +265,11 @@ test.describe('복귀 마감이 지난 외출', () => {
       await expect(upcomingRow.first()).toContainText('마감 지남');
       await expect(upcomingRow.first()).not.toContainText('예정');
       await expect(upcomingRow.first().locator('a[href="tel:119"]')).toBeVisible();
+      // 오늘 마감이 모두 지나면(시드는 11:00·21:00 둘) 카드는 가장 늦게 지난 마감을 '마감 지남'으로 보인다
+      if (bys.length === 2) {
+        await expect(card).toContainText(`${second}까지`);
+        await expect(card).toContainText('마감 지남');
+      }
       expectGuardClean(guardian.record, '보호자 기기: ');
     } finally {
       await guardian.context.close();

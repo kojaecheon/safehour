@@ -578,6 +578,19 @@ export const messages = {
     ja: '{time}まで',
     zh: '{time}前',
   },
+  // 받은 일정 맨 위 '오늘 환자 복귀 마감' 카드 (사용성 점검 D3). 아래 날짜별 줄의 값을 다시 보여 줄 뿐이다
+  'guardian.todayReturnTitle': {
+    ko: '오늘 환자 복귀 마감',
+    en: "Patient's return deadline today",
+    ja: '今日の患者の戻り期限',
+    zh: '今天患者返回截止时间',
+  },
+  'guardian.todayReturnMore': {
+    ko: '오늘 마감 {count}건, 아래 오늘 일정에서 모두 볼 수 있어요',
+    en: '{count} deadlines today. See them all in today\'s schedule below',
+    ja: '今日の期限は{count}件。下の今日の予定ですべて確認できます',
+    zh: '今天共有{count}个截止时间，可在下方今天的日程中查看全部',
+  },
   'guardian.noPatientOutings': {
     ko: '이날은 환자 외출 일정이 없어요.',
     en: 'No outings planned for the patient this day.',

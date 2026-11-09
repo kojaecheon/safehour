@@ -234,10 +234,13 @@ test.describe('③층 보호자 링크 열기', () => {
     expect((await styles(call119.locator('svg'), ['color']))['color']).toBe('rgb(200, 16, 46)');
     expect((await styles(call1330.locator('svg'), ['color']))['color']).toBe('rgb(26, 28, 32)');
 
-    const returnTime = page.locator('.guardian-return-time').first();
+    // 오늘이 아닌 날짜는 접혀 있다(사용성 점검 D3): 마감 줄이 있는 첫 날짜가 접혀 있으면 펼친 뒤 본다
+    const dayWithReturn = page.locator('.guardian-day').filter({ has: page.locator('.guardian-return-time') }).first();
+    if (await dayWithReturn.evaluate((el) => el.classList.contains('is-folded'))) await dayWithReturn.locator('summary').click();
+    const returnTime = dayWithReturn.locator('.guardian-return-time').first();
     await expect(returnTime).toBeVisible();
     expect((await styles(returnTime, ['color']))['color']).toBe('rgb(26, 28, 32)');
-    expect((await styles(page.locator('.guardian-return').first(), ['border-top-left-radius']))['border-top-left-radius']).toBe('10px');
+    expect((await styles(dayWithReturn.locator('.guardian-return').first(), ['border-top-left-radius']))['border-top-left-radius']).toBe('10px');
   });
 
   test('동행이 필요한 날: 동행 안내는 띠 없는 분홍 Callout, 두 언어가 함께 보인다', async ({ page }) => {
