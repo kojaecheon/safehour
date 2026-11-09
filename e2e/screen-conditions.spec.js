@@ -491,7 +491,8 @@ test.describe('③층 조건 화면, 편집기', () => {
     for (const button of await page.locator('.conditions-group-none').all()) await button.click();
     await page.getByRole('button', { name: '저장', exact: true }).click();
     await expect(page).toHaveURL(/\/today$/);
-    await expect(page.getByText('일정을 만들지 못했어요', { exact: false })).toBeVisible({ timeout: 30_000 });
+    // 503 `{ ok:false }`(오류 코드 HTTP_503)는 일정 계산 실패 문구 하나로 보인다(usability C1, noPlanBodyKey)
+    await expect(page.getByText('일정을 계산하지 못했어요', { exact: false })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('첫 일정을 만들었어요.')).toHaveCount(0);
 
     await page.unroute('**/api/itinerary/plan');
