@@ -15,8 +15,8 @@ import { useLang } from '@/components/LanguageProvider.js';
 import { Button, EmptyState, TopBar, useStoreStatus } from '@/components/ui/index.js';
 import { READ_ONLY_REASON, getStore } from '@/lib/store/index.js';
 import { GUARDIAN_ERROR, GuardianError, isValidPin, unlockSnapshot } from '@/src/guardian/index.js';
-import { parseInstantMs } from '@/src/stay/index.js';
 import { copyIdFor, guardianErrorView } from './errorView.js';
+import { MAX_TIMER_MS, guardianExpiryDelay } from './expiry.js';
 import AlertsToggle from './AlertsToggle.js';
 import { ErrorText, WarningNote } from './Feedback.js';
 import GuardianCopyView, { kstStamp } from './GuardianCopyView.js';
@@ -30,7 +30,6 @@ import {
 } from './hooks.js';
 
 const LOGIN_HREF = `/login?returnTo=${encodeURIComponent('/g')}`;
-const MAX_TIMER_MS = 2 ** 31 - 1;
 const readCopies = (store) => store.readGuardianCopies();
 const NO_COPIES = Object.freeze([]);
 /** 더 이상 쓸 수 없는 링크 — 임시 보관을 지운다 */
@@ -42,10 +41,9 @@ const onlyDigits = (value) => value.replace(/[^0-9]/g, '').slice(0, 6);
 function useExpiryTick(copies) {
   const [, setTick] = useState(0);
   useEffect(() => {
-    const times = (copies ?? []).map((c) => parseInstantMs(c.expiresAt)).filter((ms) => ms !== null);
-    if (times.length === 0) return undefined;
-    const delay = Math.min(...times) - Date.now();
-    const timer = window.setTimeout(() => setTick((n) => n + 1), Math.min(Math.max(delay + 1000, 1000), MAX_TIMER_MS));
+    const delay = guardianExpiryDelay(copies ?? [], Date.now());
+    if (delay === null) return undefined;
+    const timer = window.setTimeout(() => setTick((n) => n + 1), delay);
     return () => window.clearTimeout(timer);
   }, [copies]);
 }

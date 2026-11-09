@@ -5,7 +5,7 @@
 //   const stay = useStay();                    // 체류(없으면 null)
 //   const { today } = useTodayTomorrow() ?? {}; // 오늘·내일(KST) 하루 일정
 //   const prefs = usePrefs();                  // { lang, notifications, dailyCheck }
-//   const received = useHasGuardianCopies();   // 이 기기에 만료 전 보호자 사본이 있는가(오늘·더보기)
+//   const received = useHasGuardianCopies();   // 이 기기에 만료 전 보호자 사본이 있는가(오늘·더보기). 만료 시각이 지나면 화면을 연 채로도 false 가 된다
 //
 // - **읽기만 한다.** 로그인 만료·오프라인에서도 이 기기에 마지막으로 로그인한 계정의 사본을 읽는다
 //   (저장소가 보기 전용에서 읽을 계정을 정한다). 네트워크를 쓰지 않는다.
@@ -15,6 +15,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { getStore } from '@/lib/store/index.js';
+import { guardianExpiryDelay } from '@/components/guardian/expiry.js';
 
 function subscriber(topics) {
   return (onChange) => {
@@ -27,7 +28,38 @@ function subscriber(topics) {
 const subscribeStay = subscriber(['stay']);
 const subscribeTripPlan = subscriber(['tripPlan']);
 const subscribePrefs = subscriber(['prefs']);
-const subscribeGuardianCopies = subscriber(['guardianCopies']);
+
+/**
+ * 보호자 사본 구독. 저장소는 만료 사본을 읽을 때 치우기만 하고 알리지 않으므로(리뷰 M2), 가장 이른 만료 시각 1초 뒤에
+ * 한 번 더 알려 다시 읽게 한다. 저장소가 알릴 때마다 타이머를 다시 잡고, 구독을 끊으면 지운다.
+ */
+function subscribeGuardianCopies(onChange) {
+  const store = getStore();
+  let timer = null;
+  const clear = () => {
+    if (timer !== null) window.clearTimeout(timer);
+    timer = null;
+  };
+  const schedule = () => {
+    clear();
+    const delay = guardianExpiryDelay(store.readGuardianCopies(), Date.now());
+    if (delay === null) return;
+    timer = window.setTimeout(() => {
+      timer = null;
+      onChange();
+      schedule();
+    }, delay);
+  };
+  const off = store.subscribe('guardianCopies', () => {
+    schedule();
+    onChange();
+  });
+  schedule();
+  return () => {
+    off();
+    clear();
+  };
+}
 
 const readStay = () => getStore().readStay();
 const readTodayTomorrow = () => getStore().readTodayTomorrow();

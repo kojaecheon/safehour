@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 
 import { moreMenuGroups } from '../components/settings/moreMenu.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
+import { guardianExpiryDelay, MAX_TIMER_MS } from '../components/guardian/expiry.js';
 
 describe('moreMenuGroups: 더보기 메뉴 묶음', () => {
   test('보호자 사본이 없으면 도구 5행, 정보 2행 그대로다', () => {
@@ -47,5 +48,32 @@ describe('moreMenuGroups: 더보기 메뉴 묶음', () => {
         for (const lang of ['ko', 'en', 'ja', 'zh']) assert.ok(UI_TEXT[key]?.[lang], `${key}.${lang}`);
       }
     }
+  });
+});
+
+// 리뷰 M2: '받은 일정' 행·버튼은 마지막 사본이 만료되면 화면을 연 채로도 사라져야 한다.
+// 저장소는 읽을 때 만료 사본을 치우지만 알리지 않으므로, 훅이 가장 이른 만료 시각에 한 번 다시 읽는다.
+
+describe('guardianExpiryDelay: 가장 이른 사본 만료까지 기다릴 시간', () => {
+  const now = Date.parse('2026-11-09T10:00:00+09:00');
+
+  test('가장 이른 만료 시각 + 1초', () => {
+    const copies = [{ expiresAt: '2026-11-09T12:00:00+09:00' }, { expiresAt: '2026-11-09T11:00:00+09:00' }];
+    assert.equal(guardianExpiryDelay(copies, now), 60 * 60 * 1000 + 1000);
+  });
+
+  test('이미 지난 만료는 1초 뒤(바로 다시 읽어 치운다)', () => {
+    assert.equal(guardianExpiryDelay([{ expiresAt: '2026-11-09T09:00:00+09:00' }], now), 1000);
+  });
+
+  test('타이머 상한을 넘지 않는다', () => {
+    assert.equal(guardianExpiryDelay([{ expiresAt: '2027-12-31T00:00:00+09:00' }], now), MAX_TIMER_MS);
+  });
+
+  test('사본이 없거나 만료 시각을 읽을 수 없으면 null (타이머 없음)', () => {
+    assert.equal(guardianExpiryDelay([], now), null);
+    assert.equal(guardianExpiryDelay(undefined, now), null);
+    assert.equal(guardianExpiryDelay([{ expiresAt: 'x' }, {}], now), null);
+    assert.equal(guardianExpiryDelay([{ expiresAt: '2026-11-09T11:00:00+09:00' }], NaN), null);
   });
 });
