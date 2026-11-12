@@ -180,6 +180,45 @@ describe('규칙 9 — 외출 불가(REST_DAY)', () => {
     assertSlaHolds(day, { recovery: false });
   });
 
+  test('보호자 외출은 환자 조건 값과 무관하다: 보행·이동 한도, 자외선·열·물, 식이, 금식이 가장 엄격해도 같은 외출이 나온다', () => {
+    // docs/business-rules.md '하루 일정 생성': 보호자 외출에는 환자 조건을 적용하지 않는다(guardianGateCondition 은 빈 조건,
+    // 조립 단계의 보행·이동 한도와 금식 시각도 보호자에게는 없다). 환자가 쉬는 날(외출 불가)의 보호자 외출을 견준다
+    const candidates = basics();
+    const lenient = plan(restrictedStay({ outing: 'FORBIDDEN' }), '2026-10-05', { candidates });
+    const strict = plan(
+      restrictedStay({
+        outing: 'FORBIDDEN',
+        walkLimit: SET(5),
+        travelLimit: SET(5),
+        avoidUv: SET(true),
+        avoidHeat: SET(true),
+        avoidWater: SET(true),
+        mealRestriction: SET({ mode: 'ALL_DAY' }),
+        diet: { spicy: SET(true), alcohol: SET(true), hard: SET(true), hot: SET(true), raw: SET(true) },
+      }),
+      '2026-10-05',
+      { candidates },
+    );
+    assert.equal(strict.coverage, 'REST_DAY');
+    assert.equal(strict.outings.length, 0);
+    assert.ok(lenient.guardianOutings.length > 0, '견줄 보호자 외출이 있어야 한다');
+    const shape = (day) =>
+      day.guardianOutings.map((o) => ({
+        departAt: o.departAt,
+        returnBy: o.returnBy,
+        stops: o.stops.map((x) => [x.contentId, x.arriveAt, x.leaveAt]),
+      }));
+    assert.deepEqual(shape(strict), shape(lenient));
+    assert.ok(allStops(lenient).length > 0);
+    // 같은 조건이 환자에게는 실제로 걸린다(외출이 허용된 날에도 환자 외출이 없다). 그래서 위 비교가 뜻이 있다
+    const patientUnderStrict = plan(
+      restrictedStay({ walkLimit: SET(5), travelLimit: SET(5), avoidUv: SET(true), mealRestriction: SET({ mode: 'ALL_DAY' }) }),
+      '2026-10-05',
+      { candidates },
+    );
+    assert.equal(patientUnderStrict.outings.length, 0);
+  });
+
   test('곁을 지켜야 하면 보호자 외출도 없고 NO_TOURISM', () => {
     const s = restrictedStay({ outing: 'FORBIDDEN', guardianMustStay: SET(true) });
     const day = plan(s, '2026-10-05', { candidates: basics() });
