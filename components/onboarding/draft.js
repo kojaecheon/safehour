@@ -33,7 +33,7 @@ export const STEP_LABEL_KEY = Object.freeze({
   preferences: 'onboarding.stepPreferences',
 });
 
-/** 병원 전화(선택): 숫자·+·-·괄호·띄어쓰기만. 긴급 연락 화면의 전화 걸기 링크가 된다(docs/platform/IA_AND_FLOWS.md '고정 요소') */
+/** 병원 전화(선택): 숫자·+·-·괄호·띄어쓰기만. 긴급 연락 화면의 전화 걸기 링크가 된다(docs/decisions/0010-map-links-emergency-notifications.md '긴급 연락') */
 export const PHONE_MAX_LENGTH = 20;
 export const PHONE_PATTERN = /^[0-9+\-() ]{3,20}$/;
 

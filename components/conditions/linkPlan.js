@@ -5,7 +5,7 @@
 //
 // - 변환은 src/recovery/link.js 의 planToStayParts(지침, 연결 병원 id) 가 한다. 연결 병원이 정해진 뒤에만 부른다.
 //   병원 복귀 항목의 hospitalId 가 연결 병원 id 로 채워진다(docs/contracts.md '`POST /api/plan/link`'). 기간은 잘라내지 않는다(docs/business-rules.md '병원 연동').
-// - 병원 일정은 연결 병원의 일정으로 더하되, **같은 날짜·시각·유형**의 일정이 이미 있으면 중복으로 보고 건너뛴다(docs/business-rules.md '병원 연동').
+// - 병원 일정은 연결 병원의 일정으로 더하되, **같은 날짜·시각·유형**의 일정이 이미 있으면 중복으로 보고 건너뛴다(docs/platform/IA_AND_FLOWS.md '병원 연동(데모)').
 // - 연결 사본(LinkedPlan)은 toLinkedPlan 으로 만든다 — 안내문의 acknowledged 는 버리고, 확인 기록 정본은
 //   `${id}@${updatedAt}` 키 지도다. 처음 연결하면 비어 있다(docs/business-rules.md '병원 연동').
 // - 안내문(채널 B) 문장은 읽지도 바꾸지도 않는다. 분류·id·updatedAt 만 본다.
@@ -71,7 +71,7 @@ function slotKey(appointment) {
 }
 
 /**
- * 병원 일정 합치기: 같은 날짜·시각(시작)·유형이 이미 있으면 건너뛴다(docs/business-rules.md '병원 연동').
+ * 병원 일정 합치기: 같은 날짜·시각(시작)·유형이 이미 있으면 건너뛴다(docs/platform/IA_AND_FLOWS.md '병원 연동(데모)').
  * 입력 배열은 바꾸지 않는다.
  * @template T
  * @param {T[]} existing

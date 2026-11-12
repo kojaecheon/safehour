@@ -15,7 +15,7 @@
 
 import { COVERAGE, DIET_KEYS, classifyDate, isStayDate, lodgingForDate } from '../../src/stay/index.js';
 
-/** 식이 카드 줄 순서: 옛 설계서의 예시 순서 그대로다(지금 문서에는 문장 목록이 없다) */
+/** 식이 카드 줄 순서: 옛 설계서의 예시 순서 그대로다(지금 문서에는 카드 줄 순서를 정한 곳이 없고, 조건 항목의 식이 순서와 같다) */
 export const DIET_ORDER = Object.freeze(['spicy', 'alcohol', 'hard', 'hot', 'raw']);
 
 /** 식이 카드 상태 */

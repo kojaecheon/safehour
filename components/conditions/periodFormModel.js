@@ -92,7 +92,7 @@ export function emptyMedicationRow() {
 }
 
 /**
- * 병원 복귀의 병원 id: 고른 값이 있으면 그 값, 등록 병원이 하나면 자동으로 그 병원 (docs/business-rules.md '조건 기간').
+ * 병원 복귀의 병원 id: 고른 값이 있으면 그 값, 등록 병원이 하나면 자동으로 그 병원 (docs/platform/ITINERARY_RULES.md '본인 체크 항목'의 복귀 시각 행).
  * @param {{place?: string, hospitalId?: string}} returnTime
  * @param {Array<{id: string}>} hospitals
  */
