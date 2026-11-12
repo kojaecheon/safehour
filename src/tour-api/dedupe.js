@@ -73,7 +73,7 @@ function richer(a, b, languageNeutral) {
  *
  * @param {object[]} candidates
  * @param {{languageNeutral?: boolean}} [options]
- *   languageNeutral — 표시 언어와 무관하게 같은 후보를 남긴다(spec 4.17, 규칙 27).
+ *   languageNeutral: 표시 언어와 무관하게 같은 후보를 남긴다(docs/business-rules.md '언어'·'전체 일정 확정과 변화 대응').
  *   국문 제목으로 비교하고, 남길 쪽은 사진 유무와 순서(거리순)로만 고른다.
  *   영문 원문 우선(기존 기본 동작)은 영문을 조회했는지에 따라 남는 contentId 가 달라지므로
  *   언어를 받는 전체 일정 경로에서는 쓰지 않는다.

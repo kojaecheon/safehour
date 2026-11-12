@@ -3,11 +3,11 @@
 // 형식과 쓰기 규칙은 ./index.js 머리 주석을 따른다. 새 키는 `cards.` 으로 시작한다.
 // ja·zh: 검수 전 번역 — 사람 검수 필요
 //
-// ── 카드 문장 (spec 4.12) ──
+// ── 카드 문장 (docs/business-rules.md '알림과 카드') ──
 //   `cards.diet*`·`cards.moveKo`·`cards.returnKo`·`cards.hospitalKo` 의 **ko 값이 카드에 크게 보이는 고정 한국어 문장**이다.
 //   AI 로 만들지 않고, 사람이 검수한다(docs/platform/HUMAN_ACTIONS.md 4번 — 의료진 검토 전 임시 문구).
 //   en·ja·zh 값은 그 문장을 사용자에게 알려 주는 설명이다(카드 아래 작은 글씨).
-//   식이 문장 다섯 개는 spec 4.12 표의 예시 문장 그대로다.
+//   식이 문장 다섯 개는 docs/business-rules.md '알림과 카드' 표의 예시 문장 그대로다.
 
 /** 일반 화면 문구 — 'cards.키': { ko, en, ja, zh } */
 export const messages = {

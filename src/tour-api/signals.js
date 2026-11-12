@@ -1,11 +1,11 @@
-// 관광 후보 분류 신호 (spec 4.8 / AX-305)
+// 관광 후보 분류 신호 (docs/business-rules.md '장소 후보와 필터' / AX-305)
 //
 // 이 모듈은 **판정하지 않는다.** 엔진(T6a)이 게이트에 쓸 신호만 만든다.
 //
 //   - 신호는 SafeHour 추정값이다. 관광공사 원문(sourceMetadata)과 섞지 않고 `signals` 에 둔다.
 //   - 입력은 언어와 무관한 것만 쓴다: 국문 제목, 국문 유형 코드, 분류체계 코드, 국문 메뉴 원문.
-//     표시 언어의 제목을 쓰면 같은 장소가 언어마다 다르게 판정된다(spec 4.17, 규칙 27).
-//   - 불확실하면 null 이다. 모르는 것을 '아님(false)'으로 바꾸지 않는다(spec 9.1).
+//     표시 언어의 제목을 쓰면 같은 장소가 언어마다 다르게 판정된다(docs/business-rules.md '언어'·'장소 후보와 필터').
+//   - 불확실하면 null 이다. 모르는 것을 '아님(false)'으로 바꾸지 않는다(docs/platform/PRODUCT_DEFINITION_V3.md '유지하는 것').
 //
 // 신호 의미
 //   isFoodPlace   국문 유형 39(음식점). 식이 신호는 이 값이 true 일 때만 뜻이 있다.
@@ -13,7 +13,7 @@
 //                 음식점 아님 false
 //   isBar         분류체계 FD04(주점) true · 다른 음식 분류 false · 분류 없음이면 이름 단서 true, 없으면 null ·
 //                 음식점 아님 false
-//   heatExposure  열 노출 단서 있음 true, 없으면 false (spec 4.8: 단서가 없으면 노출 없음)
+//   heatExposure  열 노출 단서 있음 true, 없으면 false (docs/business-rules.md '장소 후보와 필터': 단서가 없으면 노출 없음)
 //   waterActivity 물 활동 단서 있음 true, 없으면 false
 //   spicy / raw   단서 있음 true · 카페 유형이거나 메뉴 원문에 단서가 없음 false · 판단할 근거 없음 null ·
 //                 음식점 아님 null (적용 대상 아님)
@@ -128,7 +128,7 @@ function dietSignal({ isFoodPlace, isCafe, hasMenuInfo, texts, cues, classificat
   const hits = textEvidence(texts, cues);
   if (hits.length > 0) return { value: true, evidence: hits };
 
-  // spec 4.8: 카페·전통찻집 유형은 '매운 음식·날음식 아님' 단서로 본다.
+  // docs/business-rules.md '장소 후보와 필터': 카페·전통찻집 유형은 '매운 음식·날음식 아님' 단서로 본다.
   if (isCafe === true) {
     return { value: false, evidence: [{ field: "lclsSystm2", cue: classification.lclsSystm2 }] };
   }

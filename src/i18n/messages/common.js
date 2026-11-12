@@ -73,7 +73,7 @@ export const messages = {
   'common.close': { ko: '닫기', en: 'Close', ja: '閉じる', zh: '关闭' },
   'common.today': { ko: '오늘', en: 'Today', ja: '本日', zh: '今日' },
 
-  // ── 배지 5종 (spec 7장) — 모양·아이콘·문구로 구분한다 ──
+  // ── 배지 5종 (docs/platform/DESIGN_SYSTEM.md '배지 5종 (`Badge`)'): 모양·아이콘·문구로 구분한다 ──
   'common.badgeEstimate': { ko: '추정', en: 'Estimate', ja: '推定', zh: '估算' },
   'common.badgeDefaulted': {
     ko: '기본값 적용',
@@ -90,7 +90,7 @@ export const messages = {
   'common.badgeDemo': { ko: '병원 연동 데모', en: 'Hospital link demo', ja: '病院連携デモ', zh: '医院对接演示' },
   'common.badgeReadOnly': { ko: '보기 전용', en: 'View only', ja: '閲覧のみ', zh: '仅供查看' },
 
-  // ── 출처 영역 5종 (spec 7장) — 병원 발행 / 본인 체크 / SafeHour 판정·추정 / 관광공사 원문 / AI 소개 ──
+  // ── 출처 영역 5종 (docs/platform/DESIGN_SYSTEM.md '출처 영역 5종 (`SourceArea` · `SourceTag`)'): 병원 발행 / 본인 체크 / SafeHour 판정·추정 / 관광공사 원문 / AI 소개 ──
   'common.sourceHospital': { ko: '병원 발행', en: 'Issued by hospital', ja: '病院が発行', zh: '医院发布' },
   'common.sourceSelf': { ko: '본인 체크', en: 'Your self-check', ja: '本人チェック', zh: '本人填写' },
   'common.sourceEstimate': {
@@ -107,7 +107,7 @@ export const messages = {
   },
   'common.sourceAi': { ko: 'AI 소개', en: 'AI introduction', ja: 'AIによる紹介', zh: 'AI 介绍' },
 
-  // ── 예 / 아니오 / 모르겠음 입력 (spec 4.4) ──
+  // ── 예 / 아니오 / 모르겠음 입력 (docs/business-rules.md '조건 기간') ──
   'common.answerYes': { ko: '예', en: 'Yes', ja: 'はい', zh: '是' },
   'common.answerNo': { ko: '아니오', en: 'No', ja: 'いいえ', zh: '否' },
   'common.answerUnknown': { ko: '모르겠음', en: 'Not sure', ja: 'わからない', zh: '不确定' },
@@ -141,7 +141,7 @@ export const messages = {
   'common.legTaxi': { ko: '택시 {n}분', en: 'Taxi {n} min', ja: 'タクシー{n}分', zh: '出租车{n}分钟' },
   'common.legTransit': { ko: '대중교통 {n}분', en: 'Transit {n} min', ja: '公共交通{n}分', zh: '公共交通{n}分钟' },
 
-  // ── 식사 칸 (spec 4.7) — '추천 장소 없음'은 정상 결과다 ──
+  // ── 식사 칸 (docs/business-rules.md '하루 일정 생성'의 식사 칸 문단): '추천 장소 없음'은 정상 결과다 ──
   'common.mealLunch': { ko: '점심', en: 'Lunch', ja: '昼食', zh: '午餐' },
   'common.mealDinner': { ko: '저녁', en: 'Dinner', ja: '夕食', zh: '晚餐' },
   'common.mealNone': {
@@ -175,7 +175,7 @@ export const messages = {
   'common.categoryLodging': { ko: '숙소', en: 'Stay', ja: '宿泊', zh: '住宿' },
   'common.categoryOther': { ko: '기타', en: 'Other', ja: 'その他の場所', zh: '其他' },
 
-  // ── 한국어 안내 카드 틀 (spec 4.12) ──
+  // ── 한국어 안내 카드 틀 (docs/business-rules.md '알림과 카드') ──
   'common.showThisCard': {
     ko: '직원에게 이 화면을 보여 주세요',
     en: 'Show this screen to the staff',

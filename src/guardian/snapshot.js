@@ -1,7 +1,7 @@
-// 보호자 스냅샷 — 허용 목록 조립 (AX-313 · spec 4.11, 5.4, 규칙 37)
+// 보호자 스냅샷: 허용 목록 조립 (AX-313 · docs/business-rules.md '보호자')
 //
 // 스냅샷은 **허용 목록으로만** 만든다. 입력 객체를 펼치거나(`...`) 통째로 복사하지 않고,
-// spec 5.4 의 필드를 하나씩 골라 형식을 확인한 값만 옮긴다. 그래서 체류·일정에 무엇이 들어 있든
+// docs/business-rules.md '보호자'의 담는 것 필드를 하나씩 골라 형식을 확인한 값만 옮긴다. 그래서 체류·일정에 무엇이 들어 있든
 // (조건 항목 세부, 병원 이름·주소·전화, 병원 안내문, 병원 일정, 마감 이유, 이미지, 내부 id)
 // 스냅샷에 들어갈 길이 없다.
 //
@@ -20,11 +20,11 @@ import { DEFAULTS, KST_OFFSET_MIN, addDays, isClockTime, isDateString, lodgingFo
 import { GUARDIAN_ERROR, GuardianError } from './errors.js';
 
 export const GUARDIAN_SNAPSHOT_VERSION = 1;
-/** 긴급 번호 — 스냅샷 입력과 무관하게 항상 이 값이다 (spec 4.11, 4.15) */
+/** 긴급 번호: 스냅샷 입력과 무관하게 항상 이 값이다 (docs/business-rules.md '보호자', docs/platform/IA_AND_FLOWS.md '고정 요소') */
 export const EMERGENCY_NUMBERS = Object.freeze(['119', '1330']);
 /** 병원 복귀 장소의 일반 라벨. 화면이 사용자 언어로 바꿔 보여 준다 */
 export const HOSPITAL_RETURN_LABEL = '병원';
-/** 스냅샷 언어 (spec 4.17) */
+/** 스냅샷 언어 (docs/business-rules.md '언어') */
 export const GUARDIAN_LANGS = Object.freeze(['ko', 'en', 'ja', 'zh']);
 /** 만료 = 출국일의 이 시각(KST) */
 const EXPIRES_AT_CLOCK = '23:59';
@@ -50,7 +50,7 @@ function windowFilter(dates, createdDate) {
 }
 
 /**
- * @typedef {object} GuardianStop  spec 5.2 Stop 에서 보호자에게 필요한 것만 남긴 것.
+ * @typedef {object} GuardianStop  Stop(docs/contracts.md '`POST /api/itinerary/plan`')에서 보호자에게 필요한 것만 남긴 것.
  *   내부 id·이미지·라벨(식이 신호 DIET_ESTIMATED·ORDER_CARD 포함)·이동·보행·실내·식사 표시는 옮기지 않는다
  * @property {string|null} title    표시 언어 이름
  * @property {string|null} address  표시 언어 주소
@@ -63,7 +63,7 @@ function windowFilter(dates, createdDate) {
  */
 
 /**
- * @typedef {object} GuardianOuting  spec 5.2 Outing 에서 deadlineReason 을 뺀 것.
+ * @typedef {object} GuardianOuting  Outing(src/engine/dayPlan.js)에서 deadlineReason 을 뺀 것.
  *   id 는 입력 id 를 옮기지 않고 `${date}:G:${순번}` 으로 새로 만든다
  * @property {string} id
  * @property {string|null} departAt
@@ -77,7 +77,7 @@ function windowFilter(dates, createdDate) {
  */
 
 /**
- * @typedef {object} GuardianSnapshot  spec 5.4
+ * @typedef {object} GuardianSnapshot  docs/business-rules.md '보호자'(담는 것·담지 않는 것)
  * @property {1} v
  * @property {string} createdAt  ISO8601 (KST 표기)
  * @property {string} expiresAt  출국일 23:59 KST
@@ -197,7 +197,7 @@ function finishDay({ date, escortRequired, guardianSoloAllowed, patientReturn, g
  * - 'NONE'(아니오) → 제한 없음
  * - 'SET'(예), 알 수 없는 값 → 제한
  * - 항목 자체가 없음: 적용 기간이 없는 `FREE` 날이면 제한 없음, 그 밖(`NEEDS_INPUT`, 일정 없음 등)은 제한
- *   — 모르는 것을 허용으로 바꾸지 않는다(spec 9.1, 4.4 '모르겠음' 기본값과 같은 방향)
+ *   모르는 것을 허용으로 바꾸지 않는다(docs/platform/PRODUCT_DEFINITION_V3.md '유지하는 것', docs/business-rules.md '조건 기간'의 '모르겠음' 기본값과 같은 방향)
  */
 function restrictionFlag(dayPlan, key) {
   const entry = isObject(dayPlan?.effective) ? dayPlan.effective[key] : undefined;
@@ -226,7 +226,7 @@ function buildDay(stay, date, dayPlan) {
   return finishDay({
     date,
     escortRequired,
-    // spec 4.7 보호자 일정 조건 중 조건 쪽 세 가지: 동반 보호자 있음, 곁을 지킬 필요 없음, 동행 필수 아님
+    // docs/business-rules.md '하루 일정 생성'의 보호자 단독 외출 조건 중 조건 쪽 세 가지: 동반 보호자 있음, 곁을 지킬 필요 없음, 동행 필수 아님
     guardianSoloAllowed: stay.hasCompanion === true && !escortRequired && !guardianMustStay,
     patientReturn: listOf(dayPlan?.outings).map((o) => ({ by: o.returnBy, ...returnPlaceOf(o.returnPlace, lodging) })),
     guardianOutings: dayPlan?.guardianOutings,
@@ -234,7 +234,7 @@ function buildDay(stay, date, dayPlan) {
 }
 
 /**
- * 체류와 전체 일정으로 보호자 스냅샷을 만든다 (spec 4.11, 5.4).
+ * 체류와 전체 일정으로 보호자 스냅샷을 만든다 (docs/business-rules.md '보호자').
  *
  * - 날짜: 만든 날(`now` 의 KST 날짜)과 입국일 중 늦은 날부터 7일(출국일에서 멈춤). 입국 전 집에서 만들면
  *   입국일부터 7일이다.
@@ -245,7 +245,7 @@ function buildDay(stay, date, dayPlan) {
  *
  * @param {object} args
  * @param {import('../stay/stay.js').Stay} args.stay
- * @param {{lang?: string, days: Record<string, object>}} args.tripPlan  spec 5.1 TripPlan
+ * @param {{lang?: string, days: Record<string, object>}} args.tripPlan  TripPlan(docs/security.md '기기 저장소와 계정 이름공간')
  * @param {Date|number|string} [args.now]  만든 시각. 없으면 지금
  * @param {'ko'|'en'|'ja'|'zh'} [args.lang]  없으면 tripPlan.lang
  * @returns {GuardianSnapshot}
@@ -347,7 +347,7 @@ export function guardianCoverage(snapshot) {
 }
 
 /**
- * 만료됐는가 (spec 4.11: 만료 시각이 지나면 표시하지 않고 삭제한다).
+ * 만료됐는가 (docs/business-rules.md '보호자': 만료 시각이 지나면 표시하지 않고 삭제한다).
  * 만료 시각 **그 순간부터** 만료다. 만료 시각을 읽을 수 없으면 만료로 본다(보여 주지 않는 쪽).
  * @param {{expiresAt?: string} | null | undefined} snapshot
  * @param {Date|number|string} [now]  없으면 지금

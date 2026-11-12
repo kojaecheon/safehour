@@ -1,9 +1,9 @@
-// UTM-K(GRS80) ↔ 위경도 변환 — 라이브러리 없이 직접 구현 (AX-310 · spec 6장 · 규칙 45)
+// UTM-K(GRS80) ↔ 위경도 변환: 라이브러리 없이 직접 구현 (AX-310 · docs/contracts.md '`POST /api/address/search`' · src/adapters/AGENTS.md '테스트')
 //
 // 행정안전부 좌표제공 API 의 entX·entY 는 UTM-K(GRS80) 좌표다. 서버에서 위경도로 바꿔 돌려준다.
-// 새 패키지를 설치하지 않는다(handoff 3장 2). 그래서 역 횡메르카토르 투영을 여기서 계산한다.
+// 새 패키지를 설치하지 않는다(docs/standards.md '의존성'). 그래서 역 횡메르카토르 투영을 여기서 계산한다.
 //
-// 근거 (기억이 아니라 공식 문서로 확인한 것 — handoff 3장 10)
+// 근거 (기억이 아니라 공식 문서로 확인한 것, docs/standards.md '외부 API 형식')
 //   1) 좌표계: 도로명주소 도움센터(행정안전부) 공식 답변
 //      "좌표는 EPSG5179(UTM-K GRS80)좌표로 제공하고 있습니다." (2025-08-12)
 //      https://business.juso.go.kr/jsi/jsiInquiryDetails?qaPstUnqMgno=139182&qaPstRfrncMgno=139182
@@ -22,7 +22,7 @@
 //   3) 측지계: KGD2002 = ITRF2000 epoch 2002.0 (EPSG:6737).
 //      EPSG:15831 "KGD2002 to WGS 84 (1)" 은 이동량 0,0,0, 정확도 ±1 m 다.
 //      https://apps.epsg.org/api/v1/Transformation/15831/
-//      그래서 투영만 풀면 WGS84 위경도로 쓸 수 있다(1 m 수준 — 규칙 45 의 10 m 기준 안).
+//      그래서 투영만 풀면 WGS84 위경도로 쓸 수 있다(1 m 수준, src/adapters/AGENTS.md '테스트'의 10 m 기준 안).
 //   4) 공식: IOGP Publication 373-7-2 (Geomatics Guidance Note 7 part 2, 2019-09)
 //      Transverse Mercator "JHS formulas"(Krüger 급수, EPSG 권장) 정·역변환, 52–55쪽.
 //      https://www.iogp.org/wp-content/uploads/2019/09/373-07-02.pdf
@@ -45,7 +45,7 @@ export const UTMK = Object.freeze({
 });
 
 /**
- * 대한민국 범위 — spec 6장 "좌표는 대한민국 범위만 받는다".
+ * 대한민국 범위: docs/contracts.md '공통' "좌표는 대한민국 범위만 받는다".
  * 일정 API 의 좌표 범위 검사(`lib/server/itinerary-request.js` inKorea)와 같은 경계를 쓴다.
  */
 export function isInKorea(lat, lng) {

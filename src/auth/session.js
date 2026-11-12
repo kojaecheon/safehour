@@ -91,7 +91,7 @@ export function readSessionToken(token, secret, nowMs) {
   return { provider: payload.p, subject: payload.s, issuedAt: payload.iat, expiresAt: payload.exp };
 }
 
-// ── 불투명 계정 키 (AX-312 · spec 4.19 · ADR-0009) ─────────────────────
+// ── 불투명 계정 키 (AX-312 · docs/security.md '기기 저장소와 계정 이름공간' · ADR-0009) ─────────────────────
 //
 // 기기 저장소는 계정마다 이름공간(`safehour.v2.<accountKey>.*`)을 나눈다. 그 이름으로
 // 원래 식별자(provider + sub)를 쓰면 기기에 식별자가 남으므로, 서버 비밀값으로 유도한

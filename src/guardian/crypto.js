@@ -1,6 +1,6 @@
-// 보호자 스냅샷 PIN 암호화 (AX-313 · spec 4.11, 5.4)
+// 보호자 스냅샷 PIN 암호화 (AX-313 · docs/security.md '보호자 링크')
 //
-// 표준 브라우저 암호 기능(Web Crypto, `globalThis.crypto.subtle`)만 쓴다. 새 라이브러리는 없다(handoff 3장 2번).
+// 표준 브라우저 암호 기능(Web Crypto, `globalThis.crypto.subtle`)만 쓴다. 새 라이브러리는 없다(docs/standards.md '의존성').
 // Node 20+ 와 브라우저(보안 컨텍스트: https·localhost)에서 같은 코드로 동작한다.
 //
 // - 키 유도: PBKDF2-HMAC-SHA-256, 무작위 salt 16바이트, 반복 PBKDF2_ITERATIONS 회 → AES-GCM 256비트 키
@@ -8,7 +8,7 @@
 // - 암호문(링크의 # 뒤) = base64url( salt(16) | iv(12) | ciphertext+tag ), 패딩 없음
 // - 평문 = 형식 표지 1바이트 + (deflate-raw 로 압축한) 정규 JSON — encoding.js 참고
 //
-// 한계 — 화면에 밝힌다(spec 4.11): 6자리 PIN 은 경우의 수가 100만뿐이라, 암호문을 손에 넣은 사람이
+// 한계: 화면에 밝힌다(docs/security.md '보호자 링크'): 6자리 PIN 은 경우의 수가 100만뿐이라, 암호문을 손에 넣은 사람이
 // 기기 밖에서 전수 대입하면 풀 수 있다. 반복 횟수는 그 비용을 키울 뿐이다. 이 암호화는 **우연한 열람을 막는 수준**이며,
 // 기기 안의 5회 잠금(lockout.js)은 화면에서의 추측만 늦춘다. PIN 은 링크와 다른 경로로 알려야 한다.
 

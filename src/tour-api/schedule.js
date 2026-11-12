@@ -19,7 +19,7 @@
 // 어느 쪽도 확실하지 않으면 `closed: false` 를 돌려준다. 이것은 "열려 있다" 가
 // **아니라** "닫혔다는 근거가 없다" 는 뜻이다. 호출부는 이때 openNow 를 null 로 둔다.
 //
-// 판정 날짜는 두 가지로 받는다 (AX-305, spec 4.8 휴무 게이트).
+// 판정 날짜는 두 가지로 받는다 (AX-305, docs/business-rules.md '장소 후보와 필터'의 휴무 게이트).
 //   - readClosure(schedule, now)            — 지금 시각의 KST 날짜 (기존 '오늘' 판정)
 //   - readClosureOnDate(schedule, "YYYY-MM-DD") — 일정 날짜. 체류 전체 일정은 목록을 한 번 받아
 //                                             여러 날짜를 판정하므로 임의 날짜가 필요하다.
@@ -160,7 +160,7 @@ export function readClosure(schedule, now = new Date()) {
 }
 
 /**
- * 일정 날짜 기준으로 닫힘 근거를 읽는다 (spec 4.8 휴무 게이트, 규칙 26).
+ * 일정 날짜 기준으로 닫힘 근거를 읽는다 (docs/business-rules.md '장소 후보와 필터'의 휴무 게이트).
  *
  * @param {object} schedule  detailIntro2 의 운영·휴무 필드 모음
  * @param {string} date      일정 날짜 `YYYY-MM-DD` (또는 `YYYYMMDD`), KST 달력 날짜

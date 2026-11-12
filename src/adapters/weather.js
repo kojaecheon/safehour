@@ -173,7 +173,7 @@ export async function fetchKmaNowcast({
   }
 }
 
-// ── 기상청 단기예보 (VilageFcstInfoService_2.0/getVilageFcst) — AX-308 · spec 4.9 변화 원천 4, 6장 기상 ──
+// ── 기상청 단기예보 (VilageFcstInfoService_2.0/getVilageFcst): AX-308 · docs/platform/ITINERARY_RULES.md '변화 원천'(표의 4번 행), docs/contracts.md '`POST /api/itinerary/plan`' 기상 ──
 //
 // 일정 API 가 숙소 좌표의 오늘~모레 날짜별 '실외 부적합' 여부를 정한다.
 // 요청·응답 형식 근거 (2026-09-19 확인)
@@ -190,7 +190,7 @@ export async function fetchKmaNowcast({
 //               30~50mm "30.0~50.0mm", 50mm 이상 "50.0mm 이상"
 // 판정 기준은 위 WEATHER_THRESHOLD(초단기실황과 같은 값)를 시간별로 적용한다.
 // 실패·키 없음·자료 부족은 '확인 불가'(outdoorUnsafe: null)이며 판정에 반영하지 않는다 — 실외를 막지도, 허용 근거로 쓰지도 않는다.
-// 오류는 분류 코드만 돌려준다. 키·전체 조회 URL 은 반환값·로그에 남기지 않는다(spec 9.1).
+// 오류는 분류 코드만 돌려준다. 키·전체 조회 URL 은 반환값·로그에 남기지 않는다(docs/security.md '비밀값'·'기록').
 
 const KMA_VILAGE_FCST_URL =
   'https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst';

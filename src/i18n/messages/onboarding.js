@@ -5,9 +5,9 @@
 // ja·zh: 검수 전 번역 — 사람 검수 필요
 //
 // AX-314 에서 바꾼 것
-//   - 머리글에서 '안심'·'안전' 같은 보증 표현을 뺐다(spec 9.1 — 조건 통과와 안전은 다르다).
+//   - 머리글에서 '안심'·'안전' 같은 보증 표현을 뺐다(docs/business-rules.md '이 제품이 하지 않는 판단': 조건 통과와 안전은 다르다).
 //   - 고지 3종을 새 흐름(본인 체크 재도입·현재 위치 미사용·외출 없는 날)에 맞게 고쳤다.
-//   - 로그인은 '기기 저장을 계정별로 나누는 것'이라는 실제 동작대로 적었다(spec 4.18–4.19).
+//   - 로그인은 '기기 저장을 계정별로 나누는 것'이라는 실제 동작대로 적었다(docs/platform/IA_AND_FLOWS.md '보기 전용 상태', docs/security.md '인증'·'기기 저장소와 계정 이름공간').
 
 /** 일반 화면 문구 */
 export const messages = {
@@ -272,7 +272,7 @@ export const messages = {
     zh: '尚未确定住处的夜晚：{dates}。这些日期不会安排行程。',
   },
 
-  // ── 주소 검색 (spec 6장 — 사용자가 입력한 검색어로만) ──
+  // ── 주소 검색 (docs/contracts.md '`POST /api/address/search`': 사용자가 입력한 검색어로만) ──
   'onboarding.addressLabel': { ko: '주소', en: 'Address', ja: '住所', zh: '地址' },
   'onboarding.addressSearchLabel': {
     ko: '주소 검색',
@@ -557,7 +557,7 @@ export const messages = {
   },
   'onboarding.startNew': { ko: '체류 설정 시작', en: 'Set up a stay', ja: '滞在の設定を始める', zh: '开始设置停留信息' },
 
-  // ── 필드 오류 (validateStay 결과 → 필드별 문구 · 규칙 1–3) ──
+  // ── 필드 오류 (validateStay 결과 → 필드별 문구 · docs/business-rules.md '체류') ──
   'onboarding.errChoose': { ko: '하나를 골라 주세요.', en: 'Please choose one.', ja: 'いずれかを選んでください。', zh: '请选择一项。' },
   'onboarding.errDate': { ko: '날짜를 입력해 주세요.', en: 'Please enter a date.', ja: '日付を入力してください。', zh: '请输入日期。' },
   'onboarding.errTime': { ko: '시각을 입력해 주세요.', en: 'Please enter a time.', ja: '時刻を入力してください。', zh: '请输入时间。' },

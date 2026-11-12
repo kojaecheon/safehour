@@ -3,7 +3,7 @@
 // 형식과 쓰기 규칙은 ./index.js 머리 주석을 따른다.
 // 기존 키 접두사 `link.`·`guide.` 을 그대로 쓴다. 새 키는 `conditions.` 으로 시작한다.
 // 병원 안내문 원문(채널 B)은 번역 대상이 아니다 — 여기에는 라벨만 둔다.
-// 질문 문장은 spec 4.4 표를 그대로 옮겼다. 앱은 답을 해석하지 않는다.
+// 질문 문장은 docs/business-rules.md '조건 기간'의 항목 표를 그대로 옮겼다. 앱은 답을 해석하지 않는다.
 // 동의 문구는 '법무 검토 전' 초안이다(버전은 components/conditions/consent.js). 이 표시는 화면에 내지 않는다.
 // ja·zh: 검수 전 번역 — 사람 검수 필요
 
@@ -174,7 +174,7 @@ export const messages = {
     zh: '未能保存，请重试。',
   },
 
-  // 날짜 분류 (spec 4.5)
+  // 날짜 분류 (docs/business-rules.md '날짜 분류')
   'conditions.coverageFREE': { ko: '자유일', en: 'Free day', ja: '自由日', zh: '自由活动日' },
   'conditions.coverageDECLARED_FREE': {
     ko: '본인 체크: 제한 없음',
@@ -305,7 +305,7 @@ export const messages = {
     zh: '已全部作答',
   },
 
-  // 질문 (spec 4.4 표)
+  // 질문 (docs/business-rules.md '조건 기간'의 항목 표)
   'conditions.qOuting': { ko: '외출이 허용되나요?', en: 'Are you allowed to go out?', ja: '外出は許可されていますか？', zh: '是否允许外出？' },
   'conditions.outingALLOWED': { ko: '허용', en: 'Allowed', ja: '許可', zh: '允许' },
   'conditions.outingINDOOR_ONLY': { ko: '실내만', en: 'Indoors only', ja: '屋内のみ', zh: '仅限室内' },
@@ -432,7 +432,7 @@ export const messages = {
   'conditions.medRemove': { ko: '복약 시각 {n} 지우기', en: 'Remove medication time {n}', ja: '服薬時刻 {n} を削除', zh: '删除服药时间 {n}' },
   'conditions.medAdd': { ko: '복약 시각 추가', en: 'Add a medication time', ja: '服薬時刻を追加', zh: '添加服药时间' },
 
-  // 날짜별 합성 (spec 4.5)
+  // 날짜별 합성 (docs/business-rules.md '날짜별 합성')
   'conditions.dayTitle': { ko: '날짜별 적용 조건', en: 'Conditions by date', ja: '日付ごとの適用条件', zh: '按日期适用的条件' },
   'conditions.dayLead': {
     ko: '그날 적용되는 기간을 항목마다 가장 엄격한 값으로 합친 결과입니다. 항목 옆에 값의 출처를 표시합니다.',
@@ -769,7 +769,7 @@ export const messages = {
 
 /** 안전 문구 — 고지·사유 안내 문장. 화면은 선택 언어(ja·zh 는 검수 전 영어) + 한국어로 병기한다 */
 export const safety = {
-  // 민감정보 동의 초안 (spec 4.19) — 법무 검토 전
+  // 민감정보 동의 초안 (docs/security.md '민감정보 동의'): 법무 검토 전
   'conditions.consentWhat': {
     ko: '받는 것: 본인 체크 답(외출·복귀·걷기·이동·자외선·열·물·동행·식사·식이·복약 시각의 정해진 선택지)과 병원 연동 지침 사본. 증상·진단명·시술 종류는 묻지 않습니다.',
     en: 'What we take: your self-check answers (fixed choices for outings, return, walking, travel, UV, heat, water, companion, meals, diet and medication times) and copies of connected hospital plans. We do not ask about symptoms, diagnoses or procedure types.',
@@ -806,7 +806,7 @@ export const safety = {
     ja: '撤回すると、この端末から本人チェックの期間と病院ガイドの写し（連携コードを含む）を削除します。手術・施術の日以降は「入力が必要」になり、予定を計算し直します。',
     zh: '撤回后，将从此设备删除本人填写的期间和医院指引副本（包括关联代码）。从手术或治疗当天起，日期将变为“需要填写”，并重新计算行程。',
   },
-  // 연동 지침 상태 안내 (spec 4.20, 규칙 11·12)
+  // 연동 지침 상태 안내 (docs/business-rules.md '병원 연동'·'날짜별 합성'·'날짜 분류')
   'link.expiredNote': {
     ko: '이 지침은 유효기간이 지났어요. 기간은 저장하지만 적용하지 않아요. 수술·시술 날부터는 병원에서 새 지침을 받거나 본인 체크로 입력하세요.',
     en: 'This plan has expired. Its periods are saved but not applied. From your procedure date on, get a new plan from the hospital or enter a self-check.',
