@@ -27,6 +27,11 @@
 }
 
 /* ── /more (설계서 6.2 11번): 회색 바탕 위 흰 블록 두 개(도구 · 정보), 목록 행(components/ui ListItem) ── */
+/* 하이드레이션 전 메뉴: 흰 블록과 자리(사본 없는 높이)는 그대로 두고 안의 머리·행만 보이지 않게 둔다.
+   사본이 있는 기기에서 행이 뒤늦게 끼어 보이는 행이 밀리는 것을 막는다(리뷰 M3) */
+.more-menu-pending > .ui-block > * {
+  visibility: hidden;
+}
 .more-page.is-basement > nav > .ui-block:last-child {
   margin-bottom: 0;
 }

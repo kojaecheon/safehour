@@ -44,8 +44,10 @@ export const messages = {
     ja: '目的地（この場所）の名前と座標だけを渡します。出発地や宿泊先の位置は送りません。',
     zh: '只传送目的地（此地点）的名称和坐标，不会发送出发地和住处位置。',
   },
-  'place.mapGoogle': { ko: '구글 지도로 열기', en: 'Open in Google Maps', ja: 'Googleマップで開く', zh: '在 Google 地图中打开' },
-  'place.mapKakao': { ko: '카카오맵으로 열기', en: 'Open in KakaoMap', ja: 'カカオマップで開く', zh: '在 KakaoMap 中打开' },
+  // ja·zh 는 앱 이름만 둔다: 320px 에서 '…で開く'가 단어 중간에서 끊겼다(사용성 점검 G1). 링크라 '연다'는 뜻은 버튼이 전한다.
+  // zh 카카오맵은 'KakaoMap' 대신 'Kakao 地图'다: zh 문구는 한자를 담아야 한다(test/i18n-languages.test.js 문자 체계)
+  'place.mapGoogle': { ko: '구글 지도로 열기', en: 'Open in Google Maps', ja: 'Googleマップ', zh: 'Google 地图' },
+  'place.mapKakao': { ko: '카카오맵으로 열기', en: 'Open in KakaoMap', ja: 'カカオマップ', zh: 'Kakao 地图' },
   'place.mapsUnavailable': {
     ko: '좌표가 없어 지도 링크를 만들 수 없어요.',
     en: 'No coordinates, so no map link can be made.',

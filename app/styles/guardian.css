@@ -401,3 +401,99 @@
   min-height: var(--tap-min);
   gap: var(--space-2);
 }
+
+/* ───────────────────────── 오늘 환자 복귀 마감 카드 · 접힌 날짜 (사용성 점검 D3) ───────────────────────── */
+/* 흰 면 + 카드 테두리 · 모서리 16(누르는 카드). 페이지도 흰 바탕이라 선으로 구분한다. 읽을 것은 마감 시각이라 시각을 가장 크게 둔다.
+   통째로 오늘 날짜 제목으로 옮겨 가는 버튼이다(44px 이상). 링크가 아니라 버튼인 이유는 GuardianCopyView.js TodayReturnCard 주석 */
+.guardian-today {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-4);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-16);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  appearance: none;
+}
+.guardian-today:active {
+  background: var(--pressed);
+}
+.guardian-today:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--space-0-5);
+}
+.guardian-today-title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-bold);
+  color: var(--ink-soft);
+}
+.guardian-today-time {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-title-1);
+  font-weight: var(--weight-heavy);
+  font-variant-numeric: tabular-nums;
+}
+.guardian-today-none,
+.guardian-today-more {
+  font-size: var(--text-body);
+  color: var(--ink-soft);
+}
+/* 카드에서 오늘 날짜로 내려올 때 sticky 상단 바(56px + 안전 영역)에 제목이 가리지 않게 */
+.guardian-day-title {
+  scroll-margin-top: calc(56px + env(safe-area-inset-top) + var(--space-3));
+}
+
+/* 오늘이 아닌 날짜: <details> 로 접는다. 요약 줄은 날짜 제목 + 펼침 화살표, 44px 이상, 초점 링이 보인다 */
+.guardian-day-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--tap-min);
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-10);
+}
+.guardian-day-summary::-webkit-details-marker {
+  display: none;
+}
+.guardian-day-summary:focus-visible {
+  outline: var(--focus-width) solid var(--accent);
+  outline-offset: var(--space-0-5);
+}
+.guardian-day-summary .guardian-day-title {
+  margin-bottom: 0;
+}
+.guardian-day-chevron {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  color: var(--ink-subtle);
+  transition: transform var(--duration-fast) var(--ease-press);
+}
+.guardian-day-fold[open] .guardian-day-chevron {
+  transform: rotate(180deg);
+}
+.guardian-day-body {
+  margin-top: var(--space-2);
+}
+/* 접힌 날짜끼리는 목록처럼 붙여 둔다: 사본 구역 간격(32) 대신 8 + 구분선 */
+.guardian-copy > .guardian-day.is-folded + .guardian-day.is-folded {
+  margin-top: calc(var(--space-2) - var(--space-8));
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-section);
+}
+@media (prefers-reduced-motion: reduce) {
+  .guardian-day-chevron {
+    transition: none;
+  }
+}

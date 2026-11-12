@@ -5,7 +5,7 @@
 // 색은 getComputedStyle 의 rgb() 로 비교한다: --layer-basement·--surface-alt rgb(243, 244, 245), 흰 면 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { findEditableStop, gapBetween, kstDate, setClock, startTrip, stopsOf, styles } from './helpers.js';
+import { expectNoHorizontalScroll, expectStackedMapButtons, findEditableStop, gapBetween, kstDate, setClock, startTrip, stopsOf, styles } from './helpers.js';
 
 /** 장소 상세 주소 (components/CourseCard.js placeHref 와 같다) */
 const placeHrefOf = (stop) =>
@@ -93,33 +93,21 @@ test.describe('③층 장소 상세, 지도 버튼과 상태별 블록', () => {
     await expect.poll(async () => (await styles(google, ['background-color']))['background-color']).toBe('rgb(243, 244, 245)');
   });
 
-  test('320px English: 두 줄 글자여도 지도 버튼은 한 줄 반반', async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 720 });
-    await page.goto('/');
-    await page.getByRole('button', { name: 'English', exact: true }).click();
-    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-    await openPlace(page);
-    await expectHalves(page.locator('main.place-page > .place-maps .trip-map-row'));
-  });
-
+  // 360px 미만 화면은 반반 대신 세로로 쌓고 글자는 한 줄이다(사용성 점검 G1). 예전에는 320px 에서도 반반이었고
+  // ja·zh 는 아이콘을 글자 위로 올려 두 줄까지 허용했는데, 단어 중간에서 끊겨 바꿨다
   for (const [code, langName] of [
+    ['en', 'English'],
     ['ja', '日本語'],
     ['zh', '中文'],
   ]) {
-    test(`320px ${code}: 지도 버튼은 반반, 버튼 글자는 두 줄 이내(좁은 지도 구역은 아이콘이 글자 위)`, async ({ page }) => {
+    test(`320px ${code}: 지도 버튼은 세로로 쌓이고, 글자는 한 줄, 아이콘은 글자 왼쪽`, async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 720 });
       await page.goto('/');
       await page.getByRole('button', { name: langName, exact: true }).click();
       await expect(page.locator('html')).toHaveAttribute('lang', code);
       await openPlace(page);
-      const row = page.locator('main.place-page > .place-maps .trip-map-row');
-      await expectHalves(row);
-      // 보이는 글자 칸: components/trip/MapLinks.js 의 아이콘(svg) 다음 span. 숨긴 이름(.visually-hidden)은 뺀다
-      const lines = await row
-        .locator(':scope > .btn > span:not(.visually-hidden)')
-        .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight))));
-      expect(lines).toHaveLength(2);
-      expect(lines.every((n) => n <= 2), `버튼별 글자 줄 수: ${JSON.stringify(lines)}`).toBe(true);
+      await expectStackedMapButtons(page.locator('main.place-page > .place-maps .trip-map-row'), `장소 상세 320px ${code}`);
+      await expectNoHorizontalScroll(page, `장소 상세 320px ${code}`);
     });
   }
 

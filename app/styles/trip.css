@@ -393,6 +393,16 @@ p.trip-notice > .trip-notice-body {
 .trip-map-row > .btn {
   flex: 1 1 140px;
 }
+/* 360px 미만 화면: 두 버튼을 세로로 쌓아 한 버튼이 한 줄 폭을 다 쓴다. ja·zh 글자가 단어 중간에서 끊기지 않게 한다
+   (사용성 점검 G1). 아이콘은 글자 왼쪽 그대로. 쌓이면 flex-basis 가 높이가 되므로 basis 를 푼다 */
+@media (max-width: 359.98px) {
+  .trip-map-row {
+    flex-direction: column;
+  }
+  .trip-map-row > .btn {
+    flex: none;
+  }
+}
 
 .trip-tools {
   display: grid;

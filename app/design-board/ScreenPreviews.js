@@ -820,8 +820,9 @@ function GuardianScreen({ demo }) {
       <div className="page guardian-page designBoard-phone-page">
         <p className="guardian-lead">{t('guardian.openLead')}</p>
         <GuardianPinSection />
-        {/* 알림 스위치는 꺼짐·잠금으로 고정한다: 기기 설정(prefs)을 읽지 않는다 */}
-        <GuardianCopyView snapshot={demo.guardianSnapshot} alerts={<AlertsToggleView on={false} disabled />} />
+        {/* 알림 스위치는 꺼짐·잠금으로 고정한다: 기기 설정(prefs)을 읽지 않는다.
+            '지금'은 데모 시각으로 고정해 오늘 마감 카드와 접힌 날짜가 늘 같은 모습으로 보이게 한다 */}
+        <GuardianCopyView snapshot={demo.guardianSnapshot} alerts={<AlertsToggleView on={false} disabled />} fixedNowMs={DEMO_NOW_MS} />
       </div>
     </>
   );

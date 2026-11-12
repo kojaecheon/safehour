@@ -429,6 +429,36 @@ export async function expectNoAxeViolations(page, where) {
 }
 
 /** 가로 스크롤이 생기지 않아야 한다 */
+/**
+ * 360px 미만 화면의 지도 버튼 두 개(components/trip/MapLinks.js): 세로로 쌓이고(같은 폭, 둘째가 첫째 아래),
+ * 버튼마다 보이는 글자가 한 줄이며 넘치지 않고, 아이콘은 글자 왼쪽이다 (사용성 점검 G1)
+ */
+export async function expectStackedMapButtons(row, where) {
+  const items = row.locator(':scope > .btn');
+  await expect(items).toHaveCount(2);
+  const [a, b] = [await items.nth(0).boundingBox(), await items.nth(1).boundingBox()];
+  expect(b.y, `${where}: 둘째 버튼이 첫째 아래에 와야 한다`).toBeGreaterThanOrEqual(a.y + a.height - 1);
+  expect(Math.abs(a.width - b.width), `${where}: 두 버튼 폭이 같아야 한다`).toBeLessThanOrEqual(1);
+  const measures = await items.evaluateAll((els) =>
+    els.map((el) => {
+      const label = el.querySelector(':scope > span:not(.visually-hidden)');
+      const icon = el.querySelector(':scope > svg');
+      const lb = label.getBoundingClientRect();
+      return {
+        text: label.innerText,
+        lines: Math.round(lb.height / parseFloat(getComputedStyle(label).lineHeight)),
+        fits: label.scrollWidth <= label.clientWidth + 1 && el.scrollWidth <= el.clientWidth + 1,
+        iconLeft: icon.getBoundingClientRect().right <= lb.left + 1,
+      };
+    }),
+  );
+  for (const m of measures) {
+    expect(m.lines, `${where}: '${m.text}' 는 한 줄이어야 한다`).toBe(1);
+    expect(m.fits, `${where}: '${m.text}' 가 버튼을 넘친다`).toBe(true);
+    expect(m.iconLeft, `${where}: '${m.text}' 의 아이콘은 글자 왼쪽이어야 한다`).toBe(true);
+  }
+}
+
 export async function expectNoHorizontalScroll(page, where) {
   const box = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
