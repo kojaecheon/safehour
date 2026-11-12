@@ -1,4 +1,4 @@
-// 긴급 연락 번호 (AX-318 · docs/platform/IA_AND_FLOWS.md '고정 요소'·'보기 전용 상태')
+// 긴급 연락 번호 (AX-318 · docs/decisions/0010-map-links-emergency-notifications.md '긴급 연락', docs/platform/IA_AND_FLOWS.md '고정 요소'·'보기 전용 상태')
 //
 // 이 파일이 고정하는 것
 //   - 119, 1330 전화 걸기 링크. 1330 은 공식 안내의 국내 형식(국번 없이 1330)과 해외 형식(+82-2-1330)
