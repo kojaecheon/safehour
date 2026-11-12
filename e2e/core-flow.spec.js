@@ -1,9 +1,9 @@
-// 핵심 흐름 (AX-322 · spec 12.3 시나리오 1·2, 3.2 기본 흐름)
+// 핵심 흐름 (AX-322 · 시나리오 1·2(옛 작업 설계서의 화면 테스트 번호), docs/platform/IA_AND_FLOWS.md '처음 쓰는 사람')
 //
 //   1. 로그인(데모) → 체류 설정 → 민감정보 동의 → 본인 체크 → 전체 일정 → 오늘  — 화면으로 처음부터 끝까지
-//   2. 매일 확인 전 제한(STANDBY + DAILY_CHECK_PENDING, 길찾기·편집 막힘)과 확인 후 해제 (규칙 32·49)
+//   2. 매일 확인 전 제한(STANDBY + DAILY_CHECK_PENDING, 길찾기·편집 막힘)과 확인 후 해제 (docs/business-rules.md '매일 확인'·'사용자 편집'·'전체 일정 확정과 변화 대응')
 //
-// 12.4 에 따라 의도적으로 다시 썼다 — 퇴역한 단일 외출 흐름(/plan·/result)과 '수기 입력 없음' 단언은
+// docs/standards.md '테스트'(새 결정과 충돌하는 테스트는 의도적으로 고친다)에 따라 다시 썼다: 퇴역한 단일 외출 흐름(/plan·/result)과 '수기 입력 없음' 단언은
 // 본인 체크 재도입(ADR-0005)과 하루 일정 엔진(ADR-0006)으로 뜻을 잃었다.
 
 import { test, expect } from './fixtures.js';
@@ -128,7 +128,7 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
     // 수술 후 경계일(어제)이 이미 지났으니 기본 시작일은 오늘이다 (components/conditions/periodFormModel.js newPeriodDates)
     await expect(page.getByLabel('시작일')).toHaveValue(kstDate(0));
     await page.getByLabel('종료일 (포함)').fill(departure);
-    // 필수 항목은 '모르겠음'을 고를 수 없다 (규칙 6)
+    // 필수 항목은 '모르겠음'을 고를 수 없다 (docs/business-rules.md '조건 기간')
     await expect(page.getByRole('group', { name: '외출이 허용되나요?' }).getByRole('radio', { name: '모르겠음' })).toHaveCount(0);
     await expect(
       page.getByRole('group', { name: '몇 시까지 돌아와야 하는지 병원이 정했나요?' }).getByRole('radio', { name: '모르겠음' }),
@@ -164,7 +164,7 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
 
     // ── 전체 일정 — 체류 전체를 한 번 만들어 기기에 저장한다 ──
     //   체류를 저장한 순간 한 번(조건 전 — 경계일부터 NEEDS_INPUT), 기간을 저장한 뒤 오늘 이후를 다시 만든다.
-    //   지난 날짜(어제)는 재계획하지 않는다 (spec 4.9 재계획 규칙 2 · 규칙 30).
+    //   지난 날짜(어제)는 재계획하지 않는다 (docs/business-rules.md '전체 일정 확정과 변화 대응'의 재계획 규칙 2).
     await waitForTripPlan(page, { minDays: 5 });
     const coverages = async () => {
       const days = (await readRecord(page, 'tripPlan')).days;
@@ -183,14 +183,14 @@ test.describe('시나리오 1 — 데모 로그인부터 오늘까지', () => {
         expect(outing.walkTotalMin, '모르겠음 → 외출 1회 보행 15분 이하 (규칙 7)').toBeLessThanOrEqual(15);
         expect(outing.plannedReturnAt <= outing.returnBy, '예상 귀가 ≤ 복귀 마감 (규칙 13-2)').toBe(true);
       }
-      // 열·물·주점·매운 단서 장소는 들어가지 않는다 (규칙 21·22·25)
+      // 열·물·주점·매운 단서 장소는 들어가지 않는다 (docs/business-rules.md '장소 후보와 필터'의 식이 표·게이트 표)
       for (const stop of stopsOf(day)) {
         expect(stop.title).not.toMatch(/찜질|스파|수영장|호프|와인바|이자카야|떡볶이|찌개|의원|호텔/);
       }
     }
     expect(firstDayWithStops(tripPlan), '정거장이 있는 날이 하나 이상 있어야 한다').toBeTruthy();
 
-    // 일정 요청에는 PlanStay 허용 목록만 실린다 — 숙소·병원 이름·전화는 서버로 가지 않는다 (규칙 54)
+    // 일정 요청에는 PlanStay 허용 목록만 실린다: 숙소·병원 이름·전화는 서버로 가지 않는다 (docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)')
     expect(planBodies.length).toBeGreaterThan(0);
     for (const body of planBodies) {
       expect(body).not.toContain(HOSPITAL_NAME);
@@ -240,7 +240,7 @@ test.describe('시나리오 2 — 매일 확인 전 제한과 확인 후 해제'
     await expect(banner.locator('.state-secondary')).toHaveAttribute('lang', 'en');
     await evidenceShot(page, '07-daily-check-pending');
 
-    // 저장된 확정 일정은 바꾸지 않는다 — 덧씌우기는 표시 때만 (규칙 49)
+    // 저장된 확정 일정은 바꾸지 않는다. 덧씌우기는 표시 때만 (docs/business-rules.md '전체 일정 확정과 변화 대응', 오늘 게이트 덧씌우기)
     const stored = (await readRecord(page, 'tripPlan')).days[today];
     expect(stored.dayState).toBe(storedBefore.dayState);
     expect(stored.reasons ?? []).not.toContain('DAILY_CHECK_PENDING');

@@ -1,4 +1,4 @@
-// 4개 언어와 안전 문구 병기 (AX-322 · spec 12.3 시나리오 8, 4.17, 규칙 27·43·44·51)
+// 4개 언어와 안전 문구 병기 (AX-322 · 시나리오 8(옛 작업 설계서의 화면 테스트 번호), docs/business-rules.md '언어'·'전체 일정 확정과 변화 대응', src/i18n/AGENTS.md)
 //
 // - 일반 화면 문구는 ja·zh 번역을 그대로 쓴다.
 // - 안전 문구(상태·사유·고지·복귀 안내)는 선택 언어 + 한국어. ko 는 ko + en.
@@ -6,7 +6,7 @@
 //   이 E2E 빌드는 스위치를 켜지 않는다 — 그래서 일본어·중국어 안전 문구가 화면에 없어야 한다.
 // - 판정은 언어와 무관하다 — 같은 입력이면 ja 로 만든 일정과 ko 로 만든 일정의 상태·정거장이 같다.
 //
-// 12.4 에 따라 의도적으로 다시 썼다 — 예전 E2E 는 ja·zh 를 en 으로 대체한다고 단언했다(ADR-0007 로 변경).
+// docs/standards.md '테스트'(새 결정과 충돌하는 테스트는 의도적으로 고친다)에 따라 다시 썼다: 예전 E2E 는 ja·zh 를 en 으로 대체한다고 단언했다(ADR-0007 로 변경).
 
 import { test, expect } from './fixtures.js';
 import { evidenceShot, kstDate, readRecord, startTrip, stopsOf } from './helpers.js';
@@ -26,7 +26,7 @@ const UI = {
   zh: { cta: '开始使用', navToday: '今天', emergency: '紧急联系', checkTitle: '今天的条件没有变化吗？' },
 };
 
-/** 일정 요청을 같은 입력·다른 언어로 다시 보내 날짜별 상태와 정거장을 비교한다 (규칙 27) */
+/** 일정 요청을 같은 입력·다른 언어로 다시 보내 날짜별 상태와 정거장을 비교한다 (docs/business-rules.md '전체 일정 확정과 변화 대응') */
 async function expectLanguageNeutral(page, planBody, otherLang) {
   const body = JSON.parse(planBody);
   const run = async (lang) => {

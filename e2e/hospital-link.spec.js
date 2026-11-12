@@ -1,6 +1,6 @@
-// 데모 병원 연동 A/B/C (AX-322 · spec 12.3 시나리오 5, 4.20, 규칙 12·48·56·57)
+// 데모 병원 연동 A/B/C (AX-322 · 시나리오 5(옛 작업 설계서의 화면 테스트 번호), docs/business-rules.md '병원 연동'·'날짜별 합성'·'날짜 분류'·'매일 확인', docs/contracts.md '`POST /api/plan/link`')
 //
-// - 코드 연결은 로그인 + 민감정보 동의 뒤에만 된다. 데모 지침에는 '병원 연동 데모' 배지가 늘 붙는다(spec 9.1).
+// - 코드 연결은 로그인 + 민감정보 동의 뒤에만 된다. 데모 지침에는 '병원 연동 데모' 배지가 늘 붙는다(docs/business-rules.md '병원 연동').
 // - A: 정상 지침 — 병원 발행 기간이 합성에 참여하고, 확인하지 않은 중요 안내가 있으면 오늘이 STANDBY 로 덧씌워진다.
 // - B: 외출 불가 기간 — 외출 없는 날(REST_DAY → NO_TOURISM)은 오류가 아니라 정상 결과다.
 // - C: 이미 만료된 지침 — 기간은 저장되지만 적용하지 않는다. 경계일 이후는 HOSPITAL_PLAN_EXPIRED_INPUT_REQUIRED.
@@ -39,7 +39,7 @@ test.describe('시나리오 5 — 데모 병원 연동', () => {
     expect(stay.linkedPlans.map((lp) => lp.code)).toEqual(['DEMO-A']);
     const hospitalPeriods = stay.periods.filter((p) => p.source === 'HOSPITAL');
     expect(hospitalPeriods).toHaveLength(2);
-    // v2 병원 복귀 기간의 hospitalId 는 연결 병원 id 로 채워진다 (규칙 57)
+    // v2 병원 복귀 기간의 hospitalId 는 연결 병원 id 로 채워진다 (docs/contracts.md '`POST /api/plan/link`')
     const hospitalReturn = hospitalPeriods.find((p) => p.items.returnTime?.place === 'HOSPITAL');
     expect(hospitalReturn.items.returnTime.hospitalId).toBe('hosp-e2e-1');
     expect(stay.appointments.some((a) => a.source === 'HOSPITAL' && a.hospitalId === 'hosp-e2e-1')).toBe(true);
@@ -51,7 +51,7 @@ test.describe('시나리오 5 — 데모 병원 연동', () => {
 
     await expect.poll(() => coverageOf(page, today), { message: '연결 뒤 오늘 재계획' }).toBe('RESTRICTED');
 
-    // 오늘: 병원 기간만 덮는 날은 매일 확인이 없고, 확인하지 않은 중요 안내로 STANDBY (규칙 56)
+    // 오늘: 병원 기간만 덮는 날은 매일 확인이 없고, 확인하지 않은 중요 안내로 STANDBY (docs/business-rules.md '매일 확인')
     await page.goto('/today');
     await expect(page.locator('.today-date').getByText(DEMO_BADGE, { exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: '오늘 조건이 그대로인가요?' })).toHaveCount(0);
@@ -98,7 +98,7 @@ test.describe('시나리오 5 — 데모 병원 연동', () => {
     await expect(banner).toHaveClass(/state-NO_TOURISM/);
     await expect(banner).toContainText('병원이 외출을 제한했습니다');
     await expect(page.locator('main [role="alert"]')).toHaveCount(0); // 오류 알림이 아니다
-    // 보호자 탭: 동행 필수 — 잠금 표시와 이유 (spec 4.7 보호자 일정)
+    // 보호자 탭: 동행 필수, 잠금 표시와 이유 (docs/business-rules.md '하루 일정 생성'의 보호자 단독 외출)
     await page.getByRole('tab', { name: /보호자/ }).click();
     await expect(page.getByText('보호자 단독 외출 없음')).toBeVisible();
     await expect(page.getByText('동행이 필요한 날이라 보호자는 환자와 함께 있어요.', { exact: false })).toBeVisible();

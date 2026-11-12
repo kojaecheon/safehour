@@ -207,7 +207,7 @@ export const HOSPITAL_NAME = '데모 성형외과 E2E';
 export const HOSPITAL_PHONE = '02-0000-0000';
 export const LODGING_NAME = '데모 숙소 E2E';
 
-// ── 조건 항목 (spec 5.1 ConditionItems) ─────────────────────────────
+// ── 조건 항목 (src/stay/conditions.js @typedef ConditionItems) ─────────────────────────────
 
 const NONE = Object.freeze({ kind: 'NONE' });
 const YES = Object.freeze({ kind: 'SET', value: true });
@@ -233,7 +233,7 @@ export function selfItems(overrides = {}) {
 }
 
 /**
- * 체류(spec 5.1 Stay). 기본: 어제 입국 → 4일 뒤 출국, 강남 데모 숙소, 어제 수술·시술, 이틀 뒤 진료,
+ * 체류(src/stay/stay.js @typedef Stay). 기본: 어제 입국 → 4일 뒤 출국, 강남 데모 숙소, 어제 수술·시술, 이틀 뒤 진료,
  * 체류 전체를 덮는 본인 체크 기간, 민감정보 동의 있음.
  * @param {object} [o]
  */
@@ -386,7 +386,7 @@ export function stopsOf(day, role = 'P') {
 }
 
 /**
- * 오늘 게이트 덧씌우기(매일 확인 대기·확인하지 않은 병원 안내) 배너 검사 (규칙 32·49).
+ * 오늘 게이트 덧씌우기(매일 확인 대기·확인하지 않은 병원 안내) 배너 검사 (docs/business-rules.md '매일 확인'·'사용자 편집'·'전체 일정 확정과 변화 대응').
  * 덧씌우기는 **강등만** 한다 — 저장된 오늘이 이미 NO_TOURISM 이면(늦은 시각이라 외출 창이 없을 때 등)
  * 그 상태를 그대로 두고 사유만 얹는다(src/stay/todayGate.js). 그래서 저장값에 맞춰 기대값을 정한다.
  * @param {import('@playwright/test').Page} page
@@ -472,7 +472,7 @@ export async function expectNoHorizontalScroll(page, where) {
 }
 
 /**
- * 보이는 버튼·링크·입력의 터치 대상이 44px 이상인지 본다 (spec 7장).
+ * 보이는 버튼·링크·입력의 터치 대상이 44px 이상인지 본다 (docs/standards.md '테스트').
  * 문장 안의 인라인 링크는 WCAG 2.5.5 예외(inline)라 뺀다.
  */
 export async function expectTouchTargets(page, where, min = 44) {

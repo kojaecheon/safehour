@@ -1,4 +1,4 @@
-// 접근성 — axe WCAG 2.1 AA 위반 0건, 키보드, 200% 확대, 44px 터치 (AX-322 · spec 12.3 시나리오 10, 7장)
+// 접근성: axe WCAG 2.1 AA 위반 0건, 키보드, 200% 확대, 44px 터치 (AX-322 · 시나리오 10(옛 작업 설계서의 화면 테스트 번호), docs/standards.md '테스트')
 //
 // 새 화면 전부를 본다: /, /login, /onboarding 단계 5개, /conditions(동의·목록·편집기), /link(대기·병원 고르기),
 // /guide, /today, /trip, /trip/[date], /place/[id], /cards, /emergency, /more, /settings, /privacy,
