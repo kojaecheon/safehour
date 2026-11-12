@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AI 일정 소개 문장 평가 — 수동 실행 전용 (AX-309 · spec 4.16 · docs/platform/AI_USE_CASE_INTRO.md)
+// AI 일정 소개 문장 평가: 수동 실행 전용 (AX-309 · docs/platform/AI_USE_CASE_INTRO.md)
 //
 //   SAFEHOUR_AI_INTRO=1 GEMINI_API_KEY=... npm run ai:eval [-- --out <결과.json>]
 //
