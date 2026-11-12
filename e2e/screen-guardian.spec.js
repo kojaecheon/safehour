@@ -4,7 +4,7 @@
 // --emergency rgb(200, 16, 46), --state-standby-bg rgb(255, 244, 217), 흰 rgb(255, 255, 255).
 
 import { test, expect } from './fixtures.js';
-import { createGuardianLink, gapBetween, selfItems, startTrip, styles } from './helpers.js';
+import { createGuardianLink, expectNoAxeViolations, gapBetween, importGuardianCopy, selfItems, startTrip, styles } from './helpers.js';
 
 const PIN = '246810';
 const CONSENT = '위 내용을 보호자에게 보내는 데 동의해요 (이번 링크에만 적용돼요)';
@@ -253,5 +253,40 @@ test.describe('③층 보호자 링크 열기', () => {
       'background-color': 'rgb(255, 233, 240)', 'border-left-width': '0px', 'border-top-left-radius': '10px',
     });
     await expect(escort.locator('p')).toHaveCount(2);
+  });
+});
+
+test.describe('받은 일정 화면의 보기 전용 안내 (사용성 점검 D2)', () => {
+  test('로그인이 풀려도(세션 쿠키 없음) 환자용 보기 전용 막대는 없고, 알림 스위치가 이유와 로그인 버튼을 준다', async ({ page, context }) => {
+    await importGuardianCopy(page);
+    await context.clearCookies();
+    await page.goto('/g');
+    await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+    const alerts = page.locator('.guardian-alerts');
+    await expect(alerts.getByRole('switch')).toBeDisabled();
+    // 이 안내는 세션 확인이 끝나야 보인다. 그 뒤에 배너가 없는지 본다(확인 전에는 어느 화면에도 배너가 없어 헛통과한다)
+    await expect(alerts).toContainText('보기 전용에서는 바꿀 수 없어요. 로그인하면 바꿀 수 있어요.');
+    await expect(page.locator('.ui-readonly')).toHaveCount(0);
+    const login = alerts.getByRole('link', { name: '로그인하기' });
+    await expect(login).toHaveAttribute('href', '/login?returnTo=%2Fg');
+    expect((await login.boundingBox()).height).toBeGreaterThanOrEqual(44);
+    await expectNoAxeViolations(page, '/g (로그인 만료, 사본 보기)');
+  });
+
+  test('오프라인이면 로그인을 권하지 않고 연결 뒤에 바꾸라고만 한다', async ({ page, context }) => {
+    await importGuardianCopy(page);
+    await page.goto('/g');
+    await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+    await context.setOffline(true);
+    try {
+      const alerts = page.locator('.guardian-alerts');
+      await expect(alerts).toContainText('인터넷 연결이 없어 지금은 바꿀 수 없어요. 다시 연결된 뒤에 바꿔 주세요.');
+      await expect(alerts.getByRole('switch')).toBeDisabled();
+      await expect(alerts.getByRole('link', { name: '로그인하기' })).toHaveCount(0);
+      await expect(alerts).not.toContainText('로그인하면 바꿀 수 있어요');
+      await expect(page.locator('.ui-readonly')).toHaveCount(0);
+    } finally {
+      await context.setOffline(false);
+    }
   });
 });

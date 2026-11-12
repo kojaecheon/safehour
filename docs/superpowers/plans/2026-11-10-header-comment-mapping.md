@@ -345,6 +345,45 @@ findings 5가 11-07에 '대응 없음'으로 남긴 세 가지의 지금 상태:
 - **지난 문서의 같은 참조**: `docs/API_CONTRACT.md`(규칙 14건, spec 4건), `docs/platform/*.md`, `docs/superpowers/plans/*.md`에도 `spec N.N`·`규칙 N`이 있다. 이 문서들은 지난 문서이거나 작업 기록이라 정리 작업 대상이 아니다.
 - **문서에 적을지 정할 것(선택)**: `규칙 55`의 멱등 문장을 BR '전체 일정 확정과 변화 대응'이나 IR '데모 사건'에 적으면 마지막 '대응 없음'이 사라진다. 문서 변경이라 운영자 확인 뒤에 한다.
 
+## 8. 묶음 1~3에서 확인된 보완 (2026-11-12)
+
+묶음 1~3(판정 핵심, 경계 모듈, lib·scripts)을 실제로 돌리고 리뷰하면서 4절 표가 덜 맞던 곳이다. **4절과 다르면 이 절을 따른다.**
+남은 묶음(4~9)은 이 절을 먼저 읽는다.
+
+| 옛 참조 | 문장이 말하는 것 | 지금 참조 | 비고 |
+| --- | --- | --- | --- |
+| `spec 4.4 표` | 본인 체크의 **질문 문장** | `docs/platform/ITINERARY_RULES.md '본인 체크 항목'`의 질문 열 | BR '조건 기간' 항목 표에는 질문 문장이 없다(항목·값·기본값만) |
+| `spec 4.7 표` | 날짜 상태를 정하는 표 | `docs/business-rules.md '하루 일정 생성'의 날짜 상태 표` | 마감 후보를 말할 때만 '마감 후보 표' |
+| `spec 4.8` | 호출 방식, 상세 보강 대상 | `docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '호출 방식'` | BR에는 호출 방식이 없다 |
+| `spec 4.8` | 관심사 태그 순서, 단서 목록 | `docs/platform/ITINERARY_RULES.md '단서 목록 (`src/tour-api/cues.js`)'` | |
+| `spec 4.8` | 출처와 표시 언어 사슬 | `docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어'` | BR에는 '출처와 언어'라는 제목이 없다(첫 문단) |
+| `spec 4.12 표의 예시 문장` | 식이 카드 문장 다섯 개 | 대응 없음 | 참조를 지우고 "옛 설계서의 예시 문장 그대로다(지금 문서에는 문장 목록이 없다)"를 남긴다 |
+| `spec 4.17` | '판정은 언어와 무관' | `docs/business-rules.md '전체 일정 확정과 변화 대응'` | BR '언어'에는 이 문장이 없다. 국문 제목으로만 판정한다는 말이면 '장소 후보와 필터'를 함께 |
+| `spec 4.18~4.19` | 로그인은 기기 저장을 계정별로 나누는 것 | `docs/security.md '인증'·'기기 저장소와 계정 이름공간'` | IA '보기 전용 상태'를 붙이지 않는다 |
+| `spec 4.19` | 서버는 조건 값을 버리고 로그에 남기지 않는다 | `docs/security.md '기록'` | |
+| `spec 4.20` | 만료된 지침, 병원 값을 본인 체크로 옮기지 않는다 | `docs/business-rules.md '날짜 분류'` | 연동 자체를 말할 때만 '병원 연동' |
+| `spec 4.21` | 판정 로그 | `docs/security.md '기록'` | 추천 중단 스위치는 `docs/business-rules.md '운영 안전장치'`, 호출 한도 환경변수는 `docs/operations.md '환경변수'` |
+| `spec 5.1` (typedef 줄 자신) | 타입 정의 | `기기 모델`(옛 장 이름) 그대로 두고 문서를 가리키지 않는다 | 정본은 그 typedef 다 |
+| `spec 5.1 Address` 등 타입 이름 | 타입을 가리킴 | `src/stay/stay.js @typedef …`, `src/stay/conditions.js @typedef …` | |
+| `spec 5.1 TripPlan` | 기기에 저장한 전체 일정 | `lib/store/store.js readTripPlan` | TripPlan typedef 는 없다 |
+| `spec 5.1 LinkedPlan`, `LinkedPlan.plan` | 연결된 병원 지침 | `docs/business-rules.md '병원 연동'` | |
+| `spec 5.1 guardianShare.planFingerprint` | 일정 지문, 다시 보내기 판단 | `docs/business-rules.md '보호자'` | security.md 에는 지문이 없다 |
+| `spec 5.2 Stop` | 정거장 | `docs/contracts.md '`POST /api/itinerary/plan`'` | Stop typedef 는 없다. 필드 구조가 아니라 응답 절을 가리키는 것이다 |
+| `spec 6장`(경로 없음) | 주소 검색(최대 10개, 2~60자, 데모 주소, UTM-K 변환) | `docs/contracts.md '`POST /api/address/search`'` | 경로가 드러나지 않는 일반 규칙만 '공통' |
+| `spec 9.1` 병원 알선 | 의료 시설은 정거장이 되지 않는다 | `docs/business-rules.md '숙소와 병원'·'장소 후보와 필터'` | |
+| `규칙 27` | 결과가 언어에 따라 달라지면 안 된다 | `docs/business-rules.md '전체 일정 확정과 변화 대응'` | 국문 제목으로만 판정한다는 말이면 '장소 후보와 필터' |
+| `규칙 55` | 같은 사건 목록을 다시 보내도 효과가 두 번 더해지지 않는다 | 대응 없음(5절 문장을 남긴다) | 접는 쪽은 `src/engine/tripEvents.js` `foldDemoEvents`. 그 파일이 아니면 그 사실을 함께 적는다 |
+
+건수 정정: 묶음 1은 26개 파일(`src/engine/tripPlan.js`의 `재계획 규칙 2` 포함), 묶음 3은 `public/sw.js`를 빼고
+`lib/trip/local.js`·`lib/trip/runtime.js`를 더해 28개 파일이었다. `handoff 4장`은 묶음 2에 1건이다.
+
+주석과 문서가 어긋나 문서를 고친 곳(2026-11-12, 주석은 코드와 맞았다): 보호자 외출에 적용하지 않는 환자 조건의 범위,
+외출 불가일 때 복귀 시각을 묻지 않는 예외, 새로 짤 때 등록되지 않은 복귀 병원의 처리(`docs/business-rules.md`),
+빈 식사 칸이 있는 날의 '메뉴 모름' 식당 상세 확인(`docs/platform/ITINERARY_RULES.md` 8.2).
+
+검증 방법(묶음 1~3에서 쓴 것): 변경 전후 파일의 토큰 열(주석 제외)을 espree 로 비교해 코드가 한 토큰도 바뀌지 않았음을 확인한다.
+문자열(테스트 이름, 문구 값)도 토큰이라 함께 지켜진다. CSS 는 주석을 지운 본문을 비교한다.
+
 ## 부록: 참조별 파일 목록
 
 파일 전체 기준이다. 8개가 넘으면 앞의 8개만 적었다. 전체 목록은 2절 방법으로 다시 뽑을 수 있다.

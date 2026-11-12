@@ -180,3 +180,19 @@ test.describe('③층 설정, 되돌릴 수 없는 확인', () => {
     await expect(page.getByRole('button', { name: '이 기기에서 내 정보 지우기' })).toBeVisible();
   });
 });
+
+test.describe('설정, 오프라인 안내 (사용성 점검 C2 · D2)', () => {
+  test('오프라인이면 알림·동의 묶음이 로그인을 권하지 않고 연결 뒤에 바꾸라고만 한다', async ({ page, context }) => {
+    await startTrip(page, {}, { path: '/settings' });
+    await expect(page.locator('section[aria-labelledby="settings-notify-title"]')).toBeVisible();
+    await context.setOffline(true);
+    try {
+      const notify = page.locator('section[aria-labelledby="settings-notify-title"]');
+      await expect(notify).toContainText('인터넷 연결이 없어 지금은 바꿀 수 없어요. 다시 연결된 뒤에 바꿔 주세요.');
+      await expect(notify).not.toContainText('로그인하면 바꿀 수 있어요');
+      await expect(page.locator('.ui-readonly .ui-readonly-title')).toHaveText('인터넷 연결 없음, 저장된 일정만 보여 줘요');
+    } finally {
+      await context.setOffline(false);
+    }
+  });
+});

@@ -91,6 +91,13 @@ export const messages = {
     ja: '通知が許可されなかったため、オンにできませんでした。ブラウザの設定で許可してから、もう一度オンにしてください。',
     zh: '未获得通知权限，因此提醒仍未开启。请在浏览器设置中允许后再重新开启。',
   },
+  // 보기 전용의 이유가 오프라인일 때: 로그인을 권하지 않고 사실과 할 일만 적는다(설정 화면과 받은 일정의 알림 스위치가 함께 쓴다, 사용성 점검 D2 · C2)
+  'settings.offlineNote': {
+    ko: '인터넷 연결이 없어 지금은 바꿀 수 없어요. 다시 연결된 뒤에 바꿔 주세요.',
+    en: 'You are offline, so this cannot be changed right now. Please change it after you reconnect.',
+    ja: 'インターネットに接続されていないため、今は変更できません。再接続してから変更してください。',
+    zh: '当前未连接网络，暂时无法更改。请在重新连接后再更改。',
+  },
   'settings.readOnlyNote': {
     ko: '보기 전용에서는 바꿀 수 없어요. 로그인하면 바꿀 수 있어요.',
     en: 'This cannot be changed in view-only mode. Sign in to change it.',
