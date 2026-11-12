@@ -1,4 +1,4 @@
-// 앱 설치 아이콘 만들기 (AX-319 · spec 4.18)
+// 앱 설치 아이콘 만들기 (AX-319 · docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 //   node scripts/generate-pwa-icons.mjs
 //
