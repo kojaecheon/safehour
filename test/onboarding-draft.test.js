@@ -1,4 +1,4 @@
-// 체류 설정 초안 도우미 (AX-314 · spec 4.1–4.3, 5.1, 10장 규칙 1–3)
+// 체류 설정 초안 도우미 (AX-314 · docs/business-rules.md '체류'·'숙소와 병원', src/stay/stay.js @typedef Stay. 테스트 이름의 spec 번호와 규칙 번호(1~3)는 옛 설계서 번호다)
 //
 // 화면이 쓰는 순수 함수만 검증한다. 규칙 자체는 validateStay(test/stay-validate.test.js)가 정본이고,
 // 여기서는 초안이 그 규칙에 그대로 닿는지, 결과가 필드별 문구·단계로 옮겨지는지를 본다.

@@ -1,4 +1,4 @@
-// 클라이언트 요청 만들기 ↔ 서버 라우트 이음매 (spec 6장 POST /api/place · POST /api/itinerary/intro)
+// 클라이언트 요청 만들기 ↔ 서버 라우트 이음매 (docs/contracts.md '`POST /api/place`'·'`POST /api/itinerary/intro`')
 //
 // 왜 따로 두나: 두 경로는 지금까지 양쪽이 각자의 리터럴로만 테스트됐다.
 //   - 클라이언트: components/trip/viewModel.js 의 요청 만들기 → test/trip-view.test.js (서버 없음)
@@ -158,7 +158,7 @@ before(async () => {
 beforeEach(() => {
   process.env.SAFEHOUR_SESSION_SECRET = SESSION_SECRET;
   process.env.KMA_API_KEY = 'seam-kma-key';
-  // AI 는 꺼진 상태가 기본이다 — 소개 문장은 템플릿이어야 하고 외부 호출이 없어야 한다 (spec 4.16 · 규칙 36)
+  // AI 는 꺼진 상태가 기본이다. 소개 문장은 템플릿이어야 하고 외부 호출이 없어야 한다 (docs/business-rules.md 'AI 소개 문장')
   delete process.env.SAFEHOUR_AI_INTRO;
   delete process.env.GEMINI_API_KEY;
   for (const dir of [TOUR_API_PATHS.logs, TOUR_API_PATHS.cache]) {
@@ -203,7 +203,7 @@ describe('POST /api/place — 클라이언트가 만든 본문을 서버가 그�
       const stop = stopsOf(day)[0];
       const request = placeDetailRequest(stop, lang);
 
-      // 클라이언트가 보내는 것은 계약에 적힌 네 필드뿐이다 (spec 6장)
+      // 클라이언트가 보내는 것은 계약에 적힌 네 필드뿐이다 (docs/contracts.md '`POST /api/place`')
       assert.deepEqual(Object.keys(request).sort(), ['contentId', 'contentTypeIds', 'lang', 'sourceIds']);
       // 서버가 요구하는 (식별자, 유형 코드) 짝이 실제로 들어 있다
       const paired = ['ko', 'en', 'ja', 'zh'].filter((k) => request.sourceIds[k] && request.contentTypeIds[k]);

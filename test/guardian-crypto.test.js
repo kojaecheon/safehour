@@ -1,4 +1,4 @@
-// 보호자 스냅샷 PIN 암호화 · 링크 형식 (AX-313 · spec 4.11, 5.4, 규칙 37·38)
+// 보호자 스냅샷 PIN 암호화 · 링크 형식 (AX-313 · docs/security.md '보호자 링크', docs/business-rules.md '보호자'. 테스트 이름의 규칙 번호(37, 38)는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

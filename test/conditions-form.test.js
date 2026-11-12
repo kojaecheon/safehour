@@ -1,9 +1,9 @@
-// 조건 화면 — 본인 체크 입력 폼 ↔ 조건 기간 변환 (AX-315 · spec 4.4, 5.1, 규칙 6·7·13-1)
+// 조건 화면: 본인 체크 입력 폼 ↔ 조건 기간 변환 (AX-315 · docs/business-rules.md '조건 기간'·'숙소와 병원', src/stay/conditions.js @typedef ConditionPeriod. 테스트 이름의 spec 번호와 규칙 번호(6, 13-1)는 옛 설계서 번호다)
 //
 // 화면 폼 상태를 ConditionPeriod(SELF)로 바꾸는 순수 함수를 고정한다.
-//   - 필수 항목(outing·returnTime)은 '모르겠음'이 없고, 비어 있으면 저장하지 않는다(규칙 6)
-//   - 동행 필수=예 이면 guardianMustStay 는 폼 값과 무관하게 SET(true)로 보낸다(spec 4.4)
-//   - 병원 복귀는 hospitalId 를 싣는다. 병원이 하나면 자동으로 고른다(규칙 13-1)
+//   - 필수 항목(outing·returnTime)은 '모르겠음'이 없고, 비어 있으면 저장하지 않는다(docs/business-rules.md '조건 기간')
+//   - 동행 필수=예 이면 guardianMustStay 는 폼 값과 무관하게 SET(true)로 보낸다(docs/business-rules.md '조건 기간')
+//   - 병원 복귀는 hospitalId 를 싣는다. 병원이 하나면 자동으로 고른다(docs/business-rules.md '숙소와 병원', docs/platform/ITINERARY_RULES.md '본인 체크 항목'의 복귀 시각 행)
 //   - 외출 불가면 복귀 시각을 묻지도 싣지도 않는다
 //   - 복약 시각의 '숙소에서 복용'은 기본 예
 

@@ -1,4 +1,4 @@
-// 서버 라우트 로그인 가드와 새 오류 코드 (AX-302 · spec 6장)
+// 서버 라우트 로그인 가드와 새 오류 코드 (AX-302 · docs/contracts.md '공통')
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

@@ -1,4 +1,4 @@
-// AX-002 · AX-308 — 내부 API 계약 테스트: 일정 API (spec 6장)
+// AX-002 · AX-308: 내부 API 계약 테스트, 일정 API (docs/contracts.md '공통'·'`POST /api/itinerary/plan`'·'`POST /api/itinerary/alternatives`'. 테스트 이름의 spec 번호와 규칙 번호(46)는 옛 설계서 번호다)
 //
 // 단일 외출 API(POST /api/recommend·/api/recalculate·/api/today)는 퇴역했다. 이 파일이 그 계약 테스트를 대신한다.
 //

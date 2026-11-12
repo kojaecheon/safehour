@@ -1,4 +1,4 @@
-// 앱 설치 — 매니페스트와 아이콘 (AX-319 · spec 4.18)
+// 앱 설치: 매니페스트와 아이콘 (AX-319 · docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 // 설치 기본 조건(이름·시작 주소·standalone·192/512 아이콘)과 디자인 토큰 색을 고정한다.
 // 아이콘은 scripts/generate-pwa-icons.mjs 가 만든 PNG 다 — 파일 머리(IHDR)에서 실제 크기를 읽는다.

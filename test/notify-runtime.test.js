@@ -1,4 +1,4 @@
-// 알림 실행기 (AX-319 · spec 4.13)
+// 알림 실행기 (AX-319 · docs/business-rules.md '알림과 카드', lib/notify/AGENTS.md)
 //
 // 앱이 열려 있는 동안 오늘 일정에서 예약을 만들고, 때가 되면 기기 알림(주입)과 앱 안 배너를 낸다.
 //   - 예약은 저장소의 알림 예약(writeNotificationSchedule)에 남긴다. 보기 전용이면 남기지 못해도 알린다.

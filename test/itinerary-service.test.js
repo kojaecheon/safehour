@@ -1,4 +1,7 @@
-// AX-308 — 일정 API 동작 (spec 4.8 후보 조회, 4.9 기상, 4.1 공항 이동, 6장, 규칙 46·54)
+// AX-308: 일정 API 동작 (후보 조회: docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '호출 방식'.
+//   기상: docs/platform/ITINERARY_RULES.md '변화 원천'. 공항 이동: docs/platform/ITINERARY_RULES.md '공항 이동 추정 (`lib/server/airports.js` `AIRPORT_TRANSFER`)'.
+//   경로와 허용 목록: docs/contracts.md '`POST /api/itinerary/plan`'·'`POST /api/itinerary/alternatives`'·'판정 요청에 실리는 체류 (`PlanStay`)'·'공통'.
+//   테스트 이름의 spec 번호와 규칙 번호(33, 46, 51, 54)는 옛 설계서 번호다)
 //
 // 외부 데이터(관광공사·기상청)는 가짜 의존성으로 대신한다. 실제 호출 0건.
 //   - 후보는 숙소 기준점·반경 10km·언어 조합마다 한 번만 조회한다
