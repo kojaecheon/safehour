@@ -1,4 +1,4 @@
-// 날짜의 숙소·입국일 시작·출국일 마감·병원 일정 블록 (AX-302 · docs/business-rules.md '체류'·'숙소와 병원')
+// 날짜의 숙소·입국일 시작·출국일 마감·병원 일정 블록 (AX-302 · docs/business-rules.md '체류'·'숙소와 병원', 테스트 이름의 규칙 13-1·14·15 는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

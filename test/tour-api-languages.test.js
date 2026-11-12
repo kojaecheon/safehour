@@ -1,4 +1,4 @@
-// AX-305: 선택 언어 관광 데이터와 폴백 (docs/business-rules.md '장소 후보와 필터'·'전체 일정 확정과 변화 대응'·'언어', docs/platform/ITINERARY_RULES.md '출처와 언어',
+// AX-305: 선택 언어 관광 데이터와 폴백 (docs/business-rules.md '장소 후보와 필터'·'전체 일정 확정과 변화 대응', docs/platform/ITINERARY_RULES.md '출처와 언어',
 // 테스트 이름의 규칙 27 은 옛 설계서 번호다)
 //
 // 계약:

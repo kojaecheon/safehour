@@ -2,7 +2,7 @@
 //
 // docs/platform/IA_AND_FLOWS.md '즉시 복귀', docs/business-rules.md '전체 일정 확정과 변화 대응'(재계획 규칙 2~4, 전후 비교),
 // docs/platform/ITINERARY_RULES.md '데모 사건'의 규칙과 '시작된 정거장 보존'을 고정한다
-// (테스트 이름의 규칙 13, 30(재계획), 31, 50, 55 는 옛 설계서 번호다).
+// (테스트 이름의 규칙 13, 13-1, 31, 50, 55 는 옛 설계서 번호다).
 // 같은 사건 목록을 다시 보내도 효과가 두 번 더해지지 않는다. 오늘 사건은 받은 목록 전체를 처음부터 접어 한 번에 적용한다
 // (접는 쪽은 src/engine/tripEvents.js foldDemoEvents).
 

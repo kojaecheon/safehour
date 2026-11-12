@@ -1,4 +1,4 @@
-// 새 사유 코드와 조정 가능한 기본값 (AX-302 · docs/platform/IA_AND_FLOWS.md '이번에 새로 쓰는 사유 코드', docs/platform/ITINERARY_RULES.md '조정 가능한 기본값')
+// 새 사유 코드와 조정 가능한 기본값 (AX-302 · docs/platform/IA_AND_FLOWS.md '이번에 새로 쓰는 사유 코드', docs/platform/ITINERARY_RULES.md '숫자 기본값의 코드 위치 (`src/stay/defaults.js`)')
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

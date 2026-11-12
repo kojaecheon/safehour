@@ -1,4 +1,4 @@
-// 체류 모델 검증 (AX-302 · docs/business-rules.md '체류'·'숙소와 병원', 테스트 이름의 규칙 1~3 은 옛 설계서 번호다)
+// 체류 모델 검증 (AX-302 · docs/business-rules.md '체류'·'숙소와 병원', 테스트 이름의 규칙 1~3, 13-1 은 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

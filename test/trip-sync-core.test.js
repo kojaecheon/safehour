@@ -1,7 +1,7 @@
 // AX-316: 일정 동기화 순수 계층
 // (docs/business-rules.md '매일 확인'·'전체 일정 확정과 변화 대응'(재계획 규칙, 오늘 게이트 덧씌우기)·'사용자 편집',
 //  docs/platform/ITINERARY_RULES.md '변화 원천'·'데모 사건', docs/platform/IA_AND_FLOWS.md '동의 철회와 데이터 삭제',
-//  docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)', 테스트 이름의 규칙 32·49·54·55 는 옛 설계서 번호다)
+//  docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)', 테스트 이름의 규칙 49·51·55 는 옛 설계서 번호다)
 //
 // 네트워크·저장소 없이 순수 함수만 본다.
 //   - PlanStay 허용 목록: 이름·주소·전화·연결 코드를 보내지 않는다
@@ -367,7 +367,7 @@ describe('일정 요청 — previous·edits·usedContentIds·events', () => {
   });
 });
 
-// ── 편집 기록 (docs/business-rules.md '사용자 편집', edits 저장은 docs/security.md '기기 저장소와 계정 이름공간') ───────────────────────────────────
+// ── 편집 기록 (docs/business-rules.md '사용자 편집') ───────────────────────────────────
 
 describe('편집 기록', () => {
   test('교체: 새 장소는 고정, 옛 장소는 삭제. 입력은 바꾸지 않는다', () => {
