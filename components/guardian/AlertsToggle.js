@@ -10,8 +10,11 @@ import { useState } from 'react';
 import { usePrefs } from '@/components/cards/useDeviceData.js';
 import useStoreStatus, { shouldShowReadOnly } from '@/components/ui/useStoreStatus.js';
 import { turnOnDeviceNotifications } from '@/lib/notify/permission.js';
-import { getStore } from '@/lib/store/index.js';
+import { READ_ONLY_REASON, getStore } from '@/lib/store/index.js';
 import AlertsToggleView from './AlertsToggleView.js';
+
+/** 로그인하고 받은 일정 화면으로 돌아온다 */
+const LOGIN_HREF = `/login?returnTo=${encodeURIComponent('/g')}`;
 
 export default function AlertsToggle() {
   const prefs = usePrefs();
@@ -38,6 +41,8 @@ export default function AlertsToggle() {
       disabled={status.readOnly || busy || prefs === null}
       message={message}
       showReadOnly={shouldShowReadOnly(status)}
+      offline={status.reason === READ_ONLY_REASON.OFFLINE}
+      loginHref={LOGIN_HREF}
       onChange={onChange}
     />
   );

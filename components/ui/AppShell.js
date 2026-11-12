@@ -27,8 +27,10 @@ export const NAV_HIDDEN_PATHS = Object.freeze(['/', '/login', '/onboarding', '/g
  * 보기 전용 배너를 두지 않는 경로.
  *   - `/`, `/login`: 로그인 자체를 안내하는 화면이라 배너가 겹말이 된다.
  *   - `/design-board`: 고정 데모 데이터만 쓴다 — 사용자 상태를 읽지 않는다(spec 7장).
+ *   - `/g`: 보호자가 받은 링크를 여는 화면이다. 배너 문구(만들기·편집·연동·공유)는 환자용이라 보호자에게 맞지 않고,
+ *     화면이 자기 말로 안내한다: 로그인 필요, 오프라인이라 가져올 수 없음, 알림 스위치의 보기 전용 안내(사용성 점검 D2).
  */
-export const STATUS_HIDDEN_PATHS = Object.freeze(['/', '/login', '/design-board']);
+export const STATUS_HIDDEN_PATHS = Object.freeze(['/', '/login', '/design-board', '/g']);
 
 /** 긴급을 셸이 그리지 않는 경로 — 그 화면이 자기 하단 바 안에 직접 그린다 */
 export const EMERGENCY_IN_PAGE_PATHS = Object.freeze(['/']);

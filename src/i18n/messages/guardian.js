@@ -67,7 +67,7 @@ export const messages = {
   },
   'guardian.readOnlyBlocked': {
     ko: '보기 전용 상태에서는 링크를 만들 수 없어요. 로그인한 뒤 다시 시도해 주세요.',
-    en: 'You can’t create a link in view-only mode. Please log in and try again.',
+    en: 'You can’t create a link in view-only mode. Please sign in and try again.',
     ja: '閲覧専用の状態ではリンクを作成できません。ログインしてからもう一度お試しください。',
     zh: '只读状态下无法创建链接。请登录后重试。',
   },
@@ -345,31 +345,31 @@ export const messages = {
   },
   'guardian.checking': {
     ko: '로그인 상태를 확인하고 있어요…',
-    en: 'Checking your login…',
+    en: 'Checking your sign-in…',
     ja: 'ログイン状態を確認しています…',
     zh: '正在确认登录状态…',
   },
   'guardian.loginNeededTitle': {
     ko: '로그인하면 링크를 열 수 있어요',
-    en: 'Log in to open the link',
+    en: 'Sign in to open the link',
     ja: 'ログインするとリンクを開けます',
     zh: '登录后即可打开链接',
   },
   'guardian.loginNeededBody': {
     ko: '링크 내용은 이 탭에만 잠시(최대 1시간) 보관했다가, 로그인하고 돌아오면 이어서 열어요.',
-    en: 'The link is kept in this tab only for a short time (up to 1 hour), and opening continues when you come back after logging in.',
+    en: 'The link is kept in this tab only for a short time (up to 1 hour), and opening continues when you come back after signing in.',
     ja: 'リンクの内容はこのタブにだけ一時的に（最大1時間）保管し、ログインして戻ると続けて開きます。',
     zh: '链接内容仅在此标签页中临时保存（最长1小时），登录返回后会继续打开。',
   },
   'guardian.loginButton': {
     ko: '로그인하고 열기',
-    en: 'Log in and open',
+    en: 'Sign in and open',
     ja: 'ログインして開く',
     zh: '登录并打开',
   },
   'guardian.holdFailed': {
     ko: '이 브라우저에서는 링크를 잠시 보관할 수 없어요. 로그인한 뒤 받은 링크를 다시 눌러 주세요.',
-    en: 'This browser can’t keep the link for now. After logging in, tap the link you received again.',
+    en: 'This browser can’t keep the link for now. After signing in, tap the link you received again.',
     ja: 'このブラウザではリンクを一時保管できません。ログイン後、受け取ったリンクをもう一度タップしてください。',
     zh: '此浏览器无法临时保存链接。登录后请再次点击收到的链接。',
   },
@@ -523,6 +523,13 @@ export const messages = {
     en: 'Get return-time alerts',
     ja: '戻り期限の通知を受け取る',
     zh: '接收返回截止时间提醒',
+  },
+  // 오프라인이라 스위치가 막혔을 때: 로그인을 권하지 않고 사실과 할 일만 적는다 (사용성 점검 D2 · C2)
+  'guardian.alertsOfflineNote': {
+    ko: '인터넷 연결이 없어 지금은 바꿀 수 없어요. 다시 연결된 뒤에 바꿔 주세요.',
+    en: 'You are offline, so this cannot be changed right now. Please change it after you reconnect.',
+    ja: 'インターネットに接続されていないため、今は変更できません。再接続してから変更してください。',
+    zh: '当前未连接网络，暂时无法更改。请在重新连接后再更改。',
   },
   'guardian.alertsNote': {
     ko: '이 휴대폰에서 앱이 완전히 닫혀 있으면 알림이 오지 않을 수 있어요.',

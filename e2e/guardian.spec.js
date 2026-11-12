@@ -37,6 +37,9 @@ async function guardianDevice(browser, testInfo) {
 async function loginRoundTrip(page, link) {
   await page.goto(link);
   await expect(page.getByRole('heading', { name: '로그인하면 링크를 열 수 있어요' })).toBeVisible();
+  // 받은 링크 화면은 환자용 보기 전용 막대를 두지 않는다: 로그인 안내는 본문의 이 구역 하나다(사용성 점검 D2)
+  await expect(page.locator('.ui-readonly')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: '로그인하기' })).toHaveCount(0);
   // 로그인 왕복 동안 암호문을 탭 저장소에만 잠시 둔다
   await expect.poll(() => page.evaluate((k) => sessionStorage.getItem(k), PENDING_KEY)).not.toBeNull();
   await page.getByRole('link', { name: '로그인하고 열기' }).click();
