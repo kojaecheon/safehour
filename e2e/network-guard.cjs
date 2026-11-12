@@ -1,4 +1,4 @@
-// E2E 서버 쪽 외부 호출 차단기 (AX-322 · spec 12.3 '외부 호출 0건')
+// E2E 서버 쪽 외부 호출 차단기 (AX-322 · 외부 호출 0건: docs/standards.md '테스트', docs/engineering-notes.md '화면 테스트가 외부를 부르지 않게 하는 방법')
 //
 // playwright.config.js 가 E2E 서버(next start)를 `NODE_OPTIONS=--require <이 파일>` 로 띄운다.
 // 서버가 루프백(127.0.0.1·localhost·::1) 밖으로 연결하려 하면

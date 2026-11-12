@@ -1,4 +1,4 @@
-// 데모 사건 → 자동 대체와 전후 비교 · 즉시 복귀 (AX-322 · spec 12.3 시나리오 3, 4.9, 규칙 13·31·50·55)
+// 데모 사건 → 자동 대체와 전후 비교 · 즉시 복귀 (AX-322 · 시나리오 3(옛 작업 설계서의 화면 테스트 번호), docs/business-rules.md '전체 일정 확정과 변화 대응', docs/platform/ITINERARY_RULES.md '데모 사건', docs/platform/IA_AND_FLOWS.md '즉시 복귀')
 //
 // 데모 사건 패널은 '병원 연동 데모' 모드의 오늘에만 있다. 그래서 체류를 만든 뒤 데모 지침 A 를 연결하고
 // 병원 안내를 확인한 다음(확인하지 않은 중요 안내가 있으면 오늘이 STANDBY 로 덧씌워진다) 오늘 화면에서 시연한다.
@@ -34,7 +34,7 @@ test.describe('시나리오 3 — 데모 사건', () => {
     await expect(page.getByText('데모 사건을 반영해 오늘 일정을 다시 판정했어요.')).toBeVisible();
     await expect(panel.getByRole('listitem').filter({ hasText: '장소 휴무' })).toBeVisible();
 
-    // 저장된 오늘: 닫힌 장소가 빠지고, 전후 비교가 기록된다 (규칙 31 — 변화가 필요한데 비교가 비면 실패)
+    // 저장된 오늘: 닫힌 장소가 빠지고, 전후 비교가 기록된다 (docs/business-rules.md '전체 일정 확정과 변화 대응': 변화가 필요한데 비교가 비면 실패)
     const after = (await readRecord(page, 'tripPlan')).days[today];
     expect(stopsOf(after).map((s) => s.contentId)).not.toContain(next.contentId);
     expect(after.delta?.hasVisibleChange).toBe(true);
@@ -85,7 +85,8 @@ test.describe('시나리오 3 — 데모 사건', () => {
     await expect(page.getByRole('heading', { name: '지금 돌아가세요' })).toBeVisible(); // 화면의 복귀 배너는 남는다
     await expect(page.getByRole('button', { name: '복귀 안내 다시 보기' })).toBeVisible();
 
-    // 새로 고쳐도 returnNow 는 유지되고(규칙 55), 앱을 다시 열면 시트가 다시 자동으로 열린다
+    // 새로 고쳐도 returnNow 는 유지되고(docs/platform/ITINERARY_RULES.md '데모 사건': 오늘 사건은 누적 저장하고 매번 다시 보낸다), 앱을 다시 열면 시트가 다시 자동으로 열린다
+    // 같은 사건 목록을 다시 보내도 효과가 두 번 더해지지 않는다(접는 쪽은 src/engine/tripEvents.js foldDemoEvents)
     await page.reload();
     const reopened = page.getByRole('dialog', { name: '지금 돌아가세요' });
     await expect(reopened).toBeVisible();

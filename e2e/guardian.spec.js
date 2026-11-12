@@ -1,4 +1,4 @@
-// 보호자 링크 만들기와 PIN 으로 열기 (AX-322 · spec 12.3 시나리오 6, 4.11, 5.4, 규칙 37·38)
+// 보호자 링크 만들기와 PIN 으로 열기 (AX-322 · 시나리오 6(옛 작업 설계서의 화면 테스트 번호), docs/business-rules.md '보호자', docs/security.md '보호자 링크'·'기기 저장소와 계정 이름공간')
 //
 // - 환자 기기: 공유 동의 + 6자리 PIN → 링크 `<origin>/g#<암호문>`. 암호문은 # 뒤에만 있다.
 // - 보호자 기기(새 브라우저 컨텍스트 — 다른 휴대폰): 로그인하지 않은 채 링크를 열면 암호문을 탭 저장소에
@@ -69,7 +69,7 @@ test.describe('시나리오 6 — 보호자 링크', () => {
     await evidenceShot(page, '15-guardian-create');
     expect((await readRecord(page, 'stay')).guardianShare?.lastSentAt).toBeTruthy();
 
-    // 스냅샷 내용 (규칙 37) — 실제로 풀어 본다
+    // 스냅샷 내용 (docs/business-rules.md '보호자'): 실제로 풀어 본다
     const snapshot = await decryptSnapshot(fragment, PIN);
     const text = JSON.stringify(snapshot);
     expect(snapshot.emergency).toEqual(['119', '1330']);
@@ -109,7 +109,7 @@ test.describe('시나리오 6 — 보호자 링크', () => {
       expect(new URL(guardian.page.url()).hash).toBe('');
       expect(Object.keys((await readRecord(guardian.page, 'guardianCopies')) ?? {})).toHaveLength(1);
 
-      // 암호문은 어떤 요청의 경로·본문·헤더에도 실리지 않는다 (규칙 38)
+      // 암호문은 어떤 요청의 경로·본문·헤더에도 실리지 않는다 (docs/security.md '보호자 링크')
       for (const entry of [...patientRequests, ...guardianRequests]) {
         expect(await entry, '요청에 보호자 링크 암호문이 실렸다').not.toContain(fragment);
         expect(await entry).not.toContain(fragment.slice(0, 32));

@@ -1,5 +1,5 @@
-// 일정 편집 — 교체·삭제·식사 칸 비우기·다시 만들기 (AX-322 · spec 12.3 시나리오 4, 4.10, 규칙 30·33)
-// 지도 길찾기는 목적지 이름·좌표만 (spec 4.14 · 규칙 39)
+// 일정 편집: 교체·삭제·식사 칸 비우기·다시 만들기 (AX-322 · 시나리오 4(옛 작업 설계서의 화면 테스트 번호), docs/business-rules.md '사용자 편집'·'전체 일정 확정과 변화 대응')
+// 지도 길찾기는 목적지 이름·좌표만 (docs/business-rules.md '알림과 카드': 숙소·병원 좌표는 어떤 지도 링크에도 넣지 않는다)
 //
 // 편집은 시각에 영향을 받지 않도록 **내일** 일정에서 한다(오늘은 이미 지난 정거장을 바꾸지 않는다).
 
@@ -64,7 +64,7 @@ test.describe('시나리오 4 — 교체·삭제·다시 만들기', () => {
     expect(stopsOf(after).map((s) => s.contentId)).not.toContain(target.contentId);
     expect((await readRecord(page, 'tripPlan')).edits[date].deleted).toContain(target.contentId);
 
-    // 조건을 고쳐 재계획이 일어나도 뺀 장소는 돌아오지 않는다 (규칙 30)
+    // 조건을 고쳐 재계획이 일어나도 뺀 장소는 돌아오지 않는다 (docs/business-rules.md '전체 일정 확정과 변화 대응'의 재계획 규칙 2~4)
     await page.goto('/conditions');
     await page.getByRole('button', { name: '고치기' }).first().click();
     await page.locator('.conditions-group-toggle').filter({ hasText: '식사와 식이' }).click();
