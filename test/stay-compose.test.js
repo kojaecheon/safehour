@@ -1,4 +1,4 @@
-// 모르겠음 치환·항목별 엄격 합성·출처 기록 (AX-302 · spec 4.5, 10장 규칙 7·8·16·17)
+// 모르겠음 치환·항목별 엄격 합성·출처 기록 (AX-302 · docs/business-rules.md '조건 기간'·'날짜별 합성'·'하루 일정 생성', 테스트 이름의 규칙 7·8·16·17 은 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

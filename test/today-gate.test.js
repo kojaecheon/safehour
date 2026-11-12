@@ -1,4 +1,4 @@
-// 오늘 게이트 덧씌우기 (AX-302 · spec 4.6·4.9, 10장 규칙 32·49)
+// 오늘 게이트 덧씌우기 (AX-302 · docs/business-rules.md '매일 확인'·'전체 일정 확정과 변화 대응'·'사용자 편집', 테스트 이름의 규칙 32·49 는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

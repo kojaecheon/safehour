@@ -2,14 +2,14 @@
 //
 // 화면(app/today, app/trip, app/place)은 저장된 DayPlan 을 이 함수들로 바꿔 그린다.
 // 판정을 새로 만들지 않는다 — 엔진이 만든 값을 고르고 늘어놓기만 한다. 이 파일이 고정하는 것:
-//   - 하루 타임라인 항목: 블록·외출·정거장·식사 칸·복귀(예상 귀가 → 복귀 마감), 시각 순, 보호자 분리 (spec 4.7, 5.2)
-//   - 보호자 탭 잠금 사유: 합성된 escortRequired / guardianMustStay 에서 읽는다 (spec 4.7 · 4.11)
-//   - 전후 비교 요약: 대체·빠짐·들어옴·줄어듦·취소·새 마감, 장소 이름 찾기 (spec 4.9)
-//   - 오늘 화면의 지금 외출·다음 정거장 (spec 4.6 · 4.7)
-//   - 전체 일정 날짜 줄과 입력 필요 날짜의 고칠 곳 (spec 3.1 · 4.5)
-//   - AI 소개 요청은 허용 목록(이름·유형·시각·관심사·강도)만 담고 캐시 키가 결정적이다 (spec 4.16 · 규칙 36)
-//   - 장소 상세 요청은 Stop 형식이고 지도 링크 입력은 정거장뿐이다 (spec 6장 · 4.14 · 규칙 39)
-//   - 편집 가능 여부: 지난 날짜·보기 전용·매일 확인 전 오늘은 막는다 (spec 4.10 · 규칙 32)
+//   - 하루 타임라인 항목: 블록·외출·정거장·식사 칸·복귀(예상 귀가 → 복귀 마감), 시각 순, 보호자 분리 (docs/business-rules.md '하루 일정 생성', docs/contracts.md '`POST /api/itinerary/plan`')
+//   - 보호자 탭 잠금 사유: 합성된 escortRequired / guardianMustStay 에서 읽는다 (docs/business-rules.md '하루 일정 생성'·'보호자')
+//   - 전후 비교 요약: 대체·빠짐·들어옴·줄어듦·취소·새 마감, 장소 이름 찾기 (docs/business-rules.md '전체 일정 확정과 변화 대응')
+//   - 오늘 화면의 지금 외출·다음 정거장 (docs/business-rules.md '매일 확인'·'하루 일정 생성')
+//   - 전체 일정 날짜 줄과 입력 필요 날짜의 고칠 곳 (docs/platform/IA_AND_FLOWS.md '경로', docs/business-rules.md '날짜 분류')
+//   - AI 소개 요청은 허용 목록(이름·유형·시각·관심사·강도)만 담고 캐시 키가 결정적이다 (docs/business-rules.md 'AI 소개 문장', 테스트 이름의 규칙 36 은 옛 설계서 번호다)
+//   - 장소 상세 요청은 Stop 형식이고 지도 링크 입력은 정거장뿐이다 (docs/contracts.md '`POST /api/place`', docs/business-rules.md '알림과 카드'의 지도 링크 문단, 테스트 이름의 규칙 39 는 옛 설계서 번호다)
+//   - 편집 가능 여부: 지난 날짜·보기 전용·매일 확인 전 오늘은 막는다 (docs/business-rules.md '매일 확인'·'사용자 편집', 테스트 이름의 규칙 32 는 옛 설계서 번호다)
 //   - 복귀 시트의 돌아갈 곳: 숙소·병원(hospitalId 로만)·정해 둔 장소, 첫 병원으로 추측하지 않는다 (마감 지남 설계서 4.2·4.3)
 
 import assert from 'node:assert/strict';

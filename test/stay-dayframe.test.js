@@ -1,4 +1,4 @@
-// 날짜의 숙소·입국일 시작·출국일 마감·병원 일정 블록 (AX-302 · spec 4.1–4.3)
+// 날짜의 숙소·입국일 시작·출국일 마감·병원 일정 블록 (AX-302 · docs/business-rules.md '체류'·'숙소와 병원')
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

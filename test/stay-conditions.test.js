@@ -1,4 +1,4 @@
-// 조건 기간 검증과 정규화 (AX-302 · spec 4.4, 10장 규칙 6·11·13-1)
+// 조건 기간 검증과 정규화 (AX-302 · docs/business-rules.md '숙소와 병원'·'조건 기간'·'날짜별 합성', 테스트 이름의 규칙 6·11·13-1 은 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

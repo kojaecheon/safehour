@@ -1,4 +1,4 @@
-// 새 사유 코드와 조정 가능한 기본값 (AX-302 · spec 5.2 새 사유 코드, 11장)
+// 새 사유 코드와 조정 가능한 기본값 (AX-302 · docs/platform/IA_AND_FLOWS.md '이번에 새로 쓰는 사유 코드', docs/platform/ITINERARY_RULES.md '조정 가능한 기본값')
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

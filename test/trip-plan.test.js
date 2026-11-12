@@ -1,7 +1,8 @@
-// AX-307 — 체류 전체 일정 조립 (spec 4.9 생성, 4.10 다시 만들기, 6장 plan 요청)
+// AX-307: 체류 전체 일정 조립 (docs/business-rules.md '전체 일정 확정과 변화 대응'의 생성, '사용자 편집'의 다시 만들기, docs/contracts.md '`POST /api/itinerary/plan`' 요청)
 //
-// spec 10장 규칙 27(체류 전체), 28, 29, 30(지난 날짜·고정·삭제), 51(표시만 다시 쓰기)과
-// 45박 입력의 처리 시간을 고정한다.
+// docs/business-rules.md '하루 일정 생성'·'전체 일정 확정과 변화 대응'(재계획 규칙 2~4, 언어 변경만 예외)의 규칙과
+// 45박 입력의 처리 시간을 고정한다(테스트 이름의 규칙 27(체류 전체), 28, 29, 30(지난 날짜·고정·삭제),
+// 51(표시만 다시 쓰기)은 옛 설계서 번호다).
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';

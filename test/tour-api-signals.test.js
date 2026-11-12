@@ -1,12 +1,13 @@
-// AX-305 — 관광 후보 분류 신호 (spec 4.8, 10장 규칙 21–26 의 분류 부분, 11장 단서 목록)
+// AX-305: 관광 후보 분류 신호 (docs/business-rules.md '장소 후보와 필터'의 분류 부분, docs/platform/ITINERARY_RULES.md '단서 목록 (`src/tour-api/cues.js`)',
+// 테스트 이름의 규칙 21~26 은 옛 설계서 번호다)
 //
 // 계약:
 //   - 판정(제외)은 엔진(T6a)이 한다. 이 모듈은 **신호**만 만든다.
 //   - 신호는 SafeHour 추정값이다. 관광공사 원문 필드(sourceMetadata)와 섞지 않고 `signals` 에 둔다.
 //   - 매운 음식·날음식은 3상태다: 단서 있음 true / '아님' 근거 있음 false / 판단 불가 null.
-//     엔진은 null 을 MENU_UNKNOWN 으로 제외한다(spec 4.8).
-//   - 열·물은 단서가 없으면 노출이 없는 것으로 본다(spec 4.8) — boolean.
-//   - 신호는 언어와 무관해야 한다(spec 4.17, 규칙 27): 국문 제목·유형·분류·국문 메뉴만 쓴다.
+//     엔진은 null 을 MENU_UNKNOWN 으로 제외한다(docs/business-rules.md '장소 후보와 필터').
+//   - 열·물은 단서가 없으면 노출이 없는 것으로 본다(docs/business-rules.md '장소 후보와 필터'): boolean.
+//   - 신호는 언어와 무관해야 한다(docs/business-rules.md '장소 후보와 필터'·'전체 일정 확정과 변화 대응', 테스트 이름의 규칙 27 은 옛 설계서 번호다): 국문 제목·유형·분류·국문 메뉴만 쓴다.
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';

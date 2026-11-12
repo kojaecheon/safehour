@@ -1,6 +1,7 @@
-// AX-306 — 하루 일정 엔진: 틀·마감·복귀 계산·날짜 상태·보호자 (spec 4.3, 4.7, 5.2)
+// AX-306 · 하루 일정 엔진: 틀·마감·복귀 계산·날짜 상태·보호자 (docs/business-rules.md '숙소와 병원'·'하루 일정 생성', docs/contracts.md '`POST /api/itinerary/plan`'의 DayPlan)
 //
-// spec 10장 규칙 5, 9, 10, 13-1, 13-2, 14–20, 53 을 고정한다.
+// docs/business-rules.md '체류'·'숙소와 병원'·'날짜 분류'·'하루 일정 생성'의 규칙을 고정한다
+// (테스트 이름의 규칙 5, 9, 10, 13-1, 13-2, 14~20, 53 은 옛 설계서 번호다).
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
@@ -43,7 +44,7 @@ function basics() {
   ];
 }
 
-/** 외출의 복귀 계산식 required (spec 4.7) */
+/** 외출의 복귀 계산식 required (docs/business-rules.md '하루 일정 생성') */
 function required(outing, { recovery }) {
   const stays = outing.stops.reduce((s, x) => s + x.stayMin, 0);
   const travel = outing.travelTotalMin;

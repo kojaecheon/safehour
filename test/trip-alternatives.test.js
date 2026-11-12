@@ -1,6 +1,6 @@
-// AX-307 — 교체 후보 (spec 4.10 교체, 6장 alternatives 요청)
+// AX-307: 교체 후보 (docs/business-rules.md '사용자 편집'의 교체, docs/contracts.md '`POST /api/itinerary/alternatives`' 요청)
 //
-// spec 10장 규칙 33: 교체 후보는 최대 5개이고, 각 후보를 넣은 외출이 모든 검증을 통과한다.
+// docs/business-rules.md '사용자 편집'(테스트 이름의 규칙 33 은 옛 설계서 번호다): 교체 후보는 최대 5개이고, 각 후보를 넣은 외출이 모든 검증을 통과한다.
 
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
@@ -48,7 +48,7 @@ const input = (outing, stop, extra = {}) => ({
   ...extra,
 });
 
-/** 외출 하나가 spec 4.7 검증을 모두 통과하는가 */
+/** 외출 하나가 docs/business-rules.md '하루 일정 생성'의 검증을 모두 통과하는가 */
 function assertOutingValid(o, { recovery }) {
   const req = requiredMin(o, { recovery });
   assert.equal(mins(o.returnBy) - mins(o.departAt) - req, o.slackMin, `${o.id} slack`);

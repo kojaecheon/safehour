@@ -144,7 +144,7 @@ describe('초단기실황 조회', () => {
   });
 });
 
-// ── 단기예보 (AX-308 · spec 4.9 변화 원천 4, 6장 기상) ─────────────────────────
+// ── 단기예보 (AX-308 · docs/platform/ITINERARY_RULES.md '변화 원천'(표의 4번 행), docs/contracts.md '`POST /api/itinerary/plan`'의 diagnostics.weather) ─────────────────────────
 // 오늘~모레 날짜별 실외 부적합 여부. 실패·키 없음·자료 부족은 '확인 불가'(null)이고 판정에 반영하지 않는다.
 // 실제 기상청을 부르지 않는다 — 모든 응답은 fixture 다.
 

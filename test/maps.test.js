@@ -1,4 +1,4 @@
-// 지도 길찾기 링크 — 목적지 전용 (AX-318 · spec 4.14 · 규칙 39 · ADR-0010)
+// 지도 길찾기 링크: 목적지 전용 (AX-318 · docs/business-rules.md '알림과 카드'의 지도 링크 문단 · ADR-0010, 테스트 이름의 규칙 39 는 옛 설계서 번호다)
 //
 // 이 파일이 고정하는 것
 //   - 링크에는 목적지 장소의 이름과 좌표만 있다. 출발지 매개변수가 없다.
@@ -35,7 +35,7 @@ function stop(overrides = {}) {
   };
 }
 
-/** 가상의 숙소 구간 (spec 5.1 LodgingSegment) */
+/** 가상의 숙소 구간 (src/stay/stay.js @typedef LodgingSegment) */
 const LODGING = Object.freeze({
   id: 'L1',
   name: '테스트 숙소',
@@ -44,7 +44,7 @@ const LODGING = Object.freeze({
   checkOut: '2026-10-05',
 });
 
-/** 가상의 병원 (spec 5.1 Hospital) */
+/** 가상의 병원 (src/stay/stay.js @typedef Hospital) */
 const HOSPITAL = Object.freeze({
   id: 'H1',
   name: '테스트 병원',
