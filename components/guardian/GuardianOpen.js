@@ -1,6 +1,6 @@
 'use client';
 
-// 보호자 링크 열기 — /g (AX-320 · spec 4.11, 4.18, 4.19, 규칙 37·38)
+// 보호자 링크 열기, /g (AX-320 · docs/business-rules.md '보호자', docs/platform/IA_AND_FLOWS.md '보기 전용 상태', docs/security.md '보호자 링크'·'기기 저장소와 계정 이름공간')
 //
 // 흐름
 //   1. 암호문은 주소의 # 뒤에서만 읽는다(브라우저가 # 뒤를 서버로 보내지 않는다). 이 화면은 암호문을 어떤 요청에도 싣지 않는다.
@@ -196,7 +196,7 @@ export default function GuardianOpen() {
   const loggedIn = status.authenticated && !status.readOnly;
   const offline = status.reason === READ_ONLY_REASON.OFFLINE;
 
-  // 로그인하지 않은 채 링크를 열었으면 로그인 왕복 동안 암호문을 탭 저장소에 둔다 (spec 4.11)
+  // 로그인하지 않은 채 링크를 열었으면 로그인 왕복 동안 암호문을 탭 저장소에 둔다 (docs/security.md '기기 저장소와 계정 이름공간')
   useEffect(() => {
     if (!fragment || incoming.source !== 'hash' || status.authenticated) return;
     if (!status.sessionChecked && !offline) return;
@@ -239,7 +239,7 @@ export default function GuardianOpen() {
       importedAt: new Date().toISOString(),
       expiresAt: snapshot.expiresAt,
     });
-    // 가져오기가 끝났다 — 임시 보관과 주소의 암호문을 지운다 (spec 4.11 · 규칙 38)
+    // 가져오기가 끝났다: 임시 보관과 주소의 암호문을 지운다 (docs/security.md '기기 저장소와 계정 이름공간'·'보호자 링크')
     getStore().clearPendingGuardianLink();
     stripLinkFromAddress();
     setSelectedId(id);

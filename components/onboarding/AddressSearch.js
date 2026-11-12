@@ -1,10 +1,10 @@
 'use client';
 
-// 도로명주소 검색 칸 (AX-314 · spec 4.2–4.3, 6장 POST /api/address/search)
+// 도로명주소 검색 칸 (AX-314 · docs/business-rules.md '숙소와 병원', docs/contracts.md '`POST /api/address/search`')
 //
-// - 사용자가 입력한 검색어로만 찾는다. 병원 목록·추천·순위를 보여주지 않는다(spec 4.3, 9.1).
-// - 현재 위치를 쓰지 않는다. 위치 권한을 묻지 않는다(spec 9.1, 규칙 46).
-// - 결과는 허용 필드(spec 5.1 Address)만 남겨 저장한다. 도로명주소는 한국어 원문 그대로 보인다(lang="ko").
+// - 사용자가 입력한 검색어로만 찾는다. 병원 목록·추천·순위를 보여주지 않는다(docs/business-rules.md '숙소와 병원').
+// - 현재 위치를 쓰지 않는다. 위치 권한을 묻지 않는다(docs/security.md '위치 정보').
+// - 결과는 허용 필드(src/stay/stay.js @typedef Address)만 남겨 저장한다. 도로명주소는 한국어 원문 그대로 보인다(lang="ko").
 // - 데모 주소(source "DEMO")는 '데모 주소' 배지를 붙인다 — 데모를 실제처럼 보이지 않게 한다.
 // - 검색 상태(찾는 중·결과 수·결과 없음·실패)는 role="status" 한 곳에서 읽힌다.
 
@@ -28,7 +28,7 @@ const HINT_KEY = {
  * @param {string} props.field                 검증 필드 경로 ('lodgings[0].address')
  * @param {Array} props.issues                 지금 보여줄 문제 목록
  * @param {'lodging'|'hospital'} props.kind
- * @param {object|null} props.value            고른 주소(spec 5.1 Address)
+ * @param {object|null} props.value            고른 주소(src/stay/stay.js @typedef Address)
  * @param {(address: object) => void} props.onSelect
  */
 export default function AddressSearch({ field, issues, kind, value, onSelect }) {

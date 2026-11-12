@@ -1,6 +1,6 @@
 'use client';
 
-// 5단계 — 관심사(8개, 0개 이상) · 이동 강도(느긋하게 / 보통) (spec 4.1, 5.1)
+// 5단계: 관심사(8개, 0개 이상) · 이동 강도(느긋하게 / 보통) (docs/business-rules.md '체류', src/stay/stay.js @typedef Stay)
 //
 // 관심사는 체크박스 칩이다. 선택은 테두리 + 바탕 + 체크 아이콘 + 굵기로 보인다(색 단독 금지).
 // 강도의 정거장 수 설명은 기본값 파일(DEFAULTS.stopsPerPace)에서 읽는다.

@@ -1,6 +1,6 @@
 'use client';
 
-// 보호자 링크 만들기 — /guardian (AX-320 · spec 4.11, 4.18, 4.19, 5.1, 5.4, 규칙 37·38)
+// 보호자 링크 만들기, /guardian (AX-320 · docs/business-rules.md '보호자', docs/platform/IA_AND_FLOWS.md '보기 전용 상태', docs/security.md '보호자 링크'·'민감정보 동의')
 //
 // 흐름
 //   1. 체류·전체 일정이 있어야 한다. 없으면 무엇이 없는지와 어디서 넣는지 안내한다.
@@ -14,7 +14,7 @@
 //   5. 복사·공유(navigator.share 가 있으면), guardianShare{보낸 시각, 일정 지문}을 저장한다.
 //   6. 보낸 뒤 일정이 바뀌면 '보호자 링크 다시 보내기'를 안내한다(useGuardianResendNeeded).
 //
-// 보기 전용(로그인 안 함·만료·오프라인)에서는 만들기를 막는다(spec 4.18 — 공유 차단).
+// 보기 전용(로그인 안 함·만료·오프라인)에서는 만들기를 막는다(docs/platform/IA_AND_FLOWS.md '보기 전용 상태': 공유 차단).
 // PIN 은 화면 상태에만 잠시 있고, 링크를 만든 뒤 바로 지운다. 저장하거나 기록하지 않는다.
 
 import { useId, useRef, useState } from 'react';

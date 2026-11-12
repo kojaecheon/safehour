@@ -1,9 +1,9 @@
 'use client';
 
-// 본인 체크 기간 편집기 (AX-315 · spec 4.4)
+// 본인 체크 기간 편집기 (AX-315 · docs/business-rules.md '조건 기간')
 //
 // 틀은 components/ui 의 PeriodEditor, 예/아니오/모르겠음은 AnswerInput 을 쓴다.
-//   - spec 4.4 표의 항목을 모두 묻는다. 자유 서술 칸은 없다.
+//   - docs/business-rules.md '조건 기간'의 항목 표의 항목을 모두 묻는다. 자유 서술 칸은 없다.
 //   - 필수 항목(외출 허용·복귀 시각)에는 '모르겠음'이 없다. 외출 불가면 복귀 시각을 묻지 않는다.
 //   - 복귀 장소가 병원이면 등록된 병원 중에서 고른다. 병원이 하나면 자동으로 고른다.
 //   - 동행 필수=예 이면 '보호자가 곁을 지켜야 하나요?'는 '예'로 고정해 보여주고, 저장도 '예'로 한다.
@@ -39,7 +39,7 @@ import {
   validatePeriodForm,
 } from './periodFormModel.js';
 
-/** 항목 → 질문 문구 키 (spec 4.4 표) */
+/** 항목 → 질문 문구 키 (docs/platform/ITINERARY_RULES.md '본인 체크 항목'의 질문 열) */
 const QUESTION_KEY = {
   outing: 'conditions.qOuting',
   returnTime: 'conditions.qReturnTime',

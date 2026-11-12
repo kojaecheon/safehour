@@ -1,6 +1,6 @@
 'use client';
 
-// 날짜 분류 표시 (AX-315 · spec 4.5) — 색 + 아이콘 + 문구. 입력 필요는 오류 색을 쓰지 않는다.
+// 날짜 분류 표시 (AX-315 · docs/business-rules.md '날짜 분류'): 색 + 아이콘 + 문구. 입력 필요는 오류 색을 쓰지 않는다.
 
 import { useLang } from '@/components/LanguageProvider.js';
 import Icon from '@/components/ui/Icon.js';

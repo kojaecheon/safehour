@@ -1,10 +1,10 @@
 'use client';
 
-// 2단계 — 숙소 구간 (spec 4.2)
+// 2단계: 숙소 구간 (docs/business-rules.md '숙소와 병원')
 //
 // - 구간마다 이름(선택, 40자), 도로명주소 검색 결과, 체크인·체크아웃 날짜.
 //   이름을 비우면 저장하지 않고 화면은 '숙소'로 부른다(운영자 결정 2026-11-08). 주소·좌표는 그대로 필수다.
-// - 규칙 3(구간 날짜 겹침)은 validateStay() 가 판정하고, 겹친 두 구간의 체크인 칸에 붙인다.
+// - 숙소 구간 날짜 겹침(docs/business-rules.md '체류')은 validateStay() 가 판정하고, 겹친 두 구간의 체크인 칸에 붙인다.
 // - 숙소가 없는 밤은 오류가 아니라 안내다 — 그 날짜는 일정을 만들지 않는다(LODGING_REQUIRED).
 
 import { useLang } from '../LanguageProvider.js';

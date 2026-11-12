@@ -669,7 +669,7 @@ export function editErrorKey(code) {
   return EDIT_ERROR_KEY[code] ?? 'trip.errGeneric';
 }
 
-/** 정거장을 바꾸거나 뺄 수 있는가 — 오늘 이미 도착 시각이 지난 정거장은 건드리지 않는다(재계획 규칙 2) */
+/** 정거장을 바꾸거나 뺄 수 있는가: 오늘 이미 도착 시각이 지난 정거장은 건드리지 않는다(docs/business-rules.md '전체 일정 확정과 변화 대응'의 재계획 규칙 2) */
 export function stopEditable(stop, { date, today, nowMin }) {
   if (today && date < today) return false;
   if (date === today && Number.isFinite(nowMin) && minutesOf(stop?.arriveAt) <= nowMin) return false;

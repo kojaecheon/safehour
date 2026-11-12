@@ -1,4 +1,4 @@
-// 민감정보 동의 문구 버전 (AX-315 · spec 4.19)
+// 민감정보 동의 문구 버전 (AX-315 · docs/security.md '민감정보 동의')
 //
 // 동의 문구 본문은 src/i18n/messages/conditions.js 의 safety 구역(`conditions.consent*`)에 있다.
 // 문구를 바꾸면 이 버전을 올린다 — 기기에는 동의한 버전과 시각이 남는다(grantSensitiveConsent).

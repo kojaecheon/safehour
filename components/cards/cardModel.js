@@ -1,4 +1,4 @@
-// 한국어 안내 카드 모델 — 오늘 카드에 무엇을 넣을지 정한다 (AX-318 · spec 4.12 · 4.14 · 4.18)
+// 한국어 안내 카드 모델, 오늘 카드에 무엇을 넣을지 정한다 (AX-318 · docs/business-rules.md '알림과 카드', docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 // 순수 함수다(네트워크·브라우저 API 없음). 화면(app/cards)이 기기 저장소에서 읽은 체류·하루 일정을 넘긴다.
 // 로그인 만료·오프라인에서도 같은 값으로 그린다 — 이 기기의 마지막 계정 사본만 읽는다.
@@ -7,15 +7,15 @@
 //               '모르겠음'은 가장 엄격한 기본값('예')으로 이미 합성돼 들어온다.
 //               조건이 정해지지 않은 날(NEEDS_INPUT)은 '제한 없음'으로 읽지 않고 카드를 만들지 않는다.
 //   이동 카드 — 오늘 정거장의 한국어 이름·주소(Stop.ko). 원문 주소가 없으면 표시 언어 값 + '한국어 주소 확인 필요'.
-//   복귀 카드 — 그날 숙소 이름·주소(출국일은 전날 밤 숙소, spec 4.2).
+//   복귀 카드: 그날 숙소 이름·주소(출국일은 전날 밤 숙소, docs/business-rules.md '숙소와 병원').
 //   병원 카드 — 등록한 병원 이름·주소. 오늘 일정이 있는 병원이 먼저.
 //
 // 이 모델은 문구를 만들지 않는다. 카드 문장은 고정 문구(src/i18n/messages/cards.js, 사람 검수 대상, AI 금지)다.
-// 숙소·병원의 좌표와 병원 전화는 모델에 넣지 않는다 — 복귀·병원 카드는 주소 글자만 보여준다(spec 4.14 · 규칙 39).
+// 숙소·병원의 좌표와 병원 전화는 모델에 넣지 않는다, 복귀·병원 카드는 주소 글자만 보여준다(docs/business-rules.md '알림과 카드': 숙소·병원 좌표는 어떤 지도 링크에도 넣지 않는다).
 
 import { COVERAGE, DIET_KEYS, classifyDate, isStayDate, lodgingForDate } from '../../src/stay/index.js';
 
-/** 식이 카드 줄 순서 — spec 4.12 표의 예시 순서 */
+/** 식이 카드 줄 순서: 옛 설계서의 예시 순서 그대로다(지금 문서에는 문장 목록이 없다) */
 export const DIET_ORDER = Object.freeze(['spicy', 'alcohol', 'hard', 'hot', 'raw']);
 
 /** 식이 카드 상태 */
@@ -149,8 +149,8 @@ function hospitalsFor(stay, date) {
  * 오늘(KST) 한국어 안내 카드의 내용.
  *
  * @param {object} args
- * @param {object | null} args.stay     기기에 저장된 체류 (spec 5.1 Stay)
- * @param {object | null} [args.dayPlan] 그 날짜의 하루 일정 (spec 5.2 DayPlan). 다른 날짜면 쓰지 않는다
+ * @param {object | null} args.stay     기기에 저장된 체류 (src/stay/stay.js @typedef Stay)
+ * @param {object | null} [args.dayPlan] 그 날짜의 하루 일정 (docs/contracts.md '`POST /api/itinerary/plan`'의 DayPlan). 다른 날짜면 쓰지 않는다
  * @param {string} args.date            "YYYY-MM-DD" (KST 오늘)
  * @returns {{
  *   date: string,

@@ -1,6 +1,6 @@
 'use client';
 
-// 4단계 — 동반 보호자 있음 / 없음 (spec 4.1). 미리 골라 두지 않는다.
+// 4단계: 동반 보호자 있음 / 없음 (docs/business-rules.md '체류'). 미리 골라 두지 않는다.
 
 import { useLang } from '../LanguageProvider.js';
 import { ChoiceGroup } from './Fields.js';
