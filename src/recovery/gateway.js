@@ -1,19 +1,19 @@
-// SafeHour 연동 게이트웨이 — 지침 계약 v2 (AX-214 → AX-311 · spec 4.20, 5.3)
+// SafeHour 연동 게이트웨이: 지침 계약 v2 (AX-214 → AX-311 · docs/business-rules.md '병원 연동', docs/contracts.md '`POST /api/plan/link`')
 //
 // 정의: `docs/PRODUCT_DEFINITION.md` §3
 //
 // 게이트웨이의 책임
 //   1. **최소화** — 병원이 보낸 것 중 v2 계약 필드만 통과시킨다(허용 목록).
 //      진단명·시술기록·전체 약물목록·환자 호출 같은 필드가 섞여 와도 여기서 잘린다. 모든 층에 적용한다.
-//   2. **검증** — 최소화한 결과가 v2 형식이 아니면 지침 전체를 거부한다. v1 은 받지 않는다(규칙 48).
+//   2. **검증**: 최소화한 결과가 v2 형식이 아니면 지침 전체를 거부한다. v1 은 받지 않는다(docs/business-rules.md '병원 연동').
 //   3. **어댑터** — 병원마다 다른 인터페이스를 공통 계약으로 흡수한다.
 //
 // 지금은 데모 어댑터 하나뿐이다. FHIR·병원 전용 API 는 같은 자리에 어댑터로 붙는다.
-// 보호자용 축약은 게이트웨이가 아니라 보호자 스냅샷(spec 5.4)이 맡는다 — v1 `companionView` 는 없앴다.
+// 보호자용 축약은 게이트웨이가 아니라 보호자 스냅샷(docs/business-rules.md '보호자')이 맡는다, v1 `companionView` 는 없앴다.
 
 import { validatePlan } from './plan.js';
 
-/** `/api/plan/link` 오류 코드 — 모든 오류 응답은 `errorCode` 키를 쓴다 (spec 6장) */
+/** `/api/plan/link` 오류 코드: 모든 오류 응답은 `errorCode` 키를 쓴다 (docs/contracts.md '공통'·'`POST /api/plan/link`') */
 export const PLAN_LINK_ERROR = Object.freeze({
   /** 본문을 읽을 수 없거나 객체가 아님 (기존 코드) */
   BAD_REQUEST: 'SAFEHOUR_BAD_REQUEST',
@@ -32,7 +32,7 @@ export const PLAN_LINK_ERROR_STATUS = Object.freeze({
   [PLAN_LINK_ERROR.INVALID_PLAN]: 422,
 });
 
-// ── 허용 목록 (spec 5.3) — 새 필드를 통과시키려면 여기에 명시적으로 추가해야 한다 ──
+// ── 허용 목록 (src/recovery/AGENTS.md '항상 지켜야 하는 것'): 새 필드를 통과시키려면 여기에 명시적으로 추가해야 한다 ──
 
 const PLAN_SCALAR_KEYS = ['schemaVersion', 'planId', 'version', 'issuedAt', 'updatedAt', 'expiresAt', 'revoked', 'demo'];
 const ISSUER_KEYS = ['name', 'role'];
@@ -115,7 +115,7 @@ export function minimizeConditionItems(items) {
 
 /**
  * 병원이 보낸 원본에서 **v2 허용 목록에 있는 것만** 남긴다 (모든 층).
- * 원문 병원 복귀의 `hospitalId` 도 목록 밖이다 — 원문은 발행 병원을 뜻하고, 병원 id 는 변환이 채운다(규칙 57).
+ * 원문 병원 복귀의 `hospitalId` 도 목록 밖이다: 원문은 발행 병원을 뜻하고, 병원 id 는 변환이 채운다(docs/contracts.md '`POST /api/plan/link`').
  * @param {unknown} raw
  */
 export function minimizePlan(raw) {

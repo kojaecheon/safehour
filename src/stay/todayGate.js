@@ -1,4 +1,4 @@
-// 오늘 게이트 덧씌우기 (AX-302 · spec 4.6·4.9, 규칙 32·49)
+// 오늘 게이트 덧씌우기 (AX-302 · docs/business-rules.md '매일 확인'·'전체 일정 확정과 변화 대응'·'사용자 편집')
 //
 // 매일 확인 대기(DAILY_CHECK_PENDING)와 확인하지 않은 병원 중요 안내(PLAN_UNCONFIRMED_UPDATE)는
 // **저장된 확정 일정을 바꾸지 않는다.** 오늘 일정을 보여주는 시점에 이 순수 함수로 덧씌운다.
@@ -17,7 +17,7 @@ import { REASON, STATE, STATE_ORDER, mostConservative } from '../domain/states.j
  *
  * 덧씌울 것이 없으면 입력을 그대로 돌려준다(복사하지 않음 — 호출부는 결과를 바꾸지 않는다).
  *
- * @param {object|null|undefined} dayPlan  저장된 `DayPlan` (spec 5.2)
+ * @param {object|null|undefined} dayPlan  저장된 `DayPlan` (docs/contracts.md '`POST /api/itinerary/plan`')
  * @param {{dailyCheckPending?: boolean, unconfirmedHospitalUpdate?: boolean}} gates
  * @returns {object|null|undefined}
  */

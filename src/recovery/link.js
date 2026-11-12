@@ -1,14 +1,14 @@
-// 연동 지침 → 체류 모델 변환, 연결 사본, 재확인 (AX-311 · spec 4.20, 5.1, 5.3, 규칙 11·12·56·57)
+// 연동 지침 → 체류 모델 변환, 연결 사본, 재확인 (AX-311 · docs/business-rules.md '날짜별 합성'·'병원 연동', docs/contracts.md '`POST /api/plan/link`')
 //
 // 순수 함수 계층이다. 저장·네트워크·화면은 다른 작업이 맡는다
 // (저장소 AX-312, 연동 화면 AX-315, 앱 열기 재확인 AX-316).
 //
 // - 지침의 각 기간은 `HOSPITAL` 조건 기간이 된다. **기간을 잘라내지 않는다.**
-//   각 기간에 지침의 `expiresAt`·`revoked` 를 싣고, 적용 여부는 날짜별 합성(`src/stay/coverage.js`)이 정한다(규칙 12).
-// - 원문 병원 복귀(`place: "HOSPITAL"`, hospitalId 없음)는 발행 병원이다. 연결 병원 id 로 채운다(규칙 57).
+//   각 기간에 지침의 `expiresAt`·`revoked` 를 싣고, 적용 여부는 날짜별 합성(`src/stay/coverage.js`)이 정한다(docs/business-rules.md '날짜별 합성'·'병원 연동').
+// - 원문 병원 복귀(`place: "HOSPITAL"`, hospitalId 없음)는 발행 병원이다. 연결 병원 id 로 채운다(docs/contracts.md '`POST /api/plan/link`').
 //   연결 병원이 정해지기 전에는 변환하지 않는다.
 // - 한 기간 안의 동행 모순(`escortRequired`=예 + `guardianMustStay`=아니오)은 지침을 거부하지 않고 표시한다.
-//   그 기간이 덮는 날짜는 합성이 `CONFLICTING_CONDITION` 으로 막는다(규칙 11).
+//   그 기간이 덮는 날짜는 합성이 `CONFLICTING_CONDITION` 으로 막는다(docs/business-rules.md '날짜별 합성').
 // - 안내문(채널 B)은 변환 결과에 싣지 않는다. 판정에 쓰지 않는다.
 
 import { hospitalPeriodConflict } from '../stay/conditions.js';
@@ -51,7 +51,7 @@ function linkItems(items, linkedHospitalId) {
 }
 
 /**
- * v2 지침을 연결 병원 기준의 체류 모델 조각으로 바꾼다 (spec 4.20, 5.1).
+ * v2 지침을 연결 병원 기준의 체류 모델 조각으로 바꾼다 (docs/business-rules.md '병원 연동', 체류 모델 타입은 src/stay/stay.js·src/stay/conditions.js 의 typedef).
  *
  * @param {object} plan  형식이 맞는 v2 지침 (`validatePlan` 통과)
  * @param {string} linkedHospitalId  사용자가 고른 기존 병원 id 또는 새로 추가할 병원 id
@@ -63,9 +63,9 @@ function linkItems(items, linkedHospitalId) {
  * }}
  *   - `hospital`: 새 병원으로 추가할 때 쓰는 모양. 기존 병원에 연결하면 `linkedPlanId` 만 옮겨 적으면 된다.
  *     주소 출처는 데모 지침이면 `DEMO` 다. 실제 연동 지침의 주소 출처 값은 계약에 아직 없다(실제 연동 병원 0곳).
- *   - `appointments`: 지침의 병원 일정. 같은 날짜·시각·유형 중복 건너뛰기는 합치는 쪽이 한다(spec 4.20).
+ *   - `appointments`: 지침의 병원 일정. 같은 날짜·시각·유형 중복 건너뛰기는 합치는 쪽이 한다(docs/business-rules.md '병원 연동').
  *   - `periods`: 잘라내지 않은 `HOSPITAL` 기간. 각 기간에 `planId`·`planVersion`·`hospitalId`·`expiresAt`·`revoked`.
- *   - `conflictingPeriodIds`: 한 기간 안의 동행 모순이 있는 기간(규칙 11). 화면 표시용이다.
+ *   - `conflictingPeriodIds`: 한 기간 안의 동행 모순이 있는 기간(docs/business-rules.md '날짜별 합성'). 화면 표시용이다.
  * @throws {TypeError} 연결 병원 id 가 없거나 지침 형식이 틀리면
  */
 export function planToStayParts(plan, linkedHospitalId) {
@@ -116,11 +116,11 @@ export function planToStayParts(plan, linkedHospitalId) {
 }
 
 /**
- * 기기에 저장할 연결 사본 (spec 5.1 `LinkedPlan`).
+ * 기기에 저장할 연결 사본 (`LinkedPlan`, docs/business-rules.md '병원 연동').
  * - `plan`: 받은 지침 그대로이되 `instructions[].acknowledged` 는 버린다
  * - `acknowledged`: 확인 기록의 유일한 정본(`${id}@${updatedAt}` → true).
  *   이전 기록을 넘기면 **지금 지침에 그대로 있는 안내문의 확인만** 이어받는다 —
- *   내용이 바뀌어 `updatedAt` 이 달라진 안내문은 다시 확인해야 한다(규칙 56)
+ *   내용이 바뀌어 `updatedAt` 이 달라진 안내문은 다시 확인해야 한다(docs/business-rules.md '병원 연동')
  *
  * @param {{code: string, hospitalId: string, plan: object, fetchedAt: string, acknowledged?: Record<string, true>}} input
  * @throws {TypeError} 코드·병원 id·받은 시각이 없거나 지침 형식이 틀리면
@@ -151,7 +151,7 @@ function range(period) {
 }
 
 /**
- * 연동 지침 재확인 — 저장된 사본과 새로 받은 지침을 비교한다 (spec 4.6, 4.20).
+ * 연동 지침 재확인: 저장된 사본과 새로 받은 지침을 비교한다 (docs/business-rules.md '매일 확인'·'병원 연동').
  * 앱을 열 때 저장된 코드로 다시 받은 뒤 부른다. 환자 호출 필드는 없다(데모 사건으로만 다룬다).
  *
  * @param {object} previous  저장된 지침 (`LinkedPlan.plan`)
@@ -164,7 +164,7 @@ function range(period) {
  *   changedPeriods: Array<{index: number, before: {startDate: string, endDate: string} | null, after: {startDate: string, endDate: string} | null}>,
  * }}
  *   - `versionChanged`: 지침 id 또는 버전이 다르다 → 사본을 갱신한다
- *   - `revoked`·`expired`: 새 지침의 지금 상태. 외출 중이면 즉시 복귀로 전환한다(spec 4.9)
+ *   - `revoked`·`expired`: 새 지침의 지금 상태. 외출 중이면 즉시 복귀로 전환한다(docs/platform/IA_AND_FLOWS.md '즉시 복귀')
  *   - `changedPeriods`: 적용이 달라질 수 있는 기간(자리 순). 날짜·항목이 바뀌었거나, 기간이 생기거나 없어졌거나,
  *     지침 전체의 `expiresAt`·`revoked` 가 바뀌어 모든 기간의 적용이 바뀐 경우. 재계획할 날짜 범위를 준다.
  *     안내문만 바뀐 경우는 비어 있다(안내문은 판정에 쓰지 않는다)

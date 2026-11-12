@@ -708,7 +708,7 @@ function runPlan(input, { forceFresh }) {
 
 /**
  * 다시 만들기 (docs/business-rules.md '사용자 편집'): 범위의 고정·삭제·비움 기록을 지우고 새로 만든다. 지난 날짜는 다시 만들 수 없다.
- * 오늘이 범위에 들면 도착 시각이 지난 정거장은 그대로다(재계획 규칙 2).
+ * 오늘이 범위에 들면 도착 시각이 지난 정거장은 그대로다(docs/business-rules.md '전체 일정 확정과 변화 대응'의 재계획 규칙 2).
  * @param {PlanTripInput & {scope: 'DAY'|'FROM_TODAY', date?: string}} input  dates 는 무시한다(범위가 정한다)
  * @returns {{engineVersion: string, days: Record<string, object>, edits: Record<string, object>}}
  *   edits 는 범위의 기록을 지운 새 편집 기록(기기에 저장할 것)

@@ -1,4 +1,4 @@
-// 새 오류 코드와 검증 문제 코드 — 한곳 (AX-302 · spec 6장)
+// 새 오류 코드와 검증 문제 코드, 한곳 (AX-302 · docs/contracts.md '공통')
 //
 // 순수 도메인 계층에 둔다. 서버 가드(`lib/server/route-guard.js`)와 체류 검증이
 // 같은 정의를 쓰도록 하기 위해서다(도메인 → 서버 방향 의존을 만들지 않는다).
@@ -38,7 +38,7 @@ export const VALIDATION_ISSUE = Object.freeze({
   /** 필수 항목(outing·returnTime) 또는 병원 발행 기간에 '모르겠음' */
   UNKNOWN_NOT_ALLOWED: 'UNKNOWN_NOT_ALLOWED',
   OUT_OF_RANGE: 'OUT_OF_RANGE',
-  /** returnTime 장소가 병원인데 hospitalId 가 없음 (규칙 13-1) */
+  /** returnTime 장소가 병원인데 hospitalId 가 없음 (docs/business-rules.md '숙소와 병원') */
   HOSPITAL_ID_REQUIRED: 'HOSPITAL_ID_REQUIRED',
   /** noRestriction 은 SELF 기간만 */
   NO_RESTRICTION_SELF_ONLY: 'NO_RESTRICTION_SELF_ONLY',

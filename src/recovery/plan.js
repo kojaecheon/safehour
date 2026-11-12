@@ -1,4 +1,4 @@
-// 병원 지침 계약 v2 — 형식 검증과 지침 상태 (AX-311 · spec 4.20, 5.3 · ADR-0011)
+// 병원 지침 계약 v2: 형식 검증과 지침 상태 (AX-311 · docs/business-rules.md '병원 연동', docs/contracts.md '`POST /api/plan/link`' · ADR-0011)
 //
 // 정의: `docs/PRODUCT_DEFINITION.md` §2·§4, `docs/decisions/0011-recovery-plan-v2-freshness.md`
 //
@@ -18,11 +18,11 @@
 //   - instructions (채널 B): 병원이 쓴 문장. 표시 전용. 판정에 쓰지 않고 번역하지 않는다 (`instructions.js`)
 //
 // - 형식이 하나라도 어긋나면 **지침 전체를 거부한다.** 기간의 날짜가 역순이어도 전체를 거부한다.
-// - v1 은 받지 않는다(규칙 48). 실제 연동 병원이 없고 데모 지침만 있기 때문이다.
-// - 기간이 `expiresAt` 을 넘어도 거부하거나 잘라내지 않는다. 적용 여부는 날짜마다 합성 규칙이 판정한다(spec 4.5).
-// - 환자 호출 필드는 없다. 호출은 데모 사건(`PATIENT_RECALL`)으로만 다룬다(spec 4.20).
+// - v1 은 받지 않는다(docs/business-rules.md '병원 연동'). 실제 연동 병원이 없고 데모 지침만 있기 때문이다.
+// - 기간이 `expiresAt` 을 넘어도 거부하거나 잘라내지 않는다. 적용 여부는 날짜마다 합성 규칙이 판정한다(docs/business-rules.md '날짜별 합성').
+// - 환자 호출 필드는 없다. 호출은 데모 사건(`PATIENT_RECALL`)으로만 다룬다(docs/business-rules.md '병원 연동').
 // - 원문 `returnTime` 의 `place: "HOSPITAL"` 은 `hospitalId` 가 없고 **발행 병원**을 뜻한다.
-//   연결 병원 id 로 채우는 일은 변환(`link.js`)이 한다(규칙 57).
+//   연결 병원 id 로 채우는 일은 변환(`link.js`)이 한다(docs/contracts.md '`POST /api/plan/link`').
 //
 // 이 파일에는 의료 해석이 없다. 병원이 확정한 값을 형식만 검증해 그대로 넘긴다.
 
@@ -47,7 +47,7 @@ export const PLAN_VERSION = 2;
 export const PLAN_STATUS = HOSPITAL_PERIOD_STATUS;
 
 /**
- * 대한민국 범위(경계 제외). 일정 API 의 좌표 범위 검사(`lib/server/itinerary-request.js` inKorea)와 같은 범위다 (spec 6장).
+ * 대한민국 범위(경계 제외). 일정 API 의 좌표 범위 검사(`lib/server/itinerary-request.js` inKorea)와 같은 범위다 (docs/contracts.md '공통').
  */
 const KOREA_BOUNDS = Object.freeze({ latMin: 33, latMax: 39, lngMin: 124, lngMax: 132 });
 
@@ -95,7 +95,7 @@ function hospitalErrors(hospital, push) {
 }
 
 /**
- * 기간 하나 — 날짜(역순 거부)와 항목(SET·NONE 만)을 조건 기간 공통 검증으로 본다 (spec 4.4 병원 발행 기간).
+ * 기간 하나: 날짜(역순 거부)와 항목(SET·NONE 만)을 조건 기간 공통 검증으로 본다 (docs/business-rules.md '조건 기간'의 병원 발행 기간).
  */
 function periodErrors(period, i, plan, push) {
   const at = `periods[${i}]`;
@@ -184,7 +184,7 @@ export function validatePlan(plan) {
 }
 
 /**
- * 지침 전체의 지금 상태 — "유효기간 안이고 철회되지 않음" 이 최신성이다 (spec 4.6). 24시간 한도는 없다.
+ * 지침 전체의 지금 상태: "유효기간 안이고 철회되지 않음" 이 최신성이다 (docs/business-rules.md '매일 확인'). 24시간 한도는 없다.
  * 날짜별 적용은 이 값이 아니라 `hospitalPeriodStatus`(날짜의 활동 종료 시각 기준)가 정한다.
  * @param {{revoked?: boolean, expiresAt?: string}} plan
  * @param {{now?: Date|number}} [opts]

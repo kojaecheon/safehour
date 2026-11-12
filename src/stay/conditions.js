@@ -1,4 +1,4 @@
-// 조건 기간 — 검증과 정규화 (AX-302 · spec 4.4, 5.1 ConditionPeriod)
+// 조건 기간, 검증과 정규화 (AX-302 · docs/business-rules.md '조건 기간', ConditionPeriod 타입은 아래 typedef)
 //
 // 앱은 입력값을 해석하지 않는다. 정해진 항목의 형식만 검증하고 그대로 적용한다.
 // 자유 서술 칸은 계약에 없다. 의료적 타당성은 검증하지 않는다(병원·환자의 몫).
@@ -12,7 +12,7 @@ import { isClockTime, isDateString, parseInstantMs } from './time.js';
  */
 
 /**
- * @typedef {object} ConditionItems  spec 5.1
+ * @typedef {object} ConditionItems  기기 모델
  * @property {'ALLOWED'|'INDOOR_ONLY'|'FORBIDDEN'} outing  필수
  * @property {{kind: 'SET', time: string, place: 'LODGING'} | {kind: 'SET', time: string, place: 'HOSPITAL', hospitalId: string} | {kind: 'NOT_SET'}} returnTime
  *   outing≠FORBIDDEN 이면 필수
@@ -29,7 +29,7 @@ import { isClockTime, isDateString, parseInstantMs } from './time.js';
  */
 
 /**
- * @typedef {object} ConditionPeriod  spec 5.1
+ * @typedef {object} ConditionPeriod  기기 모델
  * @property {string} id
  * @property {'SELF'|'HOSPITAL'} source
  * @property {string} startDate  포함
@@ -47,7 +47,7 @@ export const CONDITION_SOURCE = Object.freeze({ SELF: 'SELF', HOSPITAL: 'HOSPITA
 export const OUTING = Object.freeze({ ALLOWED: 'ALLOWED', INDOOR_ONLY: 'INDOOR_ONLY', FORBIDDEN: 'FORBIDDEN' });
 export const RETURN_PLACE = Object.freeze({ LODGING: 'LODGING', HOSPITAL: 'HOSPITAL' });
 
-/** spec 4.4 표의 항목 키 (점 표기). `DayPlan.effective` 의 키도 이것이다 */
+/** docs/business-rules.md '조건 기간' 항목 표의 항목 키 (점 표기). `DayPlan.effective` 의 키도 이것이다 */
 export const ITEM_KEYS = Object.freeze([
   'outing',
   'returnTime',
@@ -101,7 +101,7 @@ function deepFreeze(value) {
 
 /**
  * 제한 없음 기간(`noRestriction`)과 같은 항목.
- * "모든 항목이 '아니오'이고 복귀 시각이 '병원이 정하지 않음'" (spec 4.4)
+ * "모든 항목이 '아니오'이고 복귀 시각이 '병원이 정하지 않음'" (docs/business-rules.md '조건 기간')
  * @type {ConditionItems}
  */
 export const NO_RESTRICTION_ITEMS = deepFreeze({
@@ -198,7 +198,7 @@ function checkReturnTime(returnTime, required, hospitalIds, push) {
   }
   if (returnTime.place === RETURN_PLACE.LODGING) return;
   if (returnTime.place !== RETURN_PLACE.HOSPITAL) return push('items.returnTime', VALIDATION_ISSUE.INVALID_VALUE);
-  // 규칙 13-1 — 병원 복귀에는 hospitalId 가 반드시 있다
+  // docs/business-rules.md '숙소와 병원': 병원 복귀에는 hospitalId 가 반드시 있다
   if (!isNonEmptyString(returnTime.hospitalId)) {
     return push('items.returnTime.hospitalId', VALIDATION_ISSUE.HOSPITAL_ID_REQUIRED);
   }
@@ -222,15 +222,15 @@ function checkAnswer(key, answer, source, push) {
 }
 
 /**
- * 조건 기간을 검증한다. 필수 항목이 비어 있거나 형식이 틀리면 저장하지 않는다 (spec 4.4, 규칙 6·13-1).
+ * 조건 기간을 검증한다. 필수 항목이 비어 있거나 형식이 틀리면 저장하지 않는다 (docs/business-rules.md '조건 기간'·'숙소와 병원').
  *
  * - `outing` 필수, '모르겠음' 불가
  * - `returnTime` 은 outing≠FORBIDDEN 이면 필수, '모르겠음' 불가. 병원이면 `hospitalId` 필수
  * - 나머지 항목은 키가 모두 있어야 하고(답을 고르지 않은 항목이 없어야 함), SELF 만 '모르겠음' 허용
  * - `noRestriction` 은 SELF 만. 그 기간은 항목을 보지 않는다
- * - HOSPITAL 은 `expiresAt`(ISO8601)·`revoked`(boolean) 필수. 이미 만료된 기간도 저장한다(규칙 12)
+ * - HOSPITAL 은 `expiresAt`(ISO8601)·`revoked`(boolean) 필수. 이미 만료된 기간도 저장한다(docs/business-rules.md '병원 연동')
  * - `escortRequired`=예 와 `guardianMustStay` 의 관계는 여기서 거부하지 않는다.
- *   SELF 는 정규화가 '예'로 고정하고, HOSPITAL 의 모순은 날짜를 막는다(규칙 11).
+ *   SELF 는 정규화가 '예'로 고정하고, HOSPITAL 의 모순은 날짜를 막는다(docs/business-rules.md '날짜별 합성').
  *
  * @param {ConditionPeriod} period
  * @param {{hospitals?: Array<{id: string}>}} [opts]  주면 병원 복귀 hospitalId 가 이 안에 있어야 한다
@@ -286,7 +286,7 @@ export function validateConditionPeriod(period, { hospitals } = {}) {
  * 저장·합성 전에 기간을 정규화한다. 입력은 바꾸지 않고 새 객체를 돌려준다.
  *
  * - SELF `noRestriction` → 항목을 `NO_RESTRICTION_ITEMS` 로 바꾼다
- * - SELF 에서 `escortRequired`=예 → `guardianMustStay` 를 '예'로 고정한다 (spec 4.4)
+ * - SELF 에서 `escortRequired`=예 → `guardianMustStay` 를 '예'로 고정한다 (docs/business-rules.md '조건 기간')
  * - HOSPITAL 값은 바꾸지 않는다 (모순은 `hospitalPeriodConflict` 가 날짜를 막는다)
  *
  * @param {ConditionPeriod} period
@@ -306,7 +306,7 @@ export function normalizeConditionPeriod(period) {
 }
 
 /**
- * 규칙 11 — 한 병원 기간 안에 `escortRequired`=예 와 `guardianMustStay`=아니오(보호자 분리 허용)가
+ * docs/business-rules.md '날짜별 합성': 한 병원 기간 안에 `escortRequired`=예 와 `guardianMustStay`=아니오(보호자 분리 허용)가
  * 함께 있으면 그 기간이 덮는 날짜를 `CONFLICTING_CONDITION` 으로 막는다.
  * @param {ConditionPeriod} period
  */

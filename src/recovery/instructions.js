@@ -1,4 +1,4 @@
-// 채널 B — 병원 안내문 규칙과 확인 기록 (AX-311 · spec 4.20, 5.1 LinkedPlan, 5.3, 규칙 56)
+// 채널 B: 병원 안내문 규칙과 확인 기록 (AX-311 · docs/business-rules.md '병원 연동', docs/contracts.md '`POST /api/plan/link`')
 //
 // 정의: `docs/PRODUCT_DEFINITION.md` §2·§4.3
 //
@@ -8,7 +8,7 @@
 //   - 서버로 보내지 않는다
 //
 // 확인 기록의 정본은 기기의 `LinkedPlan.acknowledged` 다. 키는 `${id}@${updatedAt}` 이다.
-// 같은 id 의 안내문이라도 내용이 바뀌어 `updatedAt` 이 달라지면 확인이 풀린다(규칙 56).
+// 같은 id 의 안내문이라도 내용이 바뀌어 `updatedAt` 이 달라지면 확인이 풀린다(docs/business-rules.md '병원 연동').
 // 지침에 실려 온 `instructions[].acknowledged` 는 확인으로 치지 않는다.
 
 import { parseInstantMs } from '../stay/time.js';
@@ -59,7 +59,7 @@ export function instructionErrors(instructions) {
 }
 
 /**
- * 확인 기록 키 — `${instructionId}@${updatedAt}` (spec 5.1 LinkedPlan.acknowledged).
+ * 확인 기록 키, `${instructionId}@${updatedAt}` (LinkedPlan.acknowledged, docs/business-rules.md '병원 연동').
  * @param {{id: string, updatedAt: string}} instruction
  */
 export function acknowledgementKey(instruction) {
@@ -81,7 +81,7 @@ export function unconfirmedInstructions(plan, acknowledged = {}) {
 
 /**
  * 확인하지 않은 **중요** 안내. 하나라도 있으면 오늘을 STANDBY 로 덧씌운다
- * (`overlayTodayGate(day, { unconfirmedHospitalUpdate: true })`, 규칙 56).
+ * (`overlayTodayGate(day, { unconfirmedHospitalUpdate: true })`, docs/business-rules.md '매일 확인').
  * @param {{instructions?: Array<object>}} plan
  * @param {Record<string, true>} [acknowledged]  `LinkedPlan.acknowledged`. 없으면 모두 미확인
  */
@@ -90,7 +90,7 @@ export function unconfirmedCritical(plan, acknowledged = {}) {
 }
 
 /**
- * 지침 사본에서 `instructions[].acknowledged` 를 뺀다 (spec 5.1 LinkedPlan.plan).
+ * 지침 사본에서 `instructions[].acknowledged` 를 뺀다 (LinkedPlan.plan, docs/business-rules.md '병원 연동').
  * 입력은 바꾸지 않고, 객체를 공유하지 않는 새 사본을 돌려준다.
  * @template T
  * @param {T} plan

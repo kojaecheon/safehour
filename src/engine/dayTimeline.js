@@ -1,6 +1,6 @@
-// 하루의 고정 블록과 외출 마감 후보 (AX-306 · spec 4.3, 4.7)
+// 하루의 고정 블록과 외출 마감 후보 (AX-306 · docs/business-rules.md '숙소와 병원'·'하루 일정 생성')
 //
-// 마감 후보와 기록할 이유 (spec 4.7 표)
+// 마감 후보와 기록할 이유 (docs/business-rules.md '하루 일정 생성'의 마감 후보 표)
 //   합성된 returnTime(그 장소로 복귀)            RETURN_TIME   — 이후 그날 환자 외출 없음
 //   다음 '숙소에서 복용' 복약 시각(숙소로 복귀)   MEDICATION    — 복약 후 15분 뒤부터 다음 외출
 //   다음 병원 일정의 시작 시각(그 병원으로 복귀)  APPOINTMENT   — 블록이 끝난 뒤부터 다음 외출
@@ -8,14 +8,14 @@
 //   출국일 마감                               DEPARTURE
 //
 // 외출 창 = 앞 블록이 끝난 때부터 다음 마감 후보까지. 창의 마감은 구조상 창 시작 뒤 가장 이른 마감 후보다.
-// 병원 일정 블록의 시작은 직전 외출이 있는지에 따라 달라진다(spec 4.3). 그 결정은 외출을 만든 뒤 엔진이 한다.
+// 병원 일정 블록의 시작은 직전 외출이 있는지에 따라 달라진다(docs/business-rules.md '숙소와 병원'). 그 결정은 외출을 만든 뒤 엔진이 한다.
 
 import { DEFAULTS } from '../stay/defaults.js';
 import { appointmentBlockMinutes, medicationDeadlines, resolveReturnPlace } from '../stay/dayFrame.js';
 import { pointOf } from '../stay/stay.js';
 import { toMinutes } from '../stay/time.js';
 
-/** 같은 시각의 마감 후보를 고르는 결정적 순서 (spec 4.7 표 순서) */
+/** 같은 시각의 마감 후보를 고르는 결정적 순서 (docs/business-rules.md '하루 일정 생성'의 마감 후보 표 순서) */
 const KIND_ORDER = Object.freeze({ RETURN_TIME: 0, MEDICATION: 1, APPOINTMENT: 2, DAY_END: 3, DEPARTURE: 3 });
 
 /**
@@ -72,7 +72,7 @@ export function patientEvents({ limits, frame, appointmentEvts, lodging, hospita
     });
   }
   if (limits.returnTime) {
-    // 규칙 13-1: 병원 복귀면 그 hospitalId 의 좌표. 찾을 수 없으면 추측하지 않고 RangeError
+    // docs/business-rules.md '숙소와 병원': 병원 복귀면 그 hospitalId 의 좌표. 찾을 수 없으면 추측하지 않고 RangeError
     const target = resolveReturnPlace(limits.returnTime, { lodging, hospitals });
     events.push({
       kind: 'RETURN_TIME',
@@ -98,7 +98,7 @@ export function patientEvents({ limits, frame, appointmentEvts, lodging, hospita
 }
 
 /**
- * 숙소로 돌아오는 창의 마감을 뒤따르는 병원 일정 블록 시작 앞으로 당긴다 (spec 4.3·4.7 — 블록 안에는 외출이 없다).
+ * 숙소로 돌아오는 창의 마감을 뒤따르는 병원 일정 블록 시작 앞으로 당긴다 (docs/business-rules.md '숙소와 병원'·'하루 일정 생성': 블록 안에는 외출이 없다).
  * 직전 외출이 병원에서 끝나지 않는 병원 일정의 블록은 '시작 − 숙소→병원 − 도착 여유'부터다. 그 시각이 이 창의
  * 마감보다 이르면(예: 15:00 병원 일정 앞의 14:55 숙소 복약·숙소 복귀 시각) 숙소 복귀 마감은 블록 시작이고,
  * 마감 이유는 APPOINTMENT 다. 복귀 장소는 숙소 그대로다.

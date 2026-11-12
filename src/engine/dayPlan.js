@@ -1,8 +1,8 @@
-// 하루 일정 엔진 (AX-306 · spec 4.7, 4.8 판정, 5.2 DayPlan)
+// 하루 일정 엔진 (AX-306 · docs/business-rules.md '하루 일정 생성'·'장소 후보와 필터', docs/contracts.md '`POST /api/itinerary/plan`'의 DayPlan)
 //
-// 하루치 입력으로 spec 5.2 `DayPlan` 을 만드는 **결정적** 함수다.
+// 하루치 입력으로 `DayPlan`(docs/contracts.md '`POST /api/itinerary/plan`') 을 만드는 **결정적** 함수다.
 //   - 같은 입력이면 같은 결과다. 시계·난수를 읽지 않는다. 후보는 contentId 순으로 다룬다.
-//   - 판정은 언어와 무관하다(규칙 27). 표시 언어 제목·주소는 Stop 표시 필드에만 쓴다.
+//   - 판정은 언어와 무관하다(docs/business-rules.md '장소 후보와 필터'·'전체 일정 확정과 변화 대응'). 표시 언어 제목·주소는 Stop 표시 필드에만 쓴다.
 //   - 판정 경로는 하나다: 후보 게이트는 safetyGate.gateCandidate, 복귀 계산은 slaCalculator.checkOutingSla.
 //   - 날짜 분류·조건 합성·하루 틀은 체류 도메인 계층(src/stay, AX-302)의 결과를 그대로 쓴다.
 //   - 의료 판단을 하지 않는다. 의료 시설은 정거장이 되지 않는다. 열려 있다고 단정하지 않는다.
@@ -94,7 +94,7 @@ export function prepareCandidates(candidates, { date, closedContentIds, lodgingP
       point: { lat: Number(cand.lat), lng: Number(cand.lng) },
       distanceKm: distanceFromKm(lodgingPoint, cand),
       // 알 수 없는 보행 부담·체류는 관광 후보 모듈의 '유형 모름' 추정값(보행 30분·체류 45분)으로 본다.
-      // 체류는 15분 미만으로 두지 않는다(규칙 19)
+      // 체류는 15분 미만으로 두지 않는다(docs/business-rules.md '하루 일정 생성')
       walkMin: finite(cand.walkMin, 30),
       stayMin: Math.max(MIN_STAY, finite(cand.stayMin, 45)),
       hasFood: cand.hasFood === true || cand.signals?.isFoodPlace === true,
@@ -222,7 +222,7 @@ function toStop(item, { date, role, diet }) {
 }
 
 /**
- * @typedef {object} Outing  spec 5.2 Outing + plannedReturnAt(추가 필드)
+ * @typedef {object} Outing  docs/contracts.md '`POST /api/itinerary/plan`'의 Outing + plannedReturnAt(추가 필드)
  * @property {string} id  `${date}:P|G:outing-N` — 역할별 출발 순 번호
  * @property {string} departAt  "HH:MM" 계획상 출발(호출 시작)
  * @property {string} returnBy  "HH:MM" **안전 마감**: 이 시각까지 returnPlace 에 닿아야 한다(복귀 계산식의 마감).
@@ -274,7 +274,7 @@ function mealSlotEntry(slot, { cleared, patientAllowed, meals, attempts }) {
 }
 
 /**
- * 하루 일정을 만든다 (spec 4.7, 5.2).
+ * 하루 일정을 만든다 (docs/business-rules.md '하루 일정 생성', docs/contracts.md '`POST /api/itinerary/plan`').
  *
  * @param {object} input
  * @param {string} input.date  "YYYY-MM-DD"
@@ -294,7 +294,7 @@ function mealSlotEntry(slot, { cleared, patientAllowed, meals, attempts }) {
  * @param {string[]} [input.closedContentIds] 닫힘으로 볼 contentId (데모 CLOSURE 사건)
  * @param {number} [input.extraBufferMin]    모든 외출 복귀 계산에 더할 버퍼 (데모 TRAFFIC_SURGE)
  * @param {{TAXI?: object, TRANSIT?: object}} [input.estimators]  동기 추정기 주입(기본: 폴백·대중교통 추정기)
- * @returns {object} spec 5.2 DayPlan (delta·intro 없음, returnNow=false)
+ * @returns {object} DayPlan, docs/contracts.md '`POST /api/itinerary/plan`' (delta·intro 없음, returnNow=false)
  */
 export function planDay(input) {
   const {
@@ -513,7 +513,7 @@ export function planDay(input) {
     const names = (anchors) => anchors.map((a) => a.name);
 
     /**
-     * 병원에서 끝나는 창(다음 병원 일정·병원 복귀 시각). spec 4.3·규칙 13-2.
+     * 병원에서 끝나는 창(다음 병원 일정·병원 복귀 시각). docs/business-rules.md '숙소와 병원'.
      * - 마지막 외출이 그 병원에서 끝난다. 마감에 맞춰 거꾸로 짠다(LATE) — 병원에 일찍 닿아 기다리지 않게.
      *   그 앞 식사 칸이 마감에 붙어 있으면(칸 끝 뒤 45분 미만) 마지막 외출이 그 식사를 맡는다.
      * - 앞부분은 다른 창과 같이 숙소로 돌아오는 외출(식사 칸 포함)이다. 계획상 마지막 외출 출발 전까지 돌아오고,
@@ -654,7 +654,7 @@ export function planDay(input) {
     }
   }
 
-  // ── 날짜 상태와 사유 (spec 4.7 표) ──
+  // ── 날짜 상태와 사유 (docs/business-rules.md '하루 일정 생성'의 날짜 상태 표) ──
   // REST_DAY 는 NO_TOURISM 줄에 명시돼 있다 — 보호자 외출을 못 만든 쉬는 날은 STANDBY 가 아니다(사유 NO_CANDIDATE 는 남긴다)
   let dayState = STATE.NO_TOURISM;
   const windowWithoutCandidate =

@@ -1,7 +1,7 @@
-// 날짜별 조건 합성 (AX-302 · spec 4.5)
+// 날짜별 조건 합성 (AX-302 · docs/business-rules.md '날짜별 합성')
 //
 // 순서
-//   1. 각 기간의 '모르겠음'을 4.4 기본값으로 바꾸고 '기본값 적용' 표시를 붙인다
+//   1. 각 기간의 '모르겠음'을 docs/business-rules.md '조건 기간'의 항목 표 기본값으로 바꾸고 '기본값 적용' 표시를 붙인다
 //   2. 항목마다 가장 엄격한 값을 고른다 (모든 예/아니오 항목은 '예'가 제한)
 //   3. 적용된 값마다 출처(기간 id, SELF/HOSPITAL, 기본값 여부)를 남긴다
 //
@@ -29,7 +29,7 @@ import { toMinutes } from './time.js';
 /**
  * @typedef {{periodId: string, source: 'SELF'|'HOSPITAL', defaulted: boolean}} Provenance
  * @typedef {Record<string, {value: any, provenance: Provenance[]}>} EffectiveConditions
- *   `DayPlan.effective` (spec 5.2). 키는 ITEM_KEYS(점 표기). 값은 ConditionItems 의 모양에서 UNKNOWN 을 뺀 것
+ *   `DayPlan.effective` (docs/contracts.md '`POST /api/itinerary/plan`'). 키는 ITEM_KEYS(점 표기). 값은 ConditionItems 의 모양에서 UNKNOWN 을 뺀 것
  */
 
 /**
@@ -88,7 +88,7 @@ function canonicalReturnTime(rt) {
 }
 
 /**
- * '모르겠음'(또는 형식이 틀린 답)을 가장 엄격한 기본값으로 바꾼다 (spec 4.4 표, 합성 1단계).
+ * '모르겠음'(또는 형식이 틀린 답)을 가장 엄격한 기본값으로 바꾼다 (docs/business-rules.md '조건 기간'의 항목 표, 합성 1단계).
  * outing·returnTime 은 다루지 않는다(모르겠음 불가 항목).
  * @param {import('./conditions.js').ConditionItems} items
  * @returns {{items: import('./conditions.js').ConditionItems, defaultedKeys: string[]}}
@@ -202,7 +202,7 @@ function composeMedication(resolvedPeriods) {
 /**
  * 날짜 D에 **적용되는** 기간들을 합성한다 (적용 여부는 coverage.js 가 먼저 정한다).
  *
- * 엄격한 순서 (spec 4.5 표)
+ * 엄격한 순서 (docs/business-rules.md '날짜별 합성'의 표)
  * - outing: FORBIDDEN > INDOOR_ONLY > ALLOWED
  * - returnTime: 설정된 시각 중 가장 이른 것(그 시각의 장소 포함) > NOT_SET
  * - walkLimit·travelLimit: 작은 값 > 제한 없음

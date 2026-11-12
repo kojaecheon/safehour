@@ -1,4 +1,4 @@
-// 교체 후보 (AX-307 · spec 4.10 교체, 6장 POST /api/itinerary/alternatives, 규칙 33)
+// 교체 후보 (AX-307 · docs/business-rules.md '사용자 편집'의 교체, docs/contracts.md '`POST /api/itinerary/alternatives`')
 //
 // 정거장 하나를 고르면 같은 자리에 넣을 수 있는 게이트 통과 후보를 최대 5개 돌려준다.
 // 각 후보는 그 자리에 넣은 **외출 전체**를 다시 검증한 것이다(복귀 계산, 보행 누적, 이동 한도,
@@ -8,7 +8,7 @@
 //   - 순위는 planDay 와 같다(고정 → 관심사 → 복귀 여유 → 보행 부담 → 같은 날 새 유형 → contentId)
 //   - 지난 날짜, 도착 시각이 지난 정거장은 교체할 수 없다(빈 목록)
 //   - 오늘 이미 출발한 외출이면 출발 시각과 시작된 정거장의 시각이 그대로인 후보만 낸다
-// 결과 정거장은 '고정'(pinned=true)이다 — 교체한 장소는 고정으로 표시한다(spec 4.10).
+// 결과 정거장은 '고정'(pinned=true)이다: 교체한 장소는 고정으로 표시한다(docs/business-rules.md '사용자 편집').
 
 import { REASON } from '../domain/states.js';
 import { DEFAULTS } from '../stay/defaults.js';
@@ -38,7 +38,7 @@ import { kstClock } from './tripPlan.js';
 const MAX_ALTERNATIVES = 5;
 
 /**
- * @typedef {object} SwapInput  spec 6장 alternatives 요청 + 서버가 준비한 외부 데이터
+ * @typedef {object} SwapInput  docs/contracts.md '`POST /api/itinerary/alternatives`' 요청 + 서버가 준비한 외부 데이터
  * @property {object} stay  PlanStay
  * @property {string} date
  * @property {object} day  그 날짜의 DayPlan (기기 저장본)
@@ -204,7 +204,7 @@ function prepare(input) {
 }
 
 /**
- * 교체 후보 (규칙 33). 최대 5개, 순위 순. 교체할 수 없으면(지난 날짜·도착한 정거장·창 없음) 빈 배열.
+ * 교체 후보 (docs/business-rules.md '사용자 편집'). 최대 5개, 순위 순. 교체할 수 없으면(지난 날짜·도착한 정거장·창 없음) 빈 배열.
  * @param {SwapInput} input
  * @returns {Array<{stop: object, outingPreview: object}>}
  * @throws {RangeError} 외출·정거장을 찾을 수 없음
@@ -232,7 +232,7 @@ export function alternativesFor(input) {
 }
 
 /**
- * 고른 후보를 넣은 외출 전체를 다시 검증한다 (spec 4.10 — 통과하지 못하면 넣을 수 없고 이유를 보여준다).
+ * 고른 후보를 넣은 외출 전체를 다시 검증한다 (docs/business-rules.md '사용자 편집': 통과하지 못하면 넣을 수 없고 이유를 보여준다).
  * @param {SwapInput & {contentId: string}} input
  * @returns {{ok: true, stop: object, outingPreview: object} | {ok: false, reasons: string[], blocked?: string}}
  */

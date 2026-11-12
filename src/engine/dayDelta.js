@@ -1,4 +1,4 @@
-// 날짜별 전후 비교 (AX-307 · spec 4.9 전후 비교, 5.2 DayDelta, 규칙 31)
+// 날짜별 전후 비교 (AX-307 · docs/business-rules.md '전체 일정 확정과 변화 대응')
 //
 // 재계획 전(before)과 후(after) DayPlan 을 비교해 사용자가 볼 변화를 기록한다.
 //   removed   빠진 곳          before 에만 있는 정거장 (대체로 짝지어진 것은 빼고)
@@ -12,7 +12,7 @@
 //   stateChanged / before / after, reasons, hasVisibleChange, seen=false
 // 정거장 id 는 `${date}:${role}:${contentId}` 로 결정적이므로 같은 장소는 같은 id 다.
 //
-// **알림만 하는 재계산 금지** (기존 원칙, 규칙 31): 바뀌어야 하는 정거장(requiredStopIds)이 있는데
+// **알림만 하는 재계산 금지** (기존 원칙, docs/business-rules.md '전체 일정 확정과 변화 대응'): 바뀌어야 하는 정거장(requiredStopIds)이 있는데
 // 그 정거장이 after 에 그대로 있거나 hasVisibleChange 가 false 이면 SilentReplanError 를 던진다.
 // 바뀌어야 하는 정거장이 있으면 userEditOnly 로 변화를 숨기지 않는다: 그 정거장이 빠진 것 자체가 원인 있는 변화다(findings 15).
 // 대체 없이 모두 빠지면 빠진 곳·취소된 외출로 하루를 비운 것을 적는다.
@@ -56,7 +56,7 @@ function overlaps(a, b) {
 }
 
 /**
- * @typedef {object} DayDelta  spec 5.2
+ * @typedef {object} DayDelta  docs/business-rules.md '전체 일정 확정과 변화 대응'
  * @property {boolean} stateChanged
  * @property {string} before  dayState
  * @property {string} after   dayState

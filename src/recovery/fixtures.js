@@ -1,4 +1,4 @@
-// 데모용 비식별 병원 지침 — 계약 v2 (AX-214 → AX-311 · spec 4.20)
+// 데모용 비식별 병원 지침, 계약 v2 (AX-214 → AX-311 · docs/business-rules.md '병원 연동')
 //
 // **실제 병원 데이터가 아니다.** 의료진이 발행을 마친 상태를 흉내 낸 예시이며,
 // 실제 병원명·주소·전화·환자 식별정보가 들어 있지 않다. 모든 지침에 `demo: true` 가 박혀 있고,
@@ -180,7 +180,7 @@ export function demoPlanRestricted(now = Date.now()) {
     diet: allDiet(),
     medication: medication(),
   });
-  // 외출 불가 기간에는 복귀 시각을 묻지 않는다 (spec 4.4)
+  // 외출 불가 기간에는 복귀 시각을 묻지 않는다 (docs/business-rules.md '조건 기간')
   delete periodItems.returnTime;
 
   return {
@@ -215,7 +215,7 @@ export function demoPlanRestricted(now = Date.now()) {
 }
 
 /**
- * `DEMO-C` — 이미 만료된 지침. 기간은 그대로 저장되고, 만료 후 날짜 규칙이 적용된다(규칙 12).
+ * `DEMO-C`: 이미 만료된 지침. 기간은 그대로 저장되고, 만료 후 날짜 규칙이 적용된다(docs/business-rules.md '병원 연동'·'날짜 분류').
  * 기간·일정은 `DEMO-A` 와 같고, 사흘 전에 발행돼 한 시간 전에 만료됐다.
  */
 export function demoPlanExpired(now = Date.now()) {
