@@ -115,7 +115,7 @@ function needsInputReasons({ lodging, applied, postBoundary, consent, covering, 
       const statuses = covering
         .filter((p) => p.source === CONDITION_SOURCE.HOSPITAL)
         .map((p) => hospitalPeriodStatus(p, date, { activityEnd }));
-      // 연동 지침이 만료된 날짜만 만료 사유다. 병원 값을 본인 체크로 옮기지 않는다 (docs/business-rules.md '병원 연동')
+      // 연동 지침이 만료된 날짜만 만료 사유다. 병원 값을 본인 체크로 옮기지 않는다 (docs/business-rules.md '날짜 분류')
       reasons.push(
         statuses.includes(HOSPITAL_PERIOD_STATUS.EXPIRED)
           ? REASON.HOSPITAL_PLAN_EXPIRED_INPUT_REQUIRED

@@ -95,7 +95,7 @@ function hospitalErrors(hospital, push) {
 }
 
 /**
- * 기간 하나: 날짜(역순 거부)와 항목(SET·NONE 만)을 조건 기간 공통 검증으로 본다 (docs/business-rules.md '조건 기간'의 병원 발행 기간).
+ * 기간 하나: 날짜(역순 거부)와 항목(SET·NONE 만)을 조건 기간 공통 검증으로 본다 (docs/business-rules.md '조건 기간', docs/platform/ITINERARY_RULES.md '병원 발행 기간').
  */
 function periodErrors(period, i, plan, push) {
   const at = `periods[${i}]`;

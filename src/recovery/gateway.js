@@ -9,7 +9,7 @@
 //   3. **어댑터** — 병원마다 다른 인터페이스를 공통 계약으로 흡수한다.
 //
 // 지금은 데모 어댑터 하나뿐이다. FHIR·병원 전용 API 는 같은 자리에 어댑터로 붙는다.
-// 보호자용 축약은 게이트웨이가 아니라 보호자 스냅샷(docs/business-rules.md '보호자')이 맡는다, v1 `companionView` 는 없앴다.
+// 보호자용 축약은 게이트웨이가 아니라 보호자 스냅샷(docs/business-rules.md '보호자')이 맡는다(v1 `companionView` 는 없앴다).
 
 import { validatePlan } from './plan.js';
 

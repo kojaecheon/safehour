@@ -36,7 +36,7 @@ export function gateCandidate(candidate, condition, ctx = {}) {
   const reasons = [];
 
   // 숙박시설 등 관광 활동이 아닌 후보는 가까워도 추천하지 않는다.
-  // 의료 시설(병원·의원·클리닉)도 관광 활동이 아니다: 병원을 정거장으로 두면 병원 알선이 된다 (docs/business-rules.md '숙소와 병원').
+  // 의료 시설(병원·의원·클리닉)도 관광 활동이 아니다: 병원을 정거장으로 두면 병원 알선이 된다 (docs/business-rules.md '숙소와 병원'·'장소 후보와 필터').
   if (candidate.tourismEligible === false || candidate.medical === true) {
     reasons.push(REASON.NON_TOURISM_ACTIVITY);
   }
