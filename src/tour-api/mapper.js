@@ -203,7 +203,7 @@ function typeOf(item) {
 }
 
 /**
- * 표시 언어 사슬 (docs/business-rules.md '장소 후보와 필터'의 출처와 언어 문단)
+ * 표시 언어 사슬 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어')
  *   ko            국문
  *   en            영문 → 국문
  *   ja · zh       그 언어 → 영문 → 국문

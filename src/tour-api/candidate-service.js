@@ -169,7 +169,7 @@ const LOCALIZED_SERVICES = Object.freeze(["english", "japanese", "chineseSimplif
 /**
  * 실시간 TourAPI 응답을 SafeHour 엔진 후보로 바꾸는 정상 서비스 경로.
  *
- * 조회 서비스 (docs/business-rules.md '장소 후보와 필터'의 출처와 언어 문단)
+ * 조회 서비스 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어')
  *   - 국문(KorService2)과 무장애(KorWithService2)는 항상 조회한다.
  *   - lang 이 en·ja·zh 이면 그 언어 서비스를 하나 더한다. ko 이면 더하지 않는다.
  *   - 일문·중문 서비스가 실패하면(키 미신청 포함) 영문으로 대체한다.

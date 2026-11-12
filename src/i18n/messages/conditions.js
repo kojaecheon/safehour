@@ -3,7 +3,7 @@
 // 형식과 쓰기 규칙은 ./index.js 머리 주석을 따른다.
 // 기존 키 접두사 `link.`·`guide.` 을 그대로 쓴다. 새 키는 `conditions.` 으로 시작한다.
 // 병원 안내문 원문(채널 B)은 번역 대상이 아니다 — 여기에는 라벨만 둔다.
-// 질문 문장은 docs/business-rules.md '조건 기간'의 항목 표를 그대로 옮겼다. 앱은 답을 해석하지 않는다.
+// 질문 문장은 docs/platform/ITINERARY_RULES.md '본인 체크 항목'의 질문 열을 옮겼다(복귀 시각과 보호자 곁 지킴 문항은 그 표와 글자가 다르다). 앱은 답을 해석하지 않는다.
 // 동의 문구는 '법무 검토 전' 초안이다(버전은 components/conditions/consent.js). 이 표시는 화면에 내지 않는다.
 // ja·zh: 검수 전 번역 — 사람 검수 필요
 
@@ -305,7 +305,7 @@ export const messages = {
     zh: '已全部作答',
   },
 
-  // 질문 (docs/business-rules.md '조건 기간'의 항목 표)
+  // 질문 (docs/platform/ITINERARY_RULES.md '본인 체크 항목'의 질문 열)
   'conditions.qOuting': { ko: '외출이 허용되나요?', en: 'Are you allowed to go out?', ja: '外出は許可されていますか？', zh: '是否允许外出？' },
   'conditions.outingALLOWED': { ko: '허용', en: 'Allowed', ja: '許可', zh: '允许' },
   'conditions.outingINDOOR_ONLY': { ko: '실내만', en: 'Indoors only', ja: '屋内のみ', zh: '仅限室内' },

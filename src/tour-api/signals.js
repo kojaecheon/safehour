@@ -4,7 +4,7 @@
 //
 //   - 신호는 SafeHour 추정값이다. 관광공사 원문(sourceMetadata)과 섞지 않고 `signals` 에 둔다.
 //   - 입력은 언어와 무관한 것만 쓴다: 국문 제목, 국문 유형 코드, 분류체계 코드, 국문 메뉴 원문.
-//     표시 언어의 제목을 쓰면 같은 장소가 언어마다 다르게 판정된다(docs/business-rules.md '언어'·'장소 후보와 필터').
+//     표시 언어의 제목을 쓰면 같은 장소가 언어마다 다르게 판정된다(docs/business-rules.md '전체 일정 확정과 변화 대응'·'장소 후보와 필터').
 //   - 불확실하면 null 이다. 모르는 것을 '아님(false)'으로 바꾸지 않는다(docs/platform/PRODUCT_DEFINITION_V3.md '유지하는 것').
 //
 // 신호 의미

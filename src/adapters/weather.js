@@ -173,7 +173,7 @@ export async function fetchKmaNowcast({
   }
 }
 
-// ── 기상청 단기예보 (VilageFcstInfoService_2.0/getVilageFcst): AX-308 · docs/platform/ITINERARY_RULES.md '변화 원천'(표의 4번 행), docs/contracts.md '`POST /api/itinerary/plan`' 기상 ──
+// ── 기상청 단기예보 (VilageFcstInfoService_2.0/getVilageFcst): AX-308 · docs/platform/ITINERARY_RULES.md '변화 원천'(표의 4번 행), docs/contracts.md '`POST /api/itinerary/plan`'의 diagnostics.weather ──
 //
 // 일정 API 가 숙소 좌표의 오늘~모레 날짜별 '실외 부적합' 여부를 정한다.
 // 요청·응답 형식 근거 (2026-09-19 확인)

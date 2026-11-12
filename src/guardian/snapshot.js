@@ -245,7 +245,7 @@ function buildDay(stay, date, dayPlan) {
  *
  * @param {object} args
  * @param {import('../stay/stay.js').Stay} args.stay
- * @param {{lang?: string, days: Record<string, object>}} args.tripPlan  TripPlan(docs/security.md '기기 저장소와 계정 이름공간')
+ * @param {{lang?: string, days: Record<string, object>}} args.tripPlan  TripPlan(기기에 저장한 전체 일정, lib/store/store.js readTripPlan)
  * @param {Date|number|string} [args.now]  만든 시각. 없으면 지금
  * @param {'ko'|'en'|'ja'|'zh'} [args.lang]  없으면 tripPlan.lang
  * @returns {GuardianSnapshot}

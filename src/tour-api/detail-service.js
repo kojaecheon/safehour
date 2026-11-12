@@ -175,7 +175,7 @@ const DETAIL_LANG_SERVICE = Object.freeze({
 
 /**
  * 표시 우선순위. lang 이 없으면 기존 동작(영문 → 국문)이다.
- * 선택 언어(ja·zh) → 영문 → 국문 (docs/business-rules.md '장소 후보와 필터'의 출처와 언어 문단: 선택 언어가 없거나 실패하면 영문, 영문도 없으면 국문)
+ * 선택 언어(ja·zh) → 영문 → 국문 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어': 선택 언어가 없거나 실패하면 영문, 영문도 없으면 국문)
  */
 function preferenceOrder(lang) {
   switch (lang) {

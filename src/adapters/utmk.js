@@ -1,4 +1,4 @@
-// UTM-K(GRS80) ↔ 위경도 변환: 라이브러리 없이 직접 구현 (AX-310 · docs/contracts.md '`POST /api/address/search`' · src/adapters/AGENTS.md '테스트')
+// UTM-K(GRS80) ↔ 위경도 변환: 라이브러리 없이 직접 구현 (AX-310 · docs/contracts.md '`POST /api/address/search`', src/adapters/AGENTS.md '테스트')
 //
 // 행정안전부 좌표제공 API 의 entX·entY 는 UTM-K(GRS80) 좌표다. 서버에서 위경도로 바꿔 돌려준다.
 // 새 패키지를 설치하지 않는다(docs/standards.md '의존성'). 그래서 역 횡메르카토르 투영을 여기서 계산한다.
@@ -45,7 +45,7 @@ export const UTMK = Object.freeze({
 });
 
 /**
- * 대한민국 범위: docs/contracts.md '공통' "좌표는 대한민국 범위만 받는다".
+ * 대한민국 범위: docs/contracts.md '공통'(좌표는 대한민국 범위 안만 받는다).
  * 일정 API 의 좌표 범위 검사(`lib/server/itinerary-request.js` inKorea)와 같은 경계를 쓴다.
  */
 export function isInKorea(lat, lng) {
