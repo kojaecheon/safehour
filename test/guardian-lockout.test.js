@@ -1,4 +1,4 @@
-// 보호자 링크 PIN 잠금 — 5회 연속 오류 후 1시간 (AX-313 · spec 4.11, 11장, 규칙 37)
+// 보호자 링크 PIN 잠금: 5회 연속 오류 후 1시간 (AX-313 · docs/security.md '보호자 링크', docs/platform/ITINERARY_RULES.md '조정 가능한 기본값'. 테스트 이름의 spec 번호와 규칙 번호(37)는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

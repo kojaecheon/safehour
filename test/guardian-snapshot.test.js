@@ -1,4 +1,4 @@
-// 보호자 스냅샷 — 허용 목록 조립과 만료 (AX-313 · spec 4.11, 5.4, 규칙 37)
+// 보호자 스냅샷: 허용 목록 조립과 만료 (AX-313 · docs/business-rules.md '보호자'. 테스트 이름의 spec 번호와 규칙 번호(37)는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

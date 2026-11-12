@@ -1,4 +1,4 @@
-// 조건 화면의 날짜별 요약 — 분류(coverage)와 합성 값의 출처 표시 (AX-315 · spec 4.5, 규칙 7·8)
+// 조건 화면의 날짜별 요약: 분류(coverage)와 합성 값의 출처 표시 (AX-315 · docs/business-rules.md '날짜 분류'·'날짜별 합성'·'조건 기간'. 테스트 이름의 spec 번호와 규칙 번호(7, 8)는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

@@ -75,7 +75,7 @@ function answer(value) {
 }
 
 /**
- * `DayPlan.effective` 모양(spec 5.2) — 모든 항목을 채운다.
+ * `DayPlan.effective` 모양(docs/contracts.md '`POST /api/itinerary/plan`'), 모든 항목을 채운다.
  * 넘기지 않은 예/아니오 항목은 '아니오'(NONE)다.
  */
 export function effective(overrides = {}) {
@@ -102,7 +102,7 @@ export function effective(overrides = {}) {
   return Object.fromEntries(Object.entries(values).map(([k, value]) => [k, { value, provenance }]));
 }
 
-/** 관광 정거장 — spec 5.2 Stop 필드를 모두 채우고, 스냅샷이 버려야 할 값도 섞는다 */
+/** 관광 정거장: Stop 필드(docs/contracts.md '`POST /api/itinerary/plan`')를 모두 채우고, 스냅샷이 버려야 할 값도 섞는다 */
 export function makeStop(date, role, contentId, overrides = {}) {
   return {
     id: `${date}:${role}:${contentId}`,
@@ -136,7 +136,7 @@ export function makeStop(date, role, contentId, overrides = {}) {
 }
 
 /**
- * 하루 일정 (spec 5.2 DayPlan) — 스냅샷이 버려야 할 필드를 모두 채운다.
+ * 하루 일정 (DayPlan, docs/contracts.md '`POST /api/itinerary/plan`'): 스냅샷이 버려야 할 필드를 모두 채운다.
  */
 export function makeDayPlan(date, overrides = {}) {
   return {
@@ -204,7 +204,7 @@ export function guardianOuting(date, overrides = {}) {
 }
 
 /**
- * 체류 전체 일정 (spec 5.1 TripPlan)
+ * 체류 전체 일정 (TripPlan, lib/store/store.js readTripPlan)
  * - 10-01 FREE: 기간 없음, 환자 외출 1개(숙소 복귀)
  * - 10-02 없음 (일정이 만들어지지 않은 날)
  * - 10-03 NEEDS_INPUT: 기간 없음
@@ -258,7 +258,7 @@ export function makeTripPlan(overrides = {}) {
   };
 }
 
-/** 스냅샷에 나올 수 있는 키 전체 (spec 5.4 허용 목록) */
+/** 스냅샷에 나올 수 있는 키 전체 (docs/business-rules.md '보호자'의 허용 목록) */
 export const ALLOWED_SNAPSHOT_KEYS = Object.freeze(
   new Set([
     // GuardianSnapshot

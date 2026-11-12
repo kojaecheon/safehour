@@ -1,7 +1,7 @@
-// AX-308 — 일정 API 요청 정규화 (spec 6장 PlanStay 허용 목록, 규칙 46·54)
+// AX-308: 일정 API 요청 정규화 (docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)'·'공통'. 테스트 이름의 규칙 번호(46, 54)는 옛 설계서 번호다)
 //
 // 계약
-//   - PlanStay 허용 목록 밖 필드(이름·주소·전화·병원 안내문·연결 코드·현재 위치류)는 버린다(규칙 54, 46 서버 쪽)
+//   - PlanStay 허용 목록 밖 필드(이름·주소·전화·병원 안내문·연결 코드·현재 위치류)는 버린다(docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)'·'공통')
 //   - 좌표는 대한민국 범위만 받는다 — 밖이면 SAFEHOUR_STAY_INVALID(OUT_OF_RANGE), 외부 호출까지 내려가지 않는다
 //   - 체류 검증(validateStay) 실패는 SAFEHOUR_STAY_INVALID + fields·issues(값 없이 경로·코드만)
 //   - 데모 사건은 엔진에 넘기기 전에 검증한다 — 모르는 유형·잘못된 매개변수는 SAFEHOUR_BAD_REQUEST

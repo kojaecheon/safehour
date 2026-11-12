@@ -1,4 +1,5 @@
-// 병원 지침 계약 v2 — 검증·게이트웨이·변환·확인 기록·재확인 (AX-311 · spec 4.20, 5.3, 규칙 11·12·48·56·57)
+// 병원 지침 계약 v2: 검증·게이트웨이·변환·확인 기록·재확인 (AX-311 · docs/business-rules.md '병원 연동'·'날짜별 합성', docs/contracts.md '`POST /api/plan/link`',
+// src/recovery/AGENTS.md '항상 지켜야 하는 것'. 테스트 이름의 spec 번호와 규칙 번호(11, 12, 48, 56, 57)는 옛 설계서 번호다)
 //
 // 여기가 깨지면 다음이 벌어진다.
 //   - 깨진 지침이나 v1 지침으로 일정을 만든다
@@ -70,7 +71,7 @@ function hospitalItems(overrides = {}) {
   };
 }
 
-/** 예전 v1 지침 모양 — 더 이상 받지 않는다 (규칙 48) */
+/** 예전 v1 지침 모양: 더 이상 받지 않는다 (docs/business-rules.md '병원 연동') */
 function legacyV1Plan() {
   return {
     schemaVersion: 1,
@@ -638,7 +639,7 @@ describe('날짜별 적용 — 기간 보존과 규칙 12 (src/stay 합성과 �
     assert.deepEqual(c.appliedPeriodIds, [parts.periods[0].id]);
     assert.ok(c.effective.walkLimit.provenance.every((p) => p.source === 'HOSPITAL' && p.defaulted === false));
 
-    // 병원 복귀 기간 — 연결 병원 좌표로 복귀를 계산할 수 있다 (규칙 13-1·57)
+    // 병원 복귀 기간: 연결 병원 좌표로 복귀를 계산할 수 있다 (docs/business-rules.md '숙소와 병원', docs/contracts.md '`POST /api/plan/link`')
     const visitDay = classifyDate(stay, d(4));
     assert.equal(visitDay.limits.returnTime.place, 'HOSPITAL');
     assert.equal(visitDay.limits.returnTime.hospitalId, HOSPITAL_ID);

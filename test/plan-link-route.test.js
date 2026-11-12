@@ -1,4 +1,4 @@
-// POST /api/plan/link — 로그인 가드·오류 형태·v2 지침 반환 (AX-311 · spec 6장, 4.20, 규칙 12·48)
+// POST /api/plan/link: 로그인 가드·오류 형태·v2 지침 반환 (AX-311 · docs/contracts.md '`POST /api/plan/link`', docs/business-rules.md '병원 연동'. 테스트 이름의 spec 번호와 규칙 번호(12)는 옛 설계서 번호다)
 //
 // 라우트 핸들러를 직접 부른다(상대 경로 import). 외부 호출은 없다 — 데모 어댑터만 쓴다.
 

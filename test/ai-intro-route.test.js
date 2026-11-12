@@ -1,4 +1,4 @@
-// POST /api/itinerary/intro — 라우트 계약 (AX-309 · spec 4.16, 6장 · 규칙 36)
+// POST /api/itinerary/intro: 라우트 계약 (AX-309 · docs/business-rules.md 'AI 소개 문장', docs/contracts.md '`POST /api/itinerary/intro`'. 테스트 이름의 규칙 번호(36)는 옛 설계서 번호다)
 //
 // 계약
 //   - 로그인 세션이 없으면 401 SAFEHOUR_AUTH_REQUIRED, 외부 호출 없음

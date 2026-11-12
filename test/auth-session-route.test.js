@@ -1,4 +1,4 @@
-// GET /api/auth/session 라우트 — 불투명 계정 키 (AX-312 · spec 6장 · 4.19)
+// GET /api/auth/session 라우트: 불투명 계정 키 (AX-312 · docs/contracts.md '`GET /api/auth/session`', docs/security.md '기기 저장소와 계정 이름공간')
 //
 // 순수 함수(sessionView) 테스트만으로는 **실제 라우트가 무엇을 내보내는지** 고정되지 않는다.
 // 라우트 파일은 Next 별칭(`@/`)을 쓰므로, 이 테스트 프로세스에서만 별칭을 저장소 루트로

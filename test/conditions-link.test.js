@@ -1,4 +1,4 @@
-// 병원 연동 화면의 순수 함수 — 체류에 지침 합치기, 일정 중복 건너뛰기, 안내 확인 (AX-315 · spec 4.20, 5.1, 규칙 12·56·57)
+// 병원 연동 화면의 순수 함수: 체류에 지침 합치기, 일정 중복 건너뛰기, 안내 확인 (AX-315 · docs/business-rules.md '병원 연동', docs/contracts.md '`POST /api/plan/link`'. 테스트 이름의 spec 번호와 규칙 번호(12, 56, 57)는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

@@ -5,7 +5,7 @@
 // 4개 언어·안전 문구 병기·이름공간 규칙은 `i18n-languages.test.js` 가 고정한다.
 //
 // AX-303 에서 의도적으로 바꾼 단언: `ja-JP`·`zh-CN` 은 이제 `en` 이 아니라 `ja`·`zh` 다
-// (spec 4.17 · 규칙 44 · ADR-0007 이 ADR-0003 규칙 1 을 개정).
+// (docs/business-rules.md '언어' · ADR-0007 이 ADR-0003 규칙 1 을 개정).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -263,7 +263,7 @@ describe('단말 데이터 삭제 목록 (AX-210)', () => {
 });
 
 describe('언어 결정', () => {
-  // AX-303: ja·zh 를 en 으로 좁히던 단언을 의도적으로 바꿨다 (spec 규칙 44)
+  // AX-303: ja·zh 를 en 으로 좁히던 단언을 의도적으로 바꿨다 (docs/business-rules.md '언어')
   test('ko·ja·zh 태그는 각 언어로, 나머지는 en 으로 좁힌다', () => {
     assert.equal(normalizeLang('ko'), 'ko');
     assert.equal(normalizeLang('ko-KR'), 'ko');
