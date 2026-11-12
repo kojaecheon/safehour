@@ -1,4 +1,4 @@
-/* 기본 부품과 앱 셸 스타일 (AX-304 · spec 7장)
+/* 기본 부품과 앱 셸 스타일 (AX-304 · docs/platform/DESIGN_SYSTEM.md '부품 (`components/ui/`)'·'앱 셸 (`AppShell`)')
  *
  * 소유: 디자인 시스템 작업(AX-304). 기능 화면 작업은 이 파일을 고치지 않고 자기 기능 파일
  * (app/styles/<기능>.css)에서 배치만 더한다. 부품 모양을 바꿔야 하면 보고한다.
@@ -321,7 +321,7 @@
 }
 .ui-source-ai .ui-source-head { color: var(--source-ai); }
 
-/* 항목 옆 작은 출처 표시 (spec 4.5: '병원 발행' / '본인 체크' / '기본값 적용') */
+/* 항목 옆 작은 출처 표시 (docs/business-rules.md '날짜별 합성': '병원 발행' / '본인 체크' / '기본값 적용') */
 .ui-source-tag {
   display: inline-flex;
   align-items: center;

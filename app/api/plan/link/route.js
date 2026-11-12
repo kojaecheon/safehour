@@ -1,11 +1,11 @@
-// POST /api/plan/link — 병원 지침 연결, 계약 v2 (AX-214 · AX-216 → AX-311 · spec 4.20, 6장)
+// POST /api/plan/link: 병원 지침 연결, 계약 v2 (AX-214 · AX-216 → AX-311 · docs/business-rules.md '병원 연동', docs/contracts.md '`POST /api/plan/link`')
 //
 // 게이트웨이를 통해 코드를 v2 지침으로 바꾼다. 지금은 데모 어댑터 하나뿐이며,
 // FHIR·병원 전용 API 는 같은 자리에 어댑터로 붙는다 (정의 §3·§10).
-// v1 지침은 받지 않는다 — 형식이 v2 가 아니면 지침 전체를 거부한다(규칙 48).
+// v1 지침은 받지 않는다. 형식이 v2 가 아니면 지침 전체를 거부한다(docs/business-rules.md '병원 연동', docs/contracts.md '`POST /api/plan/link`').
 //
 // **로그인이 필요하다.** 코드만으로 열어두면 코드가 유출됐을 때 누구나 그 지침을 본다.
-// 세션이 없으면 401 { ok: false, errorCode: 'SAFEHOUR_AUTH_REQUIRED', message } (spec 6장).
+// 세션이 없으면 401 { ok: false, errorCode: 'SAFEHOUR_AUTH_REQUIRED', message } (docs/contracts.md '공통').
 // 모든 오류 응답은 `errorCode` 키를 쓴다(기존 `code` 키 형태를 대체).
 //
 // 지침 본문은 응답으로만 나가고 서버에 남지 않는다. 로그에 코드·지침·안내문을 남기지 않는다.

@@ -1,4 +1,4 @@
-// POST /api/itinerary/plan — 체류 일정 생성·재계획·표시만 다시 쓰기 (AX-308 · spec 4.9, 6장)
+// POST /api/itinerary/plan: 체류 일정 생성·재계획·표시만 다시 쓰기 (AX-308 · docs/business-rules.md '전체 일정 확정과 변화 대응', docs/contracts.md '`POST /api/itinerary/plan`')
 //
 // 요청  { lang: "ko"|"en"|"ja"|"zh", stay: PlanStay, dates?: date[], previous?: Record<date, DayPlan>,
 //         edits?: TripPlan.edits, usedContentIds?: contentId[], events?: DemoEvent[], relabelOnly?: boolean, now }

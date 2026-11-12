@@ -1,6 +1,6 @@
 'use client';
 
-// /design-board — 디자인 시안 보드 (AX-304 토큰·부품 · AX-321 화면 시안 · spec 7장)
+// /design-board: 디자인 시안 보드 (AX-304 토큰·부품 · AX-321 화면 시안 · docs/platform/DESIGN_SYSTEM.md '시안 보드 (`/design-board`)')
 //
 // - 토큰 견본(색·대비, 글자, 간격·모서리·그림자)과 부품의 상태별 견본을 보여준다.
 // - 고정 데모 데이터(./demoData.js + designBoard 이름공간 문구)만 쓴다. 저장소·세션·서버를 부르지 않는다.
@@ -443,7 +443,7 @@ export default function DesignBoard() {
               </div>
             </Sub>
 
-            {/* 매일 확인은 규칙 32 의 관문이다. 화면 시안의 오늘은 확인을 마친 모습이라, 확인 전 모습은 여기서 본다 */}
+            {/* 매일 확인은 docs/business-rules.md '매일 확인'·'사용자 편집'의 관문이다. 화면 시안의 오늘은 확인을 마친 모습이라, 확인 전 모습은 여기서 본다 */}
             <Sub id="designBoard-c-dailycheck" title={t('designBoard.cDailyCheck')}>
               <DailyCheckCard
                 day={demoTrip.todayStored}

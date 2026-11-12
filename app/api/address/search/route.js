@@ -1,7 +1,7 @@
-// POST /api/address/search — 도로명주소 검색 + 좌표 변환 (AX-310 · spec 4.2–4.3, 6장)
+// POST /api/address/search: 도로명주소 검색 + 좌표 변환 (AX-310 · docs/business-rules.md '숙소와 병원', docs/contracts.md '`POST /api/address/search`')
 //
 // 요청  { keyword: string(앞뒤 공백 제거 후 2–60자), lang }
-// 응답  200 { ok: true, results: Address[] }  (최대 10건, Address = spec 5.1)
+// 응답  200 { ok: true, results: Address[] }  (최대 10건, Address = src/stay/stay.js @typedef Address)
 // 오류  401 SAFEHOUR_AUTH_REQUIRED       로그인 세션 없음 (route-guard)
 //       400 SAFEHOUR_BAD_REQUEST         본문·검색어 무효, 외부 API 가 검색어 문제로 거절 (`reason` 포함)
 //       503 SAFEHOUR_ADDRESS_UNAVAILABLE 키(JUSO_API_KEY·JUSO_COORD_API_KEY) 미설정
@@ -9,10 +9,10 @@
 //
 // - 키가 없어도 데모 로그인 모드(SAFEHOUR_ALLOW_DEMO_LOGIN=1)면 고정 데모 주소(source "DEMO")를 준다.
 //   키가 모두 있으면 데모 모드여도 실제 API 를 쓴다.
-// - 병원 목록·추천을 만들지 않는다. 사용자가 입력한 검색어의 결과만 돌려준다(spec 4.3, 9.1).
+// - 병원 목록·추천을 만들지 않는다. 사용자가 입력한 검색어의 결과만 돌려준다(docs/business-rules.md '숙소와 병원').
 // - `lang` 은 결과를 바꾸지 않는다. 도로명주소는 한국어 원문 그대로 돌려준다(한국어 카드·택시 안내에 쓰인다).
 // - 허용 목록(keyword, lang) 밖 필드는 읽지 않는다. 외부로 보내는 것은 검색어뿐이다.
-// - 로그에는 분류 코드만 남긴다. 키·검색어·전체 조회 URL 은 남기지 않는다(spec 9.1).
+// - 로그에는 분류 코드만 남긴다. 키·검색어·전체 조회 URL 은 남기지 않는다(docs/security.md '비밀값'·'기록').
 
 // 상대 경로 사용 — Next 외부(node --test)에서도 이 라우트를 그대로 테스트하기 위함
 import { ERROR_CODE, errorResponse, withSession } from '../../../../lib/server/route-guard.js';

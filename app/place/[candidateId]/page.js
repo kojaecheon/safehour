@@ -1,13 +1,13 @@
 'use client';
 
-// /place/[candidateId] — 장소 상세 (AX-317 · spec 3.1 · 4.8 · 4.12 · 4.14 · 6장 POST /api/place)
+// /place/[candidateId]: 장소 상세 (AX-317 · docs/platform/IA_AND_FLOWS.md '경로', docs/business-rules.md '장소 후보와 필터'·'알림과 카드', docs/contracts.md '`POST /api/place`')
 //
 // 화면 원칙
 //   - 정거장은 기기에 저장된 확정 일정에서 찾는다(?stop=정거장 id 가 있으면 그 정거장). 일정에 없는 장소는 보이지 않는다
 //     — 이 화면이 판정을 거치지 않은 장소로 가는 우회 경로가 되면 안 된다.
 //   - 관광공사 원문(개요·운영 시간·사진)과 SafeHour 판정·추정(도착·머무름·이동·실내 여부)은 다른 출처 영역에 둔다.
 //     원문은 번역하지 않고 원문 언어를 lang 으로 표시한다. 운영 시간 원문을 영업 여부로 해석하지 않는다('운영 확인 필요').
-//   - 지도 링크 2개는 목적지(이 장소)의 이름·좌표만 넘긴다. 매일 확인 전인 오늘 장소면 길찾기를 막는다(규칙 32·39).
+//   - 지도 링크 2개는 목적지(이 장소)의 이름·좌표만 넘긴다. 매일 확인 전인 오늘 장소면 길찾기를 막는다(docs/business-rules.md '매일 확인'·'알림과 카드').
 //   - 주문 카드 라벨이면 한국어 식이 카드(/cards)로 잇는다. 한국어 원문 이름·주소는 택시 기사에게 보여 줄 수 있게 따로 둔다.
 //   - 상세는 보강이다. 오프라인·로그인 만료·실패여도 일정 속 정보는 그대로 보인다. 출처 'ⓒ한국관광공사'를 늘 붙인다.
 //   - SEED ③층(설계서 6.2 8번): 회색 바탕 위 흰 블록. 그림·이름 / 지도 / 이 장소의 일정(추정) / 주문 카드 / 관광공사 원문 / 접근성 / 사진.
@@ -292,7 +292,7 @@ function PlaceDetail() {
             <div className="place-photos">
               {details.images.slice(0, 4).map((image) => (
                 <figure key={image.url}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- 관광공사 원본 URL 을 참조만 한다(내려받기·가공 금지, spec 9.1) */}
+                  {/* eslint-disable-next-line @next/next/no-img-element -- 관광공사 원본 URL 을 참조만 한다(내려받기·가공 금지, docs/business-rules.md '장소 후보와 필터') */}
                   <img src={image.url} alt={image.name ? `${stop.title} — ${image.name}` : stop.title} loading="lazy" referrerPolicy="no-referrer" />
                   <figcaption>
                     {t('place.source')} ·{' '}

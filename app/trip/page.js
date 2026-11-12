@@ -1,6 +1,6 @@
 'use client';
 
-// /trip — 전체 일정: 입국부터 출국까지 날짜 목록 (AX-317 · spec 3.1 · 4.5 · 4.9)
+// /trip: 전체 일정, 입국부터 출국까지 날짜 목록 (AX-317 · docs/platform/IA_AND_FLOWS.md '경로', docs/business-rules.md '날짜 분류'·'전체 일정 확정과 변화 대응')
 //
 // 화면 원칙
 //   - 날짜마다 상태(색 + 아이콘 + 글자), 날짜 분류, 병원 일정 표시, 장소 수, '변경됨', 사유를 보인다.
@@ -33,7 +33,7 @@ export default function TripPage() {
   const days = {};
   for (const date of Object.keys(trip.tripPlan?.days ?? {})) days[date] = date === today ? trip.today.day : trip.tripPlan.days[date];
   const rows = today ? tripDateRows({ stay, days, today }) : [];
-  // '오늘 이후 전체' 다시 만들기 — 보기 전용·일정 없음·매일 확인 전인 오늘이면 막는다 (spec 4.10)
+  // '오늘 이후 전체' 다시 만들기: 보기 전용·일정 없음·매일 확인 전인 오늘이면 막는다 (docs/business-rules.md '사용자 편집')
   const regenerate = trip.readOnly
     ? { allowed: false, reasonKey: 'trip.editReadOnly' }
     : !trip.tripPlan

@@ -22,7 +22,7 @@ import PwaRuntime from '@/components/pwa/PwaRuntime.js';
 // 일정 동기화·즉시 복귀 시트 (AX-317): 어느 화면으로 열어도 변화 감지가 돌고, 즉시 복귀 시트가 자동으로 열린다
 import TripRuntime from '@/components/trip/TripRuntime.js';
 
-// 제목·설명은 안전을 약속하지 않는다 — 조건 통과와 안전은 다르다 (spec 9.1 '안전합니다' 표현 금지 · AX-321)
+// 제목·설명은 안전을 약속하지 않는다. 조건 통과와 안전은 다르다 (docs/business-rules.md '이 제품이 하지 않는 판단': '안전합니다' 표현 금지 · AX-321)
 export const metadata = {
   title: 'SafeHour — 체류 일정 동반 / Day plans for your medical stay in Korea',
   description:

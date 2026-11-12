@@ -1,4 +1,4 @@
-// 웹 앱 매니페스트 — 홈 화면 설치 (AX-319 · spec 4.18)
+// 웹 앱 매니페스트: 홈 화면 설치 (AX-319 · docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 // Next 규칙 파일이다: /manifest.webmanifest 로 제공되고, 모든 화면 <head> 에 링크가 자동으로 붙는다.
 // 서비스 워커(public/sw.js)가 이 주소를 미리 받아 둔다.

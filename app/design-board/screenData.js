@@ -1,7 +1,7 @@
-// 시안 보드 '화면 시안'의 고정 데모 데이터 (AX-321 · spec 7장 '고정 데모 데이터만 쓰고 사용자 데이터는 읽지 않는다')
+// 시안 보드 '화면 시안'의 고정 데모 데이터 (AX-321 · docs/standards.md '안전 규칙의 구조적 강제': 고정 데모 데이터만 쓰고 사용자 데이터는 읽지 않는다)
 //
 // 여기 있는 체류·하루 일정은 **손으로 적은 고정 값**이다. 기기 저장소·세션·서버·관광공사 API 를 부르지 않는다.
-// 모양은 spec 5.1 Stay · 5.2 DayPlan 그대로이고, 날짜 분류·합성 값(effective)은 도메인 함수(classifyStay)로 채운다 —
+// 모양은 src/stay/stay.js @typedef Stay, docs/contracts.md '`POST /api/itinerary/plan`'의 DayPlan 그대로이고, 날짜 분류·합성 값(effective)은 도메인 함수(classifyStay)로 채운다.
 // 화면 부품이 실제 앱과 같은 입력을 받게 하려는 것이다. 판정 엔진은 돌리지 않는다(시각·장소는 예시값).
 //
 // 원칙
@@ -33,7 +33,7 @@ const UNKNOWN = Object.freeze({ kind: 'UNKNOWN' });
 const LODGING_POINT = Object.freeze({ lat: 37.5609, lng: 126.986 });
 const HOSPITAL_POINT = Object.freeze({ lat: 37.5163, lng: 127.0203 });
 
-/** 본인 체크 항목 — 모두 '아니오'에서 필요한 것만 바꾼다 (spec 5.1 ConditionItems) */
+/** 본인 체크 항목: 모두 '아니오'에서 필요한 것만 바꾼다 (src/stay/conditions.js @typedef ConditionItems) */
 function items(overrides = {}) {
   const { diet, ...rest } = overrides;
   return {
@@ -145,7 +145,7 @@ const PLACES = Object.freeze({
   pub: { contentId: '9003', key: 'designBoard.demoPub' },
 });
 
-/** 정거장 하나 (spec 5.2 Stop). 좌표는 숙소 근처의 예시값이다 */
+/** 정거장 하나 (docs/contracts.md '`POST /api/itinerary/plan`'의 Stop). 좌표는 숙소 근처의 예시값이다 */
 function stop(date, role, place, lang, o) {
   const { contentId, key, category, indoor, typeId } = PLACES[place];
   return {
@@ -328,7 +328,7 @@ export function buildDemoTrip(lang) {
     [d02]: baseDay(d02, byDate, {
       dayState: 'TOGETHER',
       transportMode: 'TRANSIT',
-      // 입국 11:00 + 입국 수속 90분 + 공항→숙소 추정 80분 = 13:50 (규칙 14 · lib/server/airports.js)
+      // 입국 11:00 + 입국 수속 90분 + 공항→숙소 추정 80분 = 13:50 (docs/business-rules.md '체류' · lib/server/airports.js)
       window: { start: '13:50', end: '21:00' },
       outings: [
         outing(d02, 'P', 1, {
@@ -366,7 +366,7 @@ export function buildDemoTrip(lang) {
     }),
     [d08]: baseDay(d08, byDate, {
       dayState: 'TOGETHER',
-      // 출국 18:00 − 공항 도착 여유 3시간 − 숙소→공항 추정 80분 − 여유 30분 = 13:10 (규칙 15)
+      // 출국 18:00 − 공항 도착 여유 3시간 − 숙소→공항 추정 80분 − 여유 30분 = 13:10 (docs/business-rules.md '체류')
       window: { start: '09:00', end: '13:10' },
       outings: [
         outing(d08, 'P', 1, {
