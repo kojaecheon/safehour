@@ -524,13 +524,6 @@ export const messages = {
     ja: '戻り期限の通知を受け取る',
     zh: '接收返回截止时间提醒',
   },
-  // 오프라인이라 스위치가 막혔을 때: 로그인을 권하지 않고 사실과 할 일만 적는다 (사용성 점검 D2 · C2)
-  'guardian.alertsOfflineNote': {
-    ko: '인터넷 연결이 없어 지금은 바꿀 수 없어요. 다시 연결된 뒤에 바꿔 주세요.',
-    en: 'You are offline, so this cannot be changed right now. Please change it after you reconnect.',
-    ja: 'インターネットに接続されていないため、今は変更できません。再接続してから変更してください。',
-    zh: '当前未连接网络，暂时无法更改。请在重新连接后再更改。',
-  },
   'guardian.alertsNote': {
     ko: '이 휴대폰에서 앱이 완전히 닫혀 있으면 알림이 오지 않을 수 있어요.',
     en: 'If the app is fully closed on this phone, alerts may not arrive.',

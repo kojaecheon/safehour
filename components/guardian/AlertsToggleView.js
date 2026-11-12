@@ -62,7 +62,7 @@ export default function AlertsToggleView({
       <div role="status" className="guardian-alerts-status">
         {message && NOTIFY_MESSAGE[message] && <p>{t(NOTIFY_MESSAGE[message])}</p>}
       </div>
-      {showReadOnly && offline && <p className="guardian-meta">{t('guardian.alertsOfflineNote')}</p>}
+      {showReadOnly && offline && <p className="guardian-meta">{t('settings.offlineNote')}</p>}
       {showReadOnly && !offline && (
         <>
           <p className="guardian-meta">{t('settings.readOnlyNote')}</p>

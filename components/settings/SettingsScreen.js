@@ -17,7 +17,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getStore } from '@/lib/store/index.js';
+import { READ_ONLY_REASON, getStore } from '@/lib/store/index.js';
 import { turnOnDeviceNotifications } from '@/lib/notify/permission.js';
 import { LANGS, LANG_NAMES } from '@/src/i18n/index.js';
 import ClearSessionButton from '../ClearSessionButton.js';
@@ -79,7 +79,7 @@ function LanguageSection({ inert }) {
   );
 }
 
-function NotificationSection({ readOnly, showReadOnly, inert }) {
+function NotificationSection({ readOnly, showReadOnly, noteKey, inert }) {
   const { t } = useLang();
   const prefs = usePrefs();
   const [busy, setBusy] = useState(false);
@@ -118,7 +118,7 @@ function NotificationSection({ readOnly, showReadOnly, inert }) {
       <div role="status" className="settings-status">
         {message && <p>{t(NOTIFY_MESSAGE[message])}</p>}
       </div>
-      {showReadOnly && <p className="settings-text">{t('settings.readOnlyNote')}</p>}
+      {showReadOnly && <p className="settings-text">{t(noteKey)}</p>}
       <div className="ui-callout has-icon settings-disclosure" role="note">
         <span className="ui-callout-icon settings-disclosure-icon" aria-hidden="true">
           <Icon name="info" size={20} />
@@ -129,7 +129,7 @@ function NotificationSection({ readOnly, showReadOnly, inert }) {
   );
 }
 
-function ConsentSection({ readOnly, showReadOnly, sheetOpen, setSheetOpen }) {
+function ConsentSection({ readOnly, showReadOnly, noteKey, sheetOpen, setSheetOpen }) {
   const { t, locale } = useLang();
   const stay = useStay();
   const hydrated = useHydrated();
@@ -160,7 +160,7 @@ function ConsentSection({ readOnly, showReadOnly, sheetOpen, setSheetOpen }) {
       <Button variant="secondary" disabled={!agreed || readOnly} onClick={() => setSheetOpen(true)}>
         {t('settings.consentWithdraw')}
       </Button>
-      {showReadOnly && <p className="settings-text">{t('settings.readOnlyNote')}</p>}
+      {showReadOnly && <p className="settings-text">{t(noteKey)}</p>}
       <div role="status" className="settings-status">
         {outcome &&
           (outcome.ok ? (
@@ -206,15 +206,18 @@ export default function SettingsScreen() {
   const { t } = useLang();
   const status = useStoreStatus();
   const showReadOnly = shouldShowReadOnly(status);
+  // 오프라인이면 로그인을 권하지 않는다: 위 배너도 '인터넷 연결 없음'이라고 말한다(사용성 점검 C2)
+  const noteKey = status.reason === READ_ONLY_REASON.OFFLINE ? 'settings.offlineNote' : 'settings.readOnlyNote';
   // 동의 철회 시트가 열려 있는 동안 다른 설정 묶음은 누를 수 없게 한다(시트 뒤 배경 — aria-modal 과 같은 뜻)
   const [sheetOpen, setSheetOpen] = useState(false);
   return (
     <>
       <LanguageSection inert={sheetOpen} />
-      <NotificationSection readOnly={status.readOnly} showReadOnly={showReadOnly} inert={sheetOpen} />
+      <NotificationSection readOnly={status.readOnly} showReadOnly={showReadOnly} noteKey={noteKey} inert={sheetOpen} />
       <ConsentSection
         readOnly={status.readOnly}
         showReadOnly={showReadOnly}
+        noteKey={noteKey}
         sheetOpen={sheetOpen}
         setSheetOpen={setSheetOpen}
       />

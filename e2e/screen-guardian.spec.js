@@ -257,15 +257,16 @@ test.describe('③층 보호자 링크 열기', () => {
 });
 
 test.describe('받은 일정 화면의 보기 전용 안내 (사용성 점검 D2)', () => {
-  test('로그인이 만료돼도 환자용 보기 전용 막대는 없고, 알림 스위치가 이유와 로그인 버튼을 준다', async ({ page, context }) => {
+  test('로그인이 풀려도(세션 쿠키 없음) 환자용 보기 전용 막대는 없고, 알림 스위치가 이유와 로그인 버튼을 준다', async ({ page, context }) => {
     await importGuardianCopy(page);
     await context.clearCookies();
     await page.goto('/g');
     await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
-    await expect(page.locator('.ui-readonly')).toHaveCount(0);
     const alerts = page.locator('.guardian-alerts');
     await expect(alerts.getByRole('switch')).toBeDisabled();
+    // 이 안내는 세션 확인이 끝나야 보인다. 그 뒤에 배너가 없는지 본다(확인 전에는 어느 화면에도 배너가 없어 헛통과한다)
     await expect(alerts).toContainText('보기 전용에서는 바꿀 수 없어요. 로그인하면 바꿀 수 있어요.');
+    await expect(page.locator('.ui-readonly')).toHaveCount(0);
     const login = alerts.getByRole('link', { name: '로그인하기' });
     await expect(login).toHaveAttribute('href', '/login?returnTo=%2Fg');
     expect((await login.boundingBox()).height).toBeGreaterThanOrEqual(44);
