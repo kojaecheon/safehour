@@ -52,7 +52,7 @@ SafeHour의 하루 일정 소개 문장 한 가지에 대해 정리한 것이다
 
 ## 3. 입력 최소화
 
-`POST /api/itinerary/intro`의 요청 본문 중 **아래 허용 목록만** 읽는다(spec 6장). 나머지는 읽지 않고 버린다.
+`POST /api/itinerary/intro`의 요청 본문 중 **아래 허용 목록만** 읽는다(`docs/contracts.md` '`POST /api/itinerary/intro`'). 나머지는 읽지 않고 버린다.
 
 | 넣는 것 | 값 제한 |
 | --- | --- |
@@ -89,7 +89,7 @@ SafeHour의 하루 일정 소개 문장 한 가지에 대해 정리한 것이다
 | 출력 토큰 상한 | 512(생각 토큰 포함). 상한에 걸려 끝나면(`MAX_TOKENS`) 템플릿 |
 | 라이브러리 | 없음. 서버에서 `fetch`로 직접 부른다(새 패키지 설치 금지) |
 
-모델 선택 이유: spec 4.16은 'Gemini의 빠르고 저렴한 등급(Flash 계열)'을 요구한다. 2026-09-19 공식 모델 목록에서
+모델 선택 이유: ADR-0008(`docs/decisions/0008-runtime-ai-intro.md`)은 'Gemini의 빠르고 저렴한 등급(Flash 계열)'을 요구한다. 2026-09-19 공식 모델 목록에서
 `gemini-3.5-flash-lite`는 "가장 빠르고 비용 효율적인 3.5 모델"로 Stable이고 종료 예정일이 없다.
 기본 생각 수준이 `minimal`이라 3초 제한에 맞는다. 더 큰 Flash(`gemini-3.8-flash` 등)는 기본 생각 수준이 `medium`이라
 지연이 길어질 수 있다. 모델을 바꾸면 반드시 평가(6장)를 다시 돌린다.
