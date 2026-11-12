@@ -1,4 +1,4 @@
-// 보호자 링크 PIN 잠금 저장소 (AX-320 · spec 4.11, 4.19, 규칙 37·41)
+// 보호자 링크 PIN 잠금 저장소 (AX-320 · docs/business-rules.md '보호자', docs/security.md '보호자 링크'·'기기 저장소와 계정 이름공간')
 //
 // createPinLockout(src/guardian)은 저장소를 주입받는다. 이 모듈이 그 저장소를 만든다.
 //   - 키는 기기 저장소 접두사 `safehour.v2.` 아래 기기 구역에 둔다:

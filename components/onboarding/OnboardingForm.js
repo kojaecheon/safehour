@@ -1,6 +1,6 @@
 'use client';
 
-// 체류 설정 (/onboarding) — 단계형, 360px 기준 (AX-314 · spec 3.1–3.2, 4.1–4.3, 4.18, 5.1)
+// 체류 설정 (/onboarding), 단계형, 360px 기준 (AX-314 · docs/platform/IA_AND_FLOWS.md '처음 쓰는 사람'·'보기 전용 상태', docs/business-rules.md '체류'·'숙소와 병원', src/stay/stay.js @typedef Stay)
 //
 // 흐름: 입·출국 → 숙소 → 병원·일정 → 동반 보호자 → 관심사·강도 → 저장 → /conditions
 //
@@ -10,8 +10,8 @@
 //   새 체류: schemaVersion 2, 일정 출처 USER, 민감정보 동의 없음(consent.sensitive = null).
 // - 수정(?edit=1): 저장된 체류를 불러와 고친다. 조건 기간·연동 지침·동의·보호자 공유는 그대로 둔다.
 //   저장 뒤 returnTo(같은 출처 경로만) 또는 /conditions 로 간다.
-// - 계정마다 활성 체류는 하나다(spec 4.1). 새로 만들기 화면에서 이미 체류가 있으면 수정·오늘 보기로 안내한다.
-// - 보기 전용(로그인 없음·만료·오프라인)이면 저장 버튼을 끄고 '보기 전용' 배지와 이유를 보여 준다(spec 4.18).
+// - 계정마다 활성 체류는 하나다(docs/business-rules.md '체류'). 새로 만들기 화면에서 이미 체류가 있으면 수정·오늘 보기로 안내한다.
+// - 보기 전용(로그인 없음·만료·오프라인)이면 저장 버튼을 끄고 '보기 전용' 배지와 이유를 보여 준다(docs/platform/IA_AND_FLOWS.md '보기 전용 상태').
 // - 현재 위치를 쓰지 않는다. 주소는 사용자가 검색해 고른 것만 쓴다.
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';

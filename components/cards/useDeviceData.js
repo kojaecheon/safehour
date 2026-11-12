@@ -1,6 +1,6 @@
 'use client';
 
-// 기기 저장소 읽기 훅 — 카드·긴급·설정 화면용 (AX-318 · spec 4.18)
+// 기기 저장소 읽기 훅, 카드·긴급·설정 화면용 (AX-318 · docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 //   const stay = useStay();                    // 체류(없으면 null)
 //   const { today } = useTodayTomorrow() ?? {}; // 오늘·내일(KST) 하루 일정
@@ -72,7 +72,7 @@ const readHasGuardianCopies = () => hasLiveGuardianCopy(getStore().readGuardianC
 const serverNull = () => null;
 const serverFalse = () => false;
 
-/** 이 기기의 체류 (spec 5.1 Stay) — 없으면 null */
+/** 이 기기의 체류 (src/stay/stay.js @typedef Stay), 없으면 null */
 export function useStay() {
   return useSyncExternalStore(subscribeStay, readStay, serverNull);
 }

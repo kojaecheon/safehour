@@ -1,13 +1,13 @@
 'use client';
 
-// 보호자 화면용 훅 (AX-320 · spec 4.11, 4.18)
+// 보호자 화면용 훅 (AX-320 · docs/business-rules.md '보호자', docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 //   useHydrated()               서버 렌더·하이드레이션 중 false, 그 뒤 true — 저장소 값을 그리기 전에 확인한다
 //   useStoreRecord(topic, read) 기기 저장소 값을 구독한다(바뀌지 않으면 같은 참조)
 //   useGuardianResendNeeded()   '보호자 링크 다시 보내기'를 안내할지 — 오늘 화면이 그대로 가져다 쓴다
 //   useIncomingLink()           /g 가 열 암호문: 주소의 # 뒤, 없으면 로그인 왕복 임시 보관(탭 저장소)
 //
-// 암호문은 주소의 # 뒤와 탭 저장소에서만 읽는다. 서버 요청·로그에 싣지 않는다(규칙 38).
+// 암호문은 주소의 # 뒤와 탭 저장소에서만 읽는다. 서버 요청·로그에 싣지 않는다(docs/security.md '보호자 링크').
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { getStore } from '@/lib/store/index.js';
@@ -55,7 +55,7 @@ const readStay = (store) => store.readStay();
 const readTripPlan = (store) => store.readTripPlan();
 
 /**
- * '보호자 링크 다시 보내기'를 안내해야 하는가 (spec 4.11 — 환자 일정이 바뀌면 환자 화면에 안내).
+ * '보호자 링크 다시 보내기'를 안내해야 하는가 (docs/business-rules.md '보호자': 환자 일정이 바뀌면 환자 화면에 안내).
  * 판단은 share.js 의 isGuardianResendNeeded 하나다(링크 만들기 화면과 같은 함수).
  *
  * 보낸 링크의 7일 범위가 지나고 체류가 이어지면 windowPassed 가 true 다(isGuardianWindowPassed, 화면을 열 때 판단).

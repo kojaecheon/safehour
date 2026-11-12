@@ -1,4 +1,4 @@
-// 체류 설정 초안 ↔ 기기 저장 모델 (AX-314 · spec 4.1–4.3, 5.1, 10장 규칙 1–3)
+// 체류 설정 초안 ↔ 기기 저장 모델 (AX-314 · docs/business-rules.md '체류'·'숙소와 병원', src/stay/stay.js @typedef Stay)
 //
 // 순수 함수만 둔다(React·브라우저 API 없음). 화면(app/onboarding)과 테스트가 함께 쓴다.
 //
@@ -6,14 +6,14 @@
 //                  예외(운영자 결정 2026-11-08, 판정을 느슨하게 하지 않는 기본 선택만): 공항은 인천(ICN),
 //                  이동 강도는 느긋하게(RELAXED, 덜 움직이는 쪽)를 미리 골라 둔다. 화면에서 바꿀 수 있다.
 //   선택 칸      : 숙소 이름(비우면 저장하지 않고 화면은 '숙소'로 부른다), 출발 시각(비우면 src/stay/defaults.js DEPARTURE_TIME_UNSET).
-//   체류(Stay)   — spec 5.1. stayFromDraft() 가 만들고, 검증은 도메인의 validateStay() 하나만 쓴다.
+//   체류(Stay)   : src/stay/stay.js @typedef Stay. stayFromDraft() 가 만들고, 검증은 도메인의 validateStay() 하나만 쓴다.
 //
 // 원칙
-//   - 판정·검증 규칙을 여기서 다시 만들지 않는다. 규칙 1–3(출국<입국·45박 초과, 수술·시술 없음, 숙소 겹침)은
+//   - 판정·검증 규칙을 여기서 다시 만들지 않는다. 체류 거부 조건(출국<입국·45박 초과, 수술·시술 없음, 숙소 겹침, docs/business-rules.md '체류')은
 //     validateStay() 의 결과를 필드별 문구로 옮길 뿐이다. 더하는 것은 전화번호 모양 검사 하나다.
 //   - 수정 때는 이 화면이 다루지 않는 기록(조건 기간·연동 지침·동의·보호자 공유·만든 시각)을 그대로 둔다.
 //   - 병원 연동으로 받은 일정(source "HOSPITAL")은 고치거나 지우지 않는다.
-//   - 주소는 사용자가 검색해 고른 결과만 받는다. 허용 필드만 남긴다(spec 5.1 Address).
+//   - 주소는 사용자가 검색해 고른 결과만 받는다. 허용 필드만 남긴다(src/stay/stay.js @typedef Address).
 
 import { DEFAULTS, DEPARTURE_TIME_UNSET } from '../../src/stay/defaults.js';
 import { VALIDATION_ISSUE } from '../../src/stay/errorCodes.js';
@@ -33,11 +33,11 @@ export const STEP_LABEL_KEY = Object.freeze({
   preferences: 'onboarding.stepPreferences',
 });
 
-/** 병원 전화(선택) — 숫자·+·-·괄호·띄어쓰기만. 긴급 연락 화면의 전화 걸기 링크가 된다(spec 4.15) */
+/** 병원 전화(선택): 숫자·+·-·괄호·띄어쓰기만. 긴급 연락 화면의 전화 걸기 링크가 된다(docs/decisions/0010-map-links-emergency-notifications.md '긴급 연락') */
 export const PHONE_MAX_LENGTH = 20;
 export const PHONE_PATTERN = /^[0-9+\-() ]{3,20}$/;
 
-/** 주소 검색어 길이 — 서버 계약(spec 6장)과 같다. 서버가 최종 판단한다 */
+/** 주소 검색어 길이: 서버 계약(docs/contracts.md '`POST /api/address/search`')과 같다. 서버가 최종 판단한다 */
 export const KEYWORD_MIN_LENGTH = 2;
 export const KEYWORD_MAX_LENGTH = 60;
 
@@ -118,7 +118,7 @@ export function emptyDraft() {
 // ── 주소 ────────────────────────────────────────────────────────────
 
 /**
- * 주소 검색 응답 한 건을 저장 모델(spec 5.1 Address)로 좁힌다. 허용 필드 밖은 버린다.
+ * 주소 검색 응답 한 건을 저장 모델(src/stay/stay.js @typedef Address)로 좁힌다. 허용 필드 밖은 버린다.
  * 도로명주소·좌표·출처가 없으면 null.
  */
 export function pickAddress(raw) {
@@ -227,7 +227,7 @@ function departureOf(departure) {
 }
 
 /**
- * 초안 → 기기 저장 체류(spec 5.1). 저장 시각(createdAt·updatedAt)은 저장소가 채운다.
+ * 초안 → 기기 저장 체류(src/stay/stay.js @typedef Stay). 저장 시각(createdAt·updatedAt)은 저장소가 채운다.
  *
  * @param {ReturnType<typeof emptyDraft>} draft
  * @param {object | null} [previous] 수정 중인 기존 체류 — 이 화면이 다루지 않는 기록을 그대로 둔다
@@ -452,7 +452,7 @@ export function issuesFor(issues, field) {
 
 // ── 도우미 ──────────────────────────────────────────────────────────
 
-/** 종료 시각이 없을 때의 '예상 종료' (spec 4.3 — PROCEDURE 240분, VISIT 90분). 계산할 수 없으면 null */
+/** 종료 시각이 없을 때의 '예상 종료' (docs/business-rules.md '숙소와 병원': PROCEDURE 240분, VISIT 90분). 계산할 수 없으면 null */
 export function estimatedEnd(type, start) {
   if (!APPOINTMENT_TYPES.includes(type) || !isClockTime(start)) return null;
   const { end, endMin } = appointmentEnd({ type, start });
@@ -469,8 +469,8 @@ export function nightsOf(draft) {
 }
 
 /**
- * 숙소가 정해지지 않은 밤(입국일~출국 전날). 그 날짜는 일정을 만들지 않는다(spec 4.2 LODGING_REQUIRED).
- * 체류 길이가 한도를 넘으면 계산하지 않는다(그때는 규칙 1 오류가 먼저다).
+ * 숙소가 정해지지 않은 밤(입국일~출국 전날). 그 날짜는 일정을 만들지 않는다(docs/business-rules.md '숙소와 병원'의 LODGING_REQUIRED).
+ * 체류 길이가 한도를 넘으면 계산하지 않는다(그때는 docs/business-rules.md '체류'의 45박 초과 오류가 먼저다).
  */
 export function uncoveredNights(draft, { maxNights = DEFAULTS.stay.maxNights } = {}) {
   const nights = nightsOf(draft);

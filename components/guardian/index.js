@@ -1,4 +1,4 @@
-// 보호자 화면 부품·도우미 모음 (AX-320 · spec 4.11)
+// 보호자 화면 부품·도우미 모음 (AX-320 · docs/business-rules.md '보호자')
 //
 // 오늘 화면이 '보호자 링크 다시 보내기'를 안내할 때는 useGuardianResendNeeded() 를 쓴다
 // (판단 함수 isGuardianResendNeeded 하나를 링크 만들기 화면과 함께 쓴다).

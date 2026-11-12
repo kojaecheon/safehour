@@ -1,11 +1,11 @@
 'use client';
 
-// 3단계 — 병원과 병원 일정 (spec 4.3)
+// 3단계: 병원과 병원 일정 (docs/business-rules.md '숙소와 병원')
 //
 // - 병원: 이름(40자), 도로명주소 검색(사용자 검색어만 — 병원 목록·추천·순위 없음), 전화(선택).
 // - 병원 일정: 병원, 유형(수술·시술 / 진료), 날짜, 시작, 종료(선택). 종료가 없으면 '예상 종료'를 보여준다
 //   (PROCEDURE 240분, VISIT 90분 — DEFAULTS). 시술 종류·증상은 묻지 않는다.
-// - 규칙 2: 수술·시술 일정이 하나도 없으면 저장할 수 없다(validateStay PROCEDURE_REQUIRED).
+// - docs/business-rules.md '체류': 수술·시술 일정이 하나도 없으면 저장할 수 없다(validateStay PROCEDURE_REQUIRED).
 // - 병원 연동으로 받은 일정(source HOSPITAL)은 읽기만 한다.
 
 import { useLang } from '../LanguageProvider.js';

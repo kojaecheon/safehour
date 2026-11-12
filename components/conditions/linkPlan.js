@@ -1,13 +1,13 @@
-// 병원 연동(데모) 화면의 순수 함수 — 지침을 체류에 합치기, 안내 확인 (AX-315 · spec 4.20, 5.1, 규칙 12·56·57)
+// 병원 연동(데모) 화면의 순수 함수: 지침을 체류에 합치기, 안내 확인 (AX-315 · docs/business-rules.md '병원 연동', docs/contracts.md '`POST /api/plan/link`')
 //
 // 화면은 여기서 다음 체류를 만든 뒤 저장소에 **한 번** 쓴다(updateStay). 재계획은 저장소를 구독하는
 // 동기화 작업(AX-316)이 한다 — 이 파일과 화면은 일정 API 를 부르지 않는다.
 //
 // - 변환은 src/recovery/link.js 의 planToStayParts(지침, 연결 병원 id) 가 한다. 연결 병원이 정해진 뒤에만 부른다.
-//   병원 복귀 항목의 hospitalId 가 연결 병원 id 로 채워진다(규칙 57). 기간은 잘라내지 않는다(규칙 12).
-// - 병원 일정은 연결 병원의 일정으로 더하되, **같은 날짜·시각·유형**의 일정이 이미 있으면 중복으로 보고 건너뛴다(spec 4.20).
+//   병원 복귀 항목의 hospitalId 가 연결 병원 id 로 채워진다(docs/contracts.md '`POST /api/plan/link`'). 기간은 잘라내지 않는다(docs/business-rules.md '병원 연동').
+// - 병원 일정은 연결 병원의 일정으로 더하되, **같은 날짜·시각·유형**의 일정이 이미 있으면 중복으로 보고 건너뛴다(docs/platform/IA_AND_FLOWS.md '병원 연동(데모)').
 // - 연결 사본(LinkedPlan)은 toLinkedPlan 으로 만든다 — 안내문의 acknowledged 는 버리고, 확인 기록 정본은
-//   `${id}@${updatedAt}` 키 지도다. 처음 연결하면 비어 있다(규칙 56).
+//   `${id}@${updatedAt}` 키 지도다. 처음 연결하면 비어 있다(docs/business-rules.md '병원 연동').
 // - 안내문(채널 B) 문장은 읽지도 바꾸지도 않는다. 분류·id·updatedAt 만 본다.
 //
 // Next 밖(node --test)에서도 읽히도록 상대 경로만 쓴다.
@@ -23,14 +23,14 @@ import {
 } from '../../src/recovery/instructions.js';
 import { planToStayParts, toLinkedPlan } from '../../src/recovery/link.js';
 
-/** 데모 연결 코드 — 화면의 예시 버튼 (spec 4.20). 문구 키는 conditions 이름공간 */
+/** 데모 연결 코드: 화면의 예시 버튼 (docs/business-rules.md '병원 연동'). 문구 키는 conditions 이름공간 */
 export const DEMO_CODES = Object.freeze([
   Object.freeze({ code: 'DEMO-A', labelKey: 'link.demoStandard' }),
   Object.freeze({ code: 'DEMO-B', labelKey: 'link.demoRestricted' }),
   Object.freeze({ code: 'DEMO-C', labelKey: 'link.demoExpired' }),
 ]);
 
-/** /api/plan/link 오류 코드 → 문구 키 (모든 오류 응답은 errorCode 키, spec 6장) */
+/** /api/plan/link 오류 코드 → 문구 키 (모든 오류 응답은 errorCode 키, docs/contracts.md '공통') */
 const ERROR_KEY = Object.freeze({
   [ERROR_CODE.AUTH_REQUIRED]: 'link.errLogin',
   [PLAN_LINK_ERROR.CODE_REQUIRED]: 'link.errRequired',
@@ -71,7 +71,7 @@ function slotKey(appointment) {
 }
 
 /**
- * 병원 일정 합치기 — 같은 날짜·시각(시작)·유형이 이미 있으면 건너뛴다(spec 4.20).
+ * 병원 일정 합치기: 같은 날짜·시각(시작)·유형이 이미 있으면 건너뛴다(docs/platform/IA_AND_FLOWS.md '병원 연동(데모)').
  * 입력 배열은 바꾸지 않는다.
  * @template T
  * @param {T[]} existing
@@ -112,7 +112,7 @@ function fromPlans(appointment, planIds) {
  * - hospital.kind 'EXISTING': 사용자가 고른 기존 병원에 연결 표시(linkedPlanId)만 더한다(이름·주소는 사용자 값 유지).
  * - hospital.kind 'NEW': 지침의 병원을 `linkHospitalId(planId)` 로 추가한다(이미 있으면 교체).
  * - 같은 코드나 같은 지침(planId)을 다시 연결하면 이전 사본·HOSPITAL 기간·그 지침의 병원 일정·연결 표시를 교체한다.
- *   이전 확인 기록은 지금 안내문과 같은 키(id@updatedAt)만 이어받는다(규칙 56).
+ *   이전 확인 기록은 지금 안내문과 같은 키(id@updatedAt)만 이어받는다(docs/business-rules.md '병원 연동').
  *
  * @param {object} stay
  * @param {{code: string, plan: object, hospital: {kind: 'EXISTING', id: string} | {kind: 'NEW'}, fetchedAt: string}} input

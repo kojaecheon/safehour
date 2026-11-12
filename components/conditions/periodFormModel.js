@@ -1,4 +1,4 @@
-// 본인 체크 입력 폼 ↔ 조건 기간(SELF) 변환 — 순수 함수 (AX-315 · spec 4.4, 5.1, 규칙 6·13-1)
+// 본인 체크 입력 폼 ↔ 조건 기간(SELF) 변환, 순수 함수 (AX-315 · docs/business-rules.md '조건 기간'·'숙소와 병원', src/stay/conditions.js @typedef ConditionPeriod)
 //
 // 화면(PeriodEditorForm)은 이 모양의 폼 상태만 들고 있고, 저장할 때 여기서 ConditionPeriod 로 바꾼다.
 // 검증은 도메인 계약(src/stay/conditions.js validateConditionPeriod)이 한다 — 여기서 규칙을 새로 만들지 않는다.
@@ -15,7 +15,7 @@
 //     medication: { answer, times: Array<{ time, atLodging }> },   '숙소에서 복용' 기본 예
 //   }
 //
-// 답의 뜻 (handoff 4장): 예 = 그 값을 적용, 아니오 = 병원이 그런 안내를 하지 않음(제한 없음),
+// 답의 뜻 (docs/business-rules.md '조건 기간'의 답 세 종류 표): 예 = 그 값을 적용, 아니오 = 병원이 그런 안내를 하지 않음(제한 없음),
 // 모르겠음 = 가장 엄격한 기본값(합성이 적용하고 '기본값 적용'을 붙인다).
 // 자유 서술 칸은 없다. 앱은 값을 해석하지 않는다.
 //
@@ -38,7 +38,7 @@ import { isDateString, postProcedureBoundary } from '../../src/stay/index.js';
 
 export const ANSWER = Object.freeze({ YES: 'YES', NO: 'NO', UNKNOWN: 'UNKNOWN' });
 
-/** 예/아니오 항목 — 화면 순서도 이것이다 (spec 4.4 표) */
+/** 예/아니오 항목: 화면 순서도 이것이다 (docs/business-rules.md '조건 기간'의 항목 표) */
 export const FORM_YES_NO_KEYS = YES_NO_KEYS;
 
 /** 한도 항목 — 분(5–240) */
@@ -92,7 +92,7 @@ export function emptyMedicationRow() {
 }
 
 /**
- * 병원 복귀의 병원 id — 고른 값이 있으면 그 값, 등록 병원이 하나면 자동으로 그 병원 (spec 4.4).
+ * 병원 복귀의 병원 id: 고른 값이 있으면 그 값, 등록 병원이 하나면 자동으로 그 병원 (docs/platform/ITINERARY_RULES.md '본인 체크 항목'의 복귀 시각 행).
  * @param {{place?: string, hospitalId?: string}} returnTime
  * @param {Array<{id: string}>} hospitals
  */
@@ -188,7 +188,7 @@ function medicationAnswer(field) {
   const times = Array.isArray(field.times) ? field.times : [];
   return {
     kind: 'SET',
-    // '숙소에서 복용'은 기본 예 — 값이 없으면 예로 본다 (spec 4.4)
+    // '숙소에서 복용'은 기본 예: 값이 없으면 예로 본다 (docs/business-rules.md '조건 기간')
     value: times.map((row) => ({ time: row?.time ?? '', atLodging: row?.atLodging !== false })),
   };
 }
@@ -212,9 +212,9 @@ function returnTimeAnswer(field, hospitals) {
 /**
  * 폼 → 조건 기간(SELF). 검증하지 않는다 — validatePeriodForm 을 쓴다.
  *
- * - 제한 없음이면 항목은 NO_RESTRICTION_ITEMS 다(spec 4.4).
+ * - 제한 없음이면 항목은 NO_RESTRICTION_ITEMS 다(docs/business-rules.md '조건 기간').
  * - 외출 불가면 복귀 시각을 싣지 않는다(묻지 않는 항목).
- * - 동행 필수=예 이면 guardianMustStay 는 폼 값과 무관하게 SET(true)다(spec 4.4).
+ * - 동행 필수=예 이면 guardianMustStay 는 폼 값과 무관하게 SET(true)다(docs/business-rules.md '조건 기간').
  *
  * @param {ReturnType<typeof emptyPeriodForm>} form
  * @param {{id: string, hospitals?: Array<{id: string}>}} opts

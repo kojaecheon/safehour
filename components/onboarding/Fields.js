@@ -182,7 +182,7 @@ export function ChoiceGroup({ field, issues, legend, name, value, onChange, opti
 }
 
 /**
- * 안전 문구(고지) 병기 — 주 언어 한 줄 + 병기 언어 한 줄 (spec 4.17).
+ * 안전 문구(고지) 병기: 주 언어 한 줄 + 병기 언어 한 줄 (docs/business-rules.md '언어').
  * 병기 언어는 useLang().pair() 가 정한다(ja·zh 는 검수 전이면 영어 + 한국어).
  * 앞에 20px 안내 아이콘을 둔다(SEED Callout — 설계서 5.6). 시작 화면 면책 상자도 이 부품이다.
  */

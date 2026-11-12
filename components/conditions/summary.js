@@ -1,4 +1,4 @@
-// 조건 화면의 날짜별 요약 — 순수 함수 (AX-315 · spec 4.5)
+// 조건 화면의 날짜별 요약, 순수 함수 (AX-315 · docs/business-rules.md '날짜별 합성'·'날짜 분류')
 //
 // 날짜 분류와 합성은 도메인(src/stay/coverage.js classifyStay)이 한다. 여기서는 화면에 보여줄 모양으로만 고른다.
 // 판정 규칙을 새로 만들지 않는다.
@@ -10,7 +10,7 @@ import { classifyStay } from '../../src/stay/coverage.js';
 import { isStayDate } from '../../src/stay/stay.js';
 import { eachDate, isDateString } from '../../src/stay/time.js';
 
-/** 분류 표시 순서 (spec 4.5 표) */
+/** 분류 표시 순서 (docs/business-rules.md '날짜 분류') */
 export const COVERAGE_ORDER = Object.freeze(['FREE', 'DECLARED_FREE', 'RESTRICTED', 'REST_DAY', 'NEEDS_INPUT']);
 
 /**
@@ -47,7 +47,7 @@ export function coverageCounts(list) {
 }
 
 /**
- * 합성 결과(`DayPlan.effective` 모양)를 화면 줄로. 항목 순서는 spec 4.4 표 순서다.
+ * 합성 결과(`DayPlan.effective` 모양)를 화면 줄로. 항목 순서는 docs/business-rules.md '조건 기간'의 항목 표 순서다.
  * - sources: 이 값을 낸 출처 — 병원 발행이 먼저, 그다음 본인 체크 (중복 없음)
  * - defaulted: '모르겠음'에 기본값을 적용한 출처가 있는가 → '기본값 적용'
  * @param {Record<string, {value: any, provenance: Array<{periodId: string, source: string, defaulted: boolean}>}>} effective
