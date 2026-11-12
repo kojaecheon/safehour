@@ -1,4 +1,4 @@
-// AX-305 — 식당 메뉴·운영 원문 보강은 요청받은 후보에만 (spec 4.8 호출 방식)
+// AX-305: 식당 메뉴·운영 원문 보강은 요청받은 후보에만 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '호출 방식')
 //
 // 계약:
 //   - detailIntro2(국문) 한 번으로 운영·휴무 원문과 대표메뉴(firstmenu)·취급메뉴(treatmenu)를 받는다.

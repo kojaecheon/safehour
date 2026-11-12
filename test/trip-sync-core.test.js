@@ -1,11 +1,14 @@
-// AX-316 — 일정 동기화 순수 계층 (spec 4.9 변화 원천·재계획 규칙, 4.10 편집, 4.19 동의 철회, 6장 PlanStay, 규칙 32·49·54·55)
+// AX-316: 일정 동기화 순수 계층
+// (docs/business-rules.md '매일 확인'·'전체 일정 확정과 변화 대응'(재계획 규칙, 오늘 게이트 덧씌우기)·'사용자 편집',
+//  docs/platform/ITINERARY_RULES.md '변화 원천'·'데모 사건', docs/platform/IA_AND_FLOWS.md '동의 철회와 데이터 삭제',
+//  docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)', 테스트 이름의 규칙 49·51·55 는 옛 설계서 번호다)
 //
 // 네트워크·저장소 없이 순수 함수만 본다.
 //   - PlanStay 허용 목록: 이름·주소·전화·연결 코드를 보내지 않는다
 //   - 영향 날짜: 체류 변경 종류마다 그 날짜만(이름·주소 같은 표시 값은 재계획하지 않는다)
 //   - 요청 모양: previous·edits·usedContentIds·events
 //   - 편집 기록: 교체·삭제·비움·다시 만들기
-//   - 오늘 게이트 덧씌우기: 저장된 일정을 바꾸지 않는다(규칙 49)
+//   - 오늘 게이트 덧씌우기: 저장된 일정을 바꾸지 않는다(docs/business-rules.md '전체 일정 확정과 변화 대응')
 //   - 동의 철회 오프라인 대비: 조건에서 나온 값을 남기지 않는다
 
 import { test, describe } from 'node:test';
@@ -34,7 +37,7 @@ import { overdueOutingOf, returnTargetOf } from '../components/trip/viewModel.js
 
 const clone = (v) => structuredClone(v);
 
-// ── 하루 일정 모양 (spec 5.2) ─────────────────────────────────────────
+// ── 하루 일정 모양 (docs/contracts.md '`POST /api/itinerary/plan`') ─────────────────────────────────────────
 
 function stop(date, contentId, arriveAt, leaveAt, o = {}) {
   return {
@@ -110,7 +113,7 @@ function day(date, o = {}) {
   };
 }
 
-// ── PlanStay 허용 목록 (spec 6장, 규칙 54) ───────────────────────────
+// ── PlanStay 허용 목록 (docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)') ───────────────────────────
 
 describe('PlanStay — 이름·주소·전화·연결 코드를 보내지 않는다', () => {
   const device = makeStay({
@@ -143,7 +146,7 @@ describe('PlanStay — 이름·주소·전화·연결 코드를 보내지 않는
   });
 });
 
-// ── 영향 날짜 (spec 4.9 변화 원천 1·2, 규칙 30) ─────────────────────────
+// ── 영향 날짜 (docs/platform/ITINERARY_RULES.md '변화 원천' 표의 1·2번 행, docs/business-rules.md '전체 일정 확정과 변화 대응'의 재계획 규칙 2~4) ─────────────────────────
 
 describe('영향 날짜 — 체류 변경 종류마다 영향받는 날짜만', () => {
   // makeStay: 10-01~10-08, L1 10-01~10-05, L2 10-05~10-08, A1 VISIT 10-02, A2 PROCEDURE 10-03 → 경계일 10-03
@@ -288,7 +291,7 @@ describe('영향 날짜 — 체류 변경 종류마다 영향받는 날짜만', 
   });
 });
 
-// ── 요청 모양 (spec 6장, 규칙 29·55) ───────────────────────────────────
+// ── 요청 모양 (docs/contracts.md '`POST /api/itinerary/plan`', docs/business-rules.md '하루 일정 생성', docs/platform/ITINERARY_RULES.md '데모 사건') ───────────────────────────────────
 
 describe('일정 요청 — previous·edits·usedContentIds·events', () => {
   const tripPlan = {
@@ -364,7 +367,7 @@ describe('일정 요청 — previous·edits·usedContentIds·events', () => {
   });
 });
 
-// ── 편집 기록 (spec 4.10, 5.1 edits) ───────────────────────────────────
+// ── 편집 기록 (docs/business-rules.md '사용자 편집') ───────────────────────────────────
 
 describe('편집 기록', () => {
   test('교체: 새 장소는 고정, 옛 장소는 삭제. 입력은 바꾸지 않는다', () => {
@@ -387,7 +390,7 @@ describe('편집 기록', () => {
   });
 });
 
-// ── 오늘 게이트 덧씌우기 (spec 4.6·4.9, 규칙 32·49) ──────────────────────
+// ── 오늘 게이트 덧씌우기 (docs/business-rules.md '매일 확인'·'전체 일정 확정과 변화 대응'·'사용자 편집') ──────────────────────
 
 describe('오늘 표시 — 저장된 일정은 그대로, 표시할 때만 덧씌운다', () => {
   const today = '2026-10-05';
@@ -440,7 +443,7 @@ describe('오늘 표시 — 저장된 일정은 그대로, 표시할 때만 덧�
   });
 });
 
-// ── 즉시 복귀 판단 (spec 4.9, 규칙 13) ─────────────────────────────────
+// ── 즉시 복귀 판단 (docs/platform/IA_AND_FLOWS.md '즉시 복귀') ─────────────────────────────────
 
 describe('외출 중 지침 철회·만료', () => {
   const date = '2026-10-05';
@@ -466,7 +469,7 @@ describe('외출 중 지침 철회·만료', () => {
   });
 });
 
-// ── 동의 철회 — 오프라인 대비 (spec 4.19) ────────────────────────────────
+// ── 동의 철회: 오프라인 대비 (docs/platform/IA_AND_FLOWS.md '동의 철회와 데이터 삭제') ────────────────────────────────
 
 describe('동의 철회를 재계획하지 못했을 때 기기에서 먼저 지운다', () => {
   test('조건에서 나온 값(적용 조건·식이 표시·복약 블록·조건 경고·제외 목록·조건 사유)을 지운다. 정거장·시각은 그대로', () => {

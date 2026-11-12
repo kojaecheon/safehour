@@ -96,7 +96,7 @@ export const museum = (id, o = {}) => place(id, { type: '14', ...o });
 export const shop = (id, o = {}) => place(id, { type: '38', lcls: { lclsSystm1: 'SH' }, ...o });
 
 /**
- * 국문 제목이 비어 있는 후보 (규칙 27).
+ * 국문 제목이 비어 있는 후보 (docs/business-rules.md '장소 후보와 필터'·'전체 일정 확정과 변화 대응').
  * 다른 fixture 는 모두 국문 제목을 채우므로 '국문 원문이 비었을 때' 경로가 가려진다.
  * 국문 제목이 비면 표시 제목은 선택 언어를 따라 달라진다 — 그래도 판정은 같아야 한다.
  */

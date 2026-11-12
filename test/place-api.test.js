@@ -1,4 +1,4 @@
-// AX-005 · AX-308 — 장소 상세 API 계약 (D03-SCR006, D04-F009, D09-AC016 · spec 6장 POST /api/place, 4.8 출처와 언어)
+// AX-005 · AX-308: 장소 상세 API 계약 (D03-SCR006, D04-F009, D09-AC016 · docs/contracts.md '`POST /api/place`', docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어')
 //
 // 계약:
 //   - 로그인 세션이 없으면 401 SAFEHOUR_AUTH_REQUIRED, 외부 호출 없음

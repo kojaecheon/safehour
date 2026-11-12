@@ -1,6 +1,7 @@
-// UTM-K(GRS80) → WGS84 변환 정확도 (AX-310 · spec 6장 · 규칙 45)
+// UTM-K(GRS80) → WGS84 변환 정확도 (AX-310 · docs/contracts.md '`POST /api/address/search`', src/adapters/AGENTS.md '테스트')
 //
-// 규칙 45: 도로명주소 좌표 변환은 알려진 지점 3곳 이상에서 10m 이내다.
+// src/adapters/AGENTS.md '테스트': 도로명주소 좌표 변환은 알려진 지점 3곳 이상에서 10m 이내다
+// (테스트 이름의 규칙 45 는 옛 설계서 번호다).
 //
 // 기준점과 출처
 //   A. 공개된 UTM-K ↔ 위경도 쌍

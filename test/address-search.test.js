@@ -1,4 +1,4 @@
-// POST /api/address/search — 도로명주소 검색 프록시 계약 (AX-310 · spec 6장)
+// POST /api/address/search: 도로명주소 검색 프록시 계약 (AX-310 · docs/contracts.md '`POST /api/address/search`')
 //
 // 계약
 //   - 로그인 세션이 없으면 401 SAFEHOUR_AUTH_REQUIRED

@@ -91,7 +91,7 @@ export function makeStay(overrides = {}) {
   };
 }
 
-/** spec 6장 PlanStay 허용 목록 모양 — 이름·주소·전화·연결 코드 없음 */
+/** docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)'의 허용 목록 모양: 이름·주소·전화·연결 코드 없음 */
 export function makePlanStay(overrides = {}) {
   const stay = makeStay();
   return {

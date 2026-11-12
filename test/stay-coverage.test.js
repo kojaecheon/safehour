@@ -1,5 +1,6 @@
 // 날짜 분류·NEEDS_INPUT 사유·병원 기간 적용·매일 확인 대상
-// (AX-302 · spec 4.5·4.6·4.20, 10장 규칙 3·4·5·9·10·11·12)
+// (AX-302 · docs/business-rules.md '숙소와 병원'·'날짜별 합성'·'날짜 분류'·'매일 확인'·'하루 일정 생성'·'병원 연동',
+//  테스트 이름의 규칙 3·4·5·9·10·11·12 는 옛 설계서 번호다)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';

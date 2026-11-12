@@ -31,7 +31,7 @@ export function postJson(path, body, { cookie = true } = {}) {
 }
 
 /**
- * PlanStay (spec 6장 허용 목록) — 체류 10-01~10-10, 숙소 L1, 수술 10-04, 10-04~10-10 본인 체크 기간(모두 '아니오').
+ * PlanStay (docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)'의 허용 목록): 체류 10-01~10-10, 숙소 L1, 수술 10-04, 10-04~10-10 본인 체크 기간(모두 '아니오').
  * 10-01~10-03 은 자유일, 10-04~10-10 은 제한일.
  */
 export function planStay(overrides = {}) {

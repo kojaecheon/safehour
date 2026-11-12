@@ -65,7 +65,7 @@ export const byLodging = (list) => ({ L1: list });
 export const stopsOf = (day) => [...day.outings, ...day.guardianOutings].flatMap((o) => o.stops);
 export const contentIdsOf = (day) => stopsOf(day).map((s) => s.contentId);
 
-/** 외출의 복귀 계산식 required (spec 4.7) */
+/** 외출의 복귀 계산식 required (docs/business-rules.md '하루 일정 생성') */
 export function requiredMin(outing, { recovery, extra = 0 }) {
   const stays = outing.stops.reduce((sum, s) => sum + s.stayMin, 0);
   const travel = outing.travelTotalMin;
