@@ -6,7 +6,7 @@
 //   이 E2E 빌드는 스위치를 켜지 않는다 — 그래서 일본어·중국어 안전 문구가 화면에 없어야 한다.
 // - 판정은 언어와 무관하다 — 같은 입력이면 ja 로 만든 일정과 ko 로 만든 일정의 상태·정거장이 같다.
 //
-// 12.4 에 따라 의도적으로 다시 썼다 — 예전 E2E 는 ja·zh 를 en 으로 대체한다고 단언했다(ADR-0007 로 변경).
+// docs/standards.md '테스트'(새 결정과 충돌하는 테스트는 의도적으로 고친다)에 따라 다시 썼다: 예전 E2E 는 ja·zh 를 en 으로 대체한다고 단언했다(ADR-0007 로 변경).
 
 import { test, expect } from './fixtures.js';
 import { evidenceShot, kstDate, readRecord, startTrip, stopsOf } from './helpers.js';

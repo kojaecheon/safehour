@@ -86,7 +86,7 @@ test.describe('시나리오 3 — 데모 사건', () => {
     await expect(page.getByRole('button', { name: '복귀 안내 다시 보기' })).toBeVisible();
 
     // 새로 고쳐도 returnNow 는 유지되고(docs/platform/ITINERARY_RULES.md '데모 사건': 오늘 사건은 누적 저장하고 매번 다시 보낸다), 앱을 다시 열면 시트가 다시 자동으로 열린다
-    // 같은 사건 목록을 다시 보내도 효과가 두 번 더해지지 않는다(접는 쪽은 src/engine/tripEvents.js foldDemoEvents)
+    // 같은 사건 목록을 다시 보내도 효과가 두 번 더해지지 않는다(접는 쪽은 src/engine/tripEvents.js foldDemoEvents. 이 테스트는 유지되는 것만 본다)
     await page.reload();
     const reopened = page.getByRole('dialog', { name: '지금 돌아가세요' });
     await expect(reopened).toBeVisible();
