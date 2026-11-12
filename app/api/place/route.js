@@ -1,4 +1,4 @@
-// POST /api/place — 장소 상세 (D04-F009, D09-AC016 · AX-308 spec 6장, 4.8 출처와 언어)
+// POST /api/place: 장소 상세 (D04-F009, D09-AC016 · AX-308 · docs/contracts.md '`POST /api/place`', docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어')
 //
 // 요청  { lang: "ko"|"en"|"ja"|"zh", contentId, sourceIds: { ko?, en?, ja?, zh? }, contentTypeIds: { canonical?, ko?, en?, ja?, zh? } }
 //       (정거장 Stop 과 같은 형식. 예전 { candidate: { sourceIds.korean/english, sourceMetadata } } 형식은 받지 않는다)
@@ -12,7 +12,7 @@
 // 판정에는 영향을 주지 않는 "보강 조회" 다. 상세가 실패해도 일정은 그대로이며,
 // 이 API 는 실패를 숨기지 않고 errors 로 함께 돌려준다 (D06-E010).
 // 운영시간 원문을 영업 여부로 해석하지 않는다 (D04-BR012).
-// 국문 + 선택 언어 서비스를 조회한다. 선택 언어(ja·zh)가 없거나 실패하면 영문, 그래도 없으면 국문이다(spec 4.8).
+// 국문 + 선택 언어 서비스를 조회한다. 선택 언어(ja·zh)가 없거나 실패하면 영문, 그래도 없으면 국문이다(docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어').
 
 // 상대 경로 사용 — Next 외부(node --test)에서 라우트 핸들러를 직접 계약 테스트하기 위함
 import { fetchCandidateDetails } from '../../../src/tour-api/detail-service.js';

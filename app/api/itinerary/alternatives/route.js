@@ -1,4 +1,4 @@
-// POST /api/itinerary/alternatives — 정거장 교체 후보 (AX-308 · spec 4.10, 6장, 규칙 33)
+// POST /api/itinerary/alternatives: 정거장 교체 후보 (AX-308 · docs/business-rules.md '사용자 편집', docs/contracts.md '`POST /api/itinerary/alternatives`')
 //
 // 요청  { lang, stay: PlanStay, date, outingId, stopId, day: DayPlan, usedContentIds?, now }
 //       + 선택: edits?(그 날짜 편집 기록), events?(오늘 데모 사건) — plan 과 같은 형식

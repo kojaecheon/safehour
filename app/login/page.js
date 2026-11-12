@@ -7,11 +7,11 @@
 //   - **로그인은 본인 확인이 아니다.** 어느 환자의 계획인지는 병원 발급 코드가 확인한다.
 //     이것을 화면에 명시해 사용자가 오해하지 않게 한다.
 //   - 이름·이메일·프로필을 받지 않는다는 사실을 CTA 앞에 둔다.
-//   - 로그인은 기기 저장을 계정별로 나누는 데만 쓴다(spec 4.18–4.19). 서버에 체류를 저장하지 않는다.
+//   - 로그인은 기기 저장을 계정별로 나누는 데만 쓴다(docs/security.md '인증'·'기기 저장소와 계정 이름공간'). 서버에 체류를 저장하지 않는다.
 //   - 자격증명이 없는 공급자는 보여 주지 않는다(운영자 결정 2026-11-08). '준비 중' 버튼은 첫 사용자를 멈춰 세웠다.
 //     공급자 사용 가능 여부는 /api/auth/session 의 auth.providers[].configured 가 정한다(인증 흐름은 그대로).
 //     켜진 공급자가 없고 데모만 되면 데모 버튼이 주 버튼이 된다.
-//   - 기본 흐름은 로그인 → 체류 설정(/onboarding)이다(spec 3.2). returnTo 는 같은 출처 경로만 받는다.
+//   - 기본 흐름은 로그인 → 체류 설정(/onboarding)이다(docs/platform/IA_AND_FLOWS.md '처음 쓰는 사람'). returnTo 는 같은 출처 경로만 받는다.
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';

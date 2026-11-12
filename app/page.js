@@ -10,12 +10,12 @@ import EmergencyButton from '@/components/ui/EmergencyButton.js';
 import { takeClearedFlag } from '@/lib/session.js';
 import { LANGS, LANG_NAMES } from '@/src/i18n/index.js';
 
-// SCR001 — 시작 화면 (AX-314 · spec 3.1 `/`: 언어 선택, 고지 3종, 로그인 유도)
+// SCR001: 시작 화면 (AX-314 · docs/platform/IA_AND_FLOWS.md '경로'의 `/` 행: 언어 선택, 고지 3종, 로그인 유도)
 //
-// - 머리글에 '안심'·'안전' 같은 보증 표현을 쓰지 않는다(spec 9.1 — 조건 통과와 안전은 다르다).
-// - 고지 3종과 의료 면책은 안전 문구다. 선택 언어 + 한국어(ko 면 영어)로 두 줄씩 보인다(spec 4.17 · pair()).
+// - 머리글에 '안심'·'안전' 같은 보증 표현을 쓰지 않는다(docs/business-rules.md '이 제품이 하지 않는 판단': 조건 통과와 안전은 다르다).
+// - 고지 3종과 의료 면책은 안전 문구다. 선택 언어 + 한국어(ko 면 영어)로 두 줄씩 보인다(docs/business-rules.md '언어' · pair()).
 // - 언어는 상단 지구본 버튼 말고도 여기서 바로 고를 수 있다 — 첫 화면에서 가장 먼저 필요한 동작이다.
-// - 시작하기 → 로그인 → 체류 설정(spec 3.2 기본 흐름).
+// - 시작하기 → 로그인 → 체류 설정(docs/platform/IA_AND_FLOWS.md '처음 쓰는 사람').
 // - **시작하기는 고지 3종보다 위에 둔다.** 고지가 먼저 오면 처음 온 사람이 들어가는 문을 보기까지
 //   두 화면을 넘겨야 한다(고지만 906px). 고지는 지우지 않고 자리만 아래로 옮겼다 — 같은 화면에 그대로 있다.
 

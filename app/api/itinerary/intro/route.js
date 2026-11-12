@@ -1,4 +1,4 @@
-// POST /api/itinerary/intro — AI 일정 소개 문장 (AX-309 · spec 4.16, 6장 · ADR-0008 · 규칙 36)
+// POST /api/itinerary/intro: AI 일정 소개 문장 (AX-309 · docs/business-rules.md 'AI 소개 문장', docs/contracts.md '`POST /api/itinerary/intro`' · ADR-0008)
 //
 // 요청  { lang, stops: Array<{ title, category, arriveAt }>, interests, pace }
 // 응답  200 { ok: true, text, source: "AI" | "TEMPLATE" }
@@ -8,7 +8,7 @@
 // - AI 는 기본 꺼짐이다. 스위치(SAFEHOUR_AI_INTRO=1)와 키(GEMINI_API_KEY)가 모두 있어야 부른다.
 //   꺼짐·실패·시간 초과(3초)·출력 검사 탈락은 모두 200 + 템플릿 문장이다. 실패 사유는 응답에 담지 않는다.
 // - 허용 목록 밖 필드(조건·병원·숙소·날짜·계정…)는 읽지 않고 외부로 보내지 않는다(lib/server/ai-intro.js).
-// - 서버는 아무것도 저장하지 않는다. 같은 입력의 문장 재사용은 기기 캐시가 한다(spec 4.16).
+// - 서버는 아무것도 저장하지 않는다. 같은 입력의 문장 재사용은 기기 캐시가 한다(docs/business-rules.md 'AI 소개 문장', docs/platform/AI_USE_CASE_INTRO.md '목적과 범위').
 // - 로그에는 분류 코드만 남는다. 프롬프트·출력·키·URL 은 남기지 않는다.
 // - AI 문장은 소개일 뿐이다. 배치·판정에 쓰지 않는다.
 

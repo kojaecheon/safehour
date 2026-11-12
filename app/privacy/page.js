@@ -1,12 +1,12 @@
 'use client';
 
-// 개인정보·면책 고지 (AX-211 → AX-318 · spec 3.1 · 4.17 · 4.18 · 4.19)
+// 개인정보·면책 고지 (AX-211 → AX-318 · docs/platform/IA_AND_FLOWS.md '경로'·'보기 전용 상태', docs/business-rules.md '언어', docs/security.md '기기 저장소와 계정 이름공간')
 //
 // 정적 안내 화면이다. 판정·일정 흐름에 영향을 주지 않고, 더보기(/more)와 화면 하단 링크로 들어온다.
 // 로그인 만료·오프라인에서도 보여준다(저장소를 읽지 않는다 — 내 정보 지우기 버튼만 저장소를 쓴다).
 //
 // 본문은 `src/i18n/legal.js` 가 소유한다 — 코드·명세에서 확인 가능한 사실만 적는다.
-// 고지는 안전 문구다 (spec 4.17 · 규칙 43): 문단마다 주 언어와 병기 언어(한국어, ko 면 영어)를 함께 보여준다.
+// 고지는 안전 문구다 (docs/business-rules.md '언어'): 문단마다 주 언어와 병기 언어(한국어, ko 면 영어)를 함께 보여준다.
 // 두 언어는 safetyPair() 가 고른다 — ja·zh 는 검수 스위치가 켜지기 전까지 영어 + 한국어다.
 
 import ClearSessionButton from '@/components/ClearSessionButton.js';

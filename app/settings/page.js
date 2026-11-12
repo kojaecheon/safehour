@@ -1,6 +1,6 @@
 'use client';
 
-// /settings — 언어·알림·동의 철회·이 기기에서 내 정보 지우기 (AX-318 · spec 3.1 · 4.13 · 4.17 · 4.19 · 규칙 41)
+// /settings: 언어·알림·동의 철회·이 기기에서 내 정보 지우기 (AX-318 · docs/platform/IA_AND_FLOWS.md '경로'·'동의 철회와 데이터 삭제', docs/business-rules.md '알림과 카드'·'언어', docs/security.md '민감정보 동의'·'기기 저장소와 계정 이름공간')
 // 본문은 components/settings/SettingsScreen.js 에 있다.
 
 import { useLang } from '@/components/LanguageProvider.js';

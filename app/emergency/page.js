@@ -1,6 +1,6 @@
 'use client';
 
-// /emergency — 긴급 연락 (AX-318 · spec 3.1 · 4.15 · 4.18 · 4.21 · 규칙 34·40)
+// /emergency: 긴급 연락 (AX-318 · docs/platform/IA_AND_FLOWS.md '경로'·'고정 요소'·'보기 전용 상태', docs/business-rules.md '운영 안전장치')
 //
 // - 119, 1330(관광통역안내), 등록한 병원 전화(병원 이름과 함께)를 전화 걸기 링크로 둔다.
 //   번호와 1330 발신 형식의 공식 근거는 ./contacts.js 머리 주석에 있다.
