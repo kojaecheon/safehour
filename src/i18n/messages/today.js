@@ -130,7 +130,7 @@ export const messages = {
   },
   'today.seeTrip': { ko: '전체 일정 보기', en: 'See the whole trip', ja: '全体の予定を見る', zh: '查看整个行程' },
 
-  // ── 매일 확인 (spec 4.6) ──
+  // ── 매일 확인 (docs/business-rules.md '매일 확인') ──
   'today.checkFlag': { ko: '확인 필요', en: 'Check needed', ja: '確認が必要', zh: '需要确认' },
   'today.checkTitle': {
     ko: '오늘 조건이 그대로인가요?',
@@ -164,7 +164,7 @@ export const messages = {
     ja: 'そのほか{n}項目は制限なし',
     zh: '其他 {n} 项：无限制',
   },
-  // 제한 항목은 접어 둔다 — 펼치기 문구. 확인 화면이 조건 감사표가 되지 않게 한다(spec 4.6 '요약')
+  // 제한 항목은 접어 둔다: 펼치기 문구. 확인 화면이 조건 감사표가 되지 않게 한다(docs/business-rules.md '매일 확인')
   'today.checkMoreItems': {
     ko: '제한 항목 {n}개 보기',
     en: 'Show {n} restrictions',

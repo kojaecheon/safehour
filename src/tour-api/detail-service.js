@@ -175,7 +175,7 @@ const DETAIL_LANG_SERVICE = Object.freeze({
 
 /**
  * 표시 우선순위. lang 이 없으면 기존 동작(영문 → 국문)이다.
- * 선택 언어(ja·zh) → 영문 → 국문 (spec 4.8 출처와 언어: 선택 언어가 없거나 실패하면 영문, 영문도 없으면 국문)
+ * 선택 언어(ja·zh) → 영문 → 국문 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어': 선택 언어가 없거나 실패하면 영문, 영문도 없으면 국문)
  */
 function preferenceOrder(lang) {
   switch (lang) {
@@ -257,7 +257,7 @@ function usableLocale(locale) {
  * - lang 없음: 기존 동작 — 국문·영문을 함께 부르고 영문을 우선한다
  * - ko: 국문만. en: 국문·영문
  * - ja·zh: 국문·선택 언어. 선택 언어 식별자가 없거나 기본 정보를 못 받으면(실패·키 미신청·항목 없음) 영문을 더 부른다.
- *   영문도 없으면 국문을 보여주고 overviewLanguage 로 알린다(spec 4.8)
+ *   영문도 없으면 국문을 보여주고 overviewLanguage 로 알린다(docs/business-rules.md '장소 후보와 필터')
  * @param {object} candidate
  * @param {{useCache?: boolean, lang?: "ko"|"en"|"ja"|"zh"}} [options]
  */
@@ -277,7 +277,7 @@ export async function fetchCandidateDetails(candidate, { useCache = true, lang }
     return normalizeCandidateDetails({ korean, english });
   }
 
-  // 지원하지 않는 값은 en 으로 본다(spec 4.17 '그 외→en'). ko 는 null — 국문만 부른다
+  // 지원하지 않는 값은 en 으로 본다(docs/business-rules.md '언어': 그 외 전부 영어). ko 는 null, 국문만 부른다
   const selected = Object.prototype.hasOwnProperty.call(DETAIL_LANG_SERVICE, lang) ? DETAIL_LANG_SERVICE[lang] : "english";
   const [korean, primary] = await Promise.all([
     fetchLocale("korean"),
@@ -305,7 +305,7 @@ function hasIntro(candidate) {
 /**
  * 요청받은 후보에만 국문 소개정보(detailIntro2)를 붙인다 — 식당 메뉴와 운영·휴무 원문 (AX-305).
  *
- * spec 4.8: 상세(메뉴 포함) 보강은 일정에 들어갈 후보와 교체 후보에만 한다.
+ * docs/platform/ITINERARY_RULES.md '호출 방식': 상세(메뉴 포함) 보강은 일정에 들어갈 후보와 교체 후보에만 한다.
  * 그래서 후보를 고르는 쪽(엔진·일정 조립)이 대상을 골라 넘긴다. 이 함수는 넘겨받은 것만 부른다.
  *
  *   - 대표메뉴(firstmenu)·취급메뉴(treatmenu) 원문은 sourceMetadata.menu 에,

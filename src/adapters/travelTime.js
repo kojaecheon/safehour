@@ -39,7 +39,7 @@ export function createFallbackEstimator({ detourFactor = 1.4, kmphCar = 18, kmph
 }
 
 /**
- * 대중교통 추정기 — 자유일(FREE·DECLARED_FREE)의 이동 추정 (spec 4.7 이동수단, 11장).
+ * 대중교통 추정기: 자유일(FREE·DECLARED_FREE)의 이동 추정 (docs/business-rules.md '하루 일정 생성'의 이동수단, docs/platform/ITINERARY_RULES.md '조정 가능한 기본값').
  *
  *   직선거리 × 1.3 ÷ 20km/h + 대기·환승 10분 (값은 DEFAULTS.transitEstimate 한곳)
  *   짧은 거리는 기존 폴백 추정기와 같은 기준·속도로 도보

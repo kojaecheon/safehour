@@ -1,9 +1,9 @@
-// 관광 후보 분류 단서 목록 — 한곳에 모은 조정 가능한 상수 (spec 4.8, 11장 / AX-305)
+// 관광 후보 분류 단서 목록: 한곳에 모은 조정 가능한 상수 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '단서 목록 (`src/tour-api/cues.js`)' / AX-305)
 //
 // 이 파일만 고치면 열·물·매운·날음식·주점·카페 단서와 관심사 매핑이 바뀐다.
 // 문서(ITINERARY_RULES.md)의 같은 표가 이 파일을 정본으로 삼는다.
 //
-// ⚠ 사람 검토 전 임시값 — 식이(매운·날음식·주점) 단서 목록은 '의료진 검토' 대상이다(spec 11장).
+// ⚠ 사람 검토 전 임시값: 식이(매운·날음식·주점) 단서 목록은 '의료진 검토' 대상이다(docs/platform/ITINERARY_RULES.md '단서 목록 (`src/tour-api/cues.js`)').
 //   값을 임의로 느슨하게 바꾸지 않는다. 단서를 빼면 제외되던 장소가 일정에 들어간다.
 //
 // ── 분류체계 코드 근거 ─────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@
 //
 // ── 이름 단서 ───────────────────────────────────────────────────────────────
 // 이름 단서는 **국문 제목**과 국문 상세의 메뉴 원문에만 적용한다. 표시 언어의 제목을 쓰면
-// 언어마다 판정이 달라진다(spec 4.17 '판정은 언어와 무관', 규칙 27).
+// 언어마다 판정이 달라진다(docs/business-rules.md '전체 일정 확정과 변화 대응'·'장소 후보와 필터').
 //   substrings — 부분 문자열로 찾는다(한글 등)
 //   tokens     — 구분자로 나눈 낱말과 정확히 같을 때만 찾는다('회' 처럼 짧아 오탐이 많은 말)
 //   words      — 라틴 문자 낱말 경계로 찾는다(대소문자 무시). 국문 제목에 영문 상호가 섞인다.
@@ -220,7 +220,7 @@ export const RAW_CUES = Object.freeze({
   ]),
 });
 
-/** 관심사 태그 집합 — 이 순서로 붙인다 (spec 4.8) */
+/** 관심사 태그 집합: 이 순서로 붙인다 (docs/platform/ITINERARY_RULES.md '단서 목록 (`src/tour-api/cues.js`)') */
 export const INTEREST_TAGS = Object.freeze([
   "SHOPPING",
   "KBEAUTY",
@@ -281,7 +281,7 @@ export const INTEREST_TAG_RULES = Object.freeze({
 
 /**
  * 의료 시설 단서 — K-뷰티 관심사에서 뺀다. 병원을 관광 관심사로 올리면 병원 알선이 된다
- * (spec 9.1 '병원 목록·순위를 두지 않는다'). 이 목록은 태그만 막는다. 후보 제외는 엔진 몫이다.
+ * (docs/business-rules.md '숙소와 병원'). 이 목록은 태그만 막는다. 후보 제외는 엔진 몫이다.
  */
 export const MEDICAL_CUES = Object.freeze({
   lclsSystm3: Object.freeze(["EX050800"]),

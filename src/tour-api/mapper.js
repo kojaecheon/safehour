@@ -187,7 +187,7 @@ export function matchTourItems(primaryItems, localizedItems) {
   });
 }
 
-/** 표시 언어 (spec 4.17) */
+/** 표시 언어 (docs/business-rules.md '언어') */
 const DISPLAY_LANGS = new Set(["ko", "en", "ja", "zh"]);
 
 function joinedAddress(item) {
@@ -203,7 +203,7 @@ function typeOf(item) {
 }
 
 /**
- * 표시 언어 사슬 (spec 4.8 출처와 언어)
+ * 표시 언어 사슬 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어')
  *   ko            국문
  *   en            영문 → 국문
  *   ja · zh       그 언어 → 영문 → 국문
@@ -344,7 +344,7 @@ export function normalizeTourCandidate({
       thumbnailUrl: compactText(source.firstimage2) || null,
       copyrightDivisionCode: copyrightType,
     },
-    // 정거장(spec 5.2 Stop)에 옮겨 담을 관광공사 원본 정보. 표시 언어 제목·주소와
+    // 정거장(Stop, docs/contracts.md '`POST /api/itinerary/plan`')에 옮겨 담을 관광공사 원본 정보. 표시 언어 제목·주소와
     // 한국어 원문, 언어별 원본 ID·유형 코드를 함께 둔다. 추정값은 들어가지 않는다.
     stop: {
       contentId: String(source.contentid),

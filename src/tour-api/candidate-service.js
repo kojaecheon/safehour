@@ -169,16 +169,16 @@ const LOCALIZED_SERVICES = Object.freeze(["english", "japanese", "chineseSimplif
 /**
  * 실시간 TourAPI 응답을 SafeHour 엔진 후보로 바꾸는 정상 서비스 경로.
  *
- * 조회 서비스 (spec 4.8 출처와 언어)
+ * 조회 서비스 (docs/business-rules.md '장소 후보와 필터', docs/platform/ITINERARY_RULES.md '출처와 언어')
  *   - 국문(KorService2)과 무장애(KorWithService2)는 항상 조회한다.
  *   - lang 이 en·ja·zh 이면 그 언어 서비스를 하나 더한다. ko 이면 더하지 않는다.
  *   - 일문·중문 서비스가 실패하면(키 미신청 포함) 영문으로 대체한다.
  *     영문도 없으면 국문을 보여주고 '번역 필요'를 표시한다.
- *   - 4개 언어를 모두 조회하지 않는다 — 호출량 때문에 버린 대안이다(handoff 4장).
+ *   - 4개 언어를 모두 조회하지 않는다: 호출량 때문에 버린 대안이다(docs/decisions/0007-four-languages-server-lang.md '대안과 버린 이유').
  *
  * lang 을 주지 않으면 기존 경로다: 영문을 조회하고 중복 제거에서 영문 원문을 우선한다.
  * lang 을 주면 판정 입력이 언어와 무관해진다: 신호는 국문 원문으로만 만들고, 중복 제거도
- * 국문 제목·사진·순서로만 고른다(spec 4.17, 규칙 27).
+ * 국문 제목·사진·순서로만 고른다(docs/business-rules.md '언어'·'전체 일정 확정과 변화 대응').
  *
  * @param {object} options
  * @param {"ko"|"en"|"ja"|"zh"} [options.lang] 관광 데이터 표시 언어
@@ -383,7 +383,7 @@ export async function loadSafeHourCandidates({
 }
 
 /**
- * (기준점, 반경, 언어) 조합 키. 같은 조합은 목록을 한 번만 조회한다 (spec 4.8 호출 방식).
+ * (기준점, 반경, 언어) 조합 키. 같은 조합은 목록을 한 번만 조회한다 (docs/platform/ITINERARY_RULES.md '호출 방식').
  * 기준점 검증을 먼저 한다 — 허용하지 않는 좌표는 키도 만들지 않는다.
  * 키는 메모리 안에서만 쓴다. 좌표가 들어 있으므로 로그에 남기지 않는다.
  */

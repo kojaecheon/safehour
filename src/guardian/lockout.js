@@ -1,4 +1,4 @@
-// 보호자 링크 PIN 잠금 (AX-313 · spec 4.11, 11장, 규칙 37)
+// 보호자 링크 PIN 잠금 (AX-313 · docs/security.md '보호자 링크', docs/platform/ITINERARY_RULES.md '조정 가능한 기본값')
 //
 // PIN 이 5회 연속 틀리면 그 기기에서 그 링크를 1시간 잠근다(조정 가능: DEFAULTS.guardianPin).
 // - 저장소는 인자로 주입받는다(Web Storage 모양: getItem·setItem·removeItem, 동기·비동기 모두).

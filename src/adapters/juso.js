@@ -1,8 +1,8 @@
-// 행정안전부 도로명주소 검색 API + 좌표제공 API 어댑터 (AX-310 · spec 4.2–4.3, 6장)
+// 행정안전부 도로명주소 검색 API + 좌표제공 API 어댑터 (AX-310 · docs/business-rules.md '숙소와 병원', docs/contracts.md '`POST /api/address/search`')
 //
 // 흐름: 검색어 → 도로명주소 검색 API(최대 10건) → 결과마다 좌표제공 API → UTM-K → WGS84 → Address
 //
-// 공식 문서로 확인한 요청·응답 형식 (handoff 3장 10 — 기억으로 쓰지 않는다)
+// 공식 문서로 확인한 요청·응답 형식 (docs/standards.md '외부 API 형식': 기억으로 쓰지 않는다)
 //   도로명주소 검색 API: https://business.juso.go.kr/jst/jstRoadNmAddrApiSearch
 //     - 요청 URL  https://business.juso.go.kr/addrlink/addrLinkApi.do  (POST·GET, xml·json)
 //     - 요청변수  confmKey(필수), currentPage(필수, 기본 1), countPerPage(필수, 기본 10, 0<n≤100),
@@ -26,19 +26,19 @@
 //     - 오류코드  0 정상, -999, E0001 KEY, E0002–E0006 요청항목 없음, E0007 단시간 다량 요청
 //   좌표계는 EPSG:5179(UTM-K GRS80) — 변환 근거는 ./utmk.js 머리말.
 //
-// 비밀정보 (spec 9.1 — API 키, 전체 조회 URL 을 코드·로그·문서·테스트 데이터에 남기지 않는다)
+// 비밀정보 (docs/security.md '비밀값'·'기록': API 키, 전체 조회 URL 을 코드·로그·문서·테스트 데이터에 남기지 않는다)
 //   - 키와 검색어는 URL 조회 문자열이 아니라 POST 본문(form)으로 보낸다. 어느 계층이 URL 을 기록해도 새지 않는다.
 //   - 오류는 분류 코드(`E0001`, `HTTP_502`, `NETWORK` 등)만 담는다. 외부 오류 메시지·원인 객체를 싣지 않는다.
-//   - 서버는 상태를 저장하지 않는다(spec 6장). 검색어·결과를 디스크 캐시에 쓰지 않는다.
+//   - 서버는 상태를 저장하지 않는다(docs/contracts.md '공통'). 검색어·결과를 디스크 캐시에 쓰지 않는다.
 
 import { utmkToWgs84 } from './utmk.js';
 
 export const JUSO_SEARCH_URL = 'https://business.juso.go.kr/addrlink/addrLinkApi.do';
 export const JUSO_COORD_URL = 'https://business.juso.go.kr/addrlink/addrCoordApi.do';
 
-/** spec 6장: 결과 최대 10건 */
+/** docs/contracts.md '`POST /api/address/search`': 결과 최대 10건 */
 export const ADDRESS_RESULT_LIMIT = 10;
-/** spec 6장: 검색어 2–60자 */
+/** docs/contracts.md '`POST /api/address/search`': 검색어 2~60자 */
 export const KEYWORD_MIN_LENGTH = 2;
 export const KEYWORD_MAX_LENGTH = 60;
 
@@ -180,7 +180,7 @@ function round7(n) {
 }
 
 /**
- * 검색 결과 + 좌표 → spec 5.1 Address. 좌표가 없거나 대한민국 밖이면 null — 추정값으로 채우지 않는다.
+ * 검색 결과 + 좌표 → Address(src/stay/stay.js 의 @typedef). 좌표가 없거나 대한민국 밖이면 null: 추정값으로 채우지 않는다.
  * 계약 밖 필드(행정코드·영문주소·우편번호 등)는 싣지 않는다.
  */
 export function toAddress(item, coord) {

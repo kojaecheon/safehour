@@ -1,4 +1,4 @@
-// SafeHour 다국어 런타임 (AX-209 · AX-303 · ADR-0003 → ADR-0007 · spec 4.17)
+// SafeHour 다국어 런타임 (AX-209 · AX-303 · ADR-0003 → ADR-0007 · docs/business-rules.md '언어')
 //
 // 언어는 표시 계층에서만 결정된다. 판정은 언어와 무관하다 — 판정·일정 모듈은 이 모듈을 가져오지 않는다.
 // 이 모듈은 클라이언트·테스트 양쪽에서 쓰이므로 브라우저 API 에 의존하지 않는다.
@@ -25,7 +25,7 @@ export function isLang(value) {
 }
 
 /**
- * `navigator.language` 같은 BCP-47 태그를 지원 언어로 좁힌다 (spec 규칙 44).
+ * `navigator.language` 같은 BCP-47 태그를 지원 언어로 좁힌다 (docs/business-rules.md '언어').
  * `ko*`→ko, `ja*`→ja, `zh*`(zh-CN·zh-TW·zh-Hans…)→zh, 그 밖→en.
  * 모르는 언어를 한국어로 떨어뜨리지 않는다 — 대상 사용자가 외국인 환자이기 때문이다.
  */
@@ -36,7 +36,7 @@ export function normalizeLang(tag) {
   return 'en';
 }
 
-// ── 안전 문구 검수 스위치 (spec 4.17 · ADR-0007) ──
+// ── 안전 문구 검수 스위치 (src/i18n/AGENTS.md '항상 지켜야 하는 것' · ADR-0007) ──
 
 /** 검수 스위치 환경변수 이름. 빌드 시점 공개 환경변수이며 기본은 꺼짐이다. */
 export const SAFETY_REVIEW_ENV = Object.freeze({
@@ -67,7 +67,7 @@ function buildTimeReviewValues() {
 export const SAFETY_COPY_REVIEWED = readSafetyReview(buildTimeReviewValues());
 
 /**
- * 안전 문구 병기 규칙 (spec 4.17 · 규칙 43). **병기 언어는 이 함수만 정한다.**
+ * 안전 문구 병기 규칙 (docs/business-rules.md '언어'). **병기 언어는 이 함수만 정한다.**
  *
  *   ko → { primary: 'ko', secondary: 'en' }
  *   en → { primary: 'en', secondary: 'ko' }

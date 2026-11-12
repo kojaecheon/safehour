@@ -36,7 +36,7 @@ export const messages = {
   },
   'place.notFoundCta': { ko: '전체 일정 보기', en: 'Open the whole trip', ja: '全体の予定を開く', zh: '打开整个行程' },
 
-  // ── 지도 길찾기 (spec 4.14) ──
+  // ── 지도 길찾기 (docs/business-rules.md '알림과 카드') ──
   'place.mapsTitle': { ko: '지도 앱으로 길찾기', en: 'Directions in a map app', ja: '地図アプリで道案内', zh: '在地图应用中导航' },
   'place.mapsNote': {
     ko: '목적지(이 장소)의 이름과 좌표만 넘겨요. 출발지와 숙소 위치는 보내지 않아요.',

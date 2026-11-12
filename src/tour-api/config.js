@@ -38,7 +38,7 @@ export const TOUR_API_KEY = process.env.TOUR_API_KEY?.trim() ?? "";
 //   일문 https://www.data.go.kr/data/15101760/openapi.do  host "apis.data.go.kr/B551011/JpnService2"
 //   중문 간체 https://www.data.go.kr/data/15101764/openapi.do  host "apis.data.go.kr/B551011/ChsService2"
 //   두 서비스 모두 locationBasedList2·detailCommon2·detailIntro2·detailImage2 를 제공한다(2026-09-18 확인).
-// 일문·중문은 운영자가 활용 신청을 해야 쓸 수 있다(spec 13장). 신청 전에는 공급자 오류로 실패하고
+// 일문·중문은 운영자가 활용 신청을 해야 쓸 수 있다(docs/platform/HUMAN_ACTIONS.md 표의 2번 행). 신청 전에는 공급자 오류로 실패하고
 // 영문으로 대체된다(candidate-service.js).
 export const TOUR_API_SERVICES = Object.freeze({
   korean: {
@@ -63,7 +63,7 @@ export const TOUR_API_SERVICES = Object.freeze({
   },
 });
 
-/** 관광 데이터 언어 (spec 4.17) — `ko` 는 국문만 쓰므로 더할 서비스가 없다 */
+/** 관광 데이터 언어 (docs/business-rules.md '언어'): `ko` 는 국문만 쓰므로 더할 서비스가 없다 */
 export const TOUR_LANGS = Object.freeze(["ko", "en", "ja", "zh"]);
 
 /** 선택 언어 → 더해서 조회할 서비스 */
@@ -74,7 +74,7 @@ export const TOUR_LANG_SERVICE = Object.freeze({
 });
 
 /**
- * 요청 언어를 관광 데이터 언어로 정한다. 지원하지 않는 값은 `en` 이다(spec 4.17 '그 외→en').
+ * 요청 언어를 관광 데이터 언어로 정한다. 지원하지 않는 값은 `en` 이다(docs/business-rules.md '언어': 그 외 전부 영어).
  * 값이 없으면 null — 호출부가 기존(언어 미지정) 동작을 고를 수 있게 구분한다.
  */
 export function resolveTourLang(lang) {
@@ -105,7 +105,7 @@ function readPositiveInteger(env, name, issues) {
 }
 
 /**
- * 호출 경고·차단 값을 환경변수에서 읽는다 (spec 4.21).
+ * 호출 경고·차단 값을 환경변수에서 읽는다 (docs/operations.md '환경변수').
  *
  *   TOUR_API_DAILY_LIMIT  operation별 일일 차단 값 (기본 1,000)
  *   TOUR_API_WARNING_AT   operation별 일일 경고 값 (기본 800)
