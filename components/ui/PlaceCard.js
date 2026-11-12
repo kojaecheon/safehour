@@ -1,6 +1,6 @@
 'use client';
 
-// 장소 카드 — 사진 중심 (AX-304 · spec 4.8 · 7장)
+// 장소 카드: 사진 중심 (AX-304 · docs/business-rules.md '장소 후보와 필터', docs/platform/DESIGN_SYSTEM.md '부품 (`components/ui/`)')
 //
 //   <PlaceCard title="경복궁" category="SPOT" imageUrl={stop.image?.url} time="10:25–11:20"
 //              meta={['체류 55분']} badges={['estimate', 'hoursUnconfirmed']} href="/place/…" />
@@ -80,7 +80,7 @@ export default function PlaceCard({
     <article className={variant === 'compact' ? 'ui-place is-compact' : 'ui-place'}>
       <div className="ui-place-media">
         {showImage ? (
-          // eslint-disable-next-line @next/next/no-img-element -- 원본 URL 을 참조만 한다. next/image 는 서버가 이미지를 받아 가공한다(spec 9.1 이미지 미다운로드)
+          // eslint-disable-next-line @next/next/no-img-element -- 원본 URL 을 참조만 한다. next/image 는 서버가 이미지를 받아 가공한다(docs/business-rules.md '장소 후보와 필터': 이미지를 내려받지 않는다)
           <img
             ref={imgRef}
             src={imageUrl}

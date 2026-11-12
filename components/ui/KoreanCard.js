@@ -1,6 +1,6 @@
 'use client';
 
-// 한국어 안내 카드 틀 (AX-304 · spec 4.12)
+// 한국어 안내 카드 틀 (AX-304 · docs/business-rules.md '알림과 카드')
 //
 //   <KoreanCard title={식이 카드 이름}
 //               korean={['매운 음식은 빼 주세요', '술은 마실 수 없어요']}

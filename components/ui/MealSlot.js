@@ -1,6 +1,6 @@
 'use client';
 
-// 식사 칸 (AX-304 · spec 4.7 식사 칸 · 5.2 mealSlots)
+// 식사 칸 (AX-304 · docs/business-rules.md '하루 일정 생성'의 식사 칸, docs/contracts.md '`POST /api/itinerary/plan`'의 mealSlots)
 //
 //   <MealSlot slot="LUNCH" status="FILLED" time="12:00–13:00"><PlaceCard … /></MealSlot>
 //   <MealSlot slot="DINNER" status="NONE_AVAILABLE" reasons={['MENU_UNKNOWN']} />

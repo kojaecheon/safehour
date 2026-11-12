@@ -1,6 +1,6 @@
 'use client';
 
-// 앱 셸 (AX-304 · spec 3.1 · 4.18)
+// 앱 셸 (AX-304 · docs/platform/IA_AND_FLOWS.md '고정 요소'·'보기 전용 상태')
 //
 //   [보기 전용 배너 자리]   ← 저장소 상태로 자동 표시 (ReadOnlyBanner)
 //   [긴급 연락 버튼]        ← 늘 하단에 붙어 있다. 내비가 있으면 다섯째 칸, 없으면 하단 긴급 바.
@@ -42,7 +42,7 @@ export default function AppShell({ children }) {
       {showBanner && <ReadOnlyBanner />}
       {children}
       {showNav && <BottomNav pathname={pathname} />}
-      {/* 긴급은 어느 화면에서든 닿아야 한다(spec 4.15).
+      {/* 긴급은 어느 화면에서든 닿아야 한다(docs/platform/IA_AND_FLOWS.md '고정 요소').
           내비가 있으면 다섯째 칸이, 없으면 이 바가 그 역할을 한다. 떠 있게 두지 않는다. */}
       {showEmergencyBar && (
         <div className="ui-emergency-bar">

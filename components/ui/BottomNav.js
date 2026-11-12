@@ -1,13 +1,13 @@
 'use client';
 
-// 하단 내비 5개 (AX-304 · spec 3.1 · 4.15): 오늘 /today · 일정 /trip · 조건 /conditions · 더보기 /more · 긴급 /emergency
+// 하단 내비 5개 (AX-304 · docs/platform/IA_AND_FLOWS.md '고정 요소'): 오늘 /today · 일정 /trip · 조건 /conditions · 더보기 /more · 긴급 /emergency
 //
 // 긴급은 내비 칸이다 — 떠 있는 버튼은 본문 위에 얹혀 누를 수 있는 요소를 덮었다(중국어 선택 칸 41% 등).
 // 내비가 없는 로그인 전 흐름에서는 앱 셸이 떠 있는 버튼을 대신 그린다.
 //
 // - 현재 화면은 aria-current="page" + 채운 아이콘 + 진한 글자 + 굵기로 표시한다(색 단독 금지 · SEED Bottom Navigation).
 // - 하위 화면도 해당 탭을 현재로 본다(예: /trip/2026-10-03 · /place/… → 일정, /link → 조건).
-// - /design-board 는 내비에 넣지 않는다(spec 7장).
+// - /design-board 는 내비에 넣지 않는다(docs/platform/DESIGN_SYSTEM.md '시안 보드 (`/design-board`)').
 
 import Link from 'next/link';
 import { useLang } from '../LanguageProvider.js';

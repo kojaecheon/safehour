@@ -1,4 +1,4 @@
-// 버튼 (AX-304 · spec 7장)
+// 버튼 (AX-304 · docs/platform/DESIGN_SYSTEM.md '부품 (`components/ui/`)')
 //
 //   <Button>다음</Button>                                 주 버튼 (포인트 색 한 가지, 화면당 하나)
 //   <Button variant="secondary">나중에</Button>           보조 버튼 (회색 채움 — SEED neutralWeak)

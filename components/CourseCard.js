@@ -1,6 +1,6 @@
 'use client';
 
-// 일정 속 장소 카드 — 정거장(Stop) 하나 (AX-317 · spec 4.8 · 5.2 Stop · 7장)
+// 일정 속 장소 카드: 정거장(Stop) 하나 (AX-317 · docs/business-rules.md '장소 후보와 필터', docs/contracts.md '`POST /api/itinerary/plan`', docs/platform/DESIGN_SYSTEM.md '부품 (`components/ui/`)')
 //
 // 예전 단일 외출 추천 카드(D08-CMP008)를 새 일정 모델에 맞게 다시 썼다. 모양은 디자인 시스템의 PlaceCard 다.
 //   - 제목은 관광공사 원문(표시 언어가 화면 언어와 다르면 lang 표시). 번역하지 않는다.
@@ -23,7 +23,7 @@ const INDOOR_KEY = { true: 'trip.indoor', false: 'trip.outdoor' };
 
 /**
  * @param {object} props
- * @param {object} props.stop                  Stop (spec 5.2)
+ * @param {object} props.stop                  Stop (docs/contracts.md '`POST /api/itinerary/plan`')
  * @param {boolean} [props.link]               장소 상세로 가는 링크를 만든다 (기본 true)
  * @param {'feature'|'compact'} [props.variant]
  * @param {2|3|4} [props.headingLevel]

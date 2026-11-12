@@ -1,4 +1,4 @@
-// 빈 상태 (AX-304 · spec 7장)
+// 빈 상태 (AX-304 · docs/platform/DESIGN_SYSTEM.md '부품 (`components/ui/`)')
 //
 //   <EmptyState icon="navTrip" title="아직 일정이 없어요" body="체류 정보를 넣으면 날짜별 일정을 만들어요."
 //               action={<Button href="/onboarding">체류 정보 넣기</Button>} />

@@ -1,6 +1,6 @@
 'use client';
 
-// 안전 문구 병기 한 덩어리 (AX-318 · spec 4.17 · 규칙 43)
+// 안전 문구 병기 한 덩어리 (AX-318 · docs/business-rules.md '언어')
 //
 //   <PairText k="settings.notifyDisclosure" />
 //

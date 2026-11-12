@@ -1,4 +1,4 @@
-// 세션 유지 — 화면으로 돌아오면 로그인 상태를 다시 묻는다 (AX-319 · spec 4.18 · 4.19)
+// 세션 유지: 화면으로 돌아오면 로그인 상태를 다시 묻는다 (AX-319 · docs/platform/IA_AND_FLOWS.md '보기 전용 상태', docs/security.md '인증')
 //
 // 앱 셸(AppShell)은 처음 한 번만 세션을 묻는다. 설치한 앱은 몇 시간씩 열린 채 백그라운드에 있으므로,
 // 창에 다시 초점이 오거나(focus) 화면이 다시 보이면(visibilitychange) 저장소 refreshSession() 을 다시 부른다.
