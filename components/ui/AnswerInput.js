@@ -1,13 +1,13 @@
 'use client';
 
-// 예 / 아니오 / 모르겠음 입력 (AX-304 · spec 4.4 본인 체크 항목)
+// 예 / 아니오 / 모르겠음 입력 (AX-304 · docs/business-rules.md '조건 기간')
 //
 //   <AnswerInput legend="자외선을 피해야 하나요?" value={v} onChange={setV} />
 //   <AnswerInput legend="외출이 허용되나요?" disallowUnknown … />   ← 필수 항목은 '모르겠음'이 없다
 //
 // 값: 'YES' | 'NO' | 'UNKNOWN' | null(아직 고르지 않음)
 //
-// '아니오'와 '모르겠음'은 뜻이 다르다(handoff 4장).
+// '아니오'와 '모르겠음'은 뜻이 다르다(docs/business-rules.md '조건 기간'의 답 세 종류 표).
 //   - 아니오 = 병원이 그런 안내를 하지 않았다 → 제한 없음
 //   - 모르겠음 = 가장 엄격한 기본값을 적용한다 → '기본값 적용' 배지
 // 그래서 고른 뒤 그 뜻을 한 줄로 바로 보여준다(showMeaning, 기본 켜짐).

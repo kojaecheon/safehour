@@ -1,6 +1,6 @@
 'use client';
 
-// 출처 영역 (AX-304 · spec 7장 · 9.1 '원문과 추정값을 같은 필드에 섞지 않는다')
+// 출처 영역 (AX-304 · docs/platform/DESIGN_SYSTEM.md '출처 영역 5종 (`SourceArea` · `SourceTag`)', docs/business-rules.md '장소 후보와 필터': 원문과 추정값을 같은 필드에 섞지 않는다)
 //
 //   <SourceArea source="hospital">…병원 원문…</SourceArea>
 //   <SourceArea source="self">…본인 체크 값…</SourceArea>
@@ -9,9 +9,9 @@
 //   <SourceArea source="ai" note="…">…AI 소개 문장…</SourceArea>
 //
 // 다섯 출처는 **머리글 문구 + 아이콘 + 테두리 모양**으로 나뉜다(실선 띠 / 파선 / 점선 / 두 줄 띠 / 말풍선).
-// 한 영역 안에 두 출처를 섞지 않는다. 병원 안내문은 번역·요약하지 않은 원문 그대로 넣는다(spec 9.1).
+// 한 영역 안에 두 출처를 섞지 않는다. 병원 안내문은 번역·요약하지 않은 원문 그대로 넣는다(docs/business-rules.md '병원 연동').
 //
-// SourceTag 는 항목 옆에 붙이는 작은 출처 표시다(spec 4.5 '병원 발행' / '본인 체크').
+// SourceTag 는 항목 옆에 붙이는 작은 출처 표시다(docs/business-rules.md '날짜별 합성'의 출처 '병원 발행' / '본인 체크').
 // '기본값 적용'은 <Badge kind="defaulted" /> 를 쓴다.
 
 import { useId } from 'react';

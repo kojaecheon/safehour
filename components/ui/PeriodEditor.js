@@ -1,6 +1,6 @@
 'use client';
 
-// 조건 기간 편집기 — 틀만 (AX-304 · spec 4.4)
+// 조건 기간 편집기: 틀만 (AX-304 · docs/business-rules.md '조건 기간')
 //
 // 배치만 정한다. 항목 목록·저장 규칙·검증은 조건 화면 작업(T14)이 children·actions 로 채운다.
 //
@@ -12,8 +12,8 @@
 //   </PeriodEditor>
 //
 // - source="SELF"(본인 체크)는 파선 테두리, "HOSPITAL"(병원 발행)은 실선 띠 — 출처 영역과 같은 모양 규칙.
-// - 병원 발행 기간은 날짜를 고칠 수 없다(읽기 전용 입력). 시작일·종료일은 둘 다 포함한다(spec 4.4).
-// - 자유 서술 입력칸은 두지 않는다(spec 4.4).
+// - 병원 발행 기간은 날짜를 고칠 수 없다(읽기 전용 입력). 시작일·종료일은 둘 다 포함한다(docs/business-rules.md '조건 기간').
+// - 자유 서술 입력칸은 두지 않는다(docs/business-rules.md '조건 기간').
 
 import { useId } from 'react';
 import { useLang } from '../LanguageProvider.js';

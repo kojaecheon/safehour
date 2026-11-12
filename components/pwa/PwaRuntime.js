@@ -1,6 +1,6 @@
 'use client';
 
-// 설치·오프라인·알림 실행 부품 (AX-319 · spec 4.13 · 4.18)
+// 설치·오프라인·알림 실행 부품 (AX-319 · docs/business-rules.md '알림과 카드', lib/notify/AGENTS.md, docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 // app/layout.js 가 앱 셸 옆에 한 번 단다. 화면 데이터를 받지 않는다.
 //   1. 서비스 워커 등록 — 운영 빌드에서만(public/sw.js). 오프라인 보기 전용 화면과 설치를 켠다.
@@ -8,7 +8,7 @@
 //      저장소 refreshSession() 을 부른다. 보기 전용 배너·보류 중인 로그아웃 재전송은 저장소가 판단한다.
 //      셸이 세션을 묻지 않는 경로(STATUS_HIDDEN_PATHS: 시작·로그인·시안 보드)에서는 부르지 않는다. 받은 링크 화면(/g)은
 //      배너만 없고 세션은 묻는 경로라 여기서도 부른다(components/ui/shellPaths.js).
-//   3. 앱 안 알림 배너(NotificationBanner) — 시안 보드에서는 달지 않는다(사용자 데이터를 읽지 않는 화면, spec 7장).
+//   3. 앱 안 알림 배너(NotificationBanner): 시안 보드에서는 달지 않는다(사용자 데이터를 읽지 않는 화면, docs/standards.md '안전 규칙의 구조적 강제').
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';

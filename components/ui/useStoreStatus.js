@@ -1,6 +1,6 @@
 'use client';
 
-// 기기 저장소의 보기 전용 신호를 화면에서 읽는 훅 (AX-304 · spec 4.18)
+// 기기 저장소의 보기 전용 신호를 화면에서 읽는 훅 (AX-304 · docs/platform/IA_AND_FLOWS.md '보기 전용 상태')
 //
 //   const { readOnly, reason, sessionChecked } = useStoreStatus();
 //

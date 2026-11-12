@@ -1,4 +1,4 @@
-// 디자인 시스템 부품 모음 (AX-304 · spec 7장)
+// 디자인 시스템 부품 모음 (AX-304 · docs/platform/DESIGN_SYSTEM.md '부품 (`components/ui/`)')
 //
 // 화면은 여기서 부품을 가져다 쓴다. 모양은 app/globals.css(토큰·기본) + app/styles/ui.css(부품)가 정한다.
 // 부품을 고쳐야 하면 디자인 시스템 소유(AX-304)에 보고하고, 화면 배치는 자기 기능 스타일 파일에서 한다.

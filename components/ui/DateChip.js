@@ -1,6 +1,6 @@
 'use client';
 
-// 날짜 칩 (AX-304 · spec 3.1 /trip, 4.7 dayState)
+// 날짜 칩 (AX-304 · docs/platform/IA_AND_FLOWS.md '경로'의 /trip, docs/business-rules.md '하루 일정 생성'의 날짜 상태 표)
 //
 //   <ul className="ui-date-strip">
 //     <li><DateChip date="2026-10-03" state="TOGETHER" isToday selected href="/trip/2026-10-03" /></li>

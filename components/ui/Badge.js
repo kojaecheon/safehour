@@ -1,6 +1,6 @@
 'use client';
 
-// 배지 5종 (AX-304 · spec 7장)
+// 배지 5종 (AX-304 · docs/platform/DESIGN_SYSTEM.md '배지 5종 (`Badge`)')
 //
 //   <Badge kind="estimate" />          추정            — SafeHour 가 추정한 값(이동·체류 시간, 식이 판단)
 //   <Badge kind="defaulted" />         기본값 적용     — '모르겠음'에 가장 엄격한 기본값을 넣었다
