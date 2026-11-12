@@ -1,4 +1,4 @@
-// 하루의 틀 — 활동 창, 입국일 시작·출국일 마감, 병원 일정 블록, 복약 마감 (AX-302 · spec 4.1·4.3·4.7)
+// 하루의 틀: 활동 창, 입국일 시작·출국일 마감, 병원 일정 블록, 복약 마감 (AX-302 · docs/business-rules.md '체류'·'숙소와 병원'·'하루 일정 생성')
 //
 // 이동 추정은 **인자로 받는다**. 이 계층은 이동시간을 추정하지 않는다(엔진·어댑터 몫).
 // 이동 추정이 필요한데 없으면 0분으로 가정하지 않고 TypeError 를 낸다 — 창이 넓어지는 쪽으로 틀리지 않게.
@@ -18,7 +18,7 @@ function travelMinutes(value, name) {
 
 /**
  * 입국일 일정 시작 시각(입국일 자정부터의 분, 24시간을 넘을 수 있음).
- * = 도착 시각 + 입국 수속 90분 + 공항→그날 숙소 이동 추정 (spec 4.1, 규칙 14)
+ * = 도착 시각 + 입국 수속 90분 + 공항→그날 숙소 이동 추정 (docs/business-rules.md '체류')
  * @param {import('./stay.js').Stay} stay
  * @param {number} airportToLodgingMin
  */
@@ -32,7 +32,7 @@ export function arrivalDayStartMin(stay, airportToLodgingMin) {
 
 /**
  * 출국일 일정 마감 시각(출국일 자정부터의 분, 음수일 수 있음).
- * = 출발 시각 − 공항 도착 여유 3시간 − 그날 숙소→공항 이동 추정 − 여유 30분 (spec 4.1, 규칙 15)
+ * = 출발 시각 − 공항 도착 여유 3시간 − 그날 숙소→공항 이동 추정 − 여유 30분 (docs/business-rules.md '체류')
  * @param {import('./stay.js').Stay} stay
  * @param {number} lodgingToAirportMin
  */
@@ -46,7 +46,7 @@ export function departureDayCutoffMin(stay, lodgingToAirportMin) {
 }
 
 /**
- * 날짜의 활동 창 (spec 4.1·4.7): 활동 시간 09:00–21:00 을 입국일 시작·출국일 마감으로 자른다.
+ * 날짜의 활동 창 (docs/business-rules.md '체류'·'하루 일정 생성'): 활동 시간 09:00~21:00 을 입국일 시작·출국일 마감으로 자른다.
  * 창이 없거나 체류 밖이면 `window: null` + `OUTSIDE_STAY_WINDOW`.
  *
  * @param {import('./stay.js').Stay} stay
@@ -83,7 +83,7 @@ export function dayWindow(stay, date, { airportToLodgingMin, lodgingToAirportMin
 }
 
 /**
- * 병원 일정의 종료. 종료 시각이 없으면 PROCEDURE 240분, VISIT 90분으로 보고 '예상 종료'로 표시한다 (spec 4.3).
+ * 병원 일정의 종료. 종료 시각이 없으면 PROCEDURE 240분, VISIT 90분으로 보고 '예상 종료'로 표시한다 (docs/business-rules.md '숙소와 병원').
  * @param {import('./stay.js').Appointment} appointment
  * @returns {{end: string, endMin: number, estimated: boolean}}  endMin 은 24시간을 넘을 수 있다(end 는 23:59 로 자름)
  */
@@ -98,7 +98,7 @@ export function appointmentEnd(appointment) {
 }
 
 /**
- * 병원 일정 블록의 범위(분). 이 구간에는 외출을 만들지 않는다 (spec 4.3).
+ * 병원 일정 블록의 범위(분). 이 구간에는 외출을 만들지 않는다 (docs/business-rules.md '숙소와 병원').
  *
  * - 기본: [시작 − 숙소→병원 이동 − 도착 여유 10분, 종료 + 병원→숙소 이동]
  * - 직전 외출이 이 병원에서 끝나면(`precededByOuting`): 블록은 **일정 시작 시각**부터다.
@@ -119,7 +119,7 @@ export function appointmentBlockMinutes(appointment, { lodgingToHospitalMin, hos
 }
 
 /**
- * `DayPlan.blocks` 원소 모양의 병원 일정 블록 (spec 5.2).
+ * `DayPlan.blocks` 원소 모양의 병원 일정 블록 (docs/contracts.md '`POST /api/itinerary/plan`').
  * @returns {{kind: 'APPOINTMENT', start: string, end: string, appointmentId: string}}
  */
 export function appointmentBlock(appointment, travel) {
@@ -135,9 +135,9 @@ function atLodgingDoses(medication) {
 }
 
 /**
- * '숙소에서 복용' 복약 시각이 만드는 마감 (규칙 16).
+ * '숙소에서 복용' 복약 시각이 만드는 마감 (docs/business-rules.md '하루 일정 생성').
  * 그 전 외출은 이 시각까지 숙소로 돌아와야 하고, 마감 이유는 `MEDICATION`, 사유는 `MEDICATION_WINDOW` 다.
- * '숙소 밖 복용'은 마감을 만들지 않는다. 복약 '모르겠음'은 합성 결과가 [] 라 마감이 없다(규칙 17).
+ * '숙소 밖 복용'은 마감을 만들지 않는다. 복약 '모르겠음'은 합성 결과가 [] 라 마감이 없다(docs/business-rules.md '하루 일정 생성'의 마감 후보 표, '조건 기간'의 복약 행).
  * @param {Array<{time: string, atLodging: boolean}>} medication  `ConditionLimits.medication`
  * @returns {Array<{time: string, deadlineReason: 'MEDICATION', reason: 'MEDICATION_WINDOW'}>}
  */
@@ -150,7 +150,7 @@ export function medicationDeadlines(medication) {
 }
 
 /**
- * '숙소에서 복용' 복약 블록: 복약 시각부터 15분(조정 가능)이 지나야 다음 외출을 시작한다 (spec 4.7).
+ * '숙소에서 복용' 복약 블록: 복약 시각부터 15분(조정 가능)이 지나야 다음 외출을 시작한다 (docs/business-rules.md '하루 일정 생성').
  * @returns {Array<{kind: 'MEDICATION', start: string, end: string}>}
  */
 export function medicationBlocks(medication) {
@@ -162,7 +162,7 @@ export function medicationBlocks(medication) {
 }
 
 /**
- * 복귀 장소와 좌표 (규칙 13-1). `returnTime` 장소가 병원이면 그 `hospitalId` 병원의 좌표, 아니면 그날 숙소 좌표.
+ * 복귀 장소와 좌표 (docs/business-rules.md '숙소와 병원'). `returnTime` 장소가 병원이면 그 `hospitalId` 병원의 좌표, 아니면 그날 숙소 좌표.
  * 찾을 수 없으면 추측하지 않고 RangeError.
  * @param {{place?: 'LODGING'|'HOSPITAL', hospitalId?: string} | null} returnTime  `ConditionLimits.returnTime`
  * @param {{lodging: import('./stay.js').LodgingSegment | null, hospitals: import('./stay.js').Hospital[]}} ctx

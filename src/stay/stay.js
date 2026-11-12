@@ -1,4 +1,4 @@
-// 체류 모델 — 검증과 날짜 도우미 (AX-302 · spec 4.1–4.3, 5.1 Stay, 6장 PlanStay)
+// 체류 모델, 검증과 날짜 도우미 (AX-302 · docs/business-rules.md '체류'·'숙소와 병원', Stay 타입은 아래 typedef, docs/contracts.md '판정 요청에 실리는 체류 (`PlanStay`)')
 //
 // 기기 저장 모델(`Stay`)과 서버 요청 모델(`PlanStay`)을 같은 함수로 다룬다.
 // 둘의 차이(이름·주소 유무, 좌표 위치, 동의 표현)는 규칙에 영향을 주지 않는다.
@@ -9,7 +9,7 @@ import { VALIDATION_ISSUE, validationResult } from './errorCodes.js';
 import { addDays, diffDays, eachDate, isClockTime, isDateString, parseInstantMs, toMinutes } from './time.js';
 
 /**
- * @typedef {object} Address  spec 5.1
+ * @typedef {object} Address  기기 모델
  * @property {string} roadAddress
  * @property {string} [jibunAddress]
  * @property {string} [buildingName]
@@ -19,7 +19,7 @@ import { addDays, diffDays, eachDate, isClockTime, isDateString, parseInstantMs,
  */
 
 /**
- * @typedef {object} LodgingSegment  spec 5.1 (PlanStay 는 address 대신 lat·lng, name 없음)
+ * @typedef {object} LodgingSegment  기기 모델 (PlanStay 는 address 대신 lat·lng, name 없음)
  * @property {string} id
  * @property {string} [name]  최대 40자
  * @property {Address} [address]
@@ -30,7 +30,7 @@ import { addDays, diffDays, eachDate, isClockTime, isDateString, parseInstantMs,
  */
 
 /**
- * @typedef {object} Hospital  spec 5.1 (PlanStay 는 {id, lat, lng})
+ * @typedef {object} Hospital  기기 모델 (PlanStay 는 {id, lat, lng})
  * @property {string} id
  * @property {string} [name]  최대 40자
  * @property {Address} [address]
@@ -41,7 +41,7 @@ import { addDays, diffDays, eachDate, isClockTime, isDateString, parseInstantMs,
  */
 
 /**
- * @typedef {object} Appointment  spec 5.1
+ * @typedef {object} Appointment  기기 모델
  * @property {string} id
  * @property {string} hospitalId
  * @property {'PROCEDURE'|'VISIT'} type
@@ -52,7 +52,7 @@ import { addDays, diffDays, eachDate, isClockTime, isDateString, parseInstantMs,
  */
 
 /**
- * @typedef {object} Stay  spec 5.1 (PlanStay 도 같은 규칙 필드를 가진다)
+ * @typedef {object} Stay  기기 모델 (PlanStay 도 같은 규칙 필드를 가진다)
  * @property {2} [schemaVersion]
  * @property {{date: string, time: string, airport: 'ICN'|'GMP'}} arrival
  * @property {{date: string, time: string, airport: 'ICN'|'GMP'}} departure
@@ -102,7 +102,7 @@ export function pointOf(entity) {
 }
 
 /**
- * 체류 모델을 검증한다 (spec 4.1–4.3, 규칙 1–3).
+ * 체류 모델을 검증한다 (docs/business-rules.md '체류'·'숙소와 병원').
  *
  * 거부 사유: 입국·출국 형식, 출국 < 입국, 체류 > 45박(조정 가능), 숙소 구간 0개·날짜 역순·겹침,
  * `PROCEDURE` 일정 0개, 등록되지 않은 병원을 가리키는 일정, 조건 기간 형식(있을 때).
@@ -249,7 +249,7 @@ export function validateStay(stay, { maxNights = DEFAULTS.stay.maxNights } = {})
         push(`${prefix}.source`, VALIDATION_ISSUE.INVALID_VALUE);
       }
     });
-    // 경계일을 빼먹으면 수술 뒤 날짜가 제한 없는 자유일로 만들어진다 (spec 4.3)
+    // 경계일을 빼먹으면 수술 뒤 날짜가 제한 없는 자유일로 만들어진다 (docs/business-rules.md '체류')
     if (!appointments.some((a) => a?.type === 'PROCEDURE' && isDateString(a.date))) {
       push('appointments', VALIDATION_ISSUE.PROCEDURE_REQUIRED);
     }
@@ -290,7 +290,7 @@ export function stayNights(stay) {
 }
 
 /**
- * 날짜 D의 숙소 (spec 4.2): D일 밤을 묵는 숙소(체크인 ≤ D < 체크아웃).
+ * 날짜 D의 숙소 (docs/business-rules.md '숙소와 병원'): D일 밤을 묵는 숙소(체크인 ≤ D < 체크아웃).
  * 출국일의 숙소는 전날 밤 숙소다(짐이 있는 곳). 없으면 null.
  * @param {Stay} stay
  * @param {string} date
@@ -305,7 +305,7 @@ export function lodgingForDate(stay, date) {
 }
 
 /**
- * 수술 후 경계일 = 가장 이른 `PROCEDURE` 일정의 날짜 (spec 4.3). 없으면 null.
+ * 수술 후 경계일 = 가장 이른 `PROCEDURE` 일정의 날짜 (docs/business-rules.md '체류'). 없으면 null.
  * null 이면 분류는 모든 날짜를 경계일 이후로 본다(자유일로 새지 않게).
  */
 export function postProcedureBoundary(stay) {

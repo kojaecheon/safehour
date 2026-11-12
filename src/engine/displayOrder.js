@@ -1,4 +1,4 @@
-// 하루 일정의 표시 순서 (spec 5.2 DayPlan.warnings · Stop.labels)
+// 하루 일정의 표시 순서 (docs/contracts.md '`POST /api/itinerary/plan`'의 warnings, docs/business-rules.md '장소 후보와 필터'의 Stop.labels)
 //
 // 하루 일정 엔진(dayPlan.js)이 이 순서로 만들고, 체류 조립·재계획(tripPlan.js)이 같은 순서로 다시 쓴다.
 // tripPlan 쪽은 이 목록을 **거르개**로 쓴다(relabelStop · assembleDay) — 목록에 없는 값은

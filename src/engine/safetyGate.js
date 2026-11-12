@@ -36,22 +36,22 @@ export function gateCandidate(candidate, condition, ctx = {}) {
   const reasons = [];
 
   // 숙박시설 등 관광 활동이 아닌 후보는 가까워도 추천하지 않는다.
-  // 의료 시설(병원·의원·클리닉)도 관광 활동이 아니다 — 병원을 정거장으로 두면 병원 알선이 된다 (spec 9.1).
+  // 의료 시설(병원·의원·클리닉)도 관광 활동이 아니다: 병원을 정거장으로 두면 병원 알선이 된다 (docs/business-rules.md '숙소와 병원'·'장소 후보와 필터').
   if (candidate.tourismEligible === false || candidate.medical === true) {
     reasons.push(REASON.NON_TOURISM_ACTIVITY);
   }
 
-  // 열 노출 (spec 4.8, AX-306) — 단서가 있는 장소만. 단서가 없으면 노출 없음으로 본다
+  // 열 노출 (docs/business-rules.md '장소 후보와 필터', AX-306): 단서가 있는 장소만. 단서가 없으면 노출 없음으로 본다
   if (condition.avoidHeat && candidate.heatExposure === true) {
     reasons.push(REASON.HEAT_EXPOSURE);
   }
 
-  // 물 활동 (spec 4.8, AX-306)
+  // 물 활동 (docs/business-rules.md '장소 후보와 필터', AX-306)
   if (condition.avoidWater && candidate.waterActivity === true) {
     reasons.push(REASON.WATER_ACTIVITY);
   }
 
-  // 식이 필터 — 식당·카페에만 (spec 4.8). 판정 결과는 추정이다
+  // 식이 필터: 식당·카페에만 (docs/business-rules.md '장소 후보와 필터'). 판정 결과는 추정이다
   for (const reason of dietReasons(candidate.food, condition.diet)) {
     reasons.push(reason);
   }
@@ -107,7 +107,7 @@ export function gateCandidate(candidate, condition, ctx = {}) {
 }
 
 /**
- * 식이 필터 (spec 4.8, 규칙 21–23).
+ * 식이 필터 (docs/business-rules.md '장소 후보와 필터'의 식이 표).
  * - 술: 주점 유형(isBar=true)만 제외 → DIET_RESTRICTED
  * - 매운 음식·날음식: 단서 있음(true) → DIET_RESTRICTED, 판단할 단서 없음(null) → MENU_UNKNOWN.
  *   카페·전통찻집 유형은 '매운 음식·날음식 아님'으로 본다

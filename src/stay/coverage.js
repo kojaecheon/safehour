@@ -1,4 +1,4 @@
-// 날짜 분류(coverage)·NEEDS_INPUT 사유·병원 기간 적용·매일 확인 대상 (AX-302 · spec 4.5·4.6·4.20)
+// 날짜 분류(coverage)·NEEDS_INPUT 사유·병원 기간 적용·매일 확인 대상 (AX-302 · docs/business-rules.md '날짜별 합성'·'날짜 분류'·'매일 확인'·'병원 연동')
 //
 // 날짜 D에 적용되는 기간
 //   - 민감정보 동의가 유효할 때의 SELF 기간
@@ -6,7 +6,7 @@
 //     (하루 도중에 만료되는 지침은 그날을 덮지 않는다 — 보수적 처리)
 //
 // 경계일 전 날짜의 FREE 일정은 병원 조건 게이트를 거치지 않는다.
-// **이것은 "병원 조건이 없으면 추천하지 않는다" 원칙의 의도된 변경이다** (spec 4.5·9.2).
+// **이것은 "병원 조건이 없으면 추천하지 않는다" 원칙의 의도된 변경이다** (docs/business-rules.md '날짜 분류', docs/platform/PRODUCT_DEFINITION_V3.md '바뀌는 것 (이번 결정)').
 
 import { REASON } from '../domain/states.js';
 import { NO_RESTRICTION_LIMITS, composeConditions, flattenEffective } from './compose.js';
@@ -34,7 +34,7 @@ export const HOSPITAL_PERIOD_STATUS = Object.freeze({
  * @property {string} date
  * @property {'FREE'|'DECLARED_FREE'|'RESTRICTED'|'REST_DAY'|'NEEDS_INPUT'} coverage
  * @property {string[]} reasons  REASON 코드. NEEDS_INPUT 사유, REST_DAY 의 OUTING_FORBIDDEN,
- *   CONFLICTING_CONDITION(규칙 11), ESCORT_REQUIRED(규칙 10)
+ *   CONFLICTING_CONDITION(docs/business-rules.md '날짜별 합성'), ESCORT_REQUIRED(docs/business-rules.md '하루 일정 생성')
  * @property {string|null} lodgingId  그날 숙소 (`DayPlan.lodgingId`)
  * @property {string[]} appliedPeriodIds  적용된 기간 id (id 순)
  * @property {import('./compose.js').EffectiveConditions} effective
@@ -42,7 +42,7 @@ export const HOSPITAL_PERIOD_STATUS = Object.freeze({
  * @property {import('./compose.js').ConditionLimits | null} limits
  *   엔진 입력. FREE 는 NO_RESTRICTION_LIMITS, NEEDS_INPUT 은 null(일정 없음)
  * @property {Array<'MEDICATION_TIMES_MISSING'|'DEFAULTS_APPLIED'>} warnings
- * @property {boolean} blocked  한 병원 기간 안의 모순으로 날짜가 막힘(규칙 11) — 환자·보호자 외출 없음
+ * @property {boolean} blocked  한 병원 기간 안의 모순으로 날짜가 막힘(docs/business-rules.md '날짜별 합성'), 환자·보호자 외출 없음
  * @property {boolean} patientOutingAllowed  날짜 단위로 환자 외출을 만들 수 있는가 (구간 판정은 엔진)
  * @property {boolean} guardianSoloAllowed   날짜 단위로 보호자 단독 외출이 가능한가
  *   (동반 보호자 있음 + 합성 guardianMustStay=아니오 + 동행 필수 아님 + RESTRICTED/REST_DAY + 막힘 없음).
@@ -64,12 +64,12 @@ export function periodCoversDate(period, date) {
 }
 
 /**
- * 병원 기간의 날짜 D 기준 상태 (spec 4.5, 규칙 12).
+ * 병원 기간의 날짜 D 기준 상태 (docs/business-rules.md '날짜별 합성').
  * - 철회됨 → REVOKED
  * - `expiresAt` 이 D의 활동 종료 시각(KST, 기본 21:00)보다 늦지 않으면 → EXPIRED
  *   (읽을 수 없는 expiresAt 도 EXPIRED — 적용하지 않는 쪽으로)
  * - 그 밖 → ACTIVE
- * 병원 지침 최신성은 "유효기간 안이고 철회되지 않음"이다. 24시간 한도는 쓰지 않는다 (spec 4.6).
+ * 병원 지침 최신성은 "유효기간 안이고 철회되지 않음"이다. 24시간 한도는 쓰지 않는다 (docs/business-rules.md '매일 확인').
  *
  * @param {import('./conditions.js').ConditionPeriod} period
  * @param {string} date
@@ -115,7 +115,7 @@ function needsInputReasons({ lodging, applied, postBoundary, consent, covering, 
       const statuses = covering
         .filter((p) => p.source === CONDITION_SOURCE.HOSPITAL)
         .map((p) => hospitalPeriodStatus(p, date, { activityEnd }));
-      // 연동 지침이 만료된 날짜만 만료 사유다. 병원 값을 본인 체크로 옮기지 않는다 (spec 4.20)
+      // 연동 지침이 만료된 날짜만 만료 사유다. 병원 값을 본인 체크로 옮기지 않는다 (docs/business-rules.md '날짜 분류')
       reasons.push(
         statuses.includes(HOSPITAL_PERIOD_STATUS.EXPIRED)
           ? REASON.HOSPITAL_PLAN_EXPIRED_INPUT_REQUIRED
@@ -128,7 +128,7 @@ function needsInputReasons({ lodging, applied, postBoundary, consent, covering, 
 }
 
 /**
- * 날짜 하나를 분류한다 (spec 4.5 날짜 분류, 규칙 3·4·5·9·10·11·12).
+ * 날짜 하나를 분류한다 (docs/business-rules.md '숙소와 병원'·'날짜별 합성'·'날짜 분류'·'하루 일정 생성').
  *
  * | 분류 | 조건 |
  * | FREE | D < 경계일이고 적용 기간 없음 |
@@ -183,7 +183,7 @@ export function classifyDate(stay, date, { activityEnd = DEFAULTS.activityHours.
   }
 
   if (applied.length === 0) {
-    // 경계일 전 빈 날짜 — 만료·철회된 병원 기간만 덮었어도 같다 (규칙 12)
+    // 경계일 전 빈 날짜, 만료·철회된 병원 기간만 덮었어도 같다 (docs/business-rules.md '날짜별 합성')
     return {
       ...base,
       coverage: COVERAGE.FREE,
@@ -246,7 +246,7 @@ export function classifyStay(stay, opts) {
 }
 
 /**
- * 매일 확인 대상인가 (spec 4.6): 오늘이 체류 기간 안이고, 오늘을 덮는 SELF 기간이 하나 이상.
+ * 매일 확인 대상인가 (docs/business-rules.md '매일 확인'): 오늘이 체류 기간 안이고, 오늘을 덮는 SELF 기간이 하나 이상.
  * DECLARED_FREE(제한 없음 기간)도 포함한다. HOSPITAL 기간만 덮는 날은 대상이 아니다.
  * 동의가 없으면 SELF 기간이 적용되지 않으므로 대상이 아니다. 미래 날짜는 호출부가 넘기지 않는다.
  * @param {import('./stay.js').Stay} stay
