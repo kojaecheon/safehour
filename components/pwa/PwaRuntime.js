@@ -12,7 +12,7 @@
 
 import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { STATUS_HIDDEN_PATHS } from '@/components/ui/AppShell.js';
+import { STATUS_HIDDEN_PATHS, matchesPath } from '@/components/ui/shellPaths.js';
 import { getStore } from '@/lib/store/index.js';
 import { getNotifier } from '@/lib/notify/client.js';
 import NotificationBanner from './NotificationBanner.js';
@@ -21,14 +21,10 @@ import { attachSessionUpkeep, createSessionUpkeep } from './sessionUpkeep.js';
 
 const DESIGN_BOARD = '/design-board';
 
-function inPaths(pathname, list) {
-  return list.some((base) => (base === '/' ? pathname === '/' : pathname === base || pathname.startsWith(`${base}/`)));
-}
-
 export default function PwaRuntime() {
   const pathname = usePathname() ?? '/';
-  const upkeepOn = !inPaths(pathname, STATUS_HIDDEN_PATHS);
-  const onBoard = inPaths(pathname, [DESIGN_BOARD]);
+  const upkeepOn = !matchesPath(pathname, STATUS_HIDDEN_PATHS);
+  const onBoard = matchesPath(pathname, [DESIGN_BOARD]);
   const triggerRef = useRef(null);
 
   useEffect(() => {

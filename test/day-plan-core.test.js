@@ -8,6 +8,7 @@ import { describe, test } from 'node:test';
 import { createFallbackEstimator } from '../src/adapters/travelTime.js';
 import { REASON, STATE } from '../src/domain/states.js';
 import { planDay, planStayDay } from '../src/engine/dayPlan.js';
+import { guardianGateCondition } from '../src/engine/stopCandidate.js';
 import { classifyDate, dayWindow, fromMinutes } from '../src/stay/index.js';
 import {
   AIRPORT_TRAVEL,
@@ -210,6 +211,8 @@ describe('규칙 9 — 외출 불가(REST_DAY)', () => {
       }));
     assert.deepEqual(shape(strict), shape(lenient));
     assert.ok(allStops(lenient).length > 0);
+    // 게이트에 넘기는 보호자 조건은 비어 있다: 실내 전용·금식(하루 종일)·자외선·열·물·식이가 게이트에서 모두 빠진다
+    assert.deepEqual(guardianGateCondition(), {});
     // 같은 조건이 환자에게는 실제로 걸린다(외출이 허용된 날에도 환자 외출이 없다). 그래서 위 비교가 뜻이 있다
     const patientUnderStrict = plan(
       restrictedStay({ walkLimit: SET(5), travelLimit: SET(5), avoidUv: SET(true), mealRestriction: SET({ mode: 'ALL_DAY' }) }),
