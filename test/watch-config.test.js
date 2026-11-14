@@ -24,6 +24,7 @@ import {
   runtimeFlagsSnapshot,
 } from '../lib/server/runtime-flags.js';
 import { watchConfig } from '../lib/server/watch/config.js';
+import { EARLY_TOLERANCE_MS } from '../lib/server/watch/arm.js';
 import { ERROR_CODE, ERROR_HTTP_STATUS } from '../src/stay/errorCodes.js';
 import { DEFAULTS } from '../src/stay/defaults.js';
 import { GET as healthGet } from '../app/api/health/route.js';
@@ -464,6 +465,11 @@ describe('오류 코드와 기본값', () => {
 
   test('서버 푸시 유예 기본값은 10분이다', () => {
     assert.equal(DEFAULTS.notifications.serverPushGraceMin, 10);
+  });
+
+  test('EARLY_TOLERANCE_MS 는 기본값 파일에서 나온다', () => {
+    assert.equal(DEFAULTS.notifications.serverPushEarlyToleranceSec, 30);
+    assert.equal(EARLY_TOLERANCE_MS, DEFAULTS.notifications.serverPushEarlyToleranceSec * 1000);
   });
 });
 
