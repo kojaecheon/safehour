@@ -366,9 +366,18 @@ test('메모리 예약도 입력이 틀리면 { ok: false } 다', async () => {
   assert.equal(mem.messages.length, 0);
 });
 
-test('공용 메모리 예약은 프로세스에 하나다', () => {
+test('공용 메모리 예약은 프로세스에 하나이고 globalThis 에 산다', () => {
   assert.equal(sharedMemoryScheduler(), sharedMemoryScheduler());
   assert.notEqual(sharedMemoryScheduler(), createMemoryScheduler());
+  assert.equal(globalThis[Symbol.for('safehour.watch.memoryScheduler')], sharedMemoryScheduler());
+});
+
+test('메모리 예약은 범위 밖 notBeforeMs 를 받지 않는다', async () => {
+  const mem = createMemoryScheduler();
+  for (const notBeforeMs of [-1500, 1e300]) {
+    assert.deepEqual(await mem.schedule({ body: BODY, notBeforeMs, dedupId: 'd' }), { ok: false });
+  }
+  assert.equal(mem.messages.length, 0);
 });
 
 // ── 새지 않음 ──
@@ -397,9 +406,34 @@ test('결과와 예외에 토큰·주소가 없다', async () => {
   assert.equal(typeof verify('garbage'), 'boolean');
 });
 
-test('어댑터 객체를 문자열로 바꿔도 토큰이 드러나지 않는다', () => {
+test('어댑터 객체의 속성 값에 토큰이 없다(클로저 안에만 있다)', () => {
   const s = scheduler(async () => jsonResponse(200, { messageId: 'msg_1' }), { protectionBypass: BYPASS });
-  const text = JSON.stringify(s) + String(Object.keys(s));
-  assert.ok(!text.includes(TOKEN));
-  assert.ok(!text.includes(BYPASS));
+  assert.deepEqual(Object.keys(s).sort(), ['cancel', 'schedule']);
+  for (const value of Object.values(s)) assert.equal(typeof value, 'function');
+});
+
+test('서명: null·배열·문자열 입력에도 던지지 않고 거짓이다', () => {
+  for (const input of [null, undefined, [], 'x', 42]) assert.equal(verifyQstashSignature(input), false);
+});
+
+test('서명: exp·nbf 가 무한대이면 거짓이다', () => {
+  // JSON 에서 1e400 은 Infinity 가 된다. 키를 가진 쪽만 만들 수 있지만 유한한 값만 받는다
+  const tamper = (claimsJson) => {
+    const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = b64url(claimsJson);
+    const sig = createHmac('sha256', CURRENT_KEY).update(`${header}.${payload}`).digest('base64url');
+    return `${header}.${payload}.${sig}`;
+  };
+  const base = `"iss":"Upstash","sub":"${BASE_URL}${DUE_PATH}","body":"${bodyHash(RAW_BODY)}"`;
+  assert.equal(verify(tamper(`{${base},"exp":1e400,"nbf":${NOW_SEC}}`)), false);
+  assert.equal(verify(tamper(`{${base},"exp":${NOW_SEC + 300},"nbf":-1e400}`)), false);
+  assert.equal(verify(tamper(`{${base},"exp":${NOW_SEC + 300},"nbf":${NOW_SEC}}`)), true);
+});
+
+test('서명: sub 는 https 이고 쿼리·조각이 없어야 한다', () => {
+  for (const sub of [`http://app.example${DUE_PATH}`, `${BASE_URL}${DUE_PATH}?x=1`, `${BASE_URL}${DUE_PATH}#f`]) {
+    assert.equal(verify(makeJwt({ claims: { sub } })), false, sub);
+  }
+  // 호스트는 보지 않는다(설계상 의도, 본문 해시·이름공간·HSETNX 가 재전송을 막는다)
+  assert.equal(verify(makeJwt({ claims: { sub: `https://other.example${DUE_PATH}` } })), true);
 });
