@@ -232,6 +232,22 @@ test('pushToGuardian: GONE 이면 구독을 지운다', async () => {
   assert.equal(await readSub(ctx, watchKey), null);
 });
 
+test('pushToGuardian: GONE 을 받는 사이 새로 구독했으면 새 구독은 지우지 않는다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx);
+  const fresh = { subId: newSubId(), ...subscriptionFixture().subscription, lang: 'en' };
+  const send = ctx.push.send.bind(ctx.push);
+  ctx.push.send = async (input) => {
+    // 첫 구독으로 보내는 동안 보호자가 새 기기로 구독한다
+    await writeSub(ctx, watchKey, fresh, '2026-11-25');
+    ctx.push.outcome = 'GONE';
+    return send(input);
+  };
+  const r = await pushToGuardian(ctx, watchKey, { kind: PUSH_KIND.OVERDUE, date: TODAY, time: '14:30' });
+  assert.equal(r.outcome, 'GONE');
+  assert.equal((await readSub(ctx, watchKey))?.subId, fresh.subId);
+});
+
 test('pushToGuardian: RETRY·REJECTED 는 구독을 지우지 않는다', async () => {
   for (const outcome of ['RETRY', 'REJECTED']) {
     const ctx = testCtx();
