@@ -91,7 +91,8 @@
   expiresOn: string,     // 서버가 마지막으로 받아들인 업로드의 출국일(보낸 값 그대로, 서버 상한 전)
   lastUploaded: { [date: string]: string[] }, // 마지막으로 서버가 받아들인 날짜별 마감(빈 목록 포함) + 어제 것
   uploadPending: boolean, // 서버가 최신 전체를 다 걸었는지 모른다: 같아도 다시 보낸다
-  backQueue: Array<{ date: string, by: string, undo: boolean }>, // 최대 20, 오래된 것이 앞
+  backQueue: Array<{ date: string, by: string, undo: boolean, atMs: number, departAt: string|null }>, // 최대 20, 오래된 것이 앞. atMs·departAt 은 기기에만(다르게 정한 것 25)
+  confirmed: Array<{ date: string, by: string, atMs: number, departAt: string|null }>, // 서버가 recorded: true 로 받은 확인, 최대 20(다르게 정한 것 25)
   state: 'ON' | 'REPLACED',
 }
 ```
@@ -507,7 +508,7 @@ test('pruneBackQueue: 어제보다 앞 날짜를 버리고 20개를 넘지 않�
     - `ensureRegistered({ stay }) → Promise<{ ok: true, watchId } | { ok: false, reason: 'LOGIN_REQUIRED'|'RATE_LIMITED'|'OFF'|'UNAVAILABLE' }>`
     - `retire() → Promise<{ ok: true, pending: boolean } | { ok: false, reason: 'LOGIN_REQUIRED'|'UNAVAILABLE' }>` (작업 7 검토 반영)
     - `removeAll() → Promise<{ ok: true, deleted: number } | { ok: false, reason: 'LOGIN_REQUIRED'|'RATE_LIMITED'|'UNAVAILABLE' }>`
-    - `pressBack({ date, by }) → void`, `undoBack({ date, by }) → void`
+    - `pressBack({ date, by, departAt }) → void`(`departAt`은 누른 외출의 출발, 시트의 지난 마감 경로는 `null`), `undoBack({ date, by }) → void`
     - `backStatus({ date, by }) → { phase, undoUntilMs } | null`
     - `subscribe(listener) → () => void`
   - `getWatchSync()`(`lib/trip/client.js`, 서버 렌더링 중 `null`)
