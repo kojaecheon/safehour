@@ -14,6 +14,12 @@
 //   5. 복사·공유(navigator.share 가 있으면), guardianShare{보낸 시각, 일정 지문}을 저장한다.
 //   6. 보낸 뒤 일정이 바뀌면 '보호자 링크 다시 보내기'를 안내한다(useGuardianResendNeeded).
 //
+// 서버 알림 선택 항목 (docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 8, 규칙은 ./serverPush.js)
+//   - 공유 동의 체크 아래에 체크 하나와 동의 목록, 법률 검토 안내 줄(conditions.consentLegalReview)을 둔다. 배지는 없다(D12).
+//   - 서버 알림 스위치가 꺼져 있거나 출국일이 지났으면 항목이 숨고 화면은 예전과 같다. 숨어 있으면 지켜보기를 건드리지 않는다.
+//   - 만들기를 누르면 검증 뒤, 스냅샷을 만들기 전에 지켜보기를 켜거나(ensureRegistered) 끈다(retire). 등록이 실패해도 링크는
+//     만들고(D6) 결과 줄에 이유 하나를 보인다. 스냅샷에는 켜진 지켜보기의 watchId 만 싣는다.
+//
 // 보기 전용(로그인 안 함·만료·오프라인)에서는 만들기를 막는다(docs/platform/IA_AND_FLOWS.md '보기 전용 상태': 공유 차단).
 // PIN 은 화면 상태에만 잠시 있고, 링크를 만든 뒤 바로 지운다. 저장하거나 기록하지 않는다.
 
@@ -21,6 +27,8 @@ import { useId, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
 import { Button, EmptyState, Icon, TopBar, useStoreStatus, shouldShowReadOnly } from '@/components/ui/index.js';
 import { getStore } from '@/lib/store/index.js';
+import { getWatchSync } from '@/lib/trip/client.js';
+import { useGuardianWatch, useServerPushConfig } from '@/lib/trip/useWatch.js';
 import {
   GUARDIAN_ERROR,
   GUARDIAN_LINK_BUDGET_CHARS,
@@ -36,6 +44,14 @@ import { dateLabel, kstClock, kstDate } from './errorView.js';
 import { ErrorText, WarningNote } from './Feedback.js';
 import { useGuardianResendNeeded, useHydrated, useStoreRecord } from './hooks.js';
 import SafetyNote from './SafetyNote.js';
+import {
+  SERVER_PUSH_ACTION,
+  SERVER_PUSH_CONSENT_KEYS,
+  serverPushInitialChecked,
+  serverPushOptionVisible,
+  serverPushResultKeys,
+  serverPushSubmitPlan,
+} from './serverPush.js';
 import { buildShareSnapshot, shareRecordFor } from './share.js';
 
 const readStay = (store) => store.readStay();
@@ -128,6 +144,8 @@ function LinkResult({ result, onNewLink, headingRef }) {
   const [feedback, setFeedback] = useState(null);
   const canShare = hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   const expires = kstLabel(result.expiresAt, locale);
+  // 서버 알림 결과 줄: 체크해 등록을 시도했을 때만 있다
+  const pushKeys = serverPushResultKeys(result.serverPush ?? null);
 
   async function copyLink() {
     try {
@@ -194,6 +212,13 @@ function LinkResult({ result, onNewLink, headingRef }) {
       <p className="guardian-feedback" role="status">
         {feedback ? t(feedback) : ''}
       </p>
+      {pushKeys.length > 0 && (
+        <div className="guardian-push-result" role="status">
+          {pushKeys.map((key) => (
+            <p key={key}>{t(key)}</p>
+          ))}
+        </div>
+      )}
       {result.overBudget && <WarningNote>{t('guardian.longLink', { n: result.linkChars })}</WarningNote>}
       <CoverageNote view={result.coverage} />
       <p className="guardian-pin-reminder">{t('guardian.pinReminder')}</p>
@@ -215,12 +240,49 @@ function previewCoverage(stay, tripPlan, locale) {
   }
 }
 
+/** 오늘(KST) 날짜 */
+function todayKst() {
+  return kstDate(Date.now());
+}
+
+/**
+ * 링크를 만들기 전에 서버 알림 지켜보기를 켜거나 끈다. 던지지 않는다.
+ * @returns {Promise<{ watchId: string|null, serverPush: null | { ok: true } | { ok: false, reason: string } }>}
+ *   serverPush: 등록을 시도했을 때만 그 결과(결과 줄), 아니면 null
+ */
+async function applyServerPush(plan, stay) {
+  const sync = getWatchSync();
+  if (plan.action === SERVER_PUSH_ACTION.REGISTER) {
+    let registered;
+    try {
+      registered = sync ? await sync.ensureRegistered({ stay }) : null;
+    } catch {
+      registered = null;
+    }
+    if (registered?.ok === true) return { watchId: registered.watchId, serverPush: { ok: true } };
+    return { watchId: null, serverPush: { ok: false, reason: registered?.reason ?? 'UNAVAILABLE' } };
+  }
+  if (plan.action === SERVER_PUSH_ACTION.RETIRE) {
+    try {
+      await sync?.retire();
+    } catch {
+      // 실행기는 던지지 않는 것이 약속이다. 남은 서버 삭제는 저장소가 다음 온라인·앱 열기에 다시 보낸다
+    }
+  }
+  return { watchId: plan.watchId, serverPush: null };
+}
+
 function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consentHeadingRef }) {
   const { t, locale } = useLang();
   const coverage = previewCoverage(stay, tripPlan, locale);
+  const pushConfig = useServerPushConfig();
+  const watch = useGuardianWatch();
+  const pushVisible = serverPushOptionVisible({ enabled: pushConfig.enabled, departureDate: stay?.departure?.date, today: todayKst() });
   const ids = {
     consent: useId(),
     consentError: useId(),
+    push: useId(),
+    pushDetails: useId(),
     pin: useId(),
     pinHint: useId(),
     pinError: useId(),
@@ -231,6 +293,8 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
   const pinRef = useRef(null);
   const pin2Ref = useRef(null);
   const [consent, setConsent] = useState(false);
+  // 처음 체크 상태는 지켜보기가 켜져(ON) 있을 때만 켜짐(다르게 정한 것 20). 이 양식이 그려질 때 한 번 정한다
+  const [pushChecked, setPushChecked] = useState(() => serverPushInitialChecked(watch.state));
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
   const [errors, setErrors] = useState({});
@@ -250,13 +314,17 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
 
     setBusy(true);
     try {
+      // 서버 알림: 항목이 보일 때만 켜거나 끈다. 등록이 실패해도 링크는 만든다(D6)
+      const pushPlan = serverPushSubmitPlan({ visible: pushVisible, checked: pushChecked, state: watch.state, watchId: watch.watchId });
+      const push = await applyServerPush(pushPlan, stay);
       const origin = window.location.origin;
       const nowMs = Date.now();
-      const snapshot = buildShareSnapshot({ stay, tripPlan, now: nowMs });
+      const snapshot = buildShareSnapshot({ stay, tripPlan, now: nowMs, watchId: push.watchId });
       const size = await measureGuardianLink(snapshot, { origin });
       const fragment = await encryptSnapshot(snapshot, pin);
       const link = buildGuardianLink(origin, fragment);
       const saved = getStore().writeGuardianShare(await shareRecordFor(snapshot));
+      void getWatchSync()?.kick('register');
       // PIN·동의는 이 링크로 끝난다 — 다음 링크는 다시 받는다
       setPin('');
       setPin2('');
@@ -268,6 +336,7 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
         expiresAt: snapshot.expiresAt,
         coverage: coverageView(snapshot, locale, nowMs),
         shareSaved: saved?.ok === true,
+        serverPush: push.serverPush,
       });
     } catch (err) {
       const code = err?.code;
@@ -332,6 +401,39 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
           />
         </div>
         {errors.consent && <ErrorText id={ids.consentError}>{t(errors.consent)}</ErrorText>}
+        {pushVisible && (
+          <div className="guardian-push">
+            <h3 className="guardian-list-title">{t('guardian.serverPushTitle')}</h3>
+            <div className="toggle-row guardian-consent guardian-push-check">
+              <label htmlFor={ids.push} className="label">
+                {t('guardian.serverPushCheck')}
+              </label>
+              <input
+                id={ids.push}
+                type="checkbox"
+                checked={pushChecked}
+                onChange={(e) => setPushChecked(e.target.checked)}
+                aria-describedby={ids.pushDetails}
+              />
+            </div>
+            <div>
+              <p id={ids.pushDetails} className="guardian-hint">
+                {t('guardian.serverPushIntro')}
+              </p>
+              <ul className="guardian-list guardian-push-list" role="list">
+                {SERVER_PUSH_CONSENT_KEYS.map((key) => (
+                  <li key={key}>
+                    <span className="guardian-list-icon" aria-hidden="true">
+                      <Icon name="info" size={20} />
+                    </span>
+                    <span>{t(key)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="guardian-hint">{t('conditions.consentLegalReview')}</p>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="guardian-section" aria-labelledby="guardian-pin-title">

@@ -167,6 +167,107 @@ export const messages = {
     ja: 'リンクを作成するには同意が必要です。',
     zh: '需要同意后才能创建链接。',
   },
+
+  // ── 서버 알림 선택 항목 (계획 2026-11-15 Task 8, 설계서 5.5·8.1, 다르게 정한 것 19) ──
+  // 동의 목록은 설계서 5.5 문장을 그대로 쓰고 빈칸은 설계서 11.1 확인 결과로 채웠다(콘솔 최종 확인 전, 법률 검토 전).
+  // 배지를 두지 않고 conditions.consentLegalReview 안내 줄을 함께 보인다(D12). 영어에 'check-in'을 쓰지 않는다.
+  'guardian.serverPushTitle': {
+    ko: '서버 알림 (선택)',
+    en: 'Server alerts (optional)',
+    ja: 'サーバー通知（任意）',
+    zh: '服务器提醒（可选）',
+  },
+  'guardian.serverPushCheck': {
+    ko: '서버 알림 사용: 앱이 닫혀 있어도 보호자에게 알림을 보내요',
+    en: 'Use server alerts: we send alerts to your guardian even when the app is closed',
+    ja: 'サーバー通知を使う：アプリが閉じていても付き添い者に通知を送ります',
+    zh: '使用服务器提醒：即使应用已关闭，也会向陪同者发送提醒',
+  },
+  'guardian.serverPushIntro': {
+    ko: '보호자에게 앱이 닫혀 있어도 알림을 보내려면 아래 정보를 SafeHour 서버에 보관합니다.',
+    en: 'To send alerts to your guardian even when the app is closed, we keep the information below on the SafeHour server.',
+    ja: 'アプリが閉じていても付き添い者に通知を送るため、以下の情報をSafeHourのサーバーに保管します。',
+    zh: '为了在应用关闭时也能向陪同者发送提醒，我们会将以下信息保存在SafeHour服务器上。',
+  },
+  'guardian.serverPushStored': {
+    ko: "보관하는 것: 남은 체류 기간의 날짜별 복귀 마감 시각, '돌아왔어요'를 눌렀는지 여부",
+    en: 'What we keep: your return deadline times for each remaining day of your stay, and whether you tapped “I’m back”',
+    ja: '保管するもの：残りの滞在期間の日ごとの戻り期限の時刻、「戻りました」を押したかどうか',
+    zh: '保存的内容：剩余停留期间每天的返回截止时间，以及是否点击了“我已返回”',
+  },
+  'guardian.serverPushNotStored': {
+    ko: '보관하지 않는 것: 장소, 위치, 몸 상태와 조건, 병원 정보',
+    en: 'What we do not keep: places, your location, how you feel and your conditions, hospital information',
+    ja: '保管しないもの：場所、位置情報、体調と条件、病院の情報',
+    zh: '不保存的内容：地点、位置、身体状况与条件、医院信息',
+  },
+  'guardian.serverPushDeadlineKind': {
+    ko: '복귀 마감 시각은 조건과 병원 일정으로 정해진 값입니다. 보호자에게 보내는 사본에 담기는 것과 같은 종류의 정보입니다.',
+    en: 'Return deadline times come from your conditions and hospital schedule. They are the same kind of information as the copy you send to your guardian.',
+    ja: '戻り期限の時刻は、条件と病院の予定から決まる値です。付き添い者に送るコピーに含まれるものと同じ種類の情報です。',
+    zh: '返回截止时间是根据条件和医院日程确定的。这与发送给陪同者的副本中包含的信息属于同一类。',
+  },
+  'guardian.serverPushRetention': {
+    ko: '보관 기간: 출국 7일 뒤 자동 삭제. 설정에서 언제든 지울 수 있습니다. 예약 처리 업체에 남는 알림 예약 기록은 3일 안에 지워집니다.',
+    en: 'How long we keep it: deleted automatically 7 days after departure. You can delete it in Settings at any time. Alert scheduling records left with the scheduling provider are deleted within 3 days.',
+    ja: '保管期間：出国の7日後に自動で削除します。設定からいつでも削除できます。予約処理業者に残る通知予約の記録は3日以内に削除されます。',
+    zh: '保存期限：离境7天后自动删除。您可以随时在设置中删除。预约处理服务商留存的提醒预约记录会在3天内删除。',
+  },
+  'guardian.serverPushOffline': {
+    ko: '휴대폰이 오프라인이면 바뀐 마감이 늦게 전달될 수 있습니다.',
+    en: 'If your phone is offline, changed deadlines may reach the server late.',
+    ja: 'スマートフォンがオフラインだと、変わった期限が遅れて届くことがあります。',
+    zh: '如果手机处于离线状态，变更后的截止时间可能会延迟送达。',
+  },
+  'guardian.serverPushAlertRule': {
+    ko: "마감이 지나도 '돌아왔어요'를 누르지 않으면 보호자에게 알림이 갑니다. 앱은 위치를 모르므로 실제로 돌아왔는지는 알 수 없습니다.",
+    en: 'If you do not tap “I’m back” after a deadline passes, your guardian gets an alert. The app does not know your location, so it cannot tell whether you are actually back.',
+    ja: '期限を過ぎても「戻りました」を押さないと、付き添い者に通知が届きます。アプリは位置情報を知らないため、実際に戻ったかどうかは分かりません。',
+    zh: '截止时间过后如果没有点击“我已返回”，陪同者会收到提醒。应用不知道您的位置，因此无法得知您是否真的已经返回。',
+  },
+  'guardian.serverPushLocation': {
+    ko: '저장 위치: 일본 도쿄. 알림 예약 메시지는 유럽 또는 미국에 보관됩니다.',
+    en: 'Where it is stored: Tokyo, Japan. Scheduled alert messages are kept in Europe or the United States.',
+    ja: '保存場所：日本の東京。通知の予約メッセージはヨーロッパまたはアメリカに保管されます。',
+    zh: '存储位置：日本东京。提醒预约消息保存在欧洲或美国。',
+  },
+  // 링크를 만든 뒤 결과 줄. 체크하지 않았으면 줄이 없다. 등록이 실패해도 링크는 만든다(D6)
+  'guardian.serverPushOn': {
+    ko: '서버 알림을 켰어요.',
+    en: 'Server alerts are on.',
+    ja: 'サーバー通知をオンにしました。',
+    zh: '已开启服务器提醒。',
+  },
+  'guardian.serverPushNotOn': {
+    ko: '서버 알림은 켜지 못했어요. 링크는 만들었어요.',
+    en: 'Server alerts could not be turned on. The link was still created.',
+    ja: 'サーバー通知はオンにできませんでした。リンクは作成しました。',
+    zh: '未能开启服务器提醒。链接已创建。',
+  },
+  'guardian.serverPushLogin': {
+    ko: '서버 알림은 Google 또는 카카오로 로그인해야 켤 수 있어요.',
+    en: 'To turn on server alerts, sign in with Google or Kakao.',
+    ja: 'サーバー通知をオンにするには、GoogleまたはKakaoでログインしてください。',
+    zh: '需要使用Google或Kakao登录才能开启服务器提醒。',
+  },
+  'guardian.serverPushLimit': {
+    ko: '요청이 많아 지금은 켤 수 없어요. 잠시 뒤 새 링크를 만들며 다시 시도해 주세요.',
+    en: 'There have been too many requests, so it cannot be turned on right now. Please try again later when you create a new link.',
+    ja: 'リクエストが多いため、今はオンにできません。しばらくしてから新しいリンクを作成するときにもう一度お試しください。',
+    zh: '请求过多，目前无法开启。请稍后在创建新链接时重试。',
+  },
+  'guardian.serverPushOffNow': {
+    ko: '지금은 서버 알림을 쓸 수 없어요.',
+    en: 'Server alerts are not available right now.',
+    ja: '現在、サーバー通知は使えません。',
+    zh: '目前无法使用服务器提醒。',
+  },
+  'guardian.serverPushUnavailable': {
+    ko: '연결이나 서버 상태 때문일 수 있어요. 잠시 뒤 새 링크를 만들며 다시 시도해 주세요.',
+    en: 'This may be due to your connection or the server. Please try again later when you create a new link.',
+    ja: '接続またはサーバーの状態が原因の可能性があります。しばらくしてから新しいリンクを作成するときにもう一度お試しください。',
+    zh: '可能是网络连接或服务器状态导致的。请稍后在创建新链接时重试。',
+  },
   'guardian.pinTitle': {
     ko: 'PIN 정하기',
     en: 'Set a PIN',
