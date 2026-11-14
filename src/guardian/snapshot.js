@@ -17,6 +17,7 @@
 // 순수 함수 계층이다. 네트워크·저장소·브라우저 API 를 쓰지 않는다.
 
 import { DEFAULTS, KST_OFFSET_MIN, addDays, isClockTime, isDateString, lodgingForDate, parseInstantMs, stayDates } from '../stay/index.js';
+import { patientReturnsOf } from './deadlines.js';
 import { GUARDIAN_ERROR, GuardianError } from './errors.js';
 
 export const GUARDIAN_SNAPSHOT_VERSION = 1;
@@ -228,7 +229,8 @@ function buildDay(stay, date, dayPlan) {
     escortRequired,
     // docs/business-rules.md '하루 일정 생성'의 보호자 단독 외출 조건 중 조건 쪽 세 가지: 동반 보호자 있음, 곁을 지킬 필요 없음, 동행 필수 아님
     guardianSoloAllowed: stay.hasCompanion === true && !escortRequired && !guardianMustStay,
-    patientReturn: listOf(dayPlan?.outings).map((o) => ({ by: o.returnBy, ...returnPlaceOf(o.returnPlace, lodging) })),
+    // 당겨진 외출의 마감도 지금처럼 담는다. 서버 알림 업로드만 뺀다(deadlines.js)
+    patientReturn: patientReturnsOf(dayPlan).map((r) => ({ by: r.by, ...returnPlaceOf(r.returnPlace, lodging) })),
     guardianOutings: dayPlan?.guardianOutings,
   });
 }

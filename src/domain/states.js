@@ -164,11 +164,23 @@ export const RETURN_NOW_CAUSES = Object.freeze([
 /**
  * 마감을 '지금'으로 당긴 즉시 복귀 날인가. 외출 중 재계획으로 늦어 OUTING_OVERDUE 가 켜진 날만 그렇다.
  * PATIENT_RECALLED·PLAN_REVOKED·PLAN_EXPIRED 로 켜진 날은 외출의 실제 마감(returnBy)이 그대로 남는다.
- * 쓰는 곳: lib/notify/schedule.js(마감 지남 알림 제외), components/trip/viewModel.js todayFocus(외출 중 유지).
+ * 쓰는 곳: isClampedOverdueOuting(아래), components/trip/viewModel.js todayFocus(외출 중 유지).
  * @param {object|null} day  DayPlan
  */
 export function isOverdueClampedDay(day) {
   return day?.returnNow === true && Array.isArray(day.reasons) && day.reasons.includes(REASON.OUTING_OVERDUE);
+}
+
+/**
+ * 마감이 '지금'으로 당겨진 외출인가. OUTING_OVERDUE 즉시 복귀 날(isOverdueClampedDay)의 여유 음수 외출만 그렇다.
+ * 그 외출의 returnBy 는 엔진이 당겨 놓은 값이라 실제 마감 시각이 아니다. 같은 날의 다른 외출과 다른 즉시 복귀 원인의 날은
+ * 실제 마감이 남아 있다.
+ * 쓰는 곳: lib/notify/schedule.js(마감 지남 알림 제외), src/guardian/deadlines.js(서버 알림 업로드 제외).
+ * @param {object|null} day  DayPlan
+ * @param {object|null} outing  그날의 환자 외출
+ */
+export function isClampedOverdueOuting(day, outing) {
+  return isOverdueClampedDay(day) && typeof outing?.slackMin === 'number' && outing.slackMin < 0;
 }
 
 /**
