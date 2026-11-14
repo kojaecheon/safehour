@@ -83,12 +83,16 @@ export async function sendPush(input) {
     // 시간 한도가 틀린 값이면 부르는 쪽 설정 실수다. 네트워크 실패(RETRY)로 보면 끝없이 다시 부르므로 REJECTED 로 둔다
     if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) return REJECTED();
     if (typeof fetchImpl !== 'function') return REJECTED();
-    request = { url: parsed.url.href, headers, body, fetchImpl, signal: AbortSignal.timeout(timeoutMs) };
+    request = { url: parsed.url.href, headers, body, fetchImpl, timeoutMs };
   } catch {
     // 키 형식 오류(PUSH_KEY), 본문 초과(PUSH_PAYLOAD_TOO_LARGE), 서명 실패(PUSH_VAPID). 원래 메시지는 버린다
     return REJECTED();
   }
 
+  // AbortSignal.timeout 의 타이머는 이벤트 루프를 붙잡지 않아(unref) Node 22 테스트 실행기가 기다리던 약속을 취소한다.
+  // 붙잡는 타이머로 끊고, 응답 헤더를 받으면 지운다(본문은 읽지 않는다)
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('시간 한도를 넘었습니다.', 'TimeoutError')), request.timeoutMs);
   let response;
   try {
     response = await request.fetchImpl(request.url, {
@@ -96,10 +100,12 @@ export async function sendPush(input) {
       headers: request.headers,
       body: request.body,
       redirect: 'manual',
-      signal: request.signal,
+      signal: controller.signal,
     });
   } catch {
     return result(PUSH_OUTCOME.RETRY, 'network');
+  } finally {
+    clearTimeout(timer);
   }
 
   // 응답 본문은 읽지 않는다. 연결을 놓아 주려고 버리기만 한다

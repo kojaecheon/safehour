@@ -9,6 +9,7 @@ ADR-0012(`docs/decisions/0012-server-minimal-storage-guardian-push.md`)의 서�
 - 저장소 어댑터(`kv.js`), 키 유도와 형식 정규식(`keys.js`), 구독 봉인(`seal.js`), 횟수 제한(`limits.js`)
 - 네 레코드 읽기·쓰기(`records.js`)
 - 예약 어댑터와 서명 검증(`scheduler.js`), 예약 걸기(`arm.js`), 예약 처리 판정표(`due.js`)
+- 바깥 호출 시간 한도(`timeout.js`). `AbortSignal.timeout`을 쓰지 않는다(`docs/engineering-notes.md`의 Node 22 항목)
 - 서버 푸시 문구(`text.js`)와 보호자에게 보내기(`notify.js`)
 - 환자 쪽 동작(`patient.js`), 보호자 쪽 동작(`guardian.js`)
 - 요청 본문 읽기와 허용 목록(`requests.js`), 기록 한 줄(`log.js`), 라우트 처리기(`handlers.js`)

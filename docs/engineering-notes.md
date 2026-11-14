@@ -382,3 +382,17 @@
 - **원인**: 이 기계의 `grep`은 ugrep이다. 기본 문법에서 `\|`를 글자 그대로 읽어 '또는'이 되지 않는다. 그래서 예전 명령은 늘 통과했다.
 - **대응**: perl로 검사한다. `git diff -U0 | grep '^+' | perl -CSD -ne 'print if /[\x{2013}\x{2014}]/'`의 결과가 없어야 한다.
 - **확인**: 대시가 든 줄을 일부러 넣고 위 명령이 그 줄을 출력하는지 한 번 본다.
+
+### 이 기계의 Node(26)에서 통과한 시험이 CI(Node 22)에서 취소된다
+
+- **증상**: 로컬 `npm test`는 모두 통과하는데 CI의 `quality`에서 응답을 끝없이 미루는 가짜 `fetch` 시험이
+  "Promise resolution is still pending but the event loop has already resolved"로 실패하고, 같은 파일의 뒤 시험이 줄줄이
+  `cancelledByParent`가 된다. 같은 실행에서 VAPID 키 쌍 확인이 다른 쌍을 받아들인다.
+- **원인**: 두 가지다. `AbortSignal.timeout()`의 타이머는 이벤트 루프를 붙잡지 않는다(unref). 기다리는 것이 그 타이머뿐이면
+  Node 22 테스트 실행기는 루프가 빈 것으로 보고 약속을 취소한다. 또 Node 22는 JWK(x, y, d)로 개인키를 읽을 때 공개키와
+  맞는 쌍인지 확인하지 않는다. 이 기계의 Node 26은 둘 다 다르게 동작해 로컬에서는 드러나지 않았다.
+- **대응**: 시간 한도는 `AbortController`와 붙잡는 `setTimeout`으로 걸고 끝나면 지운다(`lib/server/watch/timeout.js`의
+  `withTimeout`, `src/push/send.js`). 키 쌍은 `createECDH('prime256v1')`에 개인키를 넣어 만든 공개키와 비교한다
+  (`lib/server/watch/config.js`). CI는 `.github/workflows`의 `node-version: 22.x`다.
+- **확인**: 이 기계에는 Node 18(`/opt/homebrew/opt/node@18/bin/node`)이 있다. 바깥 호출·암호 관련 시험은
+  `/opt/homebrew/opt/node@18/bin/node --test <파일>`로도 돌려 본다(고치기 전 코드는 Node 18에서 CI와 같은 실패 1건, 취소 30건이었다).
