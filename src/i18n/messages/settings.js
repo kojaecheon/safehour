@@ -326,12 +326,13 @@ export const safety = {
     ja: 'サーバー通知は現在止まっています。その間、付き添い者にサーバー通知は届きません。',
     zh: '服务器提醒目前已暂停。在此期间，陪同者不会收到服务器提醒。',
   },
-  // 서버 알림 끄기 확인 시트 본문(화면 검토 M6). 보호자에게 알림이 가는지를 말하는 문장이다
+  // 서버 알림 끄기 확인 시트 본문(화면 검토 M6). 보호자에게 알림이 가는지를 말하는 문장이다.
+  // 서버에서 지우지 못하면 연결될 때까지 알림이 갈 수 있으므로(serverPushTurnOffPending) '지워진 뒤부터'라고 쓴다(검토 M6)
   'settings.serverPushTurnOffBody': {
-    ko: '끄면 보호자에게 서버 알림이 가지 않아요. 다시 켜려면 보호자 링크를 새로 만들어 보내야 해요.',
-    en: 'If you turn them off, your guardian will not get server alerts. To turn them on again, you need to create and send a new guardian link.',
-    ja: 'オフにすると、付き添い者にサーバー通知が届かなくなります。もう一度オンにするには、付き添い者用リンクを新しく作成して送る必要があります。',
-    zh: '关闭后，陪同者将不会收到服务器提醒。如需重新开启，需要重新创建并发送陪同者链接。',
+    ko: '끄면 서버에서 정보가 지워진 뒤부터 보호자에게 서버 알림이 가지 않아요. 다시 켜려면 보호자 링크를 새로 만들어 보내야 해요.',
+    en: 'If you turn them off, your guardian will stop getting server alerts once the information on the server is deleted. To turn them on again, you need to create and send a new guardian link.',
+    ja: 'オフにすると、サーバーの情報が削除されたあとは、付き添い者にサーバー通知が届かなくなります。もう一度オンにするには、付き添い者用リンクを新しく作成して送る必要があります。',
+    zh: '关闭后，服务器上的信息删除之后，陪同者就不会再收到服务器提醒。如需重新开启，需要重新创建并发送陪同者链接。',
   },
   // 서버 알림 끄기 결과 중 보호자에게 알림이 갈 수 있는지를 말하는 줄(계획 2026-11-15 Task 10, 작업 7 검토 반영)
   'settings.serverPushTurnOffPending': {

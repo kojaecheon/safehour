@@ -248,7 +248,7 @@ describe('문구', () => {
     assert.equal(settingsMessages['settings.serverPushTurnOffTitle'].ko, '서버 알림을 끌까요?');
     assert.equal(
       settingsSafety['settings.serverPushTurnOffBody'].ko,
-      '끄면 보호자에게 서버 알림이 가지 않아요. 다시 켜려면 보호자 링크를 새로 만들어 보내야 해요.',
+      '끄면 서버에서 정보가 지워진 뒤부터 보호자에게 서버 알림이 가지 않아요. 다시 켜려면 보호자 링크를 새로 만들어 보내야 해요.',
     );
     // 레코드가 없을 때의 예전 안내는 그대로다
     assert.equal(settingsMessages['clear.note'].ko, '체류·조건·일정은 이 기기에만 저장됩니다. 서버에는 저장되지 않습니다.');

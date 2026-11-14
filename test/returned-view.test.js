@@ -143,6 +143,23 @@ describe("복귀 시트의 '돌아왔어요'", () => {
     assert.equal(sheetShowsConfirm({ day: {}, today: '2026-10-02' }), false);
     assert.equal(sheetShowsConfirm(), false);
   });
+
+  test('열려 있는 동안 자정이 지나도 열린 날로 본다. 자정 뒤에 지난 날의 시트를 열면 두지 않는다(검토 M2)', () => {
+    const day = { date: '2026-10-02', outings: [] };
+    // 10-02 에 열린 시트는 10-03 이 되어도 닫을 때까지 둔다
+    assert.equal(sheetShowsConfirm({ day, today: '2026-10-03', openedOn: '2026-10-02' }), true);
+    assert.equal(sheetShowsConfirm({ day, today: '2026-10-02', openedOn: '2026-10-02' }), true);
+    // 10-03 에 하루 화면에서 10-02 시트를 다시 열었다
+    assert.equal(sheetShowsConfirm({ day, today: '2026-10-03', openedOn: '2026-10-03' }), false);
+    // 열린 날을 아직 잡지 못했으면(첫 그리기) 오늘로 본다
+    for (const openedOn of [null, undefined, '', '2026-10-2']) {
+      assert.equal(sheetShowsConfirm({ day, today: '2026-10-02', openedOn }), true, String(openedOn));
+      assert.equal(sheetShowsConfirm({ day, today: '2026-10-03', openedOn }), false, String(openedOn));
+    }
+    // 열린 날만 알고 오늘을 모르는 일은 없지만, 그때도 열린 날로 본다
+    assert.equal(sheetShowsConfirm({ day, today: null, openedOn: '2026-10-02' }), true);
+    assert.equal(sheetShowsConfirm({ day: null, today: '2026-10-03', openedOn: '2026-10-02' }), false);
+  });
 });
 
 describe("'전달했어요'", () => {
