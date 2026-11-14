@@ -6,8 +6,10 @@
 //   - writeGuardianWatch 는 같은 watchId 의 저장된 backQueue 를 덮지 않는다(새로 만들 때만 받은 값을 쓴다)
 //   - backQueue 20개, 서버 삭제 대기 10개 상한
 //   - 서버 삭제 대기: 지켜보기마다 하나씩 동시에 보내고, 200·404·400 은 빼고 네트워크·429·503 은 남긴다. 겹쳐 불러도 요청은 하나
-//   - 보내는 동안 들어온 항목은 같은 호출에서 한 번만 더 보낸다(실패한 항목은 같은 호출에서 다시 보내지 않는다)
-//   - 대기를 저장소에 쓰지 못해도 쓰기 토큰을 메모리에 남겨 보낸다. 내 정보 지우기는 키를 지운 뒤 대기를 쓴다
+//   - 보내는 동안 들어온 항목은 남은 것이 없을 때까지 같은 호출의 다음 차례로 보낸다(차례는 대기 상한까지, 실패한 항목은
+//     같은 호출에서 다시 보내지 않는다)
+//   - 대기를 저장소에 쓰지 못해도 쓰기 토큰을 메모리에 남겨 보낸다. 끄기는 레코드를, 내 정보 지우기는 키를 지운 뒤 대기를 쓴다
+//   - 끝난 삭제는 대기를 저장소에 다시 쓰지 못해도 이 인스턴스에서 되살아나지 않는다
 //   - 지우기 경로: 서버 알림 끄기, 내 정보 지우기, 출국 7일 뒤 자동 삭제, 체류 삭제, 민감정보 동의 철회
 //
 // 저장소는 메모리, 시계와 fetch 는 주입한다. 외부 호출은 없다.
@@ -443,7 +445,7 @@ describe('서버 삭제 대기', () => {
     assert.deepEqual(store.readPendingServerDelete(), [idsOf(5)]);
   });
 
-  test('보내는 중에 들어온 삭제는 그 호출이 끝나기 전에 한 번 더 보내고, 두 번째 차례 중에 들어온 것은 다음 호출로 넘긴다', async () => {
+  test('보내는 중에 들어온 삭제는 남은 것이 없을 때까지 같은 호출의 다음 차례로 보낸다(두 번째 차례 중에 들어온 것도)', async () => {
     const hang = new Set([idsOf(1).watchId, idsOf(2).watchId]);
     const { storage, fake, store } = setup({ deleteStatus: (watchId) => (hang.has(watchId) ? 'hang' : 200) });
     putRaw(storage, DEVICE_KEY.pendingServerDelete, [idsOf(1)]);
@@ -461,16 +463,42 @@ describe('서버 삭제 대기', () => {
     for (let i = 0; i < 20 && sent().length < 2; i += 1) await tick();
     assert.deepEqual(sent(), [idsOf(1).watchId, idsOf(2).watchId]);
 
-    // 두 번째 차례 중에 들어온 항목(3)은 이 호출에서 보내지 않는다(차례는 한 번만 더)
+    // 두 번째 차례 중에 들어온 항목(3)도 이 호출의 세 번째 차례에서 보낸다. 예전에는 차례가 한 번만 더라 다음 호출로 넘겼고,
+    // 그 사이에 끄기를 기다린 쪽(Task 7 retire)은 자기 항목의 시도를 보지 못했다
     store.writeGuardianWatch(watchRecord(3));
     store.retireGuardianWatch();
     fake.release();
-    assert.deepEqual(await awaited, { remaining: 1 });
-    assert.deepEqual(sent(), [idsOf(1).watchId, idsOf(2).watchId]);
-    assert.deepEqual(store.readPendingServerDelete(), [idsOf(3)]);
-    // 다음 호출이 보낸다
-    assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+    assert.deepEqual(await awaited, { remaining: 0 });
     assert.deepEqual(sent(), [1, 2, 3].map((n) => idsOf(n).watchId));
+    assert.deepEqual(store.readPendingServerDelete(), []);
+    // 남은 것이 없으니 다음 호출은 보내지 않는다
+    assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+    assert.equal(fake.deletes().length, 3);
+  });
+
+  test('차례는 대기 상한(10)번까지이고, 실패한 항목은 같은 호출에서 다시 보내지 않는다', async () => {
+    assert.equal(PENDING_DELETE_MAX, 10);
+    // 삭제를 보낼 때마다(응답 전에) 다른 지켜보기 하나가 꺼져 대기에 들어온다(끝없이 들어오는 경우). 삭제는 모두 503 으로 실패한다
+    const { fake, store } = setup();
+    let next = 2;
+    fake.deleteStatus = () => {
+      queueMicrotask(() => {
+        store.writeGuardianWatch(watchRecord(next));
+        store.retireGuardianWatch();
+        next += 1;
+      });
+      return 503;
+    };
+    store.writeGuardianWatch(watchRecord(1));
+    store.retireGuardianWatch();
+    const result = await store.retryPendingServerDelete();
+    const sentIds = fake.deletes().map((c) => c.body.watchId);
+    // 10차례에 하나씩: 1 ~ 10 을 한 번씩 보냈다. 열 번째 차례 중에 들어온 11 은 다음 호출로 넘긴다
+    assert.deepEqual(sentIds, Array.from({ length: 10 }, (_, i) => idsOf(i + 1).watchId));
+    assert.equal(new Set(sentIds).size, sentIds.length, '같은 호출에서 같은 항목을 두 번 보내지 않는다');
+    // 대기는 10개 상한이라 가장 오래된 1 은 버렸다(서버 TTL 에 맡긴다)
+    assert.deepEqual(store.readPendingServerDelete(), Array.from({ length: 10 }, (_, i) => idsOf(i + 2)));
+    assert.deepEqual(result, { remaining: 10 });
   });
 
   test('온라인 복귀와 앱 열기가 대기를 다시 보낸다', async () => {
@@ -554,6 +582,60 @@ describe('삭제 대기 쓰기 실패', () => {
       assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
       assert.equal(fake.deletes().length, count, '끝난 것은 다시 보내지 않는다');
     }
+  });
+
+  test('서버 알림 끄기: 레코드를 먼저 지우고 대기를 쓴다(저장 공간이 꽉 차도 쓰기 토큰이 저장소에 남는다)', async () => {
+    const storage = quotaStorage();
+    const clock = { ms: T0 };
+    const fake = fakeFetch({ deleteStatus: () => 'network' });
+    const store = makeStore({ storage, clock, fake });
+    signIn(store, clock);
+    store.writeGuardianWatch(watchRecord(1));
+    // 지금 쓴 만큼이 끝: 새 키를 하나도 더 쓸 수 없다
+    storage.capacity = storage.used();
+    assert.throws(() => storage.setItem(DEVICE_KEY.pendingServerDelete, '[]'));
+
+    assert.deepEqual(store.retireGuardianWatch(), { ok: true });
+    assert.equal(store.readGuardianWatch(), null);
+    // 예전에는 대기를 먼저 쓰려다 실패해 쓰기 토큰이 메모리에만 남았다(새로 고치면 서버 기록을 지울 길이 없다)
+    const raw = storage.getItem(DEVICE_KEY.pendingServerDelete);
+    assert.ok(raw !== null, '지운 레코드 자리에 대기가 들어갔다');
+    assert.deepEqual(JSON.parse(raw).data, [idsOf(1)]);
+    assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 1 });
+    // 새로 고친 뒤(새 인스턴스)에도 대기가 남아 다시 보낸다
+    fake.deleteStatus = () => 200;
+    const reopened = makeStore({ storage, clock, fake });
+    assert.deepEqual(reopened.readPendingServerDelete(), [idsOf(1)]);
+    assert.deepEqual(await reopened.retryPendingServerDelete(), { remaining: 0 });
+  });
+
+  test('끝난 삭제는 대기를 저장소에 다시 쓰지 못해도 되살아나지 않는다(이 인스턴스가 끝난 항목을 기억한다)', async () => {
+    let blocked = false;
+    const storage = throwingStorage((key) => blocked && key === DEVICE_KEY.pendingServerDelete);
+    const clock = { ms: T0 };
+    const byWatchId = new Map([[idsOf(1).watchId, 200], [idsOf(2).watchId, 503]]);
+    const fake = fakeFetch({ deleteStatus: (watchId) => byWatchId.get(watchId) });
+    const store = makeStore({ storage, clock, fake });
+    signIn(store, clock);
+    putRaw(storage, DEVICE_KEY.pendingServerDelete, [idsOf(1), idsOf(2)]);
+    blocked = true;
+
+    assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 1 });
+    // 저장소에는 예전 목록이 그대로다(쓰지 못했다). 끝난 1 은 읽을 때 빠지고, 남은 2 는 메모리에서도 지킨다
+    assert.deepEqual(JSON.parse(storage.getItem(DEVICE_KEY.pendingServerDelete)).data, [idsOf(1), idsOf(2)]);
+    assert.deepEqual(store.readPendingServerDelete(), [idsOf(2)]);
+    // 다음 호출은 남은 2 만 보낸다(예전에는 1 이 되살아나 다시 보냈다)
+    await store.retryPendingServerDelete();
+    assert.deepEqual(fake.deletes().map((c) => c.body.watchId), [1, 2, 2].map((n) => idsOf(n).watchId));
+    // 새 항목은 그대로 대기에 들어간다
+    store.writeGuardianWatch(watchRecord(3));
+    store.retireGuardianWatch();
+    assert.deepEqual(store.readPendingServerDelete(), [idsOf(2), idsOf(3)]);
+    await store.retryPendingServerDelete();
+    byWatchId.set(idsOf(2).watchId, 200);
+    byWatchId.set(idsOf(3).watchId, 200);
+    assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+    assert.deepEqual(store.readPendingServerDelete(), []);
   });
 
   test('내 정보 지우기: 지켜보기 식별 값을 먼저 모으고, 키를 지운 뒤 대기를 쓴다(저장 공간이 꽉 차도 저장소에 남는다)', async () => {
