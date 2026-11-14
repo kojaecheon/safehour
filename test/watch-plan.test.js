@@ -7,13 +7,14 @@
 //   - 출국일이 오늘보다 앞이면(일찍 귀국) 오늘 이후로 올린 날짜가 남았을 때만 expiresOn 을 오늘로, 오늘의 지난 시각만 보낸다
 //   - D1: 지난 마감은 일정에서 빠져도 남기고, 지나지 않은 마감은 일정에 없으면 뺀다
 //   - 오늘 지난 마감은 고정이다: 올린 적 없는 지난 시각은 새로 올리지 않는다(다르게 정한 것 24)
-//   - D1 보강: 묶인 외출(isHeldOuting: 당겨진 외출, 당김이 풀린 외출, 올린 적 없는 지난 마감)이 있는 오늘은 마지막으로 올린
-//     시각을 지금 이후 것까지 모두 남긴다
+//   - 오늘 목록 = 고정된 지난 시각 + 묶이지 않은 외출의 지금 마감(지금 이후) + 묶인 외출(isHeldOuting: 당겨진 외출, 당김이 풀린
+//     외출, 출발 시각에 고정된 마감, 올린 적 없는 지난 마감)의 원래 마감. 그 밖의 지나지 않은 올린 시각은 남기지 않는다
+//   - 원래 마감: 마지막으로 올린 시각 중 출발보다 늦고 다음 외출의 출발보다 이르며 묶이지 않은 다른 외출의 마감이 아닌 가장 이른 것
 //   - D2: 당겨진 외출의 마감은 새로 올리지 않는다. 다른 즉시 복귀 원인의 날은 실제 마감을 올린다
 //   - nextLastUploaded 는 서버가 가진 것과 같다: 보낸 날짜(지운 날짜 빼고)와 어제만 남긴다(자정 뒤에도 by 를 찾는다)
-//   - 체류나 일정의 날짜를 읽지 못하면 올리지 않는다
-//   - 하루 10개 상한: 지난 시각부터 이른 순으로, 그래도 넘으면 늦은 시각부터 뺀다
-//   - '돌아왔어요' 대상: 출발 전 없음, 경우 1 은 passedBy, 평소는 returnBy, 묶인 외출은 출발 이후 가장 이른 올린 시각
+//   - 체류의 날짜를 읽지 못하면 올리지 않는다. 일정의 날짜를 읽지 못하면 일찍 귀국한 체류의 줄이기만 한다
+//   - 하루 10개 상한: 지금 마감을 먼저(그것만 넘으면 이른 10개), 다음 원래 마감, 남은 자리는 최근 지난 시각
+//   - '돌아왔어요' 대상: 출발 전 없음, 경우 1 은 passedBy, 평소는 returnBy, 묶인 외출은 원래 마감(업로드와 같은 시각)
 //   - 되돌리기 마감 = 마감 + serverPushGraceMin 분 - serverPushEarlyToleranceSec 초
 //
 // 시각은 모두 오프셋이 있는 문자열로 만든다. 기기 시간대와 벽시계를 읽지 않는다. 외부 호출은 없다.
@@ -137,8 +138,10 @@ describe('buildUploadState', () => {
       assert.deepEqual(todayDeadlines(build('15:45', ['14:30', '16:30'])), ['14:30', '15:45'], reason);
       // 이미 올린 지난 실제 마감도 그대로 올린다
       assert.deepEqual(todayDeadlines(build('14:45', ['14:30', '14:45', '16:30'])), ['14:30', '14:45'], reason);
-      // 올린 적 없는 지난 마감은 새로 올리지 않는다(묶인 외출이라 올린 시각을 모두 남긴다)
-      assert.deepEqual(todayDeadlines(build('14:45', ['14:30', '16:30'])), ['14:30', '16:30'], reason);
+      // 올린 적 없는 지난 마감(14:45)은 새로 올리지 않는다. 묶인 외출의 원래 마감은 출발(13:00) 뒤 가장 이른 올린 시각 14:30 이고,
+      // 원래 마감이 아닌 지나지 않은 16:30 은 남기지 않는다. 예전 규칙(묶인 외출이 있는 날은 올린 시각을 모두 남김)에서는
+      // ['14:30', '16:30'] 이었다
+      assert.deepEqual(todayDeadlines(build('14:45', ['14:30', '16:30'])), ['14:30'], reason);
     }
   });
 
@@ -281,11 +284,14 @@ describe('backTargetOf', () => {
     assert.equal(backTargetOf({ day, outing: { ...o1, returnBy: null }, lastUploaded: {}, nowMs: NOW }), null);
   });
 
-  test('backTargetOf 경우 2: 출발 이후 가장 이른 올린 시각(미래여도), 다른 외출의 지금 마감은 뺀다, 없으면 null', () => {
+  test('backTargetOf 경우 2: 출발 뒤 다음 외출의 출발 전 가장 이른 올린 시각(미래여도), 다른 외출의 지금 마감은 뺀다, 없으면 null', () => {
+    // 다음 외출의 출발(17:00)이 찾는 범위의 끝이다(다르게 정한 것 24). 예전 시험은 다음 외출이 15:30 에 출발했고 그 뒤 시각도
+    // 찾았다. 다음 외출의 출발 뒤 시각은 그 외출의 마감일 수 있어 범위를 두었으므로, 시험의 시각이 범위 안에 들도록 o3 을
+    // 17:00 출발로 옮기고, '다른 외출의 지금 마감'은 같은 창의 마감(16:00)을 그대로 가진 앞 외출 o1 로 본다
     const day = returnNowDay(TODAY, REASON.OUTING_OVERDUE, [
-      patientOuting({ id: 'o1', departAt: '09:00', returnBy: '11:00', slackMin: 10 }),
+      patientOuting({ id: 'o1', departAt: '09:00', returnBy: '16:00', slackMin: 10 }),
       patientOuting({ id: 'o2', departAt: '13:00', returnBy: '15:00', slackMin: -20 }),
-      patientOuting({ id: 'o3', departAt: '15:30', returnBy: '16:00', slackMin: 30 }),
+      patientOuting({ id: 'o3', departAt: '17:00', returnBy: '18:00', slackMin: 30 }),
     ]);
     const clamped = day.outings[1];
     const target = (times, nowMs = NOW) => backTargetOf({ day, outing: clamped, lastUploaded: { [TODAY]: times }, nowMs });
@@ -300,6 +306,9 @@ describe('backTargetOf', () => {
     assert.deepEqual(target(['11:00', '16:00', '16:30']), { date: TODAY, by: '16:30' });
     // 당겨진 외출 자신의 지금 마감(15:00)은 다른 외출의 마감이 아니라 빼지 않는다
     assert.deepEqual(target(['15:00']), { date: TODAY, by: '15:00' });
+    // 다음 외출의 출발(17:00)과 같거나 늦은 시각은 그 외출의 마감일 수 있어 보지 않는다
+    assert.equal(target(['11:00', '17:00', '18:30']), null);
+    assert.deepEqual(target(['16:59', '17:00']), { date: TODAY, by: '16:59' });
     // 없으면 null
     assert.equal(target(['11:00', '16:00']), null);
     assert.equal(target([]), null);
@@ -316,9 +325,10 @@ describe('backTargetOf', () => {
       { date: TODAY, by: '14:00' },
     );
 
-    // 자정 뒤에도 외출이 속한 날의 올린 시각에서 찾는다
+    // 자정 뒤에도 외출이 속한 날의 올린 시각에서 찾는다(다음 외출이 없는 하루라 23:55 까지 범위다)
+    const lastOuting = returnNowDay(TODAY, REASON.OUTING_OVERDUE, [day.outings[0], clamped]);
     const afterMidnight = backTargetOf({
-      day,
+      day: lastOuting,
       outing: clamped,
       lastUploaded: { [TODAY]: ['23:55'], '2026-11-21': ['13:30'] },
       nowMs: at('2026-11-21T00:05:00+09:00'),
@@ -326,7 +336,7 @@ describe('backTargetOf', () => {
     assert.deepEqual(afterMidnight, { date: TODAY, by: '23:55' });
   });
 
-  test('경우 2: 원래 마감이 아직 미래여도 당겨진 날에는 올린 시각을 모두 남긴다 (D1 보강)', () => {
+  test('경우 2: 원래 마감이 아직 미래여도 남기고, 일정에서 빠진 외출의 지나지 않은 마감은 남기지 않는다', () => {
     // 13:00 에 나가 원래 16:30 까지 돌아와야 하는 외출이 늦을 것 같아 마감이 지금으로 당겨졌다
     const outings = [
       patientOuting({ id: 'o1', departAt: '13:00', returnBy: '15:00', slackMin: -20 }),
@@ -336,8 +346,10 @@ describe('backTargetOf', () => {
     const lastUploaded = { [TODAY]: ['12:30', '16:30', '20:00'], '2026-11-21': ['10:00'] };
     const day = returnNowDay(TODAY, REASON.OUTING_OVERDUE, outings);
     const state = buildUploadState({ stay: stayOf(), tripPlan: planOf({ [TODAY]: day }), lastUploaded, nowMs: NOW });
-    // 원래 마감 16:30(미래)과 일정에서 빠진 외출의 마감 20:00(미래)도 남는다. 당겨진 15:00 은 올리지 않는다
-    assert.deepEqual(todayDeadlines(state), ['12:30', '16:30', '19:00', '20:00']);
+    // 원래 마감 16:30(미래, 다음 외출 출발 17:00 전)은 남는다. 당겨진 15:00 은 올리지 않는다.
+    // 일정에서 빠진 외출의 마감 20:00(미래)은 원래 마감이 아니라 남기지 않는다(남기면 확인 버튼 없는 거짓 알림이 간다).
+    // 예전 규칙(묶인 외출이 있는 날은 올린 시각을 모두 남김)에서는 20:00 도 남았다
+    assert.deepEqual(todayDeadlines(state), ['12:30', '16:30', '19:00']);
     // 다음 날은 당겨진 날이 아니라 지나지 않은 시각은 일정에 없으면 빠진다
     assert.deepEqual(state.days.find((d) => d.date === '2026-11-21').deadlines, []);
     // '돌아왔어요' 대상은 서버에 남아 있는 원래 마감이다
@@ -419,6 +431,155 @@ describe('묶인 외출과 오늘 지난 마감 고정 (다르게 정한 것 24)
     // 마감 전에 등록했다면 그 마감을 올린다
     const early = buildUploadState({ stay: stayOf(), tripPlan: planOf({ [TODAY]: day }), lastUploaded: {}, nowMs: at('2026-11-20T14:00:00+09:00') });
     assert.deepEqual(todayDeadlines(early), ['14:30', '19:00']);
+  });
+});
+
+describe('오늘 목록 좁히기와 하루 10개 상한 (다르게 정한 것 24, 재검토 반영)', () => {
+  /** 올린 뒤 서버가 가진 것으로 다음 상태를 만든다(서버 모형: 보낸 목록이 그 날짜 목록을 통째로 바꾼다) */
+  const recordAfter = (state) => ({
+    watchId: 'AbCdEfGhIjKlMnOpQrSt_-',
+    writeToken: 'T'.repeat(43),
+    expiresOn: state.expiresOn,
+    lastUploaded: state.nextLastUploaded,
+    uploadPending: false,
+    backQueue: [],
+    state: 'ON',
+  });
+
+  test('출발 시각에 고정된 마감(정거장 0개 외출)은 당겨진 외출이다: 당김이 풀려도 원래 마감을 남기고 앞 외출의 마감을 확인하지 않는다', () => {
+    // A 는 13:00 까지 돌아오는 마감을 올렸고 돌아왔다. B 는 13:00 에 나가 17:00 마감을 올렸다가, 늦어 마감이 출발 시각(13:00)에
+    // 고정됐다(src/engine/dayRepair.js). 그 뒤 당김이 풀려도 B 는 13:00 을 그대로 갖는다(A 의 올린 마감과 같은 시각이다)
+    const a = patientOuting({ id: 'a', departAt: '11:00', returnBy: '13:00' });
+    const b = patientOuting({ id: 'b', departAt: '13:00', returnBy: '13:00', slackMin: -30 });
+    const lastUploaded = { [TODAY]: ['13:00', '17:00'] };
+    const clampedDay = returnNowDay(TODAY, REASON.OUTING_OVERDUE, [a, b]);
+    const releasedDay = makeDayPlan(TODAY, { outings: [a, b] });
+    for (const [name, day] of [['당겨진 동안', clampedDay], ['풀린 뒤', releasedDay]]) {
+      const state = buildUploadState({ stay: stayOf(), tripPlan: planOf({ [TODAY]: day }), lastUploaded, nowMs: NOW });
+      assert.equal(isHeldOuting({ day, outing: b, lastUploaded, nowMs: NOW }), true, name);
+      assert.equal(isHeldOuting({ day, outing: a, lastUploaded, nowMs: NOW }), false, name);
+      // 원래 마감 17:00 이 남는다. 예전에는 풀린 뒤 ['13:00'] 이었고 B 의 '돌아왔어요'가 A 의 13:00 을 확인했다
+      assert.deepEqual(todayDeadlines(state), ['13:00', '17:00'], name);
+      assert.deepEqual(backTargetOf({ day, outing: b, lastUploaded, nowMs: NOW }), { date: TODAY, by: '17:00' }, name);
+      assert.deepEqual(backTargetOf({ day, outing: a, lastUploaded, nowMs: NOW }), { date: TODAY, by: '13:00' }, name);
+    }
+    // 출발 전이면 출발 시각과 같은 마감은 아직 묶인 것이 아니다(지금 마감으로 올린다)
+    const notYet = makeDayPlan(TODAY, { outings: [patientOuting({ id: 'c', departAt: '16:00', returnBy: '16:00', slackMin: -5 })] });
+    assert.equal(isHeldOuting({ day: notYet, outing: notYet.outings[0], lastUploaded: {}, nowMs: NOW }), false);
+
+    // 마감이 예상 귀가보다 이른 외출(isPulledDeadlineOuting)도 당김이 풀린 날에 묶인 외출이다
+    const pulled = makeDayPlan(TODAY, {
+      outings: [patientOuting({ id: 'p', departAt: '13:00', returnBy: '14:00', plannedReturnAt: '16:10', slackMin: -20 })],
+    });
+    const pulledUploaded = { [TODAY]: ['12:00', '16:30'] };
+    assert.equal(isHeldOuting({ day: pulled, outing: pulled.outings[0], lastUploaded: pulledUploaded, nowMs: NOW }), true);
+    assert.deepEqual(
+      todayDeadlines(buildUploadState({ stay: stayOf(), tripPlan: planOf({ [TODAY]: pulled }), lastUploaded: pulledUploaded, nowMs: NOW })),
+      ['12:00', '16:30'],
+    );
+  });
+
+  test('늦게 등록한 뒤 저녁 외출의 마감이 바뀌면 예전 마감은 다음 올리기에서 빠진다(다음 외출의 출발이 찾는 범위의 끝)', () => {
+    // 15:00 에 처음 등록: 아침 외출(10:00 출발, 12:00 마감)은 올린 적이 없어 묶여 있다. 저녁 외출은 17:00 출발 18:00 마감
+    const morning = patientOuting({ id: 'z', departAt: '10:00', returnBy: '12:00' });
+    const evening = (returnBy) => patientOuting({ id: 'e', departAt: '17:00', returnBy });
+    const tripOf = (outings) => planOf({ [TODAY]: makeDayPlan(TODAY, { outings }) });
+    const first = buildUploadState({ stay: stayOf(), tripPlan: tripOf([morning, evening('18:00')]), lastUploaded: {}, nowMs: NOW });
+    assert.deepEqual(todayDeadlines(first), ['18:00']);
+
+    // 16:30 재계획으로 저녁 마감이 17:30 으로 당겨졌다. 18:00 은 다음 외출(17:00 출발)의 출발 뒤라 아침 외출의 원래 마감이 아니다
+    const replanned = tripOf([morning, evening('17:30')]);
+    const at1630 = at('2026-11-20T16:30:00+09:00');
+    const second = buildUploadState({ stay: stayOf(), tripPlan: replanned, lastUploaded: first.nextLastUploaded, nowMs: at1630 });
+    assert.deepEqual(todayDeadlines(second), ['17:30'], '예전에는 [17:30, 18:00] 이었다(18:00 은 확인할 버튼 없는 거짓 알림)');
+    assert.equal(isSameUpload(recordAfter(first), second), false);
+    const day = replanned.days[TODAY];
+    assert.equal(isHeldOuting({ day, outing: morning, lastUploaded: second.nextLastUploaded, nowMs: at1630 }), true);
+    assert.equal(backTargetOf({ day, outing: morning, lastUploaded: second.nextLastUploaded, nowMs: at1630 }), null);
+    assert.deepEqual(
+      backTargetOf({ day, outing: day.outings[1], lastUploaded: second.nextLastUploaded, nowMs: at('2026-11-20T17:20:00+09:00') }),
+      { date: TODAY, by: '17:30' },
+    );
+    // 올린 뒤에는 같은 상태다
+    assert.equal(isSameUpload(recordAfter(second), buildUploadState({ stay: stayOf(), tripPlan: replanned, lastUploaded: second.nextLastUploaded, nowMs: at1630 })), true);
+
+    // 알고 남기는 것: 저녁 외출이 아예 빠지면 다음 외출이 없어 범위 끝이 없다. 지난 마감을 올린 적 없는 아침 외출은 그 뒤에 올린
+    // 18:00 을 원래 마감으로 본다. 기록만으로는 당김이 풀린 외출(원래 마감을 잃으면 알림을 놓친다)과 구별할 수 없어 남기고,
+    // 아침 외출의 '돌아왔어요'가 그 시각을 확인한다
+    const removed = tripOf([morning]);
+    const at1600 = at('2026-11-20T16:00:00+09:00');
+    const third = buildUploadState({ stay: stayOf(), tripPlan: removed, lastUploaded: first.nextLastUploaded, nowMs: at1600 });
+    assert.deepEqual(todayDeadlines(third), ['18:00']);
+    assert.deepEqual(backTargetOf({ day: removed.days[TODAY], outing: morning, lastUploaded: third.nextLastUploaded, nowMs: at1600 }), { date: TODAY, by: '18:00' });
+  });
+
+  test('묶인 외출이 있는 날의 하루 10개 상한은 지금 마감을 먼저 지키고, 다음은 원래 마감, 남은 자리는 최근 지난 시각이다', () => {
+    // 14:00 에 나간 외출의 마감이 당겨졌다(원래 15:20, 다음 외출은 15:30 출발). 지금 마감은 30분마다 나가는 외출의 것이다
+    const clamped = patientOuting({ id: 'c', departAt: '14:00', returnBy: '14:40', slackMin: -10 });
+    const liveOutings = (n) => Array.from({ length: n }, (_, i) => {
+      const departMin = 15 * 60 + 30 + i * 30;
+      const clock = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+      return patientOuting({ id: `l${i}`, departAt: clock(departMin), returnBy: clock(departMin + 20) });
+    });
+    const past = ['09:00', '09:30', '10:00', '10:30', '11:00'];
+    // 21:30 은 일정에서 빠진 외출의 마감이다(다음 외출의 출발 뒤라 원래 마감이 아니다)
+    const lastUploaded = { [TODAY]: [...past, '15:20', '21:30'] };
+    const build = (n) => {
+      const outings = [clamped, ...liveOutings(n)];
+      const tripPlan = planOf({ [TODAY]: returnNowDay(TODAY, REASON.OUTING_OVERDUE, outings) });
+      return { live: outings.slice(1).map((o) => o.returnBy), state: buildUploadState({ stay: stayOf(), tripPlan, lastUploaded, nowMs: NOW }), tripPlan };
+    };
+
+    // 지금 마감 9개 + 원래 마감 = 10: 지난 시각은 모두 빠진다
+    const nine = build(9);
+    assert.deepEqual(todayDeadlines(nine.state), ['15:20', ...nine.live]);
+    // 지금 마감 8개 + 원래 마감 + 가장 최근 지난 시각
+    const eight = build(8);
+    assert.deepEqual(todayDeadlines(eight.state), ['11:00', '15:20', ...eight.live]);
+    // 지금 마감만 10개: 원래 마감과 지난 시각이 빠진다
+    const ten = build(10);
+    assert.deepEqual(todayDeadlines(ten.state), ten.live);
+    // 지금 마감만 11개: 이른 10개
+    const eleven = build(11);
+    assert.deepEqual(todayDeadlines(eleven.state), eleven.live.slice(0, 10));
+
+    for (const { live, state, tripPlan } of [nine, eight, ten, eleven]) {
+      const sent = todayDeadlines(state);
+      assert.equal(sent.length, WATCH_UPLOAD_MAX_PER_DAY);
+      assert.ok(!sent.includes('21:30'));
+      // 지금 마감이 빠졌으면 그보다 낮은 시각(원래 마감, 지난 시각)은 남지 않는다
+      if (live.some((time) => !sent.includes(time))) assert.ok(sent.every((time) => live.includes(time)));
+      // 올린 뒤 다시 만들어도 같다(같은 업로드를 되풀이하지 않는다)
+      assert.equal(isSameUpload(recordAfter(state), buildUploadState({ stay: stayOf(), tripPlan, lastUploaded: state.nextLastUploaded, nowMs: NOW })), true);
+    }
+    // 원래 마감이 남은 동안 '돌아왔어요'는 그 시각이다
+    const nineDay = nine.tripPlan.days[TODAY];
+    assert.deepEqual(backTargetOf({ day: nineDay, outing: nineDay.outings[0], lastUploaded: nine.state.nextLastUploaded, nowMs: NOW }), { date: TODAY, by: '15:20' });
+  });
+
+  test('출국일을 줄여도 오늘 이후면 줄인 날까지만 보내고, 그 뒤 날짜는 남기지 않는다(서버가 expiresOn 으로 지운다)', () => {
+    const outingDays = ['2026-11-21', '2026-11-22', '2026-11-23', '2026-11-24'];
+    const tripPlan = planOf(Object.fromEntries(outingDays.map((date) => [date, makeDayPlan(date, { outings: [patientOuting({ departAt: '13:00', returnBy: '16:00' })] })])));
+    const before = buildUploadState({ stay: stayOf(), tripPlan, lastUploaded: {}, nowMs: at('2026-11-20T10:00:00+09:00') });
+    assert.deepEqual(before.days.map((day) => day.date), [TODAY, ...outingDays]);
+
+    const shortened = stayOf('2026-11-18', '2026-11-22');
+    const state = buildUploadState({ stay: shortened, tripPlan, lastUploaded: before.nextLastUploaded, nowMs: NOW });
+    assert.equal(state.expiresOn, '2026-11-22');
+    assert.deepEqual(state.days, [
+      { date: TODAY, deadlines: [] },
+      { date: '2026-11-21', deadlines: ['16:00'] },
+      { date: '2026-11-22', deadlines: ['16:00'] },
+    ]);
+    assert.deepEqual(Object.keys(state.nextLastUploaded).sort(), [TODAY, '2026-11-21', '2026-11-22']);
+    assert.equal(isSameUpload(recordAfter(before), state), false, '출국일이 달라 다시 올린다');
+    assert.equal(isSameUpload(recordAfter(state), buildUploadState({ stay: shortened, tripPlan, lastUploaded: state.nextLastUploaded, nowMs: NOW })), true);
+
+    // 출국일을 오늘로 줄이면 오늘 하루만 보낸다
+    const today = buildUploadState({ stay: stayOf('2026-11-18', TODAY), tripPlan, lastUploaded: before.nextLastUploaded, nowMs: NOW });
+    assert.equal(today.expiresOn, TODAY);
+    assert.deepEqual(today.days, [{ date: TODAY, deadlines: [] }]);
+    assert.deepEqual(Object.keys(today.nextLastUploaded), [TODAY]);
   });
 });
 
@@ -576,12 +737,22 @@ describe('체류가 줄거나 일찍 귀국한 경우의 남은 날짜', () => {
     assert.ok(state.days.length <= WATCH_UPLOAD_MAX_DAYS);
   });
 
-  test('일정의 날짜 목록을 읽을 수 없으면 null (빈 목록으로 서버 기록을 지우지 않는다)', () => {
+  test('일정의 날짜 목록을 읽을 수 없으면 null (빈 목록으로 서버 기록을 지우지 않는다), 일찍 귀국한 체류의 줄이기는 한다', () => {
     const lastUploaded = { [TODAY]: ['12:00', '16:30'], '2026-11-21': ['10:00', '18:00'] };
+    const shrunk = buildUploadState({ stay: stayOf('2026-11-15', YESTERDAY), tripPlan: planOf({}), lastUploaded, nowMs: NOW });
+    assert.deepEqual(shrunk.days, [{ date: TODAY, deadlines: ['12:00'] }]);
     for (const tripPlan of [null, undefined, {}, { days: null }, { days: [] }, { days: 'x' }]) {
       assert.equal(buildUploadState({ stay: stayOf(), tripPlan, lastUploaded, nowMs: NOW }), null, JSON.stringify(tripPlan));
-      assert.equal(buildUploadState({ stay: stayOf('2026-11-15', YESTERDAY), tripPlan, lastUploaded, nowMs: NOW }), null, JSON.stringify(tripPlan));
+      // 일찍 귀국은 일정을 보지 않는다: 일정을 읽지 못해도 expiresOn 을 오늘로 줄여 남은 날짜의 예약을 지운다.
+      // 예전에는 여기서도 null 이라, 일정 레코드가 깨진 기기에서는 남은 날짜의 보호자 알림이 서버에 남았다
+      assert.deepEqual(
+        buildUploadState({ stay: stayOf('2026-11-15', YESTERDAY), tripPlan, lastUploaded, nowMs: NOW }),
+        shrunk,
+        JSON.stringify(tripPlan),
+      );
     }
+    // 체류를 읽을 수 없으면 일찍 귀국이어도 null
+    assert.equal(buildUploadState({ stay: { ...stayOf('2026-11-15', YESTERDAY), arrival: { date: 'x' } }, tripPlan: null, lastUploaded, nowMs: NOW }), null);
     // 빈 일정(날짜 목록은 있음)은 읽은 것이다
     assert.notEqual(buildUploadState({ stay: stayOf(), tripPlan: planOf({}), lastUploaded, nowMs: NOW }), null);
   });
