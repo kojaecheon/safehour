@@ -235,6 +235,17 @@ describe('watchConfig', () => {
     assert.deepEqual(config.missing, []);
     assert.equal(config.ready, true);
 
+    // 섞인 경우: UPSTASH_ 주소만 있으면 토큰도 UPSTASH_ 에서 읽고, 없으면 그 이름이 빠진 것이다
+    const mixed = watchConfig({
+      ...env,
+      UPSTASH_REDIS_REST_URL: 'https://example-store.upstash.io',
+      KV_REST_API_URL: 'https://kv-store.upstash.io',
+      KV_REST_API_TOKEN: 'kv-token-value',
+    });
+    assert.equal(mixed.store, null);
+    assert.equal(mixed.ready, false);
+    assert.deepEqual(mixed.missing, ['UPSTASH_REDIS_REST_TOKEN']);
+
     // UPSTASH_ 이름이 먼저다
     const both = watchConfig({ ...FULL, KV_REST_API_URL: 'https://kv-store.upstash.io', KV_REST_API_TOKEN: 'kv-token-value' });
     assert.equal(both.store.url, FULL.UPSTASH_REDIS_REST_URL);
@@ -260,9 +271,16 @@ describe('watchConfig', () => {
     assert.deepEqual(demo.missing, []);
     assert.equal(demo.ready, true);
 
-    // Upstash 값이 있어도 메모리가 이긴다
-    const withUpstash = watchConfig({ ...FULL, SAFEHOUR_STORE_MODE: 'memory', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' });
+    // Upstash 값이 있어도 메모리가 이기고, 실제 QStash 와 짝짓지 않는다
+    const withUpstash = watchConfig({
+      ...FULL,
+      VERCEL_ENV: 'preview',
+      SAFEHOUR_STORE_MODE: 'memory',
+      SAFEHOUR_ALLOW_DEMO_LOGIN: '1',
+    });
     assert.deepEqual(withUpstash.store, { mode: 'memory' });
+    assert.equal(withUpstash.qstash, null);
+    assert.equal(withUpstash.ready, true);
 
     // 데모가 아니면 memory 를 무시한다
     const notDemo = watchConfig({ ...bare, SAFEHOUR_STORE_MODE: 'memory' });
@@ -278,9 +296,75 @@ describe('watchConfig', () => {
 
   test('testOrigin 은 데모 로그인일 때만 읽는다', () => {
     const origin = 'http://127.0.0.1:4010';
-    assert.equal(watchConfig({ ...FULL, SAFEHOUR_PUSH_TEST_ORIGIN: origin }).testOrigin, null);
-    assert.equal(watchConfig({ ...FULL, SAFEHOUR_PUSH_TEST_ORIGIN: origin, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).testOrigin, origin);
-    assert.equal(watchConfig({ ...FULL, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).testOrigin, null);
+    const preview = { ...FULL, VERCEL_ENV: 'preview' };
+    assert.equal(watchConfig({ ...preview, SAFEHOUR_PUSH_TEST_ORIGIN: origin }).testOrigin, null);
+    assert.equal(watchConfig({ ...preview, SAFEHOUR_PUSH_TEST_ORIGIN: origin, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).testOrigin, origin);
+    assert.equal(watchConfig({ ...preview, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).testOrigin, null);
+  });
+
+  test('testOrigin 은 http(s) 주소의 출처만 남긴다', () => {
+    const demo = { ...FULL, VERCEL_ENV: 'preview', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' };
+    assert.equal(watchConfig({ ...demo, SAFEHOUR_PUSH_TEST_ORIGIN: 'http://127.0.0.1:4010/' }).testOrigin, 'http://127.0.0.1:4010');
+    assert.equal(
+      watchConfig({ ...demo, SAFEHOUR_PUSH_TEST_ORIGIN: 'https://push.example.test/path?q=1' }).testOrigin,
+      'https://push.example.test',
+    );
+    assert.equal(watchConfig({ ...demo, SAFEHOUR_PUSH_TEST_ORIGIN: 'ftp://127.0.0.1' }).testOrigin, null);
+    assert.equal(watchConfig({ ...demo, SAFEHOUR_PUSH_TEST_ORIGIN: 'not a url' }).testOrigin, null);
+  });
+
+  test('운영 배포에서는 데모 로그인이 켜져 있어도 시험 장치를 듣지 않는다', () => {
+    const env = {
+      ...FULL,
+      VERCEL_ENV: 'production',
+      SAFEHOUR_ALLOW_DEMO_LOGIN: '1',
+      SAFEHOUR_STORE_MODE: 'memory',
+      SAFEHOUR_PUSH_TEST_ORIGIN: 'http://127.0.0.1:4010',
+    };
+    const config = watchConfig(env);
+    assert.equal(config.demo, true);
+    assert.equal(config.store.mode, 'upstash');
+    assert.equal(config.testOrigin, null);
+    assert.equal(config.ready, true);
+    // Upstash 값을 빼도 메모리로 넘어가지 않는다
+    const noStore = watchConfig(without(env, 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN'));
+    assert.equal(noStore.store, null);
+    assert.equal(noStore.ready, false);
+    assert.ok(noStore.missing.includes('UPSTASH_REDIS_REST_URL'));
+    // http 되부를 주소도 받지 않는다
+    assert.equal(watchConfig({ ...env, SAFEHOUR_PUBLIC_BASE_URL: 'http://localhost:3000' }).baseUrl, null);
+  });
+
+  test('VAPID 공개키와 개인키는 같은 쌍이어야 한다', () => {
+    const other = vapidPair();
+    const mismatched = watchConfig({ ...FULL, SAFEHOUR_VAPID_PRIVATE_KEY: other.privateKey });
+    assert.deepEqual(mismatched.missing, ['SAFEHOUR_VAPID_PRIVATE_KEY']);
+    assert.equal(mismatched.vapid, null);
+    assert.equal(mismatched.ready, false);
+    const zero = watchConfig({ ...FULL, SAFEHOUR_VAPID_PRIVATE_KEY: Buffer.alloc(32).toString('base64url') });
+    assert.deepEqual(zero.missing, ['SAFEHOUR_VAPID_PRIVATE_KEY']);
+    assert.equal(zero.vapid, null);
+  });
+
+  test('VAPID 키는 채움 문자 없는 base64url 로 돌려준다', () => {
+    const padded = (value) => Buffer.from(value, 'base64url').toString('base64');
+    const toUrlPadded = (value) => padded(value).replace(/\+/g, '-').replace(/\//g, '_');
+    const publicPadded = toUrlPadded(VAPID.publicKey);
+    const privatePadded = toUrlPadded(VAPID.privateKey);
+    assert.ok(publicPadded.endsWith('='), '시험 값에 채움 문자가 없다');
+    assert.ok(privatePadded.endsWith('='), '시험 값에 채움 문자가 없다');
+    const config = watchConfig({ ...FULL, SAFEHOUR_VAPID_PUBLIC_KEY: publicPadded, SAFEHOUR_VAPID_PRIVATE_KEY: privatePadded });
+    assert.deepEqual(config.missing, []);
+    assert.equal(config.vapid.publicKey, VAPID.publicKey);
+    assert.equal(config.vapid.privateKey, VAPID.privateKey);
+  });
+
+  test('소유 비밀이 세션 서명 키와 같으면 빠진 것으로 본다', () => {
+    const same = watchConfig({ ...FULL, SAFEHOUR_SESSION_SECRET: ` ${FULL.SAFEHOUR_WATCH_OWNER_SECRET} ` });
+    assert.deepEqual(same.missing, ['SAFEHOUR_WATCH_OWNER_SECRET']);
+    assert.equal(same.ownerSecret, null);
+    const different = watchConfig({ ...FULL, SAFEHOUR_SESSION_SECRET: randomBytes(48).toString('base64url') });
+    assert.deepEqual(different.missing, []);
   });
 
   test('namespace 는 VERCEL_ENV 를 따른다', () => {
@@ -318,17 +402,18 @@ describe('watchConfig', () => {
     assert.equal(none.baseUrl, null);
     assert.deepEqual(none.missing, ['SAFEHOUR_PUBLIC_BASE_URL']);
     // http 는 데모의 localhost·127.0.0.1 만
-    assert.equal(watchConfig({ ...FULL, SAFEHOUR_PUBLIC_BASE_URL: 'http://localhost:3000' }).baseUrl, null);
+    const preview = { ...FULL, VERCEL_ENV: 'preview' };
+    assert.equal(watchConfig({ ...preview, SAFEHOUR_PUBLIC_BASE_URL: 'http://localhost:3000' }).baseUrl, null);
     assert.equal(
-      watchConfig({ ...FULL, SAFEHOUR_PUBLIC_BASE_URL: 'http://localhost:3000', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).baseUrl,
+      watchConfig({ ...preview, SAFEHOUR_PUBLIC_BASE_URL: 'http://localhost:3000', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).baseUrl,
       'http://localhost:3000',
     );
     assert.equal(
-      watchConfig({ ...FULL, SAFEHOUR_PUBLIC_BASE_URL: 'http://127.0.0.1:3000', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).baseUrl,
+      watchConfig({ ...preview, SAFEHOUR_PUBLIC_BASE_URL: 'http://127.0.0.1:3000', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).baseUrl,
       'http://127.0.0.1:3000',
     );
     assert.equal(
-      watchConfig({ ...FULL, SAFEHOUR_PUBLIC_BASE_URL: 'http://example.com', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).baseUrl,
+      watchConfig({ ...preview, SAFEHOUR_PUBLIC_BASE_URL: 'http://example.com', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).baseUrl,
       null,
     );
   });

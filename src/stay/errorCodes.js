@@ -14,6 +14,7 @@ export const ERROR_CODE = Object.freeze({
   SERVER_PUSH_UNAVAILABLE: 'SAFEHOUR_SERVER_PUSH_UNAVAILABLE',
   /** 지켜보기를 찾지 못했다(없거나 권한이 맞지 않거나 만료됨) */
   WATCH_NOT_FOUND: 'SAFEHOUR_WATCH_NOT_FOUND',
+  /** 정해진 시간 안의 요청 횟수를 넘었다 */
   RATE_LIMITED: 'SAFEHOUR_RATE_LIMITED',
 });
 

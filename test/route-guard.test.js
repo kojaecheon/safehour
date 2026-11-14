@@ -28,7 +28,7 @@ function validCookie(nowMs = NOW) {
   return `other=1; ${SESSION_COOKIE}=${token}`;
 }
 
-describe('새 오류 코드 3개', () => {
+describe('새 오류 코드 7개', () => {
   test('코드와 HTTP 상태가 한곳에 정의돼 있다', () => {
     assert.deepEqual(ERROR_CODE, {
       AUTH_REQUIRED: 'SAFEHOUR_AUTH_REQUIRED',
