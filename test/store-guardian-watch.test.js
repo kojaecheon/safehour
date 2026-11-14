@@ -276,6 +276,32 @@ describe('guardianWatch 레코드', () => {
     assert.deepEqual(normalizeConfirmed(undefined), []);
   });
 
+  test('대기열 항목과 confirmed 는 누른 외출의 출발(departAt)을 형식이 맞을 때만 싣는다(없어도 항목은 남는다)', () => {
+    assert.deepEqual(normalizeBackQueue([
+      { date: '2026-10-02', by: '21:00', undo: false, atMs: T0, departAt: '12:41' },
+      { date: '2026-10-02', by: '20:00', undo: false, atMs: T0, departAt: '24:00' },
+      { date: '2026-10-02', by: '19:00', undo: false, departAt: null },
+    ]), [
+      { date: '2026-10-02', by: '21:00', undo: false, atMs: T0, departAt: '12:41' },
+      { date: '2026-10-02', by: '20:00', undo: false, atMs: T0 },
+      { date: '2026-10-02', by: '19:00', undo: false },
+    ]);
+    assert.deepEqual(normalizeConfirmed([
+      { date: '2026-10-02', by: '21:00', atMs: T0, departAt: '12:41' },
+      { date: '2026-10-02', by: '20:00', atMs: T0, departAt: 1241 },
+    ]), [
+      { date: '2026-10-02', by: '21:00', atMs: T0, departAt: '12:41' },
+      { date: '2026-10-02', by: '20:00', atMs: T0 },
+    ]);
+    // 레코드를 읽어도 남는다
+    const record = normalizeGuardianWatch(watchRecord(1, {
+      backQueue: [{ date: '2026-10-02', by: '21:00', undo: false, atMs: T0, departAt: '12:41' }],
+      confirmed: [{ date: '2026-10-02', by: '20:00', atMs: T0, departAt: '10:00' }],
+    }));
+    assert.equal(record.backQueue[0].departAt, '12:41');
+    assert.equal(record.confirmed[0].departAt, '10:00');
+  });
+
   test('writeGuardianWatch 는 쓰기 가능할 때만 되고 null 이면 지운다', () => {
     const { clock, fake, storage, store } = setup();
     const topics = [];
