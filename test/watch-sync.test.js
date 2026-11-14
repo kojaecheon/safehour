@@ -273,6 +273,8 @@ describe('등록', () => {
       confirmed: [],
       state: 'ON',
     });
+    assert.deepEqual(h.store.readPendingServerDelete(), [], '같은 계정이면 삭제 대기를 만들지 않는다');
+    assert.deepEqual(h.deletes, []);
   });
 
   test('등록: ON 이면 요청 없이 같은 watchId 를 돌려준다', async () => {
@@ -380,6 +382,52 @@ describe('등록', () => {
     assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' });
     assert.equal(h.store.readGuardianWatch(), null, '다른 계정으로 만든 지켜보기를 이 계정에 쓰지 않는다');
     assert.deepEqual(h.writes, []);
+    // 방금 만든 지켜보기는 서버 삭제 대기에 들어가고 DELETE 가 나간다(쓰기 토큰으로 인증, 계정과 상관없다)
+    const { watchId, writeToken } = h.api.calls[0].body;
+    await until(() => h.deletes.length === 1);
+    await h.store.retryPendingServerDelete();
+    assert.deepEqual(h.deletes, [{ watchId, writeToken }], '그 한 쌍만 지운다');
+    assert.deepEqual(h.store.readPendingServerDelete(), [], '지웠으면 대기에서 빠진다');
+  });
+
+  test('등록: 응답 사이에 계정이 바뀌어도 서버가 지우지 못하면 그 한 쌍이 삭제 대기에 남는다', async () => {
+    const h = harness({ deleteReply: () => json(503, { ok: false }) });
+    const gate = deferred();
+    h.api.reply('register', async () => {
+      await gate.promise;
+      return ok({});
+    });
+    const pending = h.sync.ensureRegistered({ stay: h.store.readStay() });
+    await until(() => h.api.open === 1);
+    h.store.setSession({ authenticated: true, accountKey: 'acct_watch_sync_test_0002', expiresAt: new Date(h.clock.now() + HOUR).toISOString() });
+    gate.resolve();
+    assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' });
+    const { watchId, writeToken } = h.api.calls[0].body;
+    await until(() => h.deletes.length === 1);
+    await h.store.retryPendingServerDelete();
+    assert.deepEqual(h.store.readPendingServerDelete(), [{ watchId, writeToken }], '다음 온라인·앱 열기에 다시 보낸다');
+  });
+
+  test('등록: REPLACED 다시 등록 중 계정이 바뀌면 그 watchId 를 삭제 대기에 넣지 않는다(앞 계정의 링크가 쓴다)', async () => {
+    const h = harness({ record: watchRecord({ state: 'REPLACED' }) });
+    const gate = deferred();
+    h.api.reply('register', async () => {
+      await gate.promise;
+      return ok({});
+    });
+    const pending = h.sync.ensureRegistered({ stay: h.store.readStay() });
+    await until(() => h.api.open === 1);
+    assert.equal(h.api.calls[0].body.watchId, W1.watchId, '같은 watchId 로 다시 등록한다');
+    h.store.setSession({ authenticated: true, accountKey: 'acct_watch_sync_test_0002', expiresAt: new Date(h.clock.now() + HOUR).toISOString() });
+    gate.resolve();
+    assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' });
+    await h.store.retryPendingServerDelete();
+    assert.deepEqual(h.deletes, []);
+    assert.deepEqual(h.store.readPendingServerDelete(), []);
+    // 앞 계정의 레코드는 그대로다
+    h.store.setSession({ authenticated: true, accountKey: ACCOUNT, expiresAt: new Date(h.clock.now() + HOUR).toISOString() });
+    assert.equal(h.store.readGuardianWatch().state, 'REPLACED');
+    assert.equal(h.store.readGuardianWatch().writeToken, W1.writeToken);
   });
 
   test('등록: 응답 사이에 레코드가 바뀌면 같은 계정의 켜진 지켜보기만 돌려준다(다른 계정의 id 는 돌려주지 않는다)', async () => {
@@ -400,6 +448,11 @@ describe('등록', () => {
     gate.resolve();
     assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' }, '다른 계정의 켜진 지켜보기 id 를 링크에 싣지 않는다');
     assert.equal(otherAccount.store.readGuardianWatch().watchId, W2.watchId, '그 계정의 레코드는 그대로다');
+    // 삭제 대기에는 방금 만든 지켜보기만 들어간다(그 계정의 W2 는 넣지 않는다)
+    const created = otherAccount.api.calls[0].body;
+    await until(() => otherAccount.deletes.length === 1);
+    assert.deepEqual(otherAccount.deletes, [{ watchId: created.watchId, writeToken: created.writeToken }]);
+    assert.notEqual(created.watchId, W2.watchId);
 
     // 같은 계정의 다른 탭이 먼저 켰으면 그 id 를 돌려준다
     const sameAccount = harness();
@@ -414,6 +467,10 @@ describe('등록', () => {
     sameGate.resolve();
     assert.deepEqual(await same, { ok: true, watchId: W2.watchId });
     assert.equal(sameAccount.store.readGuardianWatch().writeToken, W2.writeToken, '다른 탭의 결과를 덮지 않는다');
+    // 같은 계정이면 예전과 같다(삭제 대기를 만들지 않는다)
+    await sameAccount.store.retryPendingServerDelete();
+    assert.deepEqual(sameAccount.deletes, []);
+    assert.deepEqual(sameAccount.store.readPendingServerDelete(), []);
   });
 });
 

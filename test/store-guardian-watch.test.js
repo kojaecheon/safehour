@@ -461,6 +461,32 @@ describe('서버 삭제 대기', () => {
     assert.equal(store.readGuardianWatch().watchId, idsOf(2).watchId);
   });
 
+  test('queueServerDelete: 레코드 없는 지켜보기 한 쌍을 대기에 넣고 DELETE 를 보낸다. 보기 전용이어도 넣는다', async () => {
+    const { fake, store } = setup({ deleteStatus: () => 503 });
+    store.writeGuardianWatch(watchRecord(1));
+    assert.deepEqual(store.queueServerDelete(idsOf(5)), { ok: true });
+    assert.deepEqual(store.readPendingServerDelete(), [idsOf(5)]);
+    assert.equal(store.readGuardianWatch().watchId, idsOf(1).watchId, '이 계정의 레코드는 건드리지 않는다');
+    await store.retryPendingServerDelete();
+    assert.deepEqual(fake.deletes()[0].body, idsOf(5));
+    assert.deepEqual(store.readPendingServerDelete(), [idsOf(5)], '503 이면 남는다');
+
+    // 삭제는 쓰기 토큰으로 인증하므로 보기 전용(오프라인)이어도 넣는다
+    store.setOnline(false);
+    assert.deepEqual(store.queueServerDelete(idsOf(6)), { ok: true });
+    assert.deepEqual(store.readPendingServerDelete(), [idsOf(5), idsOf(6)]);
+
+    // 식별 값이 틀리면 넣지 않는다
+    for (const bad of [null, {}, { watchId: 'bad', writeToken: 'bad' }, { watchId: idsOf(7).watchId }]) {
+      assert.deepEqual(store.queueServerDelete(bad), { ok: false, code: STORE_ERROR.INVALID }, JSON.stringify(bad));
+    }
+    assert.deepEqual(store.readPendingServerDelete(), [idsOf(5), idsOf(6)]);
+
+    // 잠긴 인스턴스(서버 렌더링)는 아무것도 하지 않는다
+    const locked = makeStore({ storage: createMemoryStorage(), clock: { ms: T0 }, fake, locked: true });
+    assert.deepEqual(locked.queueServerDelete(idsOf(8)), { ok: false, code: STORE_ERROR.READ_ONLY });
+  });
+
   test('삭제 결과: 200·404·400 은 대기에서 빼고, 네트워크·429·503 은 남긴다', async () => {
     const statuses = { 1: 200, 2: 404, 3: 400, 4: 'network', 5: 429, 6: 503, 7: 'off' };
     const byWatchId = new Map(Object.entries(statuses).map(([n, status]) => [idsOf(Number(n)).watchId, status]));
