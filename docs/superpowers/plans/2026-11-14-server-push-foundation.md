@@ -40,6 +40,16 @@
 9. **지켜보기를 쓸 때마다 소유 집합의 만료도 늘린다**(`writeWatch`가 함께 한다). 삭제는 저장된 출국일이 아니라 어제부터 오늘 + 46일까지의 날짜를 훑는다(체류를 줄인 뒤 남은 날짜 기록까지 지운다).
 10. **오류 코드를 넷 둔다.** `SAFEHOUR_SERVER_PUSH_OFF`(503, 기능이 꺼짐), `SAFEHOUR_SERVER_PUSH_UNAVAILABLE`(503, 저장소·예약 업체 일시 장애), `SAFEHOUR_WATCH_NOT_FOUND`(404), `SAFEHOUR_RATE_LIMITED`(429).
 
+작업 5 검토(2026-11-15)를 반영해 더한 것. 작업 5 판정표와 다르면 아래가 정본이다.
+
+11. **보냄 표시(`p:`)는 두 단계다.** 권리를 얻을 때 `'1'`(보내는 중), 푸시 서비스가 받으면 `'s'`(보냄). 보내지 못한 결과(구독 없음, 한도, 구독 만료, 거절, 다시 시도)는 모두 표시를 지운다. `readDay`의 `pushed`는 `'s'`인 시각만 담고, 보내는 중인 시각은 `claimed`에 따로 담는다. '돌아왔어요'는 `'s'`일 때만 복귀 확인 알림을 보낸다. 예약 처리는 권리를 얻는 같은 배치에서 날짜 기록을 다시 읽어 확인(`c:`)·함께 있음(`m`)·마감 목록을 다시 본다(맞지 않으면 권리를 돌려놓고 해당 SKIP). 보낸 뒤에는 `'s'`를 쓰는 같은 배치에서 `c:`를 다시 읽고, 그 사이 확인이 들어왔으면 복귀 확인 알림을 예약 처리가 보낸다(`k:` 권리로 한 번만). 보낸 뒤의 저장소 실패는 던지지 않고 `SENT`로 끝낸다(이미 나갔다).
+12. **일찍 온 예약은 다시 부르게 한다.** 보낼 시각 − 30초보다 일찍 오면 `SKIP_EARLY`에 `retry: true`. '돌아왔어요' 되돌리기 마감도 보낼 시각 − 30초다. 상수 `EARLY_TOLERANCE_MS`는 `arm.js`가 내보내고 `due.js`와 `patient.js`가 함께 쓴다.
+13. **출국일 뒤 날짜의 예약은 건너뛴다.** 예약 처리는 `date > watch.expiresOn`이면 `SKIP_CHANGED`.
+14. **아무 일도 하지 않은 예약은 걸림 표시를 지운다.** `SKIP_CHANGED`(날짜 기록은 있는데 시각이 목록에 없을 때), `SKIP_MUTED`, `SKIP_NO_SUB`(미리 본 것과 보내기 결과 둘 다)는 `a:<시각>`을 지운다. 보호자가 구독하거나 '오늘 함께 있음'을 끄면 어제·오늘의 걸리지 않은 마감을 다시 건다(`armPending`, 실패는 응답을 바꾸지 않는다). 늦은 한도 안이면 지금 나간다.
+15. **하루 푸시 한도는 보낸 것만 센다.** 보내기 전에는 읽기만 해 한도를 보고(`peekRate`), `SENT`일 때만 센다(`countRate`). 세기가 실패해도 결과는 `SENT`다. 동시에 보내면 한도를 조금 넘을 수 있다.
+16. **마감 올리기 응답에 `armFailed`를 더한다.** 예약 업체 실패로 걸지 못한 마감 수다. 0보다 크면 클라이언트가 잠시 뒤 같은 전체를 다시 올린다(A-2에서 쓴다).
+17. **하루 1회 예약은 지켜보기 레코드가 없는 날짜 기록을 걸지 않는다.** 지켜보기마다 한 번만 확인하고 색인에서 뺀다.
+
 ## 공용 모양
 
 **WatchCtx**: 서비스 함수의 첫 인자. 운영에서는 작업 8의 `createWatchCtx()`가, 테스트에서는 `test/watch-fixtures.js`의 `testCtx()`가 만든다.
@@ -793,7 +803,7 @@ test('함께 있음: 마감을 다시 올려도 유지된다', async () => {});
 | `GET /api/push/config` | 없음 | 없음 | `{ ok: true, enabled, vapidPublicKey: string \| null, guardianLoginRequired }`. 꺼져 있으면 `enabled: false`, `vapidPublicKey: null` |
 | `POST /api/watch` | 환자 세션 | `{ watchId, writeToken, expiresOn }` | `{ ok: true, expiresOn }` |
 | `DELETE /api/watch` | `writeToken` 또는 세션 | `{ watchId, writeToken }` 또는 `{ all: true }`(세션 필요) | `{ ok: true }` 또는 `{ ok: true, deleted }` |
-| `PUT /api/watch/deadlines` | `writeToken`(세션이 있으면 소유자 일치도) | `{ watchId, writeToken, expiresOn, days: [{ date, deadlines: ["HH:MM"] }] }` | `{ ok: true, expiresOn }` |
+| `PUT /api/watch/deadlines` | `writeToken`(세션이 있으면 소유자 일치도) | `{ watchId, writeToken, expiresOn, days: [{ date, deadlines: ["HH:MM"] }] }` | `{ ok: true, expiresOn, armFailed }` |
 | `POST /api/watch/back` | `writeToken`(세션 불필요) | `{ watchId, writeToken, date, by, undo? }` | `{ ok: true, recorded }` |
 | `POST /api/watch/subscribe` | `watchId`(+ 보호자 세션, 설정에 따라) | `{ watchId, subscription: { endpoint, keys: { p256dh, auth } }, lang }` | `{ ok: true, subId }` |
 | `DELETE /api/watch/subscribe` | `watchId` + `subId` | `{ watchId, subId }` | `{ ok: true }` |
@@ -823,7 +833,7 @@ test('함께 있음: 마감을 다시 올려도 유지된다', async () => {});
 - `due`: 원문으로 `verifyQstashSignature`(QStash 설정이 있을 때) 또는 `Authorization` 헤더가 `Bearer <cronSecret>`과 같은지(`idMatches`) 확인한다. 둘 다 아니면 401. 인증 뒤 `cfg.store`가 없으면 200 `{ ok: true }`(할 일이 없다). `processDue`가 `retry`면 503 UNAVAILABLE, `KvError`도 503.
 - `cronArm`: `enabled`가 아니면 인증 없이 200 `{ ok: true, skipped: 'OFF' }`. 켜져 있으면 Bearer 확인(실패 401) 뒤 `armIndexedDates(ctx, [today - 1, today, today + 1])`. 어제를 넣는 것은 어제 늦은 밤 마감의 예약이 실패했을 때 늦은 한도 안이면 다시 걸기 위해서다.
 - 처리기는 `ctx`가 주입됐든 직접 만들었든 `enabled`를 `cfg.enabled`로 덮어쓴 사본을 서비스에 넘긴다(`{ ...ctx, enabled: cfg.enabled }`). 스위치 판단의 정본은 `watchConfig`다.
-- `createWatchCtx`: `keys`는 `redisKeys(cfg.namespace)`, `secret`은 `cfg.ownerSecret`, `sealKeys`·`testOrigin`은 `cfg`의 값. 저장소가 `upstash`면 `createUpstashKv`, `memory`면 `sharedMemoryKv`. 예약은 QStash 설정이 있으면 `createQstashScheduler`, 메모리 모드면 `sharedMemoryScheduler`, 둘 다 아니면 `schedule`이 늘 `{ ok: false }`인 빈 구현. 푸시는 VAPID가 있으면 `createVapidSigner`를 묶은 `sendPush`, 없으면 늘 `REJECTED`. `reviewed`는 `SAFETY_COPY_REVIEWED`.
+- `createWatchCtx`: `keys`는 `redisKeys(cfg.namespace)`, `secret`은 `cfg.ownerSecret`, `sealKeys`·`testOrigin`은 `cfg`의 값. 저장소가 `upstash`면 `createUpstashKv`, `memory`면 `sharedMemoryKv`. 예약은 QStash 설정이 있으면 `createQstashScheduler`, 메모리 모드면 `sharedMemoryScheduler`, 둘 다 아니면 `schedule`이 늘 `{ ok: false }`인 빈 구현. 푸시는 VAPID가 있으면 `createVapidSigner`를 묶은 `sendPush`, 없으면 늘 `REJECTED`. `reviewed`는 넣지 않는다(`undefined`). 문구 함수가 `safetyPair`의 기본값(이 빌드의 검수 스위치)을 쓰고, 서버 코드가 `SAFETY_COPY_REVIEWED`를 직접 들이지 않는다는 i18n 테스트를 지킨다.
 - `WATCH_ROUTE`: `push.config`, `watch.register`, `watch.remove`, `watch.deadlines`, `watch.back`, `watch.subscribe`, `watch.unsubscribe`, `watch.status`, `watch.mute`, `watch.due`, `watch.cron`.
 - 기록 한 줄: `{ evt: 'watch', route, outcome, errorCode?, ms?, counts? }`. `outcome`은 `OK`·`REJECTED`·`NOT_FOUND`·`LIMITED`·`OFF`·`FAILED`와 `DUE_OUTCOME`의 값만(닫힌 목록 밖은 `FAILED`). `errorCode`는 `/^SAFEHOUR_[A-Z_]+$/`만. `counts`는 `watches`·`armed`·`failed`·`deleted` 네 개의 음이 아닌 정수만, `push`는 `'2xx'|'404/410'|'4xx'|'5xx'|'network'`만. 그 밖의 입력은 버린다.
 - 라우트 파일은 `runtime = 'nodejs'`, `dynamic = 'force-dynamic'`을 두고 머리 주석에 요청·응답·오류를 적는다(`app/api/itinerary/plan/route.js`의 틀). 처리기는 `createWatchHandlers()`에서 꺼낸다.
@@ -907,9 +917,9 @@ test('vercel.json 의 예약은 하루 한 번이다', () => { /* crons 길이 1
 - `lib/server/AGENTS.md`: "이 계층은 아무것도 저장하지 않는다"에 예외를 적는다(`lib/server/watch/`는 ADR-0012의 네 레코드만 저장한다, 스위치가 켜졌을 때만).
 - `lib/notify/AGENTS.md`: '서버 푸시는 맡지 않는다' 문장에 "서버 푸시는 `lib/server/watch/`와 `src/push/`가 맡는다"를 잇는다.
 - `CLAUDE.md`와 `AGENTS.md`(내용 동일하게): 문서 나무에 `src/push/AGENTS.md`, `lib/server/watch/AGENTS.md` 두 줄. "서버에 데이터베이스가 없고" 문장은 그대로 둔다(결정 16). 그 문단 끝에 한 문장을 더한다: "서버 알림(ADR-0012)은 스위치가 꺼진 채 코드에만 들어와 있다. 켜지면 네 가지 레코드만 저장한다."
-- 설계서: 머리말 아래에 '구현에서 달라진 것' 절을 더해 이 계획의 '설계서와 다르게 정한 것' 일곱 가지를 옮긴다.
+- 설계서: 머리말 아래에 '구현에서 달라진 것' 절을 더해 이 계획의 '설계서와 다르게 정한 것' 열일곱 가지를 옮긴다.
 
-- [ ] **Step 1: 문서를 고친다.** 새 글에 엠대시·엔대시가 없는지 `git diff -U0 | grep '^+' | LC_ALL=C grep -n $'\xe2\x80\x94\|\xe2\x80\x93'`로 확인한다(결과가 없어야 한다).
+- [ ] **Step 1: 문서를 고친다.** 새 글에 엠대시·엔대시가 없는지 `git diff -U0 | grep '^+' | perl -CSD -ne 'print if /[\x{2013}\x{2014}]/'`로 확인한다(결과가 없어야 한다). 이 기계의 `grep`은 ugrep이라 `\|`를 글자로 읽어 예전 명령은 늘 통과했다.
 - [ ] **Step 2: `npm run lint && npm test`** (문서 링크나 문구를 고정한 테스트가 있으면 함께 본다)
 - [ ] **Step 3: 커밋한다.** `docs: 서버 알림 기반(A-1) 계약·운영·보안·구조 문서`
 
