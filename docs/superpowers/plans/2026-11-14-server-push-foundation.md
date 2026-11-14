@@ -35,7 +35,10 @@
 4. **찾는 키의 비밀은 하나.** 저장 키, `ownerHash`, 횟수 제한 키, 중복 제거 id, 푸시 Topic을 모두 `SAFEHOUR_WATCH_OWNER_SECRET`에 서로 다른 문맥 문자열을 붙여 만든다. 세션 서명 키와는 다른 비밀이다. 이 비밀을 바꾸면 기존 지켜보기를 더는 찾지 못하고 TTL로 사라진다(환자가 다시 켜야 한다).
 5. **상태 조회와 '오늘 함께 있음'은 `subId`를 함께 받는다.** 상태 조회는 `subId`를 주면 그 기기의 구독이 아직 유효한지(`subscriptionActive`)도 알려 준다. '오늘 함께 있음'은 지금 구독의 `subId`가 맞아야 바뀐다.
 6. **예약 처리 경로는 QStash 서명 또는 `CRON_SECRET` Bearer 둘 다 받는다**(설계서 5.2 그대로). 미리보기 시험과 화면 테스트는 Bearer로 직접 부른다.
-7. **오류 코드를 넷 둔다.** `SAFEHOUR_SERVER_PUSH_OFF`(503, 기능이 꺼짐), `SAFEHOUR_SERVER_PUSH_UNAVAILABLE`(503, 저장소·예약 업체 일시 장애), `SAFEHOUR_WATCH_NOT_FOUND`(404), `SAFEHOUR_RATE_LIMITED`(429).
+7. **시험 장치는 운영 배포에서 듣지 않는다.** 데모 로그인(`SAFEHOUR_ALLOW_DEMO_LOGIN=1`)은 운영에도 켜져 있으므로, 메모리 저장소·가짜 푸시 출처·`http` 기준 주소는 '데모 로그인이면서 `VERCEL_ENV`가 `production`이 아닐 때'만 듣는다(`testHooks`).
+8. **예약 중복 제거 id는 예약마다 다르게 한다.** QStash 중복 제거는 취소한 메시지에도 10분 동안 걸려, 마감을 뺐다가 곧 다시 넣으면 새 예약이 삼켜질 수 있다. 같은 마감이 두 번 나가지 않게 하는 것은 `a:` 표시와 `HSETNX` 권리가 맡는다.
+9. **지켜보기를 쓸 때마다 소유 집합의 만료도 늘린다**(`writeWatch`가 함께 한다). 삭제는 저장된 출국일이 아니라 어제부터 오늘 + 46일까지의 날짜를 훑는다(체류를 줄인 뒤 남은 날짜 기록까지 지운다).
+10. **오류 코드를 넷 둔다.** `SAFEHOUR_SERVER_PUSH_OFF`(503, 기능이 꺼짐), `SAFEHOUR_SERVER_PUSH_UNAVAILABLE`(503, 저장소·예약 업체 일시 장애), `SAFEHOUR_WATCH_NOT_FOUND`(404), `SAFEHOUR_RATE_LIMITED`(429).
 
 ## 공용 모양
 
@@ -568,7 +571,7 @@ test('결과와 예외에 토큰·주소가 없다', async () => {});
 - `tag`: `OVERDUE`·`CONFIRMED`는 `'sh-watch-' + date + '-' + time`(확인 알림이 마감 지남 알림을 갈아 끼운다), `DEVICE_CHANGED`는 `'sh-watch-device'`.
 - `pushPayload`는 `time`이 `HH:MM`이 아니거나(`DEVICE_CHANGED` 제외) 모르는 `kind`면 `null`.
 - `pushToGuardian`: 구독이 없으면 `NO_SUB`. `hitRate(ctx, 'push', watchKey)`가 거짓이면 `CAPPED`. `ctx.push.send({ subscription, payload, topic: topicOf(…) })`. 결과가 `GONE`이면 `deleteSub`. `DEVICE_CHANGED`는 `pushToSubscription`으로만 보낸다(횟수 제한 없음, 결과로 아무것도 지우지 않는다, Topic 없음).
-- `armPending`: 날짜마다 `readDay`. 각 마감 `t`에 대해 `armed[t]`가 있거나 `pushed`에 있거나 `now >= lateLimitMs(date, t)`이면 건너뛴다. 아니면 `scheduler.schedule({ body: { k: watchKey, d: date, t }, notBeforeMs: max(fireAtMs(date, t), now), dedupId: dedupIdOf(…) })`. 성공하면 `setDayField(… DAY_FIELD.armed(t), messageId)`. 실패하면 `failed`를 센다(다음 업로드나 하루 1회 예약이 다시 건다).
+- `armPending`: 날짜마다 `readDay`. 각 마감 `t`에 대해 `armed[t]`가 있거나 `pushed`에 있거나 `now >= lateLimitMs(date, t)`이면 건너뛴다. 아니면 `scheduler.schedule({ body: { k: watchKey, d: date, t }, notBeforeMs: max(fireAtMs(date, t), now), dedupId: dedupIdOf({ watchKey, date, time: t }, secret) + '.' + randomBytes(6).toString('base64url') })`. 중복 제거 id 끝에 예약마다 무작위 꼬리를 붙인다(QStash 중복 제거는 취소한 메시지에도 10분 걸려, 뺐다가 다시 넣은 마감의 새 예약이 삼켜질 수 있다). 성공하면 `setDayField(… DAY_FIELD.armed(t), messageId)`. 실패하면 `failed`를 센다(다음 업로드나 하루 1회 예약이 다시 건다).
 - `armIndexedDates`: 날짜마다 `indexMembers`. 날짜 기록이 없는 `watchKey`는 `dropIndexMember`. 있으면 `armPending`. 한 지켜보기의 오류가 나머지를 막지 않는다(`KvError`는 그대로 던진다).
 - `processDue` 판정표 (위에서부터, 처음 맞는 줄이 결과다):
 
@@ -818,14 +821,14 @@ test('함께 있음: 마감을 다시 올려도 유지된다', async () => {});
 - 보호자 세션: `cfg.guardianLoginRequired`가 참이면 `subscribe`·`status`·`mute`에 세션을 요구한다. `unsubscribe`는 요구하지 않는다.
 - `register`와 `remove({ all: true })`의 `accountKey`는 `deriveAccountKey(session, sessionSecret(env))`. `deadlines`는 세션이 있으면 `accountKey`를 넘기고 없으면 `null`.
 - `due`: 원문으로 `verifyQstashSignature`(QStash 설정이 있을 때) 또는 `Authorization` 헤더가 `Bearer <cronSecret>`과 같은지(`idMatches`) 확인한다. 둘 다 아니면 401. 인증 뒤 `cfg.store`가 없으면 200 `{ ok: true }`(할 일이 없다). `processDue`가 `retry`면 503 UNAVAILABLE, `KvError`도 503.
-- `cronArm`: `enabled`가 아니면 인증 없이 200 `{ ok: true, skipped: 'OFF' }`. 켜져 있으면 Bearer 확인(실패 401) 뒤 `armIndexedDates(ctx, [today, today + 1])`.
+- `cronArm`: `enabled`가 아니면 인증 없이 200 `{ ok: true, skipped: 'OFF' }`. 켜져 있으면 Bearer 확인(실패 401) 뒤 `armIndexedDates(ctx, [today - 1, today, today + 1])`. 어제를 넣는 것은 어제 늦은 밤 마감의 예약이 실패했을 때 늦은 한도 안이면 다시 걸기 위해서다.
 - 처리기는 `ctx`가 주입됐든 직접 만들었든 `enabled`를 `cfg.enabled`로 덮어쓴 사본을 서비스에 넘긴다(`{ ...ctx, enabled: cfg.enabled }`). 스위치 판단의 정본은 `watchConfig`다.
 - `createWatchCtx`: `keys`는 `redisKeys(cfg.namespace)`, `secret`은 `cfg.ownerSecret`, `sealKeys`·`testOrigin`은 `cfg`의 값. 저장소가 `upstash`면 `createUpstashKv`, `memory`면 `sharedMemoryKv`. 예약은 QStash 설정이 있으면 `createQstashScheduler`, 메모리 모드면 `sharedMemoryScheduler`, 둘 다 아니면 `schedule`이 늘 `{ ok: false }`인 빈 구현. 푸시는 VAPID가 있으면 `createVapidSigner`를 묶은 `sendPush`, 없으면 늘 `REJECTED`. `reviewed`는 `SAFETY_COPY_REVIEWED`.
 - `WATCH_ROUTE`: `push.config`, `watch.register`, `watch.remove`, `watch.deadlines`, `watch.back`, `watch.subscribe`, `watch.unsubscribe`, `watch.status`, `watch.mute`, `watch.due`, `watch.cron`.
 - 기록 한 줄: `{ evt: 'watch', route, outcome, errorCode?, ms?, counts? }`. `outcome`은 `OK`·`REJECTED`·`NOT_FOUND`·`LIMITED`·`OFF`·`FAILED`와 `DUE_OUTCOME`의 값만(닫힌 목록 밖은 `FAILED`). `errorCode`는 `/^SAFEHOUR_[A-Z_]+$/`만. `counts`는 `watches`·`armed`·`failed`·`deleted` 네 개의 음이 아닌 정수만, `push`는 `'2xx'|'404/410'|'4xx'|'5xx'|'network'`만. 그 밖의 입력은 버린다.
 - 라우트 파일은 `runtime = 'nodejs'`, `dynamic = 'force-dynamic'`을 두고 머리 주석에 요청·응답·오류를 적는다(`app/api/itinerary/plan/route.js`의 틀). 처리기는 `createWatchHandlers()`에서 꺼낸다.
 - `vercel.json`: `"crons": [{ "path": "/api/cron/watch-arm", "schedule": "10 15 * * *" }]`(15:10 UTC = 00:10 KST, Hobby는 최대 59분 흔들린다).
-- `lib/server/watch/AGENTS.md`: 맡는 것, 맡지 않는 것(판정, 화면, 위치), 항상 지켜야 하는 것(네 레코드 밖 필드 금지, Redis 배치는 `records.js`만 안다, 기록·예외·응답 금지 값, 모든 404는 같은 모양, 삭제 경로는 스위치와 무관, 시계 주입, 토큰 원문 저장 금지).
+- `lib/server/watch/AGENTS.md`: 맡는 것, 맡지 않는 것(판정, 화면, 위치), 항상 지켜야 하는 것(네 레코드 밖 필드 금지, Redis 배치는 `records.js`만 안다, `replaceDays`는 읽기와 쓰기가 두 번이라 클라이언트는 지켜보기 하나에 업로드를 하나씩만 보내고 늘 최신 전체를 보낸다, 기록·예외·응답 금지 값, 모든 404는 같은 모양, 삭제 경로는 스위치와 무관, 시계 주입, 토큰 원문 저장 금지).
 
 - [ ] **Step 1: `test/watch-requests.test.js`를 쓴다**
 
