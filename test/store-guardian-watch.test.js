@@ -714,6 +714,39 @@ describe('삭제 대기 쓰기 실패', () => {
     assert.deepEqual(store.readPendingServerDelete(), []);
   });
 
+  test('끝난 삭제 기억은 watchId 와 쓰기 토큰을 함께 본다(같은 watchId 의 새 토큰 항목은 막지 않는다)', async () => {
+    for (const blockAfterFirst of [false, true]) {
+      let blocked = false;
+      const storage = throwingStorage((key) => blocked && key === DEVICE_KEY.pendingServerDelete);
+      const clock = { ms: T0 };
+      const fake = fakeFetch({ deleteStatus: () => 200 });
+      const store = makeStore({ storage, clock, fake });
+      signIn(store, clock);
+      const first = idsOf(1);
+      const second = { watchId: first.watchId, writeToken: idsOf(7).writeToken };
+
+      // W1/T1 을 끄고 지웠다(끝난 항목으로 기억한다)
+      store.writeGuardianWatch(watchRecord(1));
+      store.retireGuardianWatch();
+      assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+      assert.deepEqual(fake.deletes().map((c) => c.body), [first]);
+      // 저장소에 끝난 W1/T1 이 남은 경우(대기를 다시 쓰지 못한 기기)도 본다
+      if (blockAfterFirst) {
+        putRaw(storage, DEVICE_KEY.pendingServerDelete, [first]);
+        blocked = true;
+        assert.deepEqual(store.readPendingServerDelete(), [], '끝난 W1/T1 은 읽을 때 빠진다');
+      }
+
+      // 같은 watchId 에 다른 쓰기 토큰으로 다시 켜고 끈다
+      store.writeGuardianWatch({ ...watchRecord(1), writeToken: second.writeToken });
+      store.retireGuardianWatch();
+      assert.deepEqual(store.readPendingServerDelete(), [second], String(blockAfterFirst));
+      assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+      assert.deepEqual(fake.deletes().map((c) => c.body), [first, second], 'DELETE 는 새 토큰으로 나간다');
+      assert.deepEqual(store.readPendingServerDelete(), []);
+    }
+  });
+
   test('내 정보 지우기: 지켜보기 식별 값을 먼저 모으고, 키를 지운 뒤 대기를 쓴다(저장 공간이 꽉 차도 저장소에 남는다)', async () => {
     const storage = quotaStorage();
     const clock = { ms: T0 };
