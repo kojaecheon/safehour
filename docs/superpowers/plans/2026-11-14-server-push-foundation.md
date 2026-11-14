@@ -572,8 +572,8 @@ test('결과와 예외에 토큰·주소가 없다', async () => {});
 
 | 키 | ko | en | ja | zh |
 | --- | --- | --- | --- | --- |
-| `notifications.serverCompanionOverdue` | 일행의 복귀 마감 {time}이 지났고 아직 복귀 확인이 없어요. 함께 있지 않다면 지금 연락해 보세요 | Your companion's {time} return time has passed with no check-in yet. If you're not together, contact them now | お連れの方の戻り期限{time}を過ぎましたが、まだ戻りの確認がありません。一緒にいない場合は、今すぐ連絡してみてください | 同伴的返回截止时间{time}已过，尚未收到返回确认。如果你们不在一起，请立即联系对方 |
-| `notifications.serverCompanionConfirmed` | 일행이 {time} 마감 뒤 복귀를 확인했어요 | Your companion checked in after the {time} return time | お連れの方が{time}の戻り期限のあと、戻りを確認しました | 同伴已在{time}的返回截止时间之后确认返回 |
+| `notifications.serverCompanionOverdue` | 일행의 복귀 마감 {time}이 지났고 아직 복귀 확인이 없어요. 함께 있지 않다면 지금 연락해 보세요 | Your companion's {time} return time has passed, and there's no confirmation yet that they're back. If you're not together, contact them now | お連れの方の戻り期限{time}を過ぎましたが、まだ戻りの確認がありません。一緒にいない場合は、今すぐ連絡してみてください | 同伴的返回截止时间{time}已过，尚未收到返回确认。如果你们不在一起，请立即联系对方 |
+| `notifications.serverCompanionConfirmed` | 일행이 {time} 마감 뒤 복귀를 확인했어요 | Your companion confirmed they're back after the {time} return time | お連れの方が{time}の戻り期限のあと、戻りを確認しました | 同伴已在{time}的返回截止时间之后确认返回 |
 | `notifications.serverDeviceChanged` | 알림 받는 기기가 바뀌었어요. 직접 바꾼 것이 아니라면 일행에게 알려 주세요 | Alerts now go to a different device. If you didn't change it, let your companion know | 通知を受け取る端末が変わりました。ご自身で変更していない場合は、お連れの方に知らせてください | 接收提醒的设备已更换。如果不是你本人操作，请告知同伴 |
 
   금지어 검사(`test/notify-schedule.test.js`의 `FORBIDDEN`)에 걸리는 낱말이 있으면 뜻을 지키는 범위에서 그 낱말만 바꾸고 보고에 적는다. '돌아오지 않았어요'처럼 사실을 단정하는 표현으로 바꾸지 않는다.
