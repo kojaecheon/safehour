@@ -648,3 +648,131 @@ export async function removeStayAndPlan(page) {
     localStorage.removeItem(`safehour.v2.${key}.tripPlan`);
   }, key);
 }
+
+// ── 서버 알림 대역 (ADR-0012, 계획 2026-11-15 Task 11) ─────────────────────────
+
+/** 형식에 맞는 고정 지켜보기 식별 값: watchId 22자, writeToken 43자(base64url) */
+export const WATCH_FIXTURE = Object.freeze({
+  watchId: 'e2eWatchId000000000000',
+  writeToken: `e2eWriteToken${'A'.repeat(30)}`,
+});
+
+/** 실패 응답 (docs/contracts.md '서버 알림' 오류 표). 'OFF' 는 503 꺼짐이다 */
+const WATCH_ERRORS = Object.freeze({
+  400: { status: 400, errorCode: 'SAFEHOUR_BAD_REQUEST', message: '요청 형식이 올바르지 않습니다.' },
+  401: { status: 401, errorCode: 'SAFEHOUR_AUTH_REQUIRED', message: '로그인이 필요합니다.' },
+  404: { status: 404, errorCode: 'SAFEHOUR_WATCH_NOT_FOUND', message: '서버 알림 정보를 찾을 수 없습니다.' },
+  429: { status: 429, errorCode: 'SAFEHOUR_RATE_LIMITED', message: '요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요.' },
+  503: { status: 503, errorCode: 'SAFEHOUR_SERVER_PUSH_UNAVAILABLE', message: '서버 알림을 잠시 쓸 수 없습니다.' },
+  OFF: { status: 503, errorCode: 'SAFEHOUR_SERVER_PUSH_OFF', message: '서버 알림이 꺼져 있습니다.' },
+});
+
+/** 켜진 스위치가 돌려주는 VAPID 공개 키 자리(형식만 맞춘 값. A-2 화면은 쓰지 않는다) */
+const STUB_VAPID_KEY = `B${'A'.repeat(86)}`;
+
+function isWatchRoute(url) {
+  return url.pathname === '/api/push/config' || url.pathname === '/api/watch' || url.pathname.startsWith('/api/watch/');
+}
+
+function watchReply({ method, path, body }, opts) {
+  const reply = (spec, data) => {
+    const status = typeof spec === 'object' && spec !== null ? spec.status : spec;
+    if (status === 200) return { status: 200, body: { ok: true, ...data } };
+    const error = WATCH_ERRORS[status] ?? WATCH_ERRORS[503];
+    return { status: error.status, body: { ok: false, errorCode: error.errorCode, message: error.message } };
+  };
+  if (path === '/api/push/config' && method === 'GET') {
+    return reply(200, { enabled: opts.enabled, vapidPublicKey: opts.enabled ? STUB_VAPID_KEY : null, guardianLoginRequired: true });
+  }
+  if (path === '/api/watch' && method === 'POST') return reply(opts.register, { expiresOn: body?.expiresOn });
+  if (path === '/api/watch' && method === 'DELETE') return reply(opts.remove, body?.all === true ? { deleted: opts.deleted } : {});
+  if (path === '/api/watch/deadlines' && method === 'PUT') {
+    return reply(opts.deadlines, { expiresOn: body?.expiresOn, armFailed: opts.deadlines?.armFailed ?? 0 });
+  }
+  if (path === '/api/watch/back' && method === 'POST') return reply(opts.back, { recorded: opts.back?.recorded ?? true });
+  return null;
+}
+
+/**
+ * 서버 알림 경로(GET /api/push/config, /api/watch, /api/watch/*)를 대역으로 바꾼다. e2e 서버는 스위치가 꺼진 채 돌므로
+ * 켜진 화면은 이 대역으로 본다. 응답 모양은 docs/contracts.md '서버 알림' 그대로다(성공 표의 키만, Cache-Control: no-store).
+ * 컨텍스트에 걸어 같은 컨텍스트의 다른 탭도 같은 대역을 쓴다.
+ * - 상태 값: 200(성공), 400·401·404·429·503(실패), 'OFF'(503 꺼짐). deadlines·back 은 { status, armFailed|recorded }
+ * - offline: true 면 요청을 끊는다. context.setOffline(true) 여도 route 는 요청을 받아 응답한다(실측). 오프라인 시험은 둘 다 켠다
+ * - config: 'fail' 이면 스위치 조회만 끊는다(스위치를 읽지 못한 상태)
+ * - calls 에는 응답한 요청, blocked 에는 끊은 요청을 { method, path, body } 로 쌓는다. body 는 JSON 으로 읽은 값이다
+ * @param {import('@playwright/test').Page} page
+ * @param {object} [options]
+ * @returns {Promise<{ calls: Array<{method: string, path: string, body: any}>, blocked: Array<{method: string, path: string, body: any}>,
+ *   set: (partial: object) => void, sent: (method: string, path: string) => Array<{method: string, path: string, body: any}> }>}
+ */
+export async function stubServerPush(page, options = {}) {
+  const opts = {
+    enabled: true,
+    register: 200,
+    deadlines: { status: 200, armFailed: 0 },
+    back: { status: 200, recorded: true },
+    remove: 200,
+    deleted: 1,
+    offline: false,
+    config: 'ok',
+    ...options,
+  };
+  const calls = [];
+  const blocked = [];
+  await page.context().route(isWatchRoute, (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    let body = null;
+    try {
+      body = request.postData() ? JSON.parse(request.postData()) : null;
+    } catch {
+      body = null;
+    }
+    const entry = { method: request.method(), path: url.pathname, body };
+    if (opts.offline || (url.pathname === '/api/push/config' && opts.config === 'fail')) {
+      blocked.push(entry);
+      return route.abort('internetdisconnected');
+    }
+    const reply = watchReply(entry, opts);
+    if (!reply) return route.fallback();
+    calls.push(entry);
+    return route.fulfill({
+      status: reply.status,
+      contentType: 'application/json',
+      headers: { 'Cache-Control': 'no-store' },
+      body: JSON.stringify(reply.body),
+    });
+  });
+  return {
+    calls,
+    blocked,
+    set(partial) {
+      Object.assign(opts, partial);
+    },
+    sent(method, path) {
+      return calls.filter((c) => c.method === method && c.path === path);
+    },
+  };
+}
+
+/**
+ * 이 계정의 서버 알림 지켜보기 레코드(guardianWatch)를 기기 저장소에 쓴다. null 이면 지운다.
+ * 같은 탭의 저장소는 storage 이벤트를 받지 않으므로 쓴 뒤 이동하거나 새로 고쳐야 화면에 반영된다(다른 탭은 바로 반영).
+ * @param {import('@playwright/test').Page} page
+ * @param {object|null} record lib/store/guardianWatch.js 모양
+ * @param {{accountKey?: string}} [options] 로그인하지 않은 페이지에서 쓸 때 계정 키
+ * @returns {Promise<string>} 계정 키
+ */
+export async function seedGuardianWatch(page, record, { accountKey } = {}) {
+  const key = accountKey ?? (await accountKeyOf(page));
+  await page.evaluate(
+    ({ key, record }) => {
+      const storeKey = `safehour.v2.${key}.guardianWatch`;
+      if (record === null) localStorage.removeItem(storeKey);
+      else localStorage.setItem(storeKey, JSON.stringify({ schemaVersion: 2, data: record }));
+    },
+    { key, record },
+  );
+  return key;
+}
