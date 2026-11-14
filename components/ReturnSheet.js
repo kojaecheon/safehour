@@ -18,13 +18,16 @@
 //     닫아도 저장 일정의 returnNow 는 그대로다. 오늘 화면이 '복귀 안내 다시 보기'를 계속 보인다.
 //   - 서버 알림 '돌아왔어요'(components/trip/ReturnedConfirm.js, 계획 2026-11-15 Task 9): PASSED 와 OUTING_OVERDUE 시트에만
 //     본문 아래, 장소 절 위에 둔다. 지켜보기가 켜져 있지 않으면 아무것도 그리지 않는다(스위치가 꺼져 있으면 시트는 예전과 같다).
-//     눌러도 시트를 닫지 않고 일정을 바꾸지 않는다. '확인했어요'가 닫는다.
+//     눌러도 시트를 닫지 않고 일정을 바꾸지 않는다. '확인했어요'가 닫는다. 시트의 날이 오늘(KST)일 때만 둔다: 하루 화면에서
+//     지난 날의 OUTING_OVERDUE 시트를 다시 열면 두지 않는다(returnedView.js sheetShowsConfirm, 화면 검토 M7).
 
 import Link from 'next/link';
 import { useLang } from './LanguageProvider.js';
 import { Icon, Sheet } from './ui/index.js';
 import { REASON } from '@/src/domain/states.js';
 import ReturnedConfirm from './trip/ReturnedConfirm.js';
+import { sheetShowsConfirm } from './trip/returnedView.js';
+import useKstClock from './trip/useKstClock.js';
 import { overdueOutingOf, returnNoteKeyOf, returnTargetOf } from './trip/viewModel.js';
 
 const PLACE_ICON = Object.freeze({ LODGING: 'bed', HOSPITAL: 'hospital', PLANNED: 'flag' });
@@ -67,7 +70,9 @@ function sheetContent({ variant, day, stay, cause, outingId }) {
  */
 export default function ReturnSheet({ day, stay, cause = null, variant = 'CLEARED', outingId, passedBy = null, onClose }) {
   const { t, pair, safety, lang, reasonText } = useLang();
+  const clock = useKstClock();
   const content = sheetContent({ variant, day, stay, cause, outingId });
+  const showConfirm = content.confirm !== null && sheetShowsConfirm({ day, today: clock?.date });
   const title = pair(content.titleKey);
   const body = pair(content.bodyKey);
   const { place } = content;
@@ -100,7 +105,7 @@ export default function ReturnSheet({ day, stay, cause = null, variant = 'CLEARE
           {body.secondary.text}
         </p>
 
-        {content.confirm && <ReturnedConfirm day={day} outing={content.confirm.outing} passedBy={variant === 'PASSED' ? passedBy : null} />}
+        {showConfirm && <ReturnedConfirm day={day} outing={content.confirm.outing} passedBy={variant === 'PASSED' ? passedBy : null} />}
 
         <section className="trip-return-place" aria-labelledby="trip-return-place-h">
           <h3 id="trip-return-place-h">

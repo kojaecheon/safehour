@@ -883,6 +883,74 @@ describe("'돌아왔어요'", () => {
     assert.equal(phaseOf(sync), BACK_PHASE.UNDO_FAILED);
     assert.deepEqual(h.api.bodies('back'), [{ ...W1, date: TODAY, by: '12:30' }], '되돌리기를 보내지 않는다');
   });
+
+  test('503·429 로 막히면 60초 뒤 다시 보내고(연속 세 번까지), 받아들여지면 횟수를 되돌린다', async () => {
+    for (const code of ['UNAVAILABLE', 'RATE_LIMITED']) {
+      const h = harness({ record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+      h.sync.start();
+      const midnight = kst('2026-10-03', '00:00') + 1000;
+      h.api.setDefault('back', () => failed(code));
+      h.sync.pressBack(BACK);
+      await h.sync.idle();
+      assert.equal(phaseOf(h.sync), BACK_PHASE.QUEUED, code);
+      assert.deepEqual(h.timers.pending(), [h.clock.now() + 60_000, midnight], `${code} 재시도 예약`);
+      for (let retry = 1; retry <= 3; retry += 1) {
+        h.timers.advanceTo(h.clock.now() + 60_000);
+        await h.sync.idle();
+        assert.equal(h.api.bodies('back').length, 1 + retry, `${code} 재시도 ${retry}`);
+      }
+      assert.deepEqual(h.timers.pending(), [midnight], `${code} 연속 세 번까지`);
+      assert.equal(phaseOf(h.sync), BACK_PHASE.QUEUED);
+
+      // 다른 계기(다시 열기)로 받아들여지면 횟수를 되돌린다. 다음 막힘에 다시 세 번까지 건다
+      h.api.setDefault('back', () => ok({ recorded: true }));
+      await h.sync.kick('resume');
+      assert.equal(phaseOf(h.sync), BACK_PHASE.SENT);
+      h.api.setDefault('back', () => failed(code));
+      h.sync.undoBack(BACK);
+      await h.sync.idle();
+      assert.equal(phaseOf(h.sync), BACK_PHASE.UNDO_QUEUED);
+      assert.deepEqual(h.timers.pending(), [h.clock.now() + 60_000, midnight], `${code} 받아들여진 뒤 다시 건다`);
+      h.sync.stop();
+      assert.deepEqual(h.timers.pending(), [], 'stop() 이 재시도 타이머를 지운다');
+    }
+  });
+
+  test('재시도는 하나만 걸고, 연결 없음·꺼짐·400 에는 걸지 않으며, 누르면 횟수를 되돌린다', async () => {
+    const midnight = kst('2026-10-03', '00:00') + 1000;
+    for (const code of ['NETWORK', 'OFF', 'BAD']) {
+      const h = harness({ record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+      h.sync.start();
+      h.api.setDefault('back', () => failed(code));
+      h.sync.pressBack(BACK);
+      await h.sync.idle();
+      assert.deepEqual(h.timers.pending(), [midnight], code);
+      h.sync.stop();
+    }
+
+    const h = harness({ record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+    h.sync.start();
+    h.api.setDefault('back', () => failed('UNAVAILABLE'));
+    h.sync.pressBack(BACK);
+    await h.sync.idle();
+    // 막힌 채 다른 계기로 또 막혀도 재시도 타이머는 하나다
+    await h.sync.kick('resume');
+    assert.deepEqual(h.timers.pending(), [h.clock.now() + 60_000, midnight]);
+    for (let retry = 1; retry <= 3; retry += 1) {
+      h.timers.advanceTo(h.clock.now() + 60_000);
+      await h.sync.idle();
+    }
+    assert.deepEqual(h.timers.pending(), [midnight]);
+    // 새로 누르면(다른 마감) 다시 세 번까지 건다
+    h.sync.pressBack({ date: TODAY, by: '18:00' });
+    await h.sync.idle();
+    assert.deepEqual(h.timers.pending(), [h.clock.now() + 60_000, midnight]);
+    h.sync.stop();
+    // 타이머 없이 만든 실행기는 걸지 않는다(던지지 않는다)
+    const bare = createWatchSync({ store: h.store, api: h.api, now: h.clock.now });
+    bare.pressBack({ date: TODAY, by: '18:00' });
+    await bare.idle();
+  });
 });
 
 // ── 응답 사이의 변경 ─────────────────────────────────────────────
