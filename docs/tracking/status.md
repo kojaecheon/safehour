@@ -51,8 +51,9 @@
   - 저장 계층(`lib/server/watch/`): Upstash REST 어댑터, HMAC 키, 구독 봉인, 고정 창 횟수 제한, 네 레코드 읽기·쓰기
   - 예약: QStash 발행·취소·서명 검증, 예약 걸기(오늘·내일, 하루 1회 예약은 어제·오늘·내일), 예약 처리 판정표(보냄 표시 두 단계)
   - 환자 쪽(등록, 마감 올리기와 `armFailed`, 돌아왔어요, 삭제)과 보호자 쪽(구독, 해지, 상태 조회, 오늘 함께 있음)
-  - 경로 9개(`/api/push/config`, `/api/watch*`, `/api/cron/watch-arm`), 본문 허용 목록, 기록 한 줄(식별 값 부재를 테스트로 고정),
-    헬스의 `serverPush`·`serverPushReady` 필드, 비밀 생성 스크립트(`scripts/generate-push-secrets.mjs`)
+  - 경로 9개(`/api/push/config`, `/api/watch*`, `/api/cron/watch-arm`), 본문 허용 목록(16KB에서 끊어 읽는 스트림), 기록 한 줄
+    (식별 값 부재와 기록 줄 밖 출력 0건을 테스트로 고정), 운영 배포의 데모 세션 거절, 헬스의 `serverPush`·`serverPushReady` 필드,
+    비밀 생성 스크립트(`scripts/generate-push-secrets.mjs`)
   - 서버 푸시 문구 3종(ko·en, ja·zh는 검수 전 번역). 영어는 숙소 체크인과 겹치지 않게 'check-in'을 쓰지 않는다
 
 **화면 다듬기 (2026-09-24)**
@@ -196,6 +197,10 @@
   - Vercel에서 Upstash Redis와 QStash 연동(Redis는 도쿄, 백업 끔, 예산 상한)
   - QStash 리전 확인(유럽·미국뿐이라 예약 본문이 그 리전에 머문다)
   - Vercel 미리보기 배포 보호 우회 비밀(`VERCEL_AUTOMATION_BYPASS_SECRET`) 만들기
+  - 운영의 실제 소셜 로그인 설정(구글·카카오, 지금 코드가 지원하는 둘): 운영 배포의 서버 알림 경로는 데모 세션을 받지 않는다(데모
+    로그인은 모두 같은 신원이라 소유 확인이 무의미하다). 이게 없으면 환자가 등록하지 못한다
+  - Vercel Firewall 횟수 제한 규칙(`/api/watch*`, `/api/push/*`, 예약 처리 `/api/watch/due`는 빼거나 넉넉히): 앱의 횟수 제한은
+    id를 바꿔 가며 보내면 새로 세고 삭제 경로에는 한도가 없어, 막지 않으면 저장소 할당량이 바닥난다
   - 실기기 확인: iOS 16.4 이상 홈 화면 웹 앱, Android Chrome
   - 법무 검토(서버 저장 범위, 동의·고지 문구, 약속 문구 변경)
   - 새 서버 푸시 문구 3종의 일본어·중국어 검수

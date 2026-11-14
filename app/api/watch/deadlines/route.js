@@ -2,6 +2,7 @@
 //
 // 요청  { watchId, writeToken, expiresOn: "YYYY-MM-DD", days: [{ date: "YYYY-MM-DD", deadlines: ["HH:MM"] }] }
 //       - writeToken 이 맞아야 한다. 로그인 세션이 있으면 그 계정이 소유자여야 한다
+//         (운영 배포의 데모 세션은 세션이 없는 것으로 보고 쓰기 토큰만 본다)
 //       - days 는 46개 이하, 날짜가 겹치면 400, 날짜당 시각 10개 이하(중복은 없애고 정렬)
 //       - 클라이언트는 지켜보기 하나에 업로드를 한 번에 하나만 보내고, 늘 가장 최근 상태 전체를 보낸다
 // 응답  200 { ok: true, expiresOn, armFailed }

@@ -16,5 +16,7 @@ import { createWatchHandlers } from '../../../../lib/server/watch/handlers.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// 푸시 서비스 호출과 저장소 배치 몇 번이 이어진다. 기본 제한에 걸려 끊기지 않게 넉넉히 둔다
+export const maxDuration = 60;
 
 export const POST = createWatchHandlers().due;

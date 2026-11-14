@@ -30,6 +30,7 @@
     참이면(기본) 세션도 요구한다. `DELETE /api/watch/subscribe`는 `watchId` + `subId`이고 세션을 요구하지 않는다.
   - `POST /api/watch/due`는 QStash 서명 또는 `Authorization: Bearer <CRON_SECRET>`, `GET /api/cron/watch-arm`은 Bearer로 연다.
   - `GET /api/push/config`는 공개다(VAPID 공개키와 켜짐 여부만 준다).
+  - 운영 배포에서는 이 경로들이 데모 세션을 세션이 없는 것으로 본다(데모 로그인은 모두 같은 신원이다). 판단은 처리기 한 곳에 있다.
 - 화면은 엔진을 직접 부르지 않는다. 라우트 핸들러를 통해 부른다. 판정 경로가 두 벌이 되면 결과가 어긋난다.
 - **긴급 연락은 모든 화면에서 바닥에 붙어 있다.** 로그인 전·로그인 만료·오프라인에서도 보인다.
   내비가 있으면 다섯째 칸, 없으면 하단 긴급 바다. **떠 있는 버튼으로 만들지 않는다** —

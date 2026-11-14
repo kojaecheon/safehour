@@ -132,6 +132,7 @@ describe('watchConfig', () => {
     assert.equal(config.baseUrl, 'https://safehour.example.com');
     assert.equal(config.namespace, 'prod');
     assert.equal(config.demo, false);
+    assert.equal(config.testHooks, false);
     assert.equal(config.protectionBypass, null);
     assert.equal(config.guardianLoginRequired, true);
     assert.equal(config.testOrigin, null);
@@ -265,6 +266,7 @@ describe('watchConfig', () => {
     );
     const demo = watchConfig({ ...bare, SAFEHOUR_STORE_MODE: 'memory', SAFEHOUR_ALLOW_DEMO_LOGIN: '1' });
     assert.equal(demo.demo, true);
+    assert.equal(demo.testHooks, true);
     assert.deepEqual(demo.store, { mode: 'memory' });
     assert.equal(demo.qstash, null);
     assert.equal(demo.baseUrl, null);
@@ -289,6 +291,7 @@ describe('watchConfig', () => {
     assert.ok(notDemo.missing.includes('UPSTASH_REDIS_REST_URL'));
     const demoTrue = watchConfig({ ...bare, SAFEHOUR_STORE_MODE: 'memory', SAFEHOUR_ALLOW_DEMO_LOGIN: 'true' });
     assert.equal(demoTrue.demo, false);
+    assert.equal(demoTrue.testHooks, false);
     assert.equal(demoTrue.store, null);
     const notDemoUpstash = watchConfig({ ...FULL, SAFEHOUR_STORE_MODE: 'memory' });
     assert.equal(notDemoUpstash.store.mode, 'upstash');
@@ -300,6 +303,9 @@ describe('watchConfig', () => {
     assert.equal(watchConfig({ ...preview, SAFEHOUR_PUSH_TEST_ORIGIN: origin }).testOrigin, null);
     assert.equal(watchConfig({ ...preview, SAFEHOUR_PUSH_TEST_ORIGIN: origin, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).testOrigin, origin);
     assert.equal(watchConfig({ ...preview, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).testOrigin, null);
+    // 시험 장치는 미리보기에서 데모 로그인일 때 켜진다
+    assert.equal(watchConfig(preview).testHooks, false);
+    assert.equal(watchConfig({ ...preview, SAFEHOUR_ALLOW_DEMO_LOGIN: '1' }).testHooks, true);
   });
 
   test('testOrigin 은 http(s) 주소의 출처만 남긴다', () => {
@@ -323,6 +329,8 @@ describe('watchConfig', () => {
     };
     const config = watchConfig(env);
     assert.equal(config.demo, true);
+    // 시험 장치(서버 알림 경로의 데모 세션 허용 포함)는 꺼진다
+    assert.equal(config.testHooks, false);
     assert.equal(config.store.mode, 'upstash');
     assert.equal(config.testOrigin, null);
     assert.equal(config.ready, true);

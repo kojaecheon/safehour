@@ -49,6 +49,32 @@ export function subscriptionFixture() {
   };
 }
 
+/**
+ * 읽는 만큼만 만들어 내는 요청 본문 스트림('a' 바이트). 얼마나 읽혔는지(pulled)와 취소됐는지(cancelled)를 남긴다.
+ * 본문 상한을 넘는 순간 읽기를 멈추는지 볼 때 쓴다. Request 에 넣을 때는 duplex: 'half' 가 필요하다.
+ */
+export function streamedBody(totalBytes, chunkBytes = 4096) {
+  const state = { pulled: 0, cancelled: false };
+  const stream = new ReadableStream(
+    {
+      pull(controller) {
+        if (state.pulled >= totalBytes) {
+          controller.close();
+          return;
+        }
+        const size = Math.min(chunkBytes, totalBytes - state.pulled);
+        state.pulled += size;
+        controller.enqueue(new Uint8Array(size).fill(0x61));
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    },
+    { highWaterMark: 0 },
+  );
+  return { stream, state };
+}
+
 const STATUS_CLASS = Object.freeze({ SENT: '2xx', GONE: '404/410', RETRY: '5xx', REJECTED: '4xx' });
 
 function recordingScheduler() {

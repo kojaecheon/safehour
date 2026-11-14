@@ -15,5 +15,7 @@ import { createWatchHandlers } from '../../../../lib/server/watch/handlers.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// 마감을 하나씩 걸고 예약 업체 호출 한 번이 몇 초 걸릴 수 있다. Vercel 은 시간 초과한 예약 실행을 다시 부르지 않으므로 넉넉히 둔다
+export const maxDuration = 60;
 
 export const GET = createWatchHandlers().cronArm;

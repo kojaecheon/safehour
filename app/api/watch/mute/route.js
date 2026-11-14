@@ -4,7 +4,7 @@
 // 응답  200 { ok: true, muted }
 //       켜면 그날(KST) 마감 지남 알림을 보내지 않는다. 다음 날은 저절로 풀린다
 // 오류  503 SAFEHOUR_SERVER_PUSH_OFF          서버 알림이 꺼져 있음
-//       401 SAFEHOUR_AUTH_REQUIRED            세션이 필요한데 없음
+//       401 SAFEHOUR_AUTH_REQUIRED            세션이 필요한데 없음(운영 배포의 데모 세션은 없는 것으로 본다)
 //       400 SAFEHOUR_BAD_REQUEST              본문·필드 형식(`field`)
 //       404 SAFEHOUR_WATCH_NOT_FOUND          모르는 id, 틀린 subId(같은 응답)
 //       429 SAFEHOUR_RATE_LIMITED             횟수 제한

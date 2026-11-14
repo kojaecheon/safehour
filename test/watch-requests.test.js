@@ -29,7 +29,7 @@ import {
 import { WATCH_ROUTE, buildWatchLogEntry, logWatch } from '../lib/server/watch/log.js';
 import { DUE_OUTCOME } from '../lib/server/watch/due.js';
 import { addDays } from '../src/stay/time.js';
-import { IDS } from './watch-fixtures.js';
+import { IDS, streamedBody } from './watch-fixtures.js';
 
 const SUB_ID = 'SUBidFixture_0123456-a';
 const WATCH_KEY = 'K'.repeat(43);
@@ -58,6 +58,10 @@ function subscribeBody({ p256dh, auth, endpoint = 'https://fcm.googleapis.com/fc
 
 function request(body, headers = {}) {
   return new Request('http://localhost/api/watch', { method: 'POST', headers, body });
+}
+
+function streamRequest(stream, headers = {}) {
+  return new Request('http://localhost/api/watch', { method: 'POST', headers, body: stream, duplex: 'half' });
 }
 
 describe('본문 허용 목록', () => {
@@ -240,6 +244,41 @@ describe('본문 허용 목록', () => {
     assert.deepEqual(await readJsonBody(request('"text"')), { ok: false });
     assert.deepEqual(await readJsonBody(request('null')), { ok: false });
     assert.deepEqual(await readJsonBody(request('')), { ok: false });
+    // UTF-8 이 아니면 실패다(바꿔 읽어 raw 가 받은 바이트와 달라지지 않게)
+    assert.deepEqual(await readJsonBody(request(Buffer.from([0x7b, 0x22, 0xff, 0x22, 0x3a, 0x31, 0x7d]))), { ok: false });
+    // 본문 없는 요청도 실패다
+    assert.deepEqual(await readJsonBody(new Request('http://localhost/api/watch', { method: 'POST' })), { ok: false });
+  });
+
+  test('readJsonBody: 스트림 본문은 상한을 넘는 순간 읽기를 멈추고 스트림을 취소한다(Content-Length 와 무관)', async () => {
+    const CHUNK = 4096;
+    for (const headers of [{}, { 'content-length': '10' }]) {
+      const { stream, state } = streamedBody(1024 * 1024, CHUNK);
+      const read = await readJsonBody(streamRequest(stream, headers));
+      assert.deepEqual(read, { ok: false });
+      // 1MB 를 다 읽지 않았다. 상한 + 조각 하나 남짓에서 멈췄다
+      assert.ok(state.pulled <= MAX_BODY_BYTES + 2 * CHUNK, `pulled ${state.pulled}`);
+      assert.equal(state.cancelled, true);
+    }
+  });
+
+  test('readJsonBody: 조각으로 나뉜 스트림 본문도 받은 바이트 그대로 raw 가 된다', async () => {
+    const text = JSON.stringify({ k: '가나다', pad: 'a'.repeat(100) });
+    const bytes = Buffer.from(text);
+    // 한글 한 글자(3바이트) 한가운데서 자른다
+    const cut = bytes.indexOf(Buffer.from('나')) + 1;
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array(bytes.subarray(0, cut)));
+        controller.enqueue(new Uint8Array(bytes.subarray(cut)));
+        controller.close();
+      },
+    });
+    const read = await readJsonBody(streamRequest(stream));
+    assert.equal(read.ok, true);
+    assert.equal(read.raw, text);
+    assert.equal(Buffer.compare(Buffer.from(read.raw), bytes), 0);
+    assert.deepEqual(read.body, { k: '가나다', pad: 'a'.repeat(100) });
   });
 });
 

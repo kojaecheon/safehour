@@ -225,10 +225,14 @@ PlanStay {
   503 `SAFEHOUR_SERVER_PUSH_OFF`다(소유 비밀이 없으면 저장 키를 만들 수 없어 지울 것을 찾지 못한다).
 - 식별 값(`watchId`, `writeToken`, `subId`)은 **요청 본문으로만** 받는다. 경로·쿼리 문자열에 싣지 않는다(URL은 플랫폼 요청
   기록에 남는다). 그래서 상태 조회도 POST다.
-- 본문은 UTF-8로 16,384바이트 이하인 JSON 객체여야 한다. 읽을 수 없거나, 넘거나, JSON이 아니거나, 객체가 아니면 400에
-  `field: 'body'`다. 필드 형식이 틀리면 400에 그 필드 이름이 `field`로 붙는다(값은 담지 않는다). 형식은 맞는데 서비스가 거절한
+- 본문은 UTF-8로 16,384바이트 이하인 JSON 객체여야 한다. 읽을 수 없거나, 넘거나, UTF-8이 아니거나, JSON이 아니거나, 객체가
+  아니면 400에 `field: 'body'`다. 넘는 본문은 끝까지 읽지 않고 넘는 순간 멈춘다(`Content-Length`가 없거나 틀려도 같다). 필드 형식이 틀리면 400에 그 필드 이름이 `field`로 붙는다(값은 담지 않는다). 형식은 맞는데 서비스가 거절한
   경우(지난 출국일, 허용 목록 밖 endpoint 등)는 400에 `field`가 없다.
 - 허용 목록 밖 필드는 조용히 버린다. 서버는 받은 객체를 그대로 넘기지 않고 정해진 키만 새로 담는다.
+- **데모 세션**: 운영 배포(`VERCEL_ENV=production`)이거나 데모 로그인이 꺼진 곳에서는 데모 로그인 세션을 세션이 없는 것으로 본다.
+  데모 로그인은 누가 눌러도 같은 신원이라 소유 확인이 무의미하기 때문이다. 등록과 `{ all: true }` 삭제는 401, 마감 올리기는 쓰기
+  토큰만 보고, 보호자 경로는 로그인을 요구하는 설정이면 401이다. 미리보기·로컬처럼 데모 로그인이면서 운영 배포가 아닌 곳에서는
+  데모 세션도 보통 세션과 같다. 운영에서 환자가 등록하려면 실제 소셜 로그인(구글·카카오)이 필요하다.
 - 형식: `watchId` 22자, `writeToken` 43자, `subId` 22자(모두 base64url), 날짜 `YYYY-MM-DD`(KST), 시각 `HH:MM`,
   `lang`은 `ko`·`en`·`ja`·`zh`. `on`·`undo`·`all`은 불리언이고 `undo`는 없으면 `false`다.
 - **찾지 못한 경우는 모두 같은 404다**: 모르는 id, 만료, 틀린 토큰, 남의 id 재등록, 틀린 `subId`. 응답 본문이 바이트까지 같아
@@ -241,8 +245,8 @@ PlanStay {
 | 경로 | 권한 | 요청 본문 | 성공 응답 |
 | --- | --- | --- | --- |
 | `GET /api/push/config` | 없음 | 없음 | `{ ok: true, enabled, vapidPublicKey: string \| null, guardianLoginRequired }`. 꺼져 있으면 `enabled: false`, `vapidPublicKey: null` |
-| `POST /api/watch` | 환자 세션 | `{ watchId, writeToken, expiresOn }` | `{ ok: true, expiresOn }` |
-| `DELETE /api/watch` | `writeToken` 또는 세션 | `{ watchId, writeToken }` 또는 `{ all: true }`(세션 필요) | `{ ok: true }` 또는 `{ ok: true, deleted }` |
+| `POST /api/watch` | 환자 세션(운영은 데모 제외) | `{ watchId, writeToken, expiresOn }` | `{ ok: true, expiresOn }` |
+| `DELETE /api/watch` | `writeToken` 또는 세션 | `{ watchId, writeToken }` 또는 `{ all: true }`(세션 필요, 운영은 데모 제외) | `{ ok: true }` 또는 `{ ok: true, deleted }` |
 | `PUT /api/watch/deadlines` | `writeToken`(세션이 있으면 소유자 일치도) | `{ watchId, writeToken, expiresOn, days: [{ date, deadlines: ["HH:MM"] }] }` | `{ ok: true, expiresOn, armFailed }` |
 | `POST /api/watch/back` | `writeToken`(세션 불필요) | `{ watchId, writeToken, date, by, undo? }` | `{ ok: true, recorded }` |
 | `POST /api/watch/subscribe` | `watchId`(+ 보호자 세션, 설정에 따라) | `{ watchId, subscription: { endpoint, keys: { p256dh, auth } }, lang }` | `{ ok: true, subId }` |
@@ -253,14 +257,14 @@ PlanStay {
 | `GET /api/cron/watch-arm` | `Authorization: Bearer <CRON_SECRET>` | 없음 | `{ ok: true, armed, failed }` 또는 꺼져 있으면 `{ ok: true, skipped: 'OFF' }` |
 
 '보호자 세션, 설정에 따라': `SAFEHOUR_WATCH_GUARDIAN_NO_LOGIN`이 정확히 `1`이 아니면(기본) 구독·상태 조회·오늘 함께 있음에 로그인
-세션을 요구한다. 구독 해지는 언제나 세션 없이 된다. 아이폰 홈 화면 앱의 로그인 왕복을 실기기로 확인한 뒤 정한다(결정 22).
+세션을 요구한다(운영 배포에서는 데모 세션이 통하지 않는다). 구독 해지는 언제나 세션 없이 된다. 아이폰 홈 화면 앱의 로그인 왕복을 실기기로 확인한 뒤 정한다(결정 22).
 
 **오류** (모두 `{ ok: false, errorCode, message }`, 메시지는 고정 문장이다)
 
 | 상태 | errorCode | 언제 | message |
 | --- | --- | --- | --- |
-| 400 | `SAFEHOUR_BAD_REQUEST` | 본문이 JSON이 아님, 16KB 초과, 필드 형식(`field` 포함), 지난 출국일, 허용 목록 밖 endpoint | 요청 형식이 올바르지 않습니다. |
-| 401 | `SAFEHOUR_AUTH_REQUIRED` | 세션이 필요한 경로, 예약 경로의 인증 실패 | 로그인이 필요합니다. |
+| 400 | `SAFEHOUR_BAD_REQUEST` | 본문이 UTF-8 JSON 객체가 아님, 16KB 초과, 필드 형식(`field` 포함), 지난 출국일, 허용 목록 밖 endpoint | 요청 형식이 올바르지 않습니다. |
+| 401 | `SAFEHOUR_AUTH_REQUIRED` | 세션이 필요한 경로(운영 배포의 데모 세션 포함), 예약 경로의 인증 실패 | 로그인이 필요합니다. |
 | 404 | `SAFEHOUR_WATCH_NOT_FOUND` | 모르는 id, 만료, 틀린 토큰, 남의 id, 틀린 `subId` | 서버 알림 정보를 찾을 수 없습니다. |
 | 429 | `SAFEHOUR_RATE_LIMITED` | 횟수 제한, 재등록·동시 지켜보기 한도 | 요청이 너무 많습니다. 잠시 뒤 다시 시도해 주세요. |
 | 503 | `SAFEHOUR_SERVER_PUSH_OFF` | 쓰기 경로인데 꺼져 있음, 삭제 경로인데 저장소 설정이 없음 | 서버 알림이 꺼져 있습니다. |
@@ -293,7 +297,8 @@ PlanStay {
 
 ### `POST /api/watch`
 
-지켜보기를 만들거나 다시 등록한다. 환자 세션이 필요하고(없으면 401), 서버는 세션 계정에서 소유자 해시(`ownerHash`)를 계산한다.
+지켜보기를 만들거나 다시 등록한다. 환자 세션이 필요하고(없으면 401, 운영 배포의 데모 세션도 401), 서버는 세션 계정에서 소유자
+해시(`ownerHash`)를 계산한다.
 
 - 새 `watchId`: 레코드를 만든다. 그 계정의 살아 있는 지켜보기가 이미 3개면 429다.
 - 이미 있는 `watchId`: 저장된 소유자가 이 계정이면 쓰기 토큰과 출국일을 바꾸고 다시 등록 횟수를 하나 늘린다. 이전 쓰기 토큰은
@@ -307,7 +312,8 @@ PlanStay {
 
 - `{ watchId, writeToken }`: 그 지켜보기의 지켜보기·구독·날짜 기록·색인 항목을 지우고 걸어 둔 예약을 취소한다. `{ ok: true }`.
   토큰이 틀리면 404이고 아무것도 지우지 않는다.
-- `{ all: true }`: 세션이 필요하다. 그 계정이 소유한 지켜보기를 모두 지운다(기기를 잃은 경우의 길). `{ ok: true, deleted }`.
+- `{ all: true }`: 세션이 필요하다(운영 배포의 데모 세션은 401). 그 계정이 소유한 지켜보기를 모두 지운다(기기를 잃은 경우의 길).
+  `{ ok: true, deleted }`.
 - 날짜 기록은 저장된 출국일과 무관하게 어제(KST)부터 오늘 + 46일까지를 훑어 지운다. 출국일을 줄이기 전에 올린 날짜 기록까지 덮는다.
 - 예약 취소가 실패해도 성공이다. 남은 예약은 도착해도 지켜보기가 없어 아무것도 보내지 않는다.
 
@@ -315,7 +321,8 @@ PlanStay {
 
 남은 체류 기간의 날짜별 복귀 마감 시각을 올린다. 출국일 연장도 이 경로가 맡는다(따로 연장 경로가 없다).
 
-- 권한: `writeToken`. 세션이 함께 오면 그 계정이 소유자여야 한다(다르면 404). 세션이 없어도 된다.
+- 권한: `writeToken`. 세션이 함께 오면 그 계정이 소유자여야 한다(다르면 404). 세션이 없어도 된다. 운영 배포의 데모 세션은
+  세션이 없는 것으로 보고 쓰기 토큰만 본다.
 - `expiresOn`은 늘 함께 보낸다. 서버는 등록과 같은 상한을 다시 씌우고, 바뀌었으면 지켜보기와 구독의 만료를 갱신한다.
   출국일이 줄었으면 새 출국일 뒤의 날짜 기록을 지운다.
 - `days`: 길이 46 이하, 날짜가 겹치면 400, 날짜당 `deadlines` 10개 이하. 시각은 중복을 없애고 정렬한다. 오늘보다 앞이거나

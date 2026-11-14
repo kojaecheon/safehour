@@ -5,10 +5,13 @@
 // 메모리, 예약과 푸시는 호출을 쌓는 기록기다. 외부 호출은 없다(createWatchCtx 시험은 가짜 fetch 를 넣는다).
 // 시계는 testCtx 기본값 2026-11-20 12:00 KST(03:00Z)에서 시작하고 ctx.clock 으로만 움직인다.
 // 마감 14:30 KST 의 보낼 시각은 14:40(05:40Z), 늦은 한도는 15:30(06:30Z)이다.
-// 기록은 process.stdout.write 를 잠시 가로채 모은다(기록 줄이 아닌 출력은 그대로 내보낸다).
+// 결과(outcome, counts)를 보려고 이 파일이 도는 동안 process.stdout.write 를 가로채 기록 줄만 모은다(테스트 실행기도 같은
+// stdout 에 보고를 쓰므로 기록 줄이 아닌 출력은 그대로 내보낸다). 처리기가 기록 줄 말고 아무것도 내지 않는지(stdout·stderr·
+// console 전체)는 실행기가 없는 별도 프로세스(test/watch-routes-child.js)로 본다('처리기 출력' 시험).
 
 import { after, before, describe, mock, test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash, createHmac, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -21,8 +24,9 @@ import { watchConfig } from '../lib/server/watch/config.js';
 import { KvError } from '../lib/server/watch/kv.js';
 import { ownerHashOf, watchKeyOf } from '../lib/server/watch/keys.js';
 import { readSub, readWatch } from '../lib/server/watch/records.js';
+import { MAX_BODY_BYTES } from '../lib/server/watch/requests.js';
 import { SESSION_SECRET } from './itinerary-fixtures.js';
-import { IDS, SECRET, subscriptionFixture, testCtx } from './watch-fixtures.js';
+import { IDS, SECRET, streamedBody, subscriptionFixture, testCtx } from './watch-fixtures.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -77,6 +81,11 @@ const QSTASH_ENV = Object.freeze({
   SAFEHOUR_PUBLIC_BASE_URL: BASE_URL,
 });
 
+// 데모 로그인은 운영에도 켜 둔다. 운영 배포에서는 시험 장치가 꺼져 서버 알림 경로가 데모 세션을 받지 않는다
+const PROD_DEMO_ENV = Object.freeze({ ...QSTASH_ENV, VERCEL_ENV: 'production' });
+const PREVIEW_DEMO_ENV = Object.freeze({ ...QSTASH_ENV, VERCEL_ENV: 'preview' });
+const PREVIEW_NO_DEMO_ENV = Object.freeze(without(PREVIEW_DEMO_ENV, 'SAFEHOUR_ALLOW_DEMO_LOGIN'));
+
 const OFF_ENV = Object.freeze(without(ENV, 'SAFEHOUR_SERVER_PUSH'));
 const KILLED_ENV = Object.freeze({ ...ENV, SAFEHOUR_KILL_SERVER_PUSH: ' ON ' });
 const NO_LOGIN_ENV = Object.freeze({ ...ENV, SAFEHOUR_WATCH_GUARDIAN_NO_LOGIN: '1' });
@@ -95,11 +104,28 @@ function setup({ env = ENV, at } = {}) {
 /** 같은 ctx 를 쓰는 다른 환경의 처리기 */
 const handlersFor = (ctx, env) => createWatchHandlers({ env, now: ctx.now, ctx });
 
-function cookieFor(ctx, subject) {
-  return `${SESSION_COOKIE}=${createSessionToken({ provider: 'demo', subject }, SESSION_SECRET, ctx.now())}`;
+function cookieFor(ctx, subject, provider = 'demo') {
+  return `${SESSION_COOKIE}=${createSessionToken({ provider, subject }, SESSION_SECRET, ctx.now())}`;
 }
 
-const accountKeyOf = (subject) => deriveAccountKey({ provider: 'demo', subject }, SESSION_SECRET);
+const accountKeyOf = (subject, provider = 'demo') => deriveAccountKey({ provider, subject }, SESSION_SECRET);
+
+/** 데모 로그인이 누구에게나 주는 신원(app/api/auth/login/route.js) */
+const DEMO_SUBJECT = 'demo-user';
+
+/** 예약 업체가 처음 n번은 실패하게 한다. 실패한 호출도 calls 에 남긴다 */
+function failFirst(scheduler, n) {
+  const original = scheduler.schedule;
+  let left = n;
+  scheduler.schedule = async (args) => {
+    if (left > 0) {
+      left -= 1;
+      scheduler.calls.push(args);
+      return { ok: false };
+    }
+    return original(args);
+  };
+}
 
 function call(method, path, body, { cookie, headers = {} } = {}) {
   const h = new Headers(headers);
@@ -405,20 +431,31 @@ describe('환자와 보호자 흐름', () => {
     await expectStatus(await h.back(call('POST', '/api/watch/back', backBody())), 404);
   });
 
-  test('마감 올리기: 예약 업체가 실패해도 200 이고 armFailed 는 음이 아닌 정수다', async () => {
+  test('마감 올리기: 예약 업체가 N번 실패해도 200 이고 armFailed 와 기록의 failed 가 N 이다', async () => {
     const lines = captureLogs();
     const { ctx, h } = setup();
     await expectStatus(await h.register(call('POST', '/api/watch', registerBody(), { cookie: cookieFor(ctx, 'patient-1') })), 200);
-    ctx.scheduler.fail = true;
-    const body = await expectStatus(
-      await h.deadlines(call('PUT', '/api/watch/deadlines', deadlinesBody([{ date: TODAY, deadlines: ['14:30', '18:00'] }]))),
-      200,
+    // 오늘 14:30·18:00, 내일 14:30 셋 가운데 앞의 둘이 실패한다
+    failFirst(ctx.scheduler, 2);
+    const days = [
+      { date: TODAY, deadlines: ['14:30', '18:00'] },
+      { date: TOMORROW, deadlines: ['14:30'] },
+    ];
+    const body = await expectStatus(await h.deadlines(call('PUT', '/api/watch/deadlines', deadlinesBody(days))), 200);
+    assert.deepEqual(body, { ok: true, expiresOn: EXPIRES_ON, armFailed: 2 });
+    // 같은 전체를 다시 올리면 걸지 못한 둘만 다시 걸고 0 이다(이미 건 것은 다시 걸지 않는다)
+    const again = await expectStatus(await h.deadlines(call('PUT', '/api/watch/deadlines', deadlinesBody(days))), 200);
+    assert.deepEqual(again, { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 });
+    assert.deepEqual(
+      ctx.scheduler.calls.map((c) => `${c.body.d} ${c.body.t}`),
+      [`${TODAY} 14:30`, `${TODAY} 18:00`, `${TOMORROW} 14:30`, `${TODAY} 14:30`, `${TODAY} 18:00`],
     );
-    assert.deepEqual(Object.keys(body).sort(), ['armFailed', 'expiresOn', 'ok']);
-    assert.ok(Number.isInteger(body.armFailed) && body.armFailed >= 0);
     // 기록의 failed 는 응답의 armFailed 와 같다
-    const log = logsOf(lines()).find((l) => l.route === 'watch.deadlines');
-    assert.equal(log.counts.failed, body.armFailed);
+    const logs = logsOf(lines()).filter((l) => l.route === 'watch.deadlines');
+    assert.deepEqual(
+      logs.map((l) => l.counts),
+      [{ failed: 2 }, { failed: 0 }],
+    );
   });
 
   test('DELETE /api/watch { all: true }: 그 계정의 지켜보기만 지운다', async () => {
@@ -656,6 +693,90 @@ describe('환자와 보호자 흐름', () => {
   });
 });
 
+describe('데모 세션', () => {
+  test('운영 배포에서는 데모 세션을 세션이 없는 것으로 본다: 데모 신원을 함께 쓰는 두 사람이 서로의 지켜보기를 가로채거나 지우지 못한다', async () => {
+    const { ctx } = setup();
+    const cfg = watchConfig(PROD_DEMO_ENV);
+    assert.equal(cfg.enabled, true);
+    assert.equal(cfg.demo, true);
+    assert.equal(cfg.testHooks, false);
+    const prod = handlersFor(ctx, PROD_DEMO_ENV);
+    // 데모 로그인은 누가 눌러도 이 신원이다. 환자와 보호자가 둘 다 데모로 들어온 상황
+    const demo = cookieFor(ctx, DEMO_SUBJECT);
+
+    // 데모 세션으로는 등록하지 못한다
+    const denied = await expectStatus(await prod.register(call('POST', '/api/watch', registerBody(), { cookie: demo })), 401);
+    assert.equal(denied.errorCode, 'SAFEHOUR_AUTH_REQUIRED');
+    assert.equal(await readWatch(ctx, WATCH_KEY), null);
+
+    // 미리보기에서 데모 신원으로 만든 지켜보기가 남아 있어도, 운영의 다른 데모 사용자가 자기 토큰으로 다시 등록하거나
+    // 전체 삭제로 지우지 못한다
+    await expectStatus(await handlersFor(ctx, PREVIEW_DEMO_ENV).register(call('POST', '/api/watch', registerBody(), { cookie: demo })), 200);
+    const owner = ownerHashOf(accountKeyOf(DEMO_SUBJECT), SECRET);
+    assert.equal((await readWatch(ctx, WATCH_KEY)).ownerHash, owner);
+    const takeover = { watchId: IDS.watchId, writeToken: WRONG_TOKEN, expiresOn: EXPIRES_ON };
+    assert.equal((await expectStatus(await prod.register(call('POST', '/api/watch', takeover, { cookie: demo })), 401)).errorCode, 'SAFEHOUR_AUTH_REQUIRED');
+    assert.equal((await expectStatus(await prod.remove(call('DELETE', '/api/watch', { all: true }, { cookie: demo })), 401)).errorCode, 'SAFEHOUR_AUTH_REQUIRED');
+    assert.equal((await readWatch(ctx, WATCH_KEY)).ownerHash, owner);
+    // 환자의 쓰기 토큰은 계속 통하고, 남이 자기 토큰으로 지우려 하면 404 다
+    await expectStatus(await prod.back(call('POST', '/api/watch/back', backBody())), 200);
+    await expectStatus(await prod.remove(call('DELETE', '/api/watch', { watchId: IDS.watchId, writeToken: WRONG_TOKEN })), 404);
+    assert.notEqual(await readWatch(ctx, WATCH_KEY), null);
+
+    // 실제 소셜 로그인 세션은 운영에서도 등록하고 전체 삭제할 수 있다
+    const patient = cookieFor(ctx, 'google-patient-1', 'google');
+    await expectStatus(await prod.register(call('POST', '/api/watch', registerBody(SECOND_WATCH_ID), { cookie: patient })), 200);
+    const secondKey = watchKeyOf(SECOND_WATCH_ID, SECRET);
+    assert.equal((await readWatch(ctx, secondKey)).ownerHash, ownerHashOf(accountKeyOf('google-patient-1', 'google'), SECRET));
+    // 마감 올리기에 데모 세션이 실려 와도 계정 없이 쓰기 토큰만 본다(데모 계정을 소유자로 대조하면 404 였을 것이다)
+    const upload = { ...deadlinesBody([{ date: TODAY, deadlines: ['14:30'] }]), watchId: SECOND_WATCH_ID };
+    await expectStatus(await prod.deadlines(call('PUT', '/api/watch/deadlines', upload, { cookie: demo })), 200);
+    // 다른 실제 계정의 세션이면 소유자가 달라 404 다(세션을 보는 길은 그대로다)
+    await expectStatus(await prod.deadlines(call('PUT', '/api/watch/deadlines', upload, { cookie: cookieFor(ctx, 'kakao-2', 'kakao') })), 404);
+
+    // 보호자 경로도 로그인을 요구하는 설정이면 데모 세션은 401 이다
+    const { subscription } = subscriptionFixture();
+    const guardianCalls = [
+      () => prod.subscribe(call('POST', '/api/watch/subscribe', subscribeBody(subscription), { cookie: demo })),
+      () => prod.status(call('POST', '/api/watch/status', { watchId: IDS.watchId }, { cookie: demo })),
+      () => prod.mute(call('POST', '/api/watch/mute', { watchId: IDS.watchId, subId: WRONG_SUB_ID, on: true }, { cookie: demo })),
+    ];
+    for (const make of guardianCalls) assert.equal((await expectStatus(await make(), 401)).errorCode, 'SAFEHOUR_AUTH_REQUIRED');
+    assert.equal(await readSub(ctx, WATCH_KEY), null);
+    // 보호자 로그인을 요구하지 않는 설정이면 세션 없이 된다(데모 세션은 아무 일도 하지 않는다)
+    const open = handlersFor(ctx, { ...PROD_DEMO_ENV, SAFEHOUR_WATCH_GUARDIAN_NO_LOGIN: '1' });
+    await expectStatus(await open.subscribe(call('POST', '/api/watch/subscribe', subscribeBody(subscription), { cookie: demo })), 200);
+
+    // 데모 로그인이 꺼진 미리보기에서도 남은 데모 쿠키는 받지 않는다
+    const noDemo = handlersFor(ctx, PREVIEW_NO_DEMO_ENV);
+    assert.equal(watchConfig(PREVIEW_NO_DEMO_ENV).testHooks, false);
+    await expectStatus(await noDemo.register(call('POST', '/api/watch', registerBody(), { cookie: demo })), 401);
+    await expectStatus(await noDemo.remove(call('DELETE', '/api/watch', { all: true }, { cookie: demo })), 401);
+    assert.equal((await readWatch(ctx, WATCH_KEY)).ownerHash, owner);
+  });
+
+  test('미리보기(시험 장치 켜짐)에서는 데모 세션이 그대로 통한다', async () => {
+    const { ctx } = setup();
+    assert.equal(watchConfig(PREVIEW_DEMO_ENV).testHooks, true);
+    const preview = handlersFor(ctx, PREVIEW_DEMO_ENV);
+    const demo = cookieFor(ctx, DEMO_SUBJECT);
+    await expectStatus(await preview.register(call('POST', '/api/watch', registerBody(), { cookie: demo })), 200);
+    assert.equal((await readWatch(ctx, WATCH_KEY)).ownerHash, ownerHashOf(accountKeyOf(DEMO_SUBJECT), SECRET));
+    // 데모 세션의 계정으로 소유자를 대조한다
+    await expectStatus(
+      await preview.deadlines(call('PUT', '/api/watch/deadlines', deadlinesBody([{ date: TODAY, deadlines: ['14:30'] }]), { cookie: demo })),
+      200,
+    );
+    const { subscription } = subscriptionFixture();
+    await expectStatus(await preview.subscribe(call('POST', '/api/watch/subscribe', subscribeBody(subscription), { cookie: demo })), 200);
+    assert.deepEqual(await expectStatus(await preview.remove(call('DELETE', '/api/watch', { all: true }, { cookie: demo })), 200), {
+      ok: true,
+      deleted: 1,
+    });
+    assert.equal(await readWatch(ctx, WATCH_KEY), null);
+  });
+});
+
 describe('예약 처리와 하루 1회 예약', () => {
   test('예약 처리: 서명도 Bearer 도 없으면 401 이다', async () => {
     const { ctx, h } = setup();
@@ -703,12 +824,105 @@ describe('예약 처리와 하루 1회 예약', () => {
     // 인증 뒤 본문 형식이 틀리면 400 이다
     const bad = await expectStatus(await h.due(call('POST', '/api/watch/due', { k: 'x', d: TODAY, t: '14:30' }, { headers: BEARER })), 400);
     assert.equal(bad.field, 'k');
-    // 스위치가 꺼져 있으면 처리하지 않고 200 으로 끝낸다(다시 부르지 않게)
-    const off = handlersFor(ctx, OFF_ENV);
-    assert.deepEqual(await expectStatus(await off.due(call('POST', '/api/watch/due', dueBody(TODAY, '18:00'), { headers: BEARER })), 200), {
+  });
+
+  test('예약 처리: 스위치가 꺼졌거나 차단 스위치가 켜지면 보낼 때가 된 마감도 보내지 않고 200 SKIP_OFF 다', async () => {
+    for (const env of [OFF_ENV, KILLED_ENV]) {
+      const { ctx, h } = setup();
+      await seedPatient(h, ctx);
+      await seedGuardian(h, ctx);
+      // 14:30 마감의 보낼 시각(14:40 KST). 켜져 있으면 보내는 때다
+      ctx.clock.set('2026-11-20T05:40:00Z');
+      const lines = captureLogs();
+      const body = await expectStatus(await handlersFor(ctx, env).due(call('POST', '/api/watch/due', dueBody(), { headers: BEARER })), 200);
+      assert.deepEqual(body, { ok: true });
+      assert.equal(ctx.push.sent.length, 0);
+      assert.deepEqual(
+        logsOf(lines()).map((l) => [l.route, l.outcome, l.errorCode]),
+        [['watch.due', 'SKIP_OFF', undefined]],
+      );
+      // 주입한 ctx 없이 설정만으로 만든 처리기도 같다(createWatchCtx 의 enabled)
+      const lines2 = captureLogs();
+      const bare = createWatchHandlers({ env, now: ctx.now });
+      assert.deepEqual(await expectStatus(await bare.due(call('POST', '/api/watch/due', dueBody(), { headers: BEARER })), 200), { ok: true });
+      assert.deepEqual(logsOf(lines2()).map((l) => l.outcome), ['SKIP_OFF']);
+      // 같은 때 켜진 설정이면 보낸다(위 결과가 시각 때문이 아니다)
+      await expectStatus(await h.due(call('POST', '/api/watch/due', dueBody(), { headers: BEARER })), 200);
+      assert.equal(ctx.push.sent.length, 1);
+    }
+  });
+
+  test('예약 처리: 일찍 온 예약(SKIP_EARLY, retry)은 503 이라 예약 업체가 다시 부른다', async () => {
+    const { ctx, h } = setup();
+    await seedPatient(h, ctx);
+    await seedGuardian(h, ctx);
+    // 14:00 KST. 14:30 마감의 보낼 시각(14:40) - 30초보다 이르다
+    ctx.clock.set('2026-11-20T05:00:00Z');
+    const lines = captureLogs();
+    assert.deepEqual(await expectStatus(await h.due(call('POST', '/api/watch/due', dueBody(), { headers: BEARER })), 503), {
+      ok: false,
+      errorCode: 'SAFEHOUR_SERVER_PUSH_UNAVAILABLE',
+      message: '서버 알림을 잠시 쓸 수 없습니다.',
+    });
+    assert.equal(ctx.push.sent.length, 0);
+    assert.deepEqual(
+      logsOf(lines()).map((l) => [l.outcome, l.errorCode]),
+      [['SKIP_EARLY', 'SAFEHOUR_SERVER_PUSH_UNAVAILABLE']],
+    );
+    // 보낼 시각에 다시 오면 보낸다
+    ctx.clock.set('2026-11-20T05:40:00Z');
+    await expectStatus(await h.due(call('POST', '/api/watch/due', dueBody(), { headers: BEARER })), 200);
+    assert.equal(ctx.push.sent.length, 1);
+  });
+
+  test('예약 처리: 인증을 저장소 설정과 본문 형식보다 먼저 본다', async () => {
+    // 저장소 설정이 없으면 인증한 호출은 할 일이 없어 200, 인증 없는 호출은 401
+    const noStoreEnv = without(ENV, 'SAFEHOUR_STORE_MODE');
+    assert.equal(watchConfig(noStoreEnv).store, null);
+    const noStore = createWatchHandlers({ env: noStoreEnv });
+    assert.deepEqual(await expectStatus(await noStore.due(call('POST', '/api/watch/due', dueBody(), { headers: BEARER })), 200), {
       ok: true,
     });
-    assert.equal(ctx.push.sent.length, 1);
+    assert.equal((await expectStatus(await noStore.due(call('POST', '/api/watch/due', dueBody())), 401)).errorCode, 'SAFEHOUR_AUTH_REQUIRED');
+
+    // 본문을 읽을 수 없으면 서명도 볼 수 없다. 인증 없이 오면 400 이 아니라 401, Bearer 가 맞으면 400
+    const { h } = setup();
+    for (const raw of ['{not json', '[1,2]', '']) {
+      assert.equal((await expectStatus(await h.due(call('POST', '/api/watch/due', raw)), 401)).errorCode, 'SAFEHOUR_AUTH_REQUIRED', raw);
+      const bad = await expectStatus(await h.due(call('POST', '/api/watch/due', raw, { headers: BEARER })), 400);
+      assert.deepEqual(bad, { ok: false, errorCode: 'SAFEHOUR_BAD_REQUEST', message: '요청 형식이 올바르지 않습니다.', field: 'body' });
+    }
+  });
+
+  test('본문 상한: 상한을 넘는 스트림 본문은 끝까지 읽지 않는다(인증 없는 예약 처리 포함)', async () => {
+    const CHUNK = 4096;
+    const { ctx, h } = setup();
+    const streamed = (path, { headers = {}, cookie } = {}) => {
+      const { stream, state } = streamedBody(8 * 1024 * 1024, CHUNK);
+      const hdrs = new Headers(headers);
+      if (cookie) hdrs.set('cookie', cookie);
+      return { state, request: new Request(`http://localhost${path}`, { method: 'POST', headers: hdrs, body: stream, duplex: 'half' }) };
+    };
+    const readLittle = (state) => {
+      assert.ok(state.pulled <= MAX_BODY_BYTES + 2 * CHUNK, `pulled ${state.pulled}`);
+      assert.equal(state.cancelled, true);
+    };
+
+    // 예약 처리는 인증 전에 본문을 읽지만 상한에서 멈추고 401 이다. Content-Length 를 작게 알려도 같다
+    for (const headers of [{}, { 'content-length': '10' }]) {
+      const unauth = streamed('/api/watch/due', { headers });
+      assert.equal((await expectStatus(await h.due(unauth.request), 401)).errorCode, 'SAFEHOUR_AUTH_REQUIRED');
+      readLittle(unauth.state);
+    }
+    // Bearer 가 맞아도 상한을 넘으면 400 body
+    const authed = streamed('/api/watch/due', { headers: BEARER });
+    assert.equal((await expectStatus(await h.due(authed.request), 400)).field, 'body');
+    readLittle(authed.state);
+    // 쓰기 경로도 같다
+    const register = streamed('/api/watch', { cookie: cookieFor(ctx, 'patient-1') });
+    assert.equal((await expectStatus(await h.register(register.request), 400)).field, 'body');
+    readLittle(register.state);
+    assert.equal(await readWatch(ctx, WATCH_KEY), null);
   });
 
   test('예약 처리: QStash 서명으로 부르면 처리하고, 본문을 바꾸면 401 이다', async () => {
@@ -939,13 +1153,64 @@ describe('기록과 계약', () => {
     for (const value of forbidden) assert.equal(all.includes(value), false, value);
   });
 
+  test('처리기 출력: 모든 경로에서 stdout·stderr·console 로 나가는 것은 기록 줄뿐이고 금지 값이 없다(별도 프로세스)', () => {
+    // 테스트 실행기가 없는 프로세스라 stdout·stderr 에 있는 것은 모두 처리기(와 그 안의 console.*)가 낸 것이다
+    const env = { ...process.env };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.NODE_OPTIONS;
+    const result = spawnSync(process.execPath, [join(ROOT, 'test', 'watch-routes-child.js')], {
+      cwd: ROOT,
+      env,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe', 'pipe'],
+      timeout: 60_000,
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.stderr, '');
+    const report = JSON.parse(result.output[3]);
+
+    // 성공, 오류, 꺼짐, 운영의 데모 세션, 저장소 장애 두 가지(KvError, 주소·토큰이 섞인 예외)를 모두 지났다
+    const failing = [200, ...Array(11).fill(503)];
+    assert.deepEqual(report.statuses, [
+      // 성공 경로(18:00 예약은 아직 일러 503)
+      200, 200, 200, 200, 200, 200, 200, 200, 503, 200, 200,
+      // 오류 경로(404, 401, 400 셋, 401, 400, 차단 503·SKIP_OFF 200, 운영 데모 401 셋)
+      404, 401, 400, 400, 400, 401, 400, 503, 200, 401, 401, 401,
+      // 삭제
+      200, 200, 200, 200,
+      // 저장소 장애
+      ...failing,
+      ...failing,
+    ]);
+    assert.equal(report.pushes, 2);
+
+    // stdout 의 모든 줄이 기록 줄이고, 처리기를 부른 만큼 한 줄씩이다
+    const lines = result.stdout.split('\n');
+    assert.equal(lines.pop(), '');
+    assert.equal(lines.length, report.calls);
+    for (const line of lines) {
+      const entry = JSON.parse(line);
+      assert.equal(entry.evt, 'watch', line);
+      assert.deepEqual(
+        Object.keys(entry).filter((k) => !['evt', 'route', 'outcome', 'errorCode', 'ms', 'counts'].includes(k)),
+        [],
+        line,
+      );
+    }
+    // 식별 값, 쿠키, 비밀, 저장소 주소·토큰·명령, 날짜·시각, 언어가 어느 줄에도 없다
+    assert.ok(report.forbidden.length > 20);
+    for (const value of report.forbidden) assert.equal(result.stdout.includes(value), false, value);
+  });
+
   test('계약: 응답 본문의 키가 표와 같다', async () => {
     const { out } = await tour();
     const keys = (obj) => Object.keys(obj).sort();
     assert.deepEqual(keys(out.pushConfig), ['enabled', 'guardianLoginRequired', 'ok', 'vapidPublicKey']);
     assert.deepEqual(keys(out.register), ['expiresOn', 'ok']);
     assert.deepEqual(keys(out.deadlines), ['armFailed', 'expiresOn', 'ok']);
-    assert.ok(Number.isInteger(out.deadlines.armFailed) && out.deadlines.armFailed >= 0);
+    // 예약 업체가 모두 받았으면 0 이다(실패 수는 '마감 올리기: 예약 업체가 N번 실패' 시험이 본다)
+    assert.equal(out.deadlines.armFailed, 0);
     assert.deepEqual(keys(out.back), ['ok', 'recorded']);
     assert.deepEqual(keys(out.subscribe), ['ok', 'subId']);
     assert.deepEqual(keys(out.unsubscribe), ['ok']);
@@ -1000,6 +1265,17 @@ describe('조립', () => {
     });
     assert.equal(prod.testOrigin, null);
     assert.equal(prod.keys.watch('x'), 'sh:prod:w:x');
+
+    // 꺼져 있거나 차단 스위치가 켜져도 ctx 는 만든다(삭제 경로용). 그때 enabled 는 거짓이다
+    for (const [name, env] of [
+      ['off', OFF_ENV],
+      ['killed', KILLED_ENV],
+      ['killed upstash', { ...QSTASH_ENV, SAFEHOUR_KILL_SERVER_PUSH: '1' }],
+    ]) {
+      const built = createWatchCtx(watchConfig(env), { fetchImpl });
+      assert.notEqual(built, null, name);
+      assert.equal(built.enabled, false, name);
+    }
   });
 
   test('createWatchCtx: Upstash 와 QStash 는 설정한 주소로 Bearer 를 붙여 부른다', async () => {
@@ -1027,6 +1303,7 @@ describe('조립', () => {
   });
 
   test('라우트 파일이 처리기를 내보낸다', async () => {
+    const LONG_RUNNING = new Set(['../app/api/watch/due/route.js', '../app/api/cron/watch-arm/route.js']);
     const expected = [
       ['../app/api/push/config/route.js', ['GET']],
       ['../app/api/watch/route.js', ['POST', 'DELETE']],
@@ -1046,6 +1323,8 @@ describe('조립', () => {
       }
       assert.equal(mod.runtime, 'nodejs', path);
       assert.equal(mod.dynamic, 'force-dynamic', path);
+      // 예약 처리와 하루 1회 예약만 실행 시간을 늘린다
+      assert.equal(mod.maxDuration, LONG_RUNNING.has(path) ? 60 : undefined, path);
     }
   });
 

@@ -6,7 +6,7 @@
 //         p256dh 는 65바이트, auth 는 16바이트, endpoint 는 2048자 이하이고 알려진 푸시 서비스의 https 주소만
 //   응답  200 { ok: true, subId }
 //   오류  503 SAFEHOUR_SERVER_PUSH_OFF          서버 알림이 꺼져 있음
-//         401 SAFEHOUR_AUTH_REQUIRED            세션이 필요한데 없음
+//         401 SAFEHOUR_AUTH_REQUIRED            세션이 필요한데 없음(운영 배포의 데모 세션은 없는 것으로 본다)
 //         400 SAFEHOUR_BAD_REQUEST              본문·필드 형식(`field`)·허용 목록 밖 endpoint
 //         404 SAFEHOUR_WATCH_NOT_FOUND          모르는 id
 //         429 SAFEHOUR_RATE_LIMITED             횟수 제한
