@@ -36,6 +36,14 @@ ADR-0012(`docs/decisions/0012-server-minimal-storage-guardian-push.md`)의 서�
   보내지 못한 결과(구독 없음, 한도, 구독 만료, 거절, 다시 시도)는 모두 표시를 지운다. `readDay`의 `pushed`는 `'s'`인 시각만,
   보내는 중인 시각은 `claimed`에 따로 담는다. '돌아왔어요'는 `'s'`일 때만 복귀 확인 알림을 보낸다. 보낸 뒤의 저장소 실패는 던지지 않고
   `SENT`로 끝낸다(알림은 이미 나갔다).
+- **마감 올리기와 '돌아왔어요'는 쓰기 토큰을 먼저 확인하고 센다.** 토큰이 맞으면 `deadlines`·`back`, 틀리거나 모르는 id면
+  `deadlinesBad`·`backBad`를 센다. 실패 한도를 미리 엿보고 막지 않는다(그러면 틀린 토큰으로 환자를 다시 막을 수 있다).
+- **예약 발행은 지켜보기당 하루 120건(`arm`)이다.** `armDay`가 발행마다 센다. 넘으면 남은 마감은 실패로 세고 멈춘다.
+  오늘 함께 있음이 켜진 날은 걸지 않는다(끄면 다시 건다).
+- **예약 표시(`a:`)를 지우는 판정은 지우기와 이유 다시 읽기를 한 배치에서 한다**(`clearArmedAndReadDay`,
+  `clearArmedAndReadSubExists`). 이유가 사라졌으면 `retry: true`로 다시 부르게 한다. 구독(`writeSub` 뒤 `armPending`),
+  함께 있음 끄기(`m` 지운 뒤 `armPending`), 마감 올리기(`replaceDays` 뒤 `armPending`)는 **먼저 쓰고 나중에 다시 건다.** 이 순서를
+  바꾸면 둘 다 상대를 못 보고 마감 하나가 조용히 사라진다.
 - **기록·예외 메시지·오류 응답에 넣지 않는 것**: `watchId`, 저장 키(`watchKey`), `ownerHash`, `subId`, `writeToken`, 계정 키,
   endpoint 주소와 호스트, 날짜, 시각, 언어, 푸시 서비스 응답 원문, 저장소 주소와 토큰, 예약 메시지 id, IP, User-Agent.
   성공 응답은 계약 표의 키만 담는다(`subId`, 상태 조회의 `date`·`confirmed`, 등록의 `expiresOn`은 계약에 있는 값이다).

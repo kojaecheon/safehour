@@ -165,6 +165,8 @@ Vercel(서울 리전) 설정이 저장소에 있다. `main`에 병합하면 운�
    (`sh:prod:`·`sh:prev:`·`sh:dev:`)로 나뉜다. 연동이 `KV_REST_API_*` 이름으로 넣어도 코드가 읽는다.
 3. **QStash 연동**: `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`를 넣는다. QStash 리전은 유럽(기본)과
    미국뿐이라 예약 메시지 본문(저장 키·날짜·시각)이 그곳에 놓인다. 운영 스위치를 켜기 전에 운영자와 법무가 리전을 확인한다.
+   월 예산 상한을 건다(결정 20). 앱은 지켜보기당 하루 120건까지만 예약을 발행하고 서비스 전체 상한은 두지 않는다. 기록의
+   `watch.deadlines` `failed` 수와 QStash 하루 메시지 수를 함께 본다.
 4. **배포 보호 우회**: 미리보기는 Vercel 로그인으로 막혀 있어 QStash의 되부르기가 앱에 닿지 못한다. Vercel 설정의 Deployment
    Protection에서 Protection Bypass for Automation 비밀을 만든다. Vercel이 그 값을 `VERCEL_AUTOMATION_BYPASS_SECRET`으로 넣고,
    예약 어댑터가 발행할 때 `Upstash-Forward-x-vercel-protection-bypass` 헤더로 실어 QStash가 `x-vercel-protection-bypass`로
