@@ -2,7 +2,9 @@
 //
 // 이 파일이 고정하는 것
 //   - 절은 스위치가 켜져 있거나 이 기기에 지켜보기 레코드(ON·REPLACED)가 있을 때만 보인다(다르게 정한 것 18)
-//   - 상태 줄 키는 ON, REPLACED, NONE 마다 다르다
+//   - 상태 줄 키는 ON, REPLACED, NONE 마다 다르다. ON 인데 서버가 스위치가 꺼졌다고 답했으면 멈춤 줄(안전 문구)이고,
+//     읽지 못했으면 예전 줄이다
+//   - '내 정보 지우기' 안내는 지켜보기 레코드(ON·REPLACED)가 있으면 서버 알림 저장을 적은 줄, 없으면 예전 줄이다
 //   - 끄기는 ON·REPLACED 이고 쓰기 가능할 때, 서버 지우기는 쓰기 가능하고 온라인일 때만
 //   - 끄기 결과: { ok: true, pending: false } 일 때만 '껐어요', pending 이면 알림이 갈 수 있다는 줄, 실패면 끄지 못했다는 줄
 //     (뒤의 둘은 안전 문구, 작업 7 검토 반영)
@@ -12,7 +14,7 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { serverPushRemoveResult, serverPushSectionView, serverPushTurnOffResult } from '../components/settings/serverPushView.js';
+import { clearNoteKey, serverPushRemoveResult, serverPushSectionView, serverPushTurnOffResult } from '../components/settings/serverPushView.js';
 import { messages as settingsMessages, safety as settingsSafety } from '../src/i18n/messages/settings.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { LANGS } from '../src/i18n/index.js';
@@ -43,6 +45,32 @@ describe('상태 줄', () => {
     assert.equal(keyOf('NONE'), 'settings.serverPushOff');
     assert.equal(new Set(['ON', 'REPLACED', 'NONE'].map(keyOf)).size, 3);
     assert.equal(keyOf(undefined), 'settings.serverPushOff');
+    for (const state of ['ON', 'REPLACED', 'NONE']) assert.equal(serverPushSectionView({ enabled: true, checked: true, state, ...WRITABLE }).statePair, false);
+  });
+
+  test('ON 인데 서버가 스위치가 꺼졌다고 답했으면 멈춤 줄(안전 문구)이고, 읽지 못했으면 예전 줄이다', () => {
+    const view = (args) => serverPushSectionView({ ...WRITABLE, ...args });
+    const paused = view({ enabled: false, checked: true, state: 'ON' });
+    assert.equal(paused.stateKey, 'settings.serverPushPaused');
+    assert.equal(paused.statePair, true);
+    assert.equal(paused.visible, true);
+    assert.equal(paused.canTurnOff, true, '멈춰 있어도 끌 수 있다');
+    // 읽지 못했거나(오프라인·실패) 아직 읽는 중이면 예전 줄 그대로다
+    for (const checked of [false, undefined]) {
+      const unknown = view({ enabled: false, checked, state: 'ON' });
+      assert.deepEqual([unknown.stateKey, unknown.statePair], ['settings.serverPushOn', false], String(checked));
+    }
+    // 켜져 있다고 답했으면 예전 줄
+    assert.equal(view({ enabled: true, checked: true, state: 'ON' }).stateKey, 'settings.serverPushOn');
+    // ON 이 아니면 멈춤 줄이 아니다
+    assert.equal(view({ enabled: false, checked: true, state: 'REPLACED' }).stateKey, 'settings.serverPushReplaced');
+    assert.equal(view({ enabled: false, checked: true, state: 'NONE' }).visible, false);
+  });
+
+  test("'내 정보 지우기' 안내: 지켜보기 레코드(ON·REPLACED)가 있으면 서버 알림 저장을 적은 줄, 없으면 예전 줄", () => {
+    assert.equal(clearNoteKey('ON'), 'clear.noteServerPush');
+    assert.equal(clearNoteKey('REPLACED'), 'clear.noteServerPush');
+    for (const state of ['NONE', undefined, null, 'OFF']) assert.equal(clearNoteKey(state), 'clear.note', String(state));
   });
 });
 
@@ -114,8 +142,9 @@ describe('문구', () => {
     'settings.serverPushRemoved',
     'settings.serverPushRemoveLogin',
     'settings.serverPushRemoveFailed',
+    'clear.noteServerPush',
   ];
-  const SAFETY_KEYS = ['settings.serverPushTurnOffPending', 'settings.serverPushTurnOffFailed'];
+  const SAFETY_KEYS = ['settings.serverPushTurnOffPending', 'settings.serverPushTurnOffFailed', 'settings.serverPushPaused'];
   const dashes = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
 
   function checkEntry(key, entry) {
@@ -152,6 +181,12 @@ describe('문구', () => {
     for (const result of [{ ok: true, deleted: 1 }, { ok: false, reason: 'LOGIN_REQUIRED' }, { ok: false }]) {
       assert.ok(settingsMessages[serverPushRemoveResult(result).key]);
     }
+    // 상태 줄도 같다(멈춤 줄만 안전 문구)
+    for (const args of [{ enabled: false, checked: true, state: 'ON' }, { enabled: true, checked: true, state: 'ON' }, { enabled: true, state: 'NONE' }]) {
+      const { stateKey, statePair } = serverPushSectionView({ ...WRITABLE, ...args });
+      assert.ok(statePair ? settingsSafety[stateKey] : settingsMessages[stateKey], stateKey);
+    }
+    for (const state of ['ON', 'NONE']) assert.ok(settingsMessages[clearNoteKey(state)], state);
   });
 
   test('계획의 한국어 원문을 쓰고, 지운 수 자리표시자가 네 언어에 있다', () => {
@@ -165,5 +200,12 @@ describe('문구', () => {
     );
     assert.equal(settingsSafety['settings.serverPushTurnOffFailed'].ko, '서버 알림을 끄지 못했어요. 연결과 로그인을 확인한 뒤 다시 해 주세요.');
     for (const lang of LANGS) assert.match(settingsMessages['settings.serverPushRemoved'][lang], /\{count\}/, lang);
+    assert.equal(settingsSafety['settings.serverPushPaused'].ko, '서버 알림이 지금 멈춰 있어요. 그동안 보호자에게 서버 알림이 가지 않아요.');
+    assert.equal(
+      settingsMessages['clear.noteServerPush'].ko,
+      "체류·조건·일정은 이 기기에만 저장됩니다. 서버 알림을 켜 두면 날짜별 복귀 마감 시각과 '돌아왔어요' 기록이 서버에 저장됩니다.",
+    );
+    // 레코드가 없을 때의 예전 안내는 그대로다
+    assert.equal(settingsMessages['clear.note'].ko, '체류·조건·일정은 이 기기에만 저장됩니다. 서버에는 저장되지 않습니다.');
   });
 });

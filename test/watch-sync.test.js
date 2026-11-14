@@ -1340,22 +1340,30 @@ describe('끄기와 서버 지우기', () => {
     assert.equal(h.store.readGuardianWatch().watchId, W2.watchId, '다른 계정의 레코드는 그대로다');
   });
 
-  test('config: 한 번 읽고 5분 기억한다, 실패는 { enabled: false } 이고 기억하지 않는다', async () => {
+  test('config: 한 번 읽고 5분 기억한다, 실패는 { enabled: false, checked: false } 이고 기억하지 않는다', async () => {
     const h = harness();
     h.api.reply('config', () => failed('NETWORK'));
-    assert.deepEqual(await h.sync.config(), { enabled: false });
-    assert.deepEqual(await h.sync.config(), { enabled: true }, '실패는 기억하지 않는다');
-    assert.deepEqual(await h.sync.config(), { enabled: true });
+    assert.deepEqual(await h.sync.config(), { enabled: false, checked: false });
+    assert.deepEqual(await h.sync.config(), { enabled: true, checked: true }, '실패는 기억하지 않는다');
+    assert.deepEqual(await h.sync.config(), { enabled: true, checked: true });
     assert.equal(h.api.calls.length, 2);
     h.clock.set(h.clock.now() + 5 * 60_000);
     h.api.reply('config', () => ok({ enabled: false, vapidPublicKey: null }));
-    assert.deepEqual(await h.sync.config(), { enabled: false });
+    // 서버가 꺼졌다고 답한 것은 checked: true 다(읽지 못한 것과 다르다). 기억한 값도 같다
+    assert.deepEqual(await h.sync.config(), { enabled: false, checked: true });
+    assert.deepEqual(await h.sync.config(), { enabled: false, checked: true });
     assert.equal(h.api.calls.length, 3);
     // 겹쳐 불러도 요청은 하나
     h.clock.set(h.clock.now() + 5 * 60_000);
     const [a, b] = await Promise.all([h.sync.config(), h.sync.config()]);
-    assert.deepEqual([a, b], [{ enabled: true }, { enabled: true }]);
+    assert.deepEqual([a, b], [{ enabled: true, checked: true }, { enabled: true, checked: true }]);
     assert.equal(h.api.calls.length, 4);
+    // 거절·한도(503·429)도 읽지 못한 것이다
+    for (const code of ['UNAVAILABLE', 'RATE_LIMITED']) {
+      const other = harness();
+      other.api.reply('config', () => failed(code));
+      assert.deepEqual(await other.sync.config(), { enabled: false, checked: false }, code);
+    }
   });
 
   test('getWatchSync 는 서버 렌더링 중(window 없음) null 이다', () => {

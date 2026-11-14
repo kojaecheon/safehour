@@ -3,6 +3,7 @@
 // 설정의 '서버 알림' 절 (docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 10, D11·D13·D14)
 //
 //   상태 줄 · 서버 알림 끄기 · 서버에 남은 내 정보 지우기(확인 시트) · 결과 줄(role="status")
+//   상태 줄은 스위치가 꺼졌다고 서버가 답했는데 이 기기의 지켜보기가 켜져 있으면 멈춰 있다는 안전 문구(병기)다.
 //
 // - 보이는 조건과 버튼을 누를 수 있는지는 serverPushView.js 하나가 정한다. 스위치가 꺼져 있고 이 기기에 지켜보기 레코드가
 //   없으면 아무것도 그리지 않는다. 끄거나 지운 뒤 절이 숨을 조건이 되어도 결과 줄을 보일 동안은 그 줄만 남긴다.
@@ -35,7 +36,13 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
   const statusRef = useRef(null);
   const [busy, setBusy] = useState(null);
   const [outcome, setOutcome] = useState(null);
-  const view = serverPushSectionView({ enabled: config.enabled, state: watch.state, readOnly: status.readOnly, online: status.online });
+  const view = serverPushSectionView({
+    enabled: config.enabled,
+    checked: config.checked,
+    state: watch.state,
+    readOnly: status.readOnly,
+    online: status.online,
+  });
 
   if (!view.visible && !outcome) return null;
   const exists = watch.state === 'ON' || watch.state === 'REPLACED';
@@ -74,7 +81,7 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
   return (
     <section className="ui-block settings-section settings-push" aria-labelledby="settings-push-title" inert={inert}>
       <h2 id="settings-push-title">{t('settings.serverPushTitle')}</h2>
-      {view.visible && <p className="settings-text">{t(view.stateKey)}</p>}
+      {view.visible && (view.statePair ? <PairText k={view.stateKey} className="settings-text" /> : <p className="settings-text">{t(view.stateKey)}</p>)}
       {view.visible && (
         <div className="settings-push-actions">
           {exists && (

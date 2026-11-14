@@ -20,6 +20,13 @@ export const messages = {
     ja: '滞在・条件・予定はこの端末にのみ保存されます。サーバーには保存されません。',
     zh: '停留信息、条件和行程只保存在此设备上，不会保存在服务器上。',
   },
+  // 이 기기에 서버 알림 레코드(ON·REPLACED)가 있을 때 clear.note 대신 보인다(components/settings/serverPushView.js clearNoteKey)
+  'clear.noteServerPush': {
+    ko: "체류·조건·일정은 이 기기에만 저장됩니다. 서버 알림을 켜 두면 날짜별 복귀 마감 시각과 '돌아왔어요' 기록이 서버에 저장됩니다.",
+    en: 'Your stay, conditions and plans are stored on this device only. While server alerts are on, the return deadline times for each day and your “I’m back” records are stored on our server.',
+    ja: '滞在・条件・予定はこの端末にのみ保存されます。サーバー通知をオンにしている間は、日ごとの帰着期限の時刻と「戻りました」の記録がサーバーに保存されます。',
+    zh: '停留信息、条件和行程只保存在此设备上。开启服务器提醒期间，每天的返回截止时间和“我已返回”记录会保存在服务器上。',
+  },
   'clear.question': {
     ko: '이 기기에 저장된 체류·조건·일정·보호자 사본을 모두 지우고 로그아웃할까요? 언어 설정만 남습니다. 되돌릴 수 없습니다.',
     en: 'Delete your stay, conditions, plans and companion copies from this device and sign out? Only your language setting is kept. This cannot be undone.',
@@ -304,6 +311,13 @@ export const safety = {
     en: 'Your plan is recalculated. Deleted conditions cannot be restored — after agreeing again you need to enter them again.',
     ja: '予定を計算し直します。削除した条件は元に戻せないため、もう一度同意したあとで入力し直す必要があります。',
     zh: '将重新计算行程。已删除的条件无法恢复，重新同意后需要再次填写。',
+  },
+  // 서버 알림 상태 줄: 이 기기의 지켜보기가 켜져 있는데 서버가 스위치가 꺼졌다고 답했을 때(보호자에게 알림이 가지 않는다)
+  'settings.serverPushPaused': {
+    ko: '서버 알림이 지금 멈춰 있어요. 그동안 보호자에게 서버 알림이 가지 않아요.',
+    en: 'Server alerts are paused right now. While they are paused, your guardian will not get server alerts.',
+    ja: 'サーバー通知は現在止まっています。その間、付き添い者にサーバー通知は届きません。',
+    zh: '服务器提醒目前已暂停。在此期间，陪同者不会收到服务器提醒。',
   },
   // 서버 알림 끄기 결과 중 보호자에게 알림이 갈 수 있는지를 말하는 줄(계획 2026-11-15 Task 10, 작업 7 검토 반영)
   'settings.serverPushTurnOffPending': {
