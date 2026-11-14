@@ -11,7 +11,9 @@
 //   - 응답 사이에 레코드가 지워지거나 다시 등록되면 결과를 쓰지 않는다
 //   - 계기: 일정·체류 구독, 온라인·쓰기 가능 복귀, KST 자정 + 1초(다음 자정을 다시 건다). 지켜보기 변경은 비우기를 부르지 않는다.
 //     stop() 은 타이머와 구독을 지운다
-//   - 끄기(retire)는 진행 중 요청이 끝난 뒤 저장소 retireGuardianWatch 와 서버 삭제 대기를 부른다. 서버 지우기(removeAll)
+//   - 끄기(retire)는 진행 중 요청이 끝난 뒤 저장소 retireGuardianWatch 와 서버 삭제 대기를 부르고 { ok, pending } 을 돌려준다.
+//     쓰기 가능하지 않거나 옮기지 못하면 ok: false 이고 아무것도 바꾸지 않는다. 서버 지우기(removeAll)
+//   - 'open' 계기는 실행기 하나에 한 번. 대기열을 쓰지 못한 누르기·되돌리기는 FAILED·UNDO_FAILED. 되돌리기는 ON 에서만
 //
 // 저장소는 메모리, 시계·타이머·난수·요청 함수는 주입한다. 가짜 요청 함수는 진짜 요청 모양(src/guardian/watchRequests.js)으로
 // 본문을 만들어 쌓는다(모양이 틀리면 그 자리에서 실패한다). 외부 호출과 벽시계는 없다. 시각은 모두 +09:00 오프셋으로 만든다.
@@ -203,13 +205,16 @@ function signOut(store) {
 /**
  * 로그인한 메모리 저장소 + 체류·일정(+ 지켜보기 레코드) + 실행기.
  * 실행기에는 writeGuardianWatch·writeBackQueue 를 기록하는 저장소를 넘긴다(writes, queueWrites).
- * 저장소의 fetch 는 서버 삭제 대기의 DELETE 본문을 deletes 에 쌓는다.
+ * 저장소의 fetch 는 서버 삭제 대기의 DELETE 본문을 deletes 에 쌓고 deleteReply 로 답한다(기본 200).
  */
-function harness({ at = kst(TODAY, '12:00'), record = null, plan = basePlan(), stay = makeStay() } = {}) {
+function harness({ at = kst(TODAY, '12:00'), record = null, plan = basePlan(), stay = makeStay(), deleteReply = () => json(200, { ok: true }) } = {}) {
   const clock = { ms: at, now: () => clock.ms, set: (value) => (clock.ms = value) };
   const deletes = [];
   const storeFetch = async (url, init = {}) => {
-    if (url === WATCH_PATHS.watch && init.method === 'DELETE') deletes.push(JSON.parse(init.body));
+    if (url === WATCH_PATHS.watch && init.method === 'DELETE') {
+      deletes.push(JSON.parse(init.body));
+      return deleteReply();
+    }
     return json(200, { ok: true });
   };
   const store = createStore({ storage: createMemoryStorage(), now: clock.now, fetchImpl: storeFetch });
@@ -372,6 +377,40 @@ describe('등록', () => {
     assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' });
     assert.equal(h.store.readGuardianWatch(), null, '다른 계정으로 만든 지켜보기를 이 계정에 쓰지 않는다');
     assert.deepEqual(h.writes, []);
+  });
+
+  test('등록: 응답 사이에 레코드가 바뀌면 같은 계정의 켜진 지켜보기만 돌려준다(다른 계정의 id 는 돌려주지 않는다)', async () => {
+    const otherAccount = harness();
+    const gate = deferred();
+    otherAccount.api.reply('register', async () => {
+      await gate.promise;
+      return ok({});
+    });
+    const pending = otherAccount.sync.ensureRegistered({ stay: otherAccount.store.readStay() });
+    await until(() => otherAccount.api.open === 1);
+    otherAccount.store.setSession({
+      authenticated: true,
+      accountKey: 'acct_watch_sync_test_0002',
+      expiresAt: new Date(otherAccount.clock.now() + HOUR).toISOString(),
+    });
+    assert.equal(otherAccount.store.writeGuardianWatch(watchRecord({ ...W2 })).ok, true);
+    gate.resolve();
+    assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' }, '다른 계정의 켜진 지켜보기 id 를 링크에 싣지 않는다');
+    assert.equal(otherAccount.store.readGuardianWatch().watchId, W2.watchId, '그 계정의 레코드는 그대로다');
+
+    // 같은 계정의 다른 탭이 먼저 켰으면 그 id 를 돌려준다
+    const sameAccount = harness();
+    const sameGate = deferred();
+    sameAccount.api.reply('register', async () => {
+      await sameGate.promise;
+      return ok({});
+    });
+    const same = sameAccount.sync.ensureRegistered({ stay: sameAccount.store.readStay() });
+    await until(() => sameAccount.api.open === 1);
+    assert.equal(sameAccount.store.writeGuardianWatch(watchRecord({ ...W2 })).ok, true);
+    sameGate.resolve();
+    assert.deepEqual(await same, { ok: true, watchId: W2.watchId });
+    assert.equal(sameAccount.store.readGuardianWatch().writeToken, W2.writeToken, '다른 탭의 결과를 덮지 않는다');
   });
 });
 
@@ -789,6 +828,57 @@ describe("'돌아왔어요'", () => {
     assert.equal(none.sync.backStatus(BACK), null);
     assert.deepEqual(none.api.calls, []);
   });
+
+  test('되돌리기도 켜진 지켜보기에서만 된다(REPLACED 면 단계와 대기열을 그대로 둔다)', async () => {
+    const sent = harness({ record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+    sent.sync.pressBack(BACK);
+    await sent.sync.idle();
+    assert.equal(phaseOf(sent.sync), BACK_PHASE.SENT);
+    assert.equal(sent.store.writeGuardianWatch({ ...sent.store.readGuardianWatch(), state: 'REPLACED' }).ok, true);
+    sent.sync.undoBack(BACK);
+    await sent.sync.idle();
+    assert.equal(phaseOf(sent.sync), BACK_PHASE.SENT);
+    assert.deepEqual(sent.store.readGuardianWatch().backQueue, []);
+    assert.deepEqual(sent.api.names(), ['back'], '되돌리기를 보내지 않는다');
+
+    // 새로 고친 뒤 대기열에서 다시 만든 QUEUED 도 REPLACED 면 건드리지 않는다
+    const queue = [{ ...BACK, undo: false }];
+    const queued = harness({ record: watchRecord({ state: 'REPLACED', backQueue: queue }) });
+    assert.equal(phaseOf(queued.sync), BACK_PHASE.QUEUED);
+    queued.sync.undoBack(BACK);
+    await queued.sync.idle();
+    assert.deepEqual(queued.store.readGuardianWatch().backQueue, queue);
+    assert.deepEqual(queued.queueWrites, []);
+    assert.deepEqual(queued.api.calls, []);
+  });
+
+  test('대기열을 저장소에 쓰지 못하면 누르기는 FAILED, 되돌리기는 UNDO_FAILED 다', async () => {
+    const h = harness({ record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+    let failWrites = true;
+    const store = {
+      ...h.store,
+      writeBackQueue: (queue) => (failWrites ? { ok: false, error: 'WRITE_FAILED' } : h.store.writeBackQueue(queue)),
+    };
+    const sync = createWatchSync({ store, api: h.api, now: h.clock.now });
+
+    sync.pressBack(BACK);
+    await sync.idle();
+    assert.equal(phaseOf(sync), BACK_PHASE.FAILED);
+    assert.deepEqual(h.api.calls, [], '대기열에 없으니 보내지 않는다');
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, []);
+
+    // 실패 뒤 다시 누를 수 있다
+    failWrites = false;
+    sync.pressBack(BACK);
+    await sync.idle();
+    assert.equal(phaseOf(sync), BACK_PHASE.SENT);
+
+    failWrites = true;
+    sync.undoBack(BACK);
+    await sync.idle();
+    assert.equal(phaseOf(sync), BACK_PHASE.UNDO_FAILED);
+    assert.deepEqual(h.api.bodies('back'), [{ ...W1, date: TODAY, by: '12:30' }], '되돌리기를 보내지 않는다');
+  });
 });
 
 // ── 응답 사이의 변경 ─────────────────────────────────────────────
@@ -842,6 +932,25 @@ describe('응답 사이에 레코드가 바뀜', () => {
 // ── 계기와 타이머 ─────────────────────────────────────────────
 
 describe('계기', () => {
+  test("'open' 계기는 실행기 하나에 한 번만 받는다(화면마다 다시 불러도 비우지 않는다)", async () => {
+    const h = harness({ record: watchRecord() });
+    await h.sync.kick('open');
+    assert.deepEqual(h.api.names(), ['deadlines']);
+    // 올릴 것이 생겨도 두 번째 open 은 비우지 않는다
+    assert.equal(h.store.writeTripPlan(planWith('2026-10-04', '15:00')).ok, true);
+    await h.sync.kick('open');
+    await h.sync.idle();
+    assert.deepEqual(h.api.names(), ['deadlines'], '두 번째 open 은 아무것도 걸지 않는다');
+    // 다른 계기는 그대로 받는다
+    await h.sync.kick('resume');
+    assert.deepEqual(h.api.names(), ['deadlines', 'deadlines']);
+    // 새 실행기(새로 고침)는 자기 open 을 한 번 받는다
+    assert.equal(h.store.writeTripPlan(planWith('2026-10-05', '15:00')).ok, true);
+    const fresh = createWatchSync({ store: h.store, api: h.api, now: h.clock.now });
+    await fresh.kick('open');
+    assert.deepEqual(h.api.names(), ['deadlines', 'deadlines', 'deadlines']);
+  });
+
   test('자정 타이머와 온라인·쓰기 가능 복귀가 kick 을 부른다', async () => {
     const h = harness({ at: kst(TODAY, '23:00'), record: watchRecord({ uploadPending: false }) });
     // 시작 전에 맞춰 둔다
@@ -926,11 +1035,79 @@ describe('끄기와 서버 지우기', () => {
 
     gate.resolve();
     await run;
-    await retired;
+    assert.deepEqual(await retired, { ok: true, pending: false });
     assert.equal(h.store.readGuardianWatch(), null);
     assert.deepEqual(h.deletes, [{ ...W1 }], '서버 삭제 대기를 보내고 끝나기를 기다린다');
     assert.deepEqual(h.store.readPendingServerDelete(), []);
     assert.equal(h.sync.backStatus(BACK), null);
+  });
+
+  test('retire: 앞선 요청을 기다리는 동안 보기 전용이 되면 아무것도 바꾸지 않고 ok: false 다', async () => {
+    const h = harness({ record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+    h.sync.pressBack(BACK);
+    await h.sync.idle();
+    assert.equal(phaseOf(h.sync), BACK_PHASE.SENT);
+    const gate = deferred();
+    h.api.reply('deadlines', async (input) => {
+      await gate.promise;
+      return ok({ expiresOn: input.expiresOn, armFailed: 0 });
+    });
+    assert.equal(h.store.writeTripPlan(planWith('2026-10-04', '15:00')).ok, true);
+    const run = h.sync.kick('plan');
+    await until(() => h.api.open === 1);
+    const retired = h.sync.retire();
+    signOut(h.store);
+    gate.resolve();
+    await run;
+    assert.deepEqual(await retired, { ok: false, reason: 'LOGIN_REQUIRED' });
+    assert.equal(h.store.readGuardianWatch().state, 'ON', '레코드는 켜진 그대로다');
+    assert.equal(h.store.readGuardianWatch().watchId, W1.watchId);
+    assert.deepEqual(h.deletes, []);
+    assert.deepEqual(h.store.readPendingServerDelete(), []);
+    assert.equal(phaseOf(h.sync), BACK_PHASE.SENT, '단계를 비우지 않는다');
+
+    const offline = harness({ record: watchRecord() });
+    offline.store.setOnline(false);
+    assert.deepEqual(await offline.sync.retire(), { ok: false, reason: 'UNAVAILABLE' });
+    assert.equal(offline.store.readGuardianWatch().watchId, W1.watchId);
+    assert.deepEqual(offline.deletes, []);
+  });
+
+  test('retire: 저장소가 옮기지 못하면 ok: false 이고 단계를 그대로 둔다', async () => {
+    const h = harness({ record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+    const store = { ...h.store, retireGuardianWatch: () => ({ ok: false, error: 'WRITE_FAILED' }) };
+    const sync = createWatchSync({ store, api: h.api, now: h.clock.now });
+    sync.pressBack(BACK);
+    await sync.idle();
+    assert.equal(phaseOf(sync), BACK_PHASE.SENT);
+    assert.deepEqual(await sync.retire(), { ok: false, reason: 'UNAVAILABLE' });
+    assert.equal(phaseOf(sync), BACK_PHASE.SENT);
+    assert.equal(h.store.readGuardianWatch().watchId, W1.watchId);
+  });
+
+  test('retire: 서버 삭제가 연결 실패로 남으면 pending: true, 지웠거나 레코드가 없으면 pending: false', async () => {
+    const h = harness({
+      record: watchRecord(),
+      deleteReply: () => {
+        throw new TypeError('network down');
+      },
+    });
+    assert.deepEqual(await h.sync.retire(), { ok: true, pending: true });
+    assert.equal(h.store.readGuardianWatch(), null, '이 기기에서는 껐다');
+    assert.deepEqual(h.deletes, [{ ...W1 }], '한 번 보냈다');
+    assert.deepEqual(
+      h.store.readPendingServerDelete().map((item) => item.watchId),
+      [W1.watchId],
+      '서버 삭제 대기에 남아 다음 계기에 다시 보낸다',
+    );
+
+    const done = harness({ record: watchRecord() });
+    assert.deepEqual(await done.sync.retire(), { ok: true, pending: false });
+    assert.deepEqual(done.store.readPendingServerDelete(), []);
+
+    const none = harness();
+    assert.deepEqual(await none.sync.retire(), { ok: true, pending: false });
+    assert.deepEqual(none.deletes, []);
   });
 
   test('removeAll: OK 면 레코드를 지우고 deleted 를 돌려준다, 401 은 LOGIN_REQUIRED', async () => {
