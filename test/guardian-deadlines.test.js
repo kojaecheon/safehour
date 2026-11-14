@@ -2,6 +2,7 @@
 //
 // 이 파일이 고정하는 것
 //   - 당겨진 외출은 OUTING_OVERDUE 즉시 복귀 날의 여유 음수 외출뿐이다(다른 즉시 복귀 원인의 날은 실제 마감이다)
+//   - 마감이 당겨진 외출(isPulledDeadlineOuting)은 여유 음수이고 마감이 예상 귀가보다 이른 외출이다. 엔진과 서버 알림이 함께 쓴다
 //   - 환자 복귀 목록은 저장 순서 그대로이고 시각이 아닌 returnBy 와 보호자 외출은 들어오지 않는다
 //   - 날짜별 마감은 fromDate(입국일보다 앞이면 입국일)부터 출국일까지, 당겨진 마감을 빼고 중복 없이 정렬한다
 //   - 당겨진 외출이 없는 날의 마감은 보호자 스냅샷의 patientReturn[].by 와 같다(스냅샷은 당겨진 외출도 담는다)
@@ -10,8 +11,9 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-import { REASON, isClampedOverdueOuting } from '../src/domain/states.js';
+import { REASON, isClampedOverdueOuting, isPulledDeadlineOuting } from '../src/domain/states.js';
 import { buildGuardianSnapshot, patientDeadlineDays, patientReturnsOf } from '../src/guardian/index.js';
 import { guardianOuting, makeDayPlan, makeGuardianStay, makeTripPlan, patientOuting } from './guardian-fixtures.js';
 
@@ -45,6 +47,39 @@ describe('isClampedOverdueOuting', () => {
     }
     assert.equal(isClampedOverdueOuting(day, null), false);
     assert.equal(isClampedOverdueOuting(null, patientOuting({ slackMin: -20 })), false);
+  });
+});
+
+describe('isPulledDeadlineOuting', () => {
+  test('여유가 음수이고 마감이 예상 귀가보다 이른 외출만 참이다(그날의 즉시 복귀 여부와 상관없다)', () => {
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: -20, returnBy: '14:30', plannedReturnAt: '15:10' })), true);
+    // 여유가 음수가 아니면 거짓
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: 0, returnBy: '14:30', plannedReturnAt: '15:10' })), false);
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: 5, returnBy: '14:30', plannedReturnAt: '15:10' })), false);
+    // 마감이 예상 귀가와 같거나 늦으면 거짓, 예상 귀가가 없으면 마감과 비교한다(같으니 거짓)
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: -20, returnBy: '15:10', plannedReturnAt: '15:10' })), false);
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: -20, returnBy: '15:30', plannedReturnAt: '15:10' })), false);
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: -20, returnBy: '14:30' })), false);
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: -20, returnBy: '14:30', plannedReturnAt: null })), false);
+    // 분으로 비교한다(09:50 은 10:05 보다 이르다)
+    assert.equal(isPulledDeadlineOuting(patientOuting({ slackMin: -1, returnBy: '09:50', plannedReturnAt: '10:05' })), true);
+    // 모양이 틀리면 거짓
+    for (const outing of [
+      null,
+      undefined,
+      patientOuting({ slackMin: '-20', returnBy: '14:30', plannedReturnAt: '15:10' }),
+      patientOuting({ slackMin: Number.NaN, returnBy: '14:30', plannedReturnAt: '15:10' }),
+      patientOuting({ slackMin: -20, returnBy: '24:00', plannedReturnAt: '15:10' }),
+      patientOuting({ slackMin: -20, returnBy: '14:30', plannedReturnAt: '9:10' }),
+    ]) {
+      assert.equal(isPulledDeadlineOuting(outing), false, JSON.stringify(outing ?? null));
+    }
+  });
+
+  test('엔진은 같은 판정의 사본을 두지 않고 공용 판정을 쓴다', () => {
+    const source = readFileSync(new URL('../src/engine/tripPlan.js', import.meta.url), 'utf8');
+    assert.match(source, /isPulledDeadlineOuting\(o\)/);
+    assert.doesNotMatch(source, /function pulledDeadline\(/);
   });
 });
 

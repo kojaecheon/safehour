@@ -184,6 +184,24 @@ export function isClampedOverdueOuting(day, outing) {
   return isOverdueClampedDay(day) && typeof outing?.slackMin === 'number' && outing.slackMin < 0;
 }
 
+/** "HH:MM" 24시간 표기인가. 이 층은 src/stay 를 불러오지 않으므로(모듈 경계) 여기서 따로 본다 */
+const CLOCK_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/**
+ * 마감이 예상 귀가보다 이른 외출인가: 여유가 음수이고 returnBy 가 plannedReturnAt(없으면 returnBy)보다 이르다.
+ * 엔진의 overdueSafe(src/engine/dayContext.js)가 마감을 출발·그때 시각으로 당긴 외출이다. overdueSafe 가 붙이는 pulled 는
+ * 저장되지 않으므로 저장된 외출에서는 이 식으로 다시 추정한다. 한쪽 기준을 바꾸면 다른 쪽도 본다.
+ * 시각은 0을 채운 "HH:MM"이라 문자열 비교가 분 비교와 같다. 시각이 아니면 거짓이다.
+ * 쓰는 곳: src/engine/tripPlan.js(해제할 때 다시 잴 외출), lib/trip/watchPlan.js(서버 알림의 묶인 외출).
+ * @param {object|null} outing  환자 외출
+ */
+export function isPulledDeadlineOuting(outing) {
+  if (typeof outing?.slackMin !== 'number' || !(outing.slackMin < 0)) return false;
+  const planned = outing.plannedReturnAt ?? outing.returnBy;
+  const isClock = (value) => typeof value === 'string' && CLOCK_RE.test(value);
+  return isClock(outing.returnBy) && isClock(planned) && outing.returnBy < planned;
+}
+
 /**
  * 사유 문구: 안전 문구다. 화면은 src/i18n 의 safetyPair() 규칙으로 보여준다 (docs/business-rules.md '언어').
  * 4개 언어를 모두 가진다. 새 사유 코드는 도메인 작업이 추가하고 문구는 언어 작업이 채운다.
