@@ -4,9 +4,10 @@
 // 모든 값은 테스트 전용 가짜 값이다. 실제 비밀, 실제 구독 주소, 실제 계정을 담지 않는다.
 // 저장소는 메모리 구현, 예약과 푸시는 호출을 쌓아 두는 기록기라 외부 호출이 0건이다.
 
-import { createECDH, randomBytes } from 'node:crypto';
+import { createECDH, generateKeyPairSync, randomBytes } from 'node:crypto';
 import { createMemoryKv } from '../lib/server/watch/kv.js';
 import { redisKeys } from '../lib/server/watch/keys.js';
+import { SESSION_SECRET } from './itinerary-fixtures.js';
 
 /** 찾는 키를 만드는 비밀 (48자, 테스트 전용) */
 export const SECRET = 'test-watch-owner-secret-0123456789abcdefghijklmn';
@@ -107,6 +108,40 @@ function recordingPush() {
     },
   };
   return push;
+}
+
+/** 예약 처리 경로의 Bearer 비밀 (테스트 전용) */
+export const WATCH_CRON_SECRET = 'cron-secret-for-route-tests-0123456789';
+
+/** VAPID 한 쌍: 공개키는 비압축 점(65바이트), 비밀키는 d. 둘 다 채움 없는 base64url */
+function vapidPair() {
+  const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const priv = privateKey.export({ format: 'jwk' });
+  const pub = publicKey.export({ format: 'jwk' });
+  const raw = Buffer.concat([Buffer.from([0x04]), Buffer.from(pub.x, 'base64url'), Buffer.from(pub.y, 'base64url')]);
+  return { publicKey: raw.toString('base64url'), privateKey: priv.d };
+}
+
+/**
+ * 라우트 처리기 시험용 환경변수. test/watch-routes.test.js 의 ENV 와 같은 값이다: 켜는 스위치 '1', 데모 로그인, 메모리 저장소,
+ * VAPID 한 쌍, 저장 키, 찾는 키 비밀(SECRET), CRON_SECRET. 세션 서명 키는 SAFEHOUR_SESSION_SECRET 로 읽는다.
+ * 부를 때마다 VAPID 한 쌍과 저장 키를 새로 만든다.
+ * @returns {Readonly<Record<string, string>>}
+ */
+export function watchRouteEnv() {
+  const vapid = vapidPair();
+  return Object.freeze({
+    SAFEHOUR_SERVER_PUSH: '1',
+    SAFEHOUR_ALLOW_DEMO_LOGIN: '1',
+    SAFEHOUR_STORE_MODE: 'memory',
+    SAFEHOUR_SESSION_SECRET: SESSION_SECRET,
+    SAFEHOUR_VAPID_PUBLIC_KEY: vapid.publicKey,
+    SAFEHOUR_VAPID_PRIVATE_KEY: vapid.privateKey,
+    SAFEHOUR_VAPID_SUBJECT: 'mailto:ops@example.com',
+    SAFEHOUR_PUSH_STORE_KEY: randomBytes(32).toString('base64url'),
+    SAFEHOUR_WATCH_OWNER_SECRET: SECRET,
+    CRON_SECRET: WATCH_CRON_SECRET,
+  });
 }
 
 /** 테스트용 WatchCtx. 시계는 ctx.clock 으로 움직인다 */
