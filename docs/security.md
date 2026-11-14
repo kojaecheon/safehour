@@ -235,7 +235,7 @@
   `ms`는 처리 시간을 반올림한 음이 아닌 정수다. 이 여섯 키 밖의 필드는 나가지 않는다(받은 객체를 펼쳐 쓰지 않는다).
 - `outcome`은 `OK`·`REJECTED`·`NOT_FOUND`·`LIMITED`·`OFF`·`FAILED`와 예약 처리 판정표의 값(`SENT`, `SKIP_*`, `SUB_GONE`, `RETRY`,
   `SEND_REJECTED`)만 받는다. 목록 밖 값은 `FAILED`가 된다. `errorCode`는 `SAFEHOUR_`로 시작하는 자체 코드만 받는다.
-- `counts`는 `watches`·`armed`·`failed`·`deleted` 네 개의 음이 아닌 정수뿐이고, 푸시 응답은 구간(`push`: `2xx`·`404/410`·`4xx`·
+- `counts`는 `watches`·`armed`·`failed`·`deleted`·`partial` 다섯 개의 음이 아닌 정수뿐이고(`partial`은 하루 1회 예약이 중간에 멈췄을 때만 1), 푸시 응답은 구간(`push`: `2xx`·`404/410`·`4xx`·
   `5xx`·`network`)으로만 남긴다. 그 밖의 입력은 버린다.
 - **넣지 않는 것**: `watchId`, 저장 키, 소유자 해시, `subId`, 쓰기 토큰, endpoint 주소와 호스트, 날짜, 시각, 언어, 푸시 서비스 응답
   원문, 저장소 주소와 토큰, QStash 메시지 id, IP, User-Agent. 예외 메시지와 응답 본문도 같은 규칙이다. 저장소 오류(`KvError`)와

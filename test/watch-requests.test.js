@@ -299,7 +299,7 @@ describe('기록 한 줄', () => {
       outcome: DUE_OUTCOME.SENT,
       errorCode: 'SAFEHOUR_SERVER_PUSH_UNAVAILABLE',
       elapsedMs: 12.6,
-      counts: { watches: 3, armed: 1, failed: 0, deleted: 2, push: '2xx' },
+      counts: { watches: 3, armed: 1, failed: 0, deleted: 2, partial: 1, push: '2xx' },
     });
     assert.deepEqual(full, {
       evt: 'watch',
@@ -307,7 +307,7 @@ describe('기록 한 줄', () => {
       outcome: 'SENT',
       errorCode: 'SAFEHOUR_SERVER_PUSH_UNAVAILABLE',
       ms: 13,
-      counts: { watches: 3, armed: 1, failed: 0, deleted: 2, push: '2xx' },
+      counts: { watches: 3, armed: 1, failed: 0, deleted: 2, partial: 1, push: '2xx' },
     });
 
     // 형식이 틀린 값은 버린다

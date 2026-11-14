@@ -1080,6 +1080,38 @@ describe('예약 처리와 하루 1회 예약', () => {
     const log = logsOf(lines()).find((l) => l.route === 'watch.cron');
     assert.deepEqual(log.counts, { watches: 1, armed: 3, failed: 0 });
   });
+
+  test('하루 1회 예약: 시간 예산 때문에 중간에 멈추면 응답 모양은 같고 기록에만 partial: 1 이 남는다', async () => {
+    const { ctx, h } = setup({ at: '2026-11-19T14:00:00Z' });
+    await expectStatus(await h.register(call('POST', '/api/watch', registerBody(), { cookie: cookieFor(ctx, 'patient-1') })), 200);
+    ctx.scheduler.fail = true;
+    await expectStatus(
+      await h.deadlines(
+        call(
+          'PUT',
+          '/api/watch/deadlines',
+          deadlinesBody([
+            { date: '2026-11-20', deadlines: ['09:00', '10:00', '11:00', '12:00', '13:00', '14:00'] },
+          ]),
+        ),
+      ),
+      200,
+    );
+    ctx.scheduler.fail = false;
+    // 발행 하나가 10초 걸리는 느린 예약 업체: 0·10·20·30·40초에 시작한 다섯 건을 걸고 50초에 멈춘다
+    const original = ctx.scheduler.schedule;
+    ctx.scheduler.schedule = async (args) => {
+      ctx.clock.set(new Date(ctx.now() + 10_000).toISOString());
+      return original(args);
+    };
+    ctx.clock.set('2026-11-19T15:05:00Z');
+    const lines = captureLogs();
+    const body = await expectStatus(await h.cronArm(call('GET', '/api/cron/watch-arm', undefined, { headers: BEARER })), 200);
+    assert.deepEqual(body, { ok: true, armed: 5, failed: 0 });
+    const log = logsOf(lines()).find((l) => l.route === 'watch.cron');
+    assert.deepEqual(log.counts, { watches: 1, armed: 5, failed: 0, partial: 1 });
+    ctx.scheduler.schedule = original;
+  });
 });
 
 describe('기록과 계약', () => {
