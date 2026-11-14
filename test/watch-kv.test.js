@@ -118,6 +118,56 @@ test('메모리: 모르는 명령은 KV_COMMAND 를 던진다', async () => {
   await assert.rejects(kv.exec([['HSET', 'h', 'only-field']]), (err) => err.code === 'KV_COMMAND');
 });
 
+test('메모리: 인자 형식이 틀린 명령이 섞이면 배치 전체를 실행하지 않는다', async () => {
+  const { kv } = memory();
+  const bad = [
+    ['GET'],
+    ['GET', 'a', 'b'],
+    ['SET', 'k'],
+    ['SET', 'k', 'v', 'EX', 10],
+    ['SET', 'k', 'v', 'EXAT'],
+    ['SET', 'k', 'v', 'EXAT', 'soon'],
+    ['EXPIRE', 'k'],
+    ['EXPIRE', 'k', '1.5'],
+    ['EXPIREAT', 'k', 'x'],
+    ['INCR', 'a', 'b'],
+    ['HSET', 'h', 'f'],
+    ['HSET', 'h', 'f', 'v', 'g'],
+    ['HSETNX', 'h', 'f'],
+    ['HDEL', 'h'],
+    ['HGETALL'],
+    ['SADD', 's'],
+    ['SREM', 's'],
+    ['SMEMBERS'],
+    ['DEL'],
+    ['EXISTS'],
+    [],
+  ];
+  for (const cmd of bad) {
+    await assert.rejects(
+      kv.exec([['SET', 'first', 'v'], ['SADD', 'set', 'm'], cmd]),
+      (err) => err instanceof KvError && err.code === 'KV_COMMAND',
+      JSON.stringify(cmd),
+    );
+    assert.deepEqual(await kv.exec([['EXISTS', 'first'], ['EXISTS', 'set']]), [0, 0], `${JSON.stringify(cmd)} 앞 명령이 실행됐다`);
+  }
+});
+
+test('메모리: 실행 중 오류는 나머지 명령을 모두 실행한 뒤 KV_COMMAND 를 던진다', async () => {
+  const { kv } = memory();
+  await kv.exec([['SET', 'str', 'abc'], ['SADD', 'set', 'm']]);
+  await assert.rejects(
+    kv.exec([
+      ['SET', 'before', '1'],
+      ['INCR', 'str'],
+      ['HSET', 'set', 'f', 'v'],
+      ['SET', 'after', '2'],
+    ]),
+    (err) => err instanceof KvError && err.code === 'KV_COMMAND',
+  );
+  assert.deepEqual(await kv.exec([['GET', 'before'], ['GET', 'after'], ['GET', 'str'], ['SMEMBERS', 'set']]), ['1', '2', 'abc', ['m']]);
+});
+
 test('메모리: exec 는 결과를 명령 순서대로 돌려준다', async () => {
   const { kv } = memory();
   const out = await kv.exec([
@@ -131,6 +181,17 @@ test('메모리: exec 는 결과를 명령 순서대로 돌려준다', async () 
   ]);
   assert.deepEqual(out, ['OK', '1', 2, '2', 1, ['x', 'y'], null]);
   assert.deepEqual(await kv.exec([]), []);
+});
+
+test('메모리: sharedMemoryKv 는 마지막으로 부른 쪽의 시계를 쓴다', async () => {
+  const first = fixedClock('2026-11-20T03:00:00Z');
+  const kv = sharedMemoryKv({ now: first.now });
+  const exat = Math.floor(first.now() / 1000) + 600;
+  await kv.exec([['SET', 'shared-clock', 'v', 'EXAT', exat]]);
+  const later = fixedClock('2026-11-20T03:20:00Z');
+  assert.equal(sharedMemoryKv({ now: later.now }), kv);
+  // 처음 시계는 그대로지만 새 시계로는 만료가 지났다
+  assert.deepEqual(await kv.exec([['GET', 'shared-clock']]), [null]);
 });
 
 test('메모리: sharedMemoryKv 는 프로세스에 하나다', async () => {
@@ -250,6 +311,38 @@ test('Upstash: HTTP 500 과 fetch 예외는 KV_UNAVAILABLE, 응답 안의 error 
     ]),
     isCode('KV_UNAVAILABLE'),
   );
+});
+
+test('Upstash: 실패 응답의 본문은 읽지 않고 놓는다', async () => {
+  let cancelled = 0;
+  let read = false;
+  const markRead = async () => {
+    read = true;
+    return {};
+  };
+  const response = (status, cancel) => ({
+    ok: false,
+    status,
+    json: markRead,
+    text: markRead,
+    body: { cancel },
+  });
+  const { kv } = upstash(() =>
+    response(503, async () => {
+      cancelled += 1;
+    }),
+  );
+  await assert.rejects(kv.exec([['GET', 'k']]), (err) => err.code === 'KV_UNAVAILABLE');
+  assert.equal(cancelled, 1);
+  assert.equal(read, false);
+  // 놓기가 실패해도 같은 오류다
+  const failing = upstash(() =>
+    response(401, async () => {
+      throw new Error('cancel failed');
+    }),
+  );
+  await assert.rejects(failing.kv.exec([['GET', 'k']]), (err) => err.code === 'KV_UNAVAILABLE');
+  assert.equal(read, false);
 });
 
 test('Upstash: 시간 초과는 KV_UNAVAILABLE 이다', async () => {

@@ -426,3 +426,157 @@ test('deleteWatchData 는 지켜보기·구독·날짜 기록·색인·소유 �
   assert.deepEqual(await ownerWatchKeys(ctx, ownerHash), [otherKey]);
   assert.ok(await readDay(ctx, otherKey, TODAY));
 });
+
+// ---- 검토 반영 ----
+
+/** 지금까지 쓴 모든 키를 명령에서 모아 형별로 돌려준다. 메모리 저장소 안을 직접 들여다보는 대신 쓴다 */
+function writtenKeys(commands) {
+  const byType = { string: new Set(), hash: new Set(), set: new Set() };
+  for (const [name, key] of commands) {
+    if (name === 'SET' || name === 'INCR') byType.string.add(key);
+    else if (name === 'HSET' || name === 'HSETNX') byType.hash.add(key);
+    else if (name === 'SADD') byType.set.add(key);
+  }
+  return byType;
+}
+
+/** watchKey 가 남아 있는 키 이름이나 집합 원소를 모두 찾는다 */
+async function leftovers(ctx, commands, watchKey) {
+  const found = [];
+  const { string, hash, set } = writtenKeys(commands);
+  for (const key of [...string, ...hash, ...set]) {
+    const [exists] = await ctx.kv.exec([['EXISTS', key]]);
+    if (exists && key.includes(watchKey)) found.push(key);
+  }
+  for (const key of set) {
+    const [members] = await ctx.kv.exec([['SMEMBERS', key]]);
+    if (members.includes(watchKey)) found.push(`${key} 원소`);
+  }
+  return found;
+}
+
+test('deleteWatchData 는 출국일을 줄이기 전에 올린 뒤쪽 날짜 기록도 지운다', async () => {
+  const ctx = testCtx();
+  const commands = recordKv(ctx);
+  const watchKey = watchKeyOf(IDS.watchId, SECRET);
+  await writeWatch(ctx, watchKey, watchRecord({ expiresOn: '2026-11-30' }));
+  await addOwnerWatch(ctx, watchRecord().ownerHash, watchKey);
+  const { subscription } = subscriptionFixture();
+  await writeSub(ctx, watchKey, { subId: 'SUBidFixture_0123456-a', ...subscription, lang: 'ko' }, '2026-11-30');
+  await replaceDays(ctx, watchKey, [
+    { date: TODAY, deadlines: ['14:30'] },
+    { date: '2026-11-28', deadlines: ['20:00'] },
+  ]);
+  await setDayField(ctx, watchKey, '2026-11-28', DAY_FIELD.armed('20:00'), 'm28');
+  // 출국일을 11-22 로 줄인다. 11-28 기록은 그대로 남아 있다
+  const shortened = watchRecord({ expiresOn: '2026-11-22' });
+  await writeWatch(ctx, watchKey, shortened);
+  await touchExpiry(ctx, watchKey, '2026-11-22');
+  assert.ok(await readDay(ctx, watchKey, '2026-11-28'));
+  assert.ok((await leftovers(ctx, commands, watchKey)).length > 0);
+
+  const out = await deleteWatchData(ctx, watchKey, shortened);
+  assert.deepEqual(out.messageIds, ['m28']);
+  assert.deepEqual(await leftovers(ctx, commands, watchKey), []);
+});
+
+test('writeWatch 는 소유 집합에 넣고 그 만료를 늦춰, 연장한 지켜보기보다 먼저 사라지지 않는다', async () => {
+  const ctx = testCtx();
+  const watchKey = watchKeyOf(IDS.watchId, SECRET);
+  const ownerHash = watchRecord().ownerHash;
+  const expiresOn = capExpiresOn('2027-12-31', TODAY);
+  assert.equal(expiresOn, '2027-01-05');
+  assert.equal(await writeWatch(ctx, watchKey, watchRecord({ expiresOn }), { onlyIfAbsent: true }), true);
+  assert.deepEqual(await ownerWatchKeys(ctx, ownerHash), [watchKey]);
+
+  ctx.clock.set('2026-12-20T03:00:00Z');
+  assert.equal(await writeWatch(ctx, watchKey, watchRecord({ expiresOn: '2027-01-20' })), true);
+
+  // 처음 등록 + 60일(2027-01-19)을 지나도 소유 집합이 남아 있다
+  ctx.clock.set('2027-01-20T03:00:00Z');
+  assert.ok(await readWatch(ctx, watchKey));
+  assert.deepEqual(await ownerWatchKeys(ctx, ownerHash), [watchKey]);
+});
+
+test('writeWatch onlyIfAbsent 가 실패하면 소유 집합을 건드리지 않는다', async () => {
+  const ctx = testCtx();
+  const watchKey = watchKeyOf(IDS.watchId, SECRET);
+  await writeWatch(ctx, watchKey, watchRecord());
+  const otherOwner = ownerHashOf(IDS.otherAccountKey, SECRET);
+  const commands = recordKv(ctx);
+  assert.equal(await writeWatch(ctx, watchKey, watchRecord({ ownerHash: otherOwner }), { onlyIfAbsent: true }), false);
+  assert.ok(commands.every((c) => c[0] === 'SET'));
+  assert.deepEqual(await ownerWatchKeys(ctx, otherOwner), []);
+});
+
+test('replaceDays: 빈 목록으로 날짜를 지워도 함께 있음 표시는 남는다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.muted, '1');
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.confirmed('14:30'), '1');
+  assert.deepEqual(await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: [] }]), {
+    removedMessageIds: [],
+    changed: 1,
+  });
+  assert.deepEqual(await readDay(ctx, watchKey, TODAY), {
+    deadlines: [],
+    confirmed: [],
+    armed: {},
+    pushed: [],
+    closed: [],
+    muted: true,
+  });
+  assert.deepEqual(await indexMembers(ctx, TODAY), []);
+  // 남긴 표시에도 날짜 만료가 걸려 있다
+  ctx.clock.set('2026-11-21T15:00:00Z');
+  assert.equal(await readDay(ctx, watchKey, TODAY), null);
+});
+
+test('replaceDays: 마감 없이 함께 있음만 있던 날짜에 빈 목록은 changed 로 세지 않는다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seedWatch(ctx);
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.muted, '1');
+  assert.deepEqual(await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: [] }]), {
+    removedMessageIds: [],
+    changed: 0,
+  });
+  assert.equal((await readDay(ctx, watchKey, TODAY)).muted, true);
+});
+
+test('형식이 망가진 지켜보기 레코드는 없는 것으로 본다', async () => {
+  const ctx = testCtx();
+  const watchKey = watchKeyOf(IDS.watchId, SECRET);
+  const key = ctx.keys.watch(watchKey);
+  const good = watchRecord();
+  const broken = [
+    { ...good, expiresOn: '2026-02-30' },
+    { ...good, expiresOn: '2026-11-25T00:00' },
+    { ...good, ownerHash: 'short' },
+    { ...good, writeHash: `${good.writeHash.slice(1)}=` },
+    { ...good, registrations: -1 },
+    { ...good, registrations: '1' },
+  ];
+  for (const value of broken) {
+    await ctx.kv.exec([['SET', key, JSON.stringify(value)]]);
+    assert.equal(await readWatch(ctx, watchKey), null, JSON.stringify(value));
+    assert.equal(await findWritableWatch(ctx, IDS.watchId, IDS.writeToken), null);
+  }
+  for (const raw of ['not json', 'null', '[]', '42']) {
+    await ctx.kv.exec([['SET', key, raw]]);
+    assert.equal(await readWatch(ctx, watchKey), null, raw);
+  }
+});
+
+test('다른 지켜보기의 키 아래로 옮긴 봉인 구독은 열리지 않는다', async () => {
+  const ctx = testCtx();
+  const a = watchKeyOf('AAAAwatchIdFixture_0-a', SECRET);
+  const b = watchKeyOf('BBBBwatchIdFixture_0-a', SECRET);
+  const { subscription } = subscriptionFixture();
+  const sub = { subId: 'SUBidFixture_0123456-a', ...subscription, lang: 'ko' };
+  await writeSub(ctx, a, sub, '2026-11-25');
+  assert.deepEqual(await readSub(ctx, a), sub);
+  const [raw] = await ctx.kv.exec([['GET', ctx.keys.sub(a)]]);
+  await ctx.kv.exec([['SET', ctx.keys.sub(b), raw]]);
+  assert.equal(await readSub(ctx, b), null);
+});

@@ -41,7 +41,7 @@ test('같은 입력은 같은 키, 문맥이 다르면 다른 값이다', () => 
   const x = IDS.writeToken;
   assert.equal(watchKeyOf(x, SECRET), watchKeyOf(x, SECRET));
   assert.notEqual(watchKeyOf(x, SECRET), ownerHashOf(x, SECRET));
-  assert.notEqual(watchKeyOf(x, SECRET), rateKeyOf({ bucket: x, subject: '' }, SECRET));
+  assert.notEqual(watchKeyOf(x, SECRET), rateKeyOf({ bucket: x, subject: 'x' }, SECRET));
   for (const v of [watchKeyOf(x, SECRET), ownerHashOf(x, SECRET), writeHashOf(x)]) {
     assert.match(v, B64URL_43);
     assert.ok(!v.includes(x));
@@ -109,6 +109,20 @@ test('idMatches 는 같은 문자열만 참이고 길이가 다르거나 문자�
   assert.equal(idMatches('abc', 42), false);
   // 바이트 길이가 같아도 문자 수가 다른 경우를 던지지 않고 거짓으로 본다
   assert.equal(idMatches('é', 'ab'), false);
+  // 문자 수는 같고 바이트 수가 다른 경우: 바이트 길이 확인이 timingSafeEqual 앞에서 거른다
+  assert.equal(idMatches('é', 'a'), false);
+});
+
+test('rateKeyOf 는 항목·주체가 빈 문자열이 아닌 문자열일 때만 받는다', () => {
+  for (const bad of [
+    { bucket: 'create', subject: '' },
+    { bucket: '', subject: 'x' },
+    { bucket: 'create', subject: null },
+    { bucket: 'create', subject: 42 },
+    { bucket: undefined, subject: 'x' },
+  ]) {
+    assert.throws(() => rateKeyOf(bad, SECRET), TypeError);
+  }
 });
 
 test('redisKeys 는 환경 이름을 접두사에 넣는다', () => {
@@ -155,6 +169,17 @@ test('이전 키로 봉인한 값도 열린다', () => {
   assert.equal(openJson(sealed, [newKey]), null);
 });
 
+test('aad 가 다르면 열리지 않는다', () => {
+  const sealed = sealJson({ a: 1 }, SEAL_KEY, 'watch-key-A');
+  assert.deepEqual(openJson(sealed, [SEAL_KEY], 'watch-key-A'), { a: 1 });
+  assert.equal(openJson(sealed, [SEAL_KEY], 'watch-key-B'), null);
+  assert.equal(openJson(sealed, [SEAL_KEY]), null);
+  // aad 없이 봉인한 값은 aad 없이만 열린다
+  const plain = sealJson({ a: 1 }, SEAL_KEY);
+  assert.deepEqual(openJson(plain, [SEAL_KEY]), { a: 1 });
+  assert.equal(openJson(plain, [SEAL_KEY], 'watch-key-A'), null);
+});
+
 test('키가 틀리거나 형식이 아니면 null 이고 던지지 않는다', () => {
   const sealed = sealJson({ a: 1 }, SEAL_KEY);
   for (const bad of ['', 'v1.', 'v2.abc', 42, null, undefined, {}, 'v1.!!!!', `v2.${sealed.slice(3)}`]) {
@@ -170,12 +195,19 @@ test('키가 틀리거나 형식이 아니면 null 이고 던지지 않는다', 
 });
 
 test('WATCH_LIMITS 는 계획의 값이고 고쳐지지 않는다', () => {
-  assert.deepEqual(WATCH_LIMITS.create, { limit: 10, windowSec: 3600 });
-  assert.deepEqual(WATCH_LIMITS.push, { limit: 20, windowSec: 86400 });
-  assert.equal(WATCH_LIMITS.maxWatchesPerOwner, 3);
-  assert.equal(WATCH_LIMITS.maxRegistrations, 5);
-  assert.equal(WATCH_LIMITS.maxDays, 46);
-  assert.equal(WATCH_LIMITS.maxDeadlinesPerDay, 10);
+  assert.deepEqual(WATCH_LIMITS, {
+    create: { limit: 10, windowSec: 3600 },
+    deadlines: { limit: 60, windowSec: 3600 },
+    back: { limit: 50, windowSec: 86400 },
+    subscribe: { limit: 10, windowSec: 3600 },
+    status: { limit: 120, windowSec: 3600 },
+    mute: { limit: 30, windowSec: 3600 },
+    push: { limit: 20, windowSec: 86400 },
+    maxWatchesPerOwner: 3,
+    maxRegistrations: 5,
+    maxDays: 46,
+    maxDeadlinesPerDay: 10,
+  });
   assert.ok(Object.isFrozen(WATCH_LIMITS));
 });
 
@@ -190,10 +222,23 @@ test('hitRate 는 한도까지 참, 그다음은 거짓이고 창이 바뀌면 �
   assert.equal(await hitRate(ctx, 'subscribe', 'subject-a'), true);
 });
 
-test('hitRate 는 창이 없는 항목이면 던진다', async () => {
+test('hitRate 는 창이 없거나 모르는 항목, 빈 주체면 저장소에 닿기 전에 던진다', async () => {
   const ctx = testCtx();
+  let calls = 0;
+  const inner = ctx.kv;
+  ctx.kv = {
+    async exec(commands) {
+      calls += 1;
+      return inner.exec(commands);
+    },
+  };
   await assert.rejects(hitRate(ctx, 'maxDays', 'x'), TypeError);
   await assert.rejects(hitRate(ctx, 'nope', 'x'), TypeError);
+  await assert.rejects(hitRate(ctx, '__proto__', 'x'), TypeError);
+  await assert.rejects(hitRate(ctx, 'create', ''), TypeError);
+  await assert.rejects(hitRate(ctx, 'create', null), TypeError);
+  await assert.rejects(hitRate(ctx, 'create', 42), TypeError);
+  assert.equal(calls, 0);
 });
 
 test('hitRate 키에 주체가 그대로 들어가지 않는다', async () => {
