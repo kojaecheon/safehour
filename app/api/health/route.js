@@ -5,6 +5,7 @@
 // 관광공사 자체 호출 카운터(오늘 operation별 사용/한도, 경고 값)도 알린다. 키·URL·매개변수는 없다.
 
 import { runtimeFlagsSnapshot } from '../../../lib/server/runtime-flags.js';
+import { watchConfig } from '../../../lib/server/watch/config.js';
 import { readTourApiUsage } from '../../../lib/server/tour-api-usage.js';
 import { resolveKmaServiceKey } from '../../../src/adapters/weather.js';
 
@@ -22,6 +23,7 @@ async function tourApiUsageOrNull() {
 
 export async function GET() {
   const tourApiUsage = await tourApiUsageOrNull();
+  const serverPush = watchConfig(process.env);
   return Response.json({
     ok: true,
     service: 'safehour',
@@ -36,6 +38,9 @@ export async function GET() {
       weatherApiKeyConfigured: Boolean(resolveKmaServiceKey(process.env)),
       // KMA_API_KEY 에 값(끄는 값 포함)이 있으면 그 변수가 정한다. 없거나 빈 값이면 TOUR_API_KEY 다.
       weatherKeySource: process.env.KMA_API_KEY ? 'KMA_API_KEY' : 'TOUR_API_KEY',
+      // 서버 알림(ADR-0012): 준비 여부와 없거나 형식이 틀린 환경변수의 이름만 알린다. 값은 담지 않는다
+      serverPushReady: serverPush.ready,
+      serverPushMissing: serverPush.missing,
     },
     flags: runtimeFlagsSnapshot(),
     // { scope: 'instance', date, dailyLimit, warningAt, counterReadable, operations: { '서비스.오퍼레이션': { used, limit, state } } }

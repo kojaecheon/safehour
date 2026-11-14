@@ -205,7 +205,7 @@ describe('헬스 엔드포인트 (RG007)', () => {
   });
 
   test('스냅샷은 스위치 상태만 담는다', () => {
-    assert.deepEqual(Object.keys(runtimeFlagsSnapshot()), ['recommendationKilled']);
+    assert.deepEqual(Object.keys(runtimeFlagsSnapshot()), ['recommendationKilled', 'serverPush', 'serverPushKilled']);
   });
 });
 
@@ -225,7 +225,13 @@ describe('헬스 엔드포인트 — 기상 키 상태는 일정 API 와 같은 
     if (tour === undefined) delete process.env.TOUR_API_KEY;
     else process.env.TOUR_API_KEY = tour;
     const data = await (await healthGet()).json();
-    assert.deepEqual(Object.keys(data.config).sort(), ['tourApiKeyConfigured', 'weatherApiKeyConfigured', 'weatherKeySource']);
+    assert.deepEqual(Object.keys(data.config).sort(), [
+      'serverPushMissing',
+      'serverPushReady',
+      'tourApiKeyConfigured',
+      'weatherApiKeyConfigured',
+      'weatherKeySource',
+    ]);
     return data.config;
   }
 
