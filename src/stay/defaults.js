@@ -90,6 +90,8 @@ export const DEFAULTS = deepFreeze({
     appointmentBeforeMin: 15,
     /** 복귀 마감이 지난 알림·시트를 마감 뒤 몇 분까지 늦게라도 내는가 (표시·알림 시점 값, 안전 판정 기준이 아니다) */
     returnPassedGraceMin: 60,
+    /** 서버 푸시 유예(분): 복귀 마감 뒤 이만큼 지나도록 확인이 없으면 보호자에게 보낸다. 사람 검토 전 임시값 (ADR-0012 결정 6) */
+    serverPushGraceMin: 10,
   },
 
   stay: {

@@ -28,12 +28,16 @@ function validCookie(nowMs = NOW) {
   return `other=1; ${SESSION_COOKIE}=${token}`;
 }
 
-describe('새 오류 코드 3개', () => {
+describe('새 오류 코드 7개', () => {
   test('코드와 HTTP 상태가 한곳에 정의돼 있다', () => {
     assert.deepEqual(ERROR_CODE, {
       AUTH_REQUIRED: 'SAFEHOUR_AUTH_REQUIRED',
       STAY_INVALID: 'SAFEHOUR_STAY_INVALID',
       ADDRESS_UNAVAILABLE: 'SAFEHOUR_ADDRESS_UNAVAILABLE',
+      SERVER_PUSH_OFF: 'SAFEHOUR_SERVER_PUSH_OFF',
+      SERVER_PUSH_UNAVAILABLE: 'SAFEHOUR_SERVER_PUSH_UNAVAILABLE',
+      WATCH_NOT_FOUND: 'SAFEHOUR_WATCH_NOT_FOUND',
+      RATE_LIMITED: 'SAFEHOUR_RATE_LIMITED',
     });
     assert.equal(ERROR_HTTP_STATUS.SAFEHOUR_AUTH_REQUIRED, 401);
     assert.equal(ERROR_HTTP_STATUS.SAFEHOUR_STAY_INVALID, 400);

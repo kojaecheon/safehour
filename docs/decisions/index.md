@@ -19,6 +19,7 @@
 | 0009 | 기기 영구 저장, 계정 이름공간, 민감정보 동의, 출국 후 삭제, 보호자 PIN 링크 | `0009-device-storage-consent-guardian-link.md` |
 | 0010 | 지도 목적지 전용 링크, 긴급 연락, 기기 알림 | `0010-map-links-emergency-notifications.md` |
 | 0011 | 병원 지침 계약 v2와 최신성 규칙 변경 | `0011-recovery-plan-v2-freshness.md` |
+| 0012 | 서버 최소 저장과 보호자 푸시, '돌아왔어요' 확인 (옵트인, 선 4의 범위 변경) | `0012-server-minimal-storage-guardian-push.md` |
 
 0003은 "언어를 서버로 보내지 않는다"고 정했고, 0007이 관광 데이터 언어를 고르기 위해 이를 개정했다.
 지금 유효한 규칙은 0007이다 — 언어는 서버로 보내되 판정 결과는 언어와 무관해야 한다.

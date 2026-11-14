@@ -7,7 +7,7 @@
 - 화면: 시작, 로그인, 체류 설정, 조건 입력·동의, 병원 연결, 병원 안내, 오늘, 전체 일정, 하루 일정,
   장소 상세, 한국어 카드, 긴급 연락, 더보기, 설정, 개인정보 고지, 보호자 링크 만들기·열기, 도움말(`/help`), 시안 보드
 - 라우트 핸들러(`app/api/`): 일정, 교체 후보, 소개 문장, 주소 검색, 장소 상세, 지침 연결,
-  로그인·세션, 상태 확인
+  로그인·세션, 상태 확인, 서버 알림(`app/api/push/config`, `app/api/watch/*`, `app/api/cron/watch-arm`, ADR-0012, 스위치 꺼짐)
 - 앱 셸, 매니페스트, 서비스 워커 등록
 - 토큰과 기능별 스타일 파일
 
@@ -22,6 +22,15 @@
 
 - **모든 라우트 핸들러는 로그인 가드를 지난다.** 예외는 로그인 흐름과 상태 확인 경로뿐이다.
   새 경로를 만들 때 가드를 빠뜨리면 로그인 없이 열린다.
+  서버 알림 경로(ADR-0012)는 정해진 예외다. 세션 대신 다른 값으로 권한을 본다(처리는 `lib/server/watch/handlers.js`, 계약은
+  `docs/contracts.md` '서버 알림', 권한 표는 `docs/security.md`).
+  - `POST /api/watch`는 환자 세션이 필요하다. `DELETE /api/watch`의 `{ all: true }`도 세션이 필요하다.
+  - `PUT /api/watch/deadlines`, `POST /api/watch/back`, 토큰 형식의 `DELETE /api/watch`는 `writeToken`으로 권한을 본다.
+  - 보호자 경로(`POST /api/watch/subscribe`, `POST /api/watch/status`, `POST /api/watch/mute`)는 `watchId`로 보고, `guardianLoginRequired`가
+    참이면(기본) 세션도 요구한다. `DELETE /api/watch/subscribe`는 `watchId` + `subId`이고 세션을 요구하지 않는다.
+  - `POST /api/watch/due`는 QStash 서명 또는 `Authorization: Bearer <CRON_SECRET>`, `GET /api/cron/watch-arm`은 Bearer로 연다.
+  - `GET /api/push/config`는 공개다(VAPID 공개키와 켜짐 여부만 준다).
+  - 운영 배포에서는 이 경로들이 데모 세션을 세션이 없는 것으로 본다(데모 로그인은 모두 같은 신원이다). 판단은 처리기 한 곳에 있다.
 - 화면은 엔진을 직접 부르지 않는다. 라우트 핸들러를 통해 부른다. 판정 경로가 두 벌이 되면 결과가 어긋난다.
 - **긴급 연락은 모든 화면에서 바닥에 붙어 있다.** 로그인 전·로그인 만료·오프라인에서도 보인다.
   내비가 있으면 다섯째 칸, 없으면 하단 긴급 바다. **떠 있는 버튼으로 만들지 않는다** —
@@ -62,4 +71,5 @@
 - 360px에서 가로 스크롤이 없어야 하고, 320–1280px 범위에서 깨지지 않아야 한다.
 - 모든 화면에서 위치 권한 요청이 **0건**임을 단언한다.
 - 화면 테스트는 외부 호출 0건이어야 한다. 캐시를 미리 심고 네트워크 감시를 붙인 상태로 돈다.
-- 새 라우트는 로그인 없이 불렀을 때 401이 나오는지 확인한다.
+- 새 라우트는 로그인 없이 불렀을 때 401이 나오는지 확인한다. 서버 알림 경로는 위 예외대로 토큰·`watchId`·서명이 틀렸을 때
+  401 또는 404가 나오는지 확인한다(`test/watch-routes.test.js`).
