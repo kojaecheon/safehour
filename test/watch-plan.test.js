@@ -14,7 +14,10 @@
 //   - nextLastUploaded 는 서버가 가진 것과 같다: 보낸 날짜(지운 날짜 빼고)와 어제만 남긴다(자정 뒤에도 by 를 찾는다)
 //   - 체류의 날짜를 읽지 못하면 올리지 않는다. 일정의 날짜를 읽지 못하면 일찍 귀국한 체류의 줄이기만 한다
 //   - 하루 10개 상한: 지금 마감을 먼저(그것만 넘으면 이른 10개), 다음 원래 마감, 남은 자리는 최근 지난 시각
-//   - '돌아왔어요' 대상: 출발 전 없음, 경우 1 은 passedBy, 평소는 returnBy, 묶인 외출은 원래 마감(업로드와 같은 시각)
+//   - '돌아왔어요' 대상: 출발 전 없음, 경우 1 은 passedBy, 평소는 returnBy, 묶인 외출은 원래 마감(업로드와 같은 시각).
+//     같은 날 나중에 출발하는 외출의 대상이 같은 시각이면 없음(다르게 정한 것 25)
+//   - 덮는 확인 되돌리기(undoStaleConfirms): 누른 뒤에 출발하는 같은 마감의 외출이 있으면 대기 중 확인은 요청 없이 지우고 보낸 확인은
+//     되돌리기를 넣는다. 되돌리기 마감이 지났거나 나중 외출에서 누른 확인은 그대로다
 //   - 되돌리기 마감 = 마감 + serverPushGraceMin 분 - serverPushEarlyToleranceSec 초
 //
 // 시각은 모두 오프셋이 있는 문자열로 만든다. 기기 시간대와 벽시계를 읽지 않는다. 외부 호출은 없다.
@@ -29,6 +32,8 @@ import {
   isHeldOuting,
   isSameUpload,
   pruneBackQueue,
+  pruneConfirmed,
+  undoStaleConfirms,
   undoUntilMs,
 } from '../lib/trip/watchPlan.js';
 import { REASON } from '../src/domain/states.js';
@@ -811,5 +816,150 @@ describe('되돌리기 마감과 대기열', () => {
     const long = Array.from({ length: 25 }, (_, i) => ({ date: TODAY, by: `${String(10 + Math.floor(i / 6)).padStart(2, '0')}:${String((i % 6) * 10).padStart(2, '0')}`, undo: false }));
     assert.deepEqual(pruneBackQueue([{ date: '2026-11-18', by: '09:00', undo: false }, ...long], NOW), long.slice(-20));
     assert.deepEqual(pruneBackQueue('x', NOW), []);
+  });
+});
+
+describe('같은 마감을 가진 외출 (다르게 정한 것 25)', () => {
+  // 엔진 표본의 하루: B 는 12:41 에 나가 13:47 에 돌아올 예정, C 는 17:17 에 나가 18:23 예정. 둘 다 하루 활동 종료 21:00 이 마감이다
+  const B_OUT = { id: 'b', departAt: '12:41', returnBy: '21:00', plannedReturnAt: '13:47', slackMin: 300 };
+  const C_OUT = { id: 'c', departAt: '17:17', returnBy: '21:00', plannedReturnAt: '18:23', slackMin: 120 };
+  const dayBC = () => makeDayPlan(TODAY, { outings: [patientOuting(B_OUT), patientOuting(C_OUT)] });
+  const dayB = () => makeDayPlan(TODAY, { outings: [patientOuting(B_OUT)] });
+  const T = (hhmm) => at(`2026-11-20T${hhmm}:00+09:00`);
+  const uploaded = { [TODAY]: ['21:00'] };
+
+  test("'돌아왔어요'는 같은 마감의 마지막 외출에만 있다(나중 외출이 출발 전이어도 앞 외출의 버튼은 없다)", () => {
+    const day = dayBC();
+    const [b, c] = day.outings;
+    // 14:00: B 에서 돌아왔지만 C 가 아직 남아 있다. 예전에는 B 가 21:00 을 확인했고, C 에서 돌아오지 않아도 알림이 가지 않았다
+    assert.equal(backTargetOf({ day, outing: b, lastUploaded: uploaded, nowMs: T('14:00') }), null);
+    assert.equal(backTargetOf({ day, outing: c, lastUploaded: uploaded, nowMs: T('14:00') }), null, 'C 는 출발 전');
+    // C 가 나간 뒤에는 C 만 21:00 을 확인한다
+    assert.equal(backTargetOf({ day, outing: b, lastUploaded: uploaded, nowMs: T('17:30') }), null);
+    assert.deepEqual(backTargetOf({ day, outing: c, lastUploaded: uploaded, nowMs: T('17:30') }), { date: TODAY, by: '21:00' });
+    // 나중 외출이 없으면 B 가 21:00 을 확인한다
+    const only = dayB();
+    assert.deepEqual(backTargetOf({ day: only, outing: only.outings[0], lastUploaded: uploaded, nowMs: T('14:00') }), { date: TODAY, by: '21:00' });
+    // 마감이 다르면 둘 다 있다
+    const apart = makeDayPlan(TODAY, { outings: [patientOuting(B_OUT), patientOuting({ ...C_OUT, returnBy: '20:00' })] });
+    assert.deepEqual(backTargetOf({ day: apart, outing: apart.outings[0], lastUploaded: uploaded, nowMs: T('17:30') }), { date: TODAY, by: '21:00' });
+    assert.deepEqual(backTargetOf({ day: apart, outing: apart.outings[1], lastUploaded: uploaded, nowMs: T('17:30') }), { date: TODAY, by: '20:00' });
+    // 경우 1 시트(passedBy)는 그대로다
+    assert.deepEqual(backTargetOf({ day, outing: b, lastUploaded: uploaded, nowMs: T('21:05'), passedBy: '21:00' }), { date: TODAY, by: '21:00' });
+    // 업로드는 바뀌지 않는다
+    assert.deepEqual(todayDeadlines(buildUploadState({ stay: stayOf(), tripPlan: planOf({ [TODAY]: day }), lastUploaded: uploaded, nowMs: T('14:00') })), ['21:00']);
+  });
+
+  test('출발 시각이 같으면 그날 외출 순서에서 뒤인 외출이 나중이다. 외출은 같은 참조, 없으면 id 로 찾는다', () => {
+    const day = makeDayPlan(TODAY, {
+      outings: [patientOuting({ ...B_OUT, departAt: '13:00' }), patientOuting({ ...C_OUT, departAt: '13:00' })],
+    });
+    const [first, second] = day.outings;
+    assert.equal(backTargetOf({ day, outing: first, lastUploaded: uploaded, nowMs: T('14:00') }), null);
+    assert.deepEqual(backTargetOf({ day, outing: second, lastUploaded: uploaded, nowMs: T('14:00') }), { date: TODAY, by: '21:00' });
+    // 같은 값의 사본(id 가 같다)도 같은 외출로 본다
+    assert.equal(backTargetOf({ day, outing: { ...first }, lastUploaded: uploaded, nowMs: T('14:00') }), null);
+    assert.deepEqual(backTargetOf({ day, outing: { ...second }, lastUploaded: uploaded, nowMs: T('14:00') }), { date: TODAY, by: '21:00' });
+  });
+
+  test('나중 외출의 대상은 묶였으면 원래 마감이다(지금 마감이 아니다)', () => {
+    // 당겨진 날: C 가 17:40 으로 당겨졌다. C 의 원래 마감 22:00 은 올린 기록에 있다. B 의 21:00 과 다르므로 B 의 버튼이 남는다
+    const outings = [patientOuting(B_OUT), patientOuting({ ...C_OUT, returnBy: '17:40', slackMin: -5 })];
+    const day = returnNowDay(TODAY, REASON.OUTING_OVERDUE, outings);
+    const lastUploaded = { [TODAY]: ['21:00', '22:00'] };
+    assert.deepEqual(backTargetOf({ day, outing: day.outings[0], lastUploaded, nowMs: T('17:40') }), { date: TODAY, by: '21:00' });
+    assert.deepEqual(backTargetOf({ day, outing: day.outings[1], lastUploaded, nowMs: T('17:40') }), { date: TODAY, by: '22:00' });
+  });
+
+  test('undoStaleConfirms: 보낸 확인은 누른 뒤에 출발하는 같은 마감의 외출이 생기면 되돌리기를 넣고 confirmed 에서 뺀다', () => {
+    const tripPlan = planOf({ [TODAY]: dayBC() });
+    const entry = { date: TODAY, by: '21:00', atMs: T('14:00') };
+    const result = undoStaleConfirms({ tripPlan, confirmed: [entry], backQueue: [], lastUploaded: uploaded, nowMs: T('15:00') });
+    assert.deepEqual(result.backQueue, [{ date: TODAY, by: '21:00', undo: true, atMs: T('15:00') }]);
+    assert.deepEqual(result.confirmed, []);
+    assert.deepEqual(result.cleared, [{ date: TODAY, by: '21:00' }]);
+    assert.equal(result.changed, true);
+
+    // C 가 없으면 그대로다
+    const alone = undoStaleConfirms({ tripPlan: planOf({ [TODAY]: dayB() }), confirmed: [entry], backQueue: [], lastUploaded: uploaded, nowMs: T('15:00') });
+    assert.deepEqual(alone, { backQueue: [], confirmed: [entry], cleared: [], changed: false });
+    // 그 날짜의 일정이 없거나 읽지 못해도 그대로다
+    for (const plan of [planOf({}), null, { days: 'x' }]) {
+      assert.equal(undoStaleConfirms({ tripPlan: plan, confirmed: [entry], backQueue: [], lastUploaded: uploaded, nowMs: T('15:00') }).changed, false);
+    }
+    // 받은 값은 바꾸지 않는다
+    const frozen = Object.freeze([Object.freeze({ ...entry })]);
+    undoStaleConfirms({ tripPlan, confirmed: frozen, backQueue: Object.freeze([]), lastUploaded: uploaded, nowMs: T('15:00') });
+    assert.deepEqual(frozen, [entry]);
+  });
+
+  test('undoStaleConfirms: C 가 출발한 뒤 C 에서 누른 확인은 되돌리지 않는다', () => {
+    const tripPlan = planOf({ [TODAY]: dayBC() });
+    const fromC = { date: TODAY, by: '21:00', atMs: T('19:00') };
+    assert.equal(undoStaleConfirms({ tripPlan, confirmed: [fromC], backQueue: [], lastUploaded: uploaded, nowMs: T('19:05') }).changed, false);
+    // 출발과 같은 때 누른 것도 덮는 것이 아니다(출발이 누른 시각보다 늦어야 덮는다)
+    const atDepart = { date: TODAY, by: '21:00', atMs: T('17:17') };
+    assert.equal(undoStaleConfirms({ tripPlan, confirmed: [atDepart], backQueue: [], lastUploaded: uploaded, nowMs: T('19:05') }).changed, false);
+    // 대기 중인 C 의 확인도 그대로다
+    const pendingC = [{ date: TODAY, by: '21:00', undo: false, atMs: T('19:00') }];
+    assert.equal(undoStaleConfirms({ tripPlan, confirmed: [], backQueue: pendingC, lastUploaded: uploaded, nowMs: T('19:05') }).changed, false);
+  });
+
+  test('undoStaleConfirms: 대기 중인 확인은 요청 없이 사라지고, 나중 외출에서 누른 대기 중 확인이 있으면 앞 확인은 빼기만 한다', () => {
+    const tripPlan = planOf({ [TODAY]: dayBC() });
+    const other = { date: TODAY, by: '12:00', undo: false, atMs: T('12:05') };
+    const pendingB = { date: TODAY, by: '21:00', undo: false, atMs: T('14:00') };
+    const cancelled = undoStaleConfirms({ tripPlan, confirmed: [], backQueue: [other, pendingB], lastUploaded: uploaded, nowMs: T('15:00') });
+    assert.deepEqual(cancelled.backQueue, [other], '대기 중인 확인과 되돌리기가 함께 사라진다(보낼 것이 없다)');
+    assert.deepEqual(cancelled.cleared, [{ date: TODAY, by: '21:00' }]);
+
+    // 새로 고쳐 버튼이 다시 보인 C 에서 다시 눌렀다: 서버의 21:00 확인(B 의 것)은 그대로 두어야 하므로 되돌리기를 넣지 않는다
+    const sentB = { date: TODAY, by: '21:00', atMs: T('14:00') };
+    const pressedC = { date: TODAY, by: '21:00', undo: false, atMs: T('19:00') };
+    const keepC = undoStaleConfirms({ tripPlan, confirmed: [sentB], backQueue: [pressedC], lastUploaded: uploaded, nowMs: T('19:05') });
+    assert.deepEqual(keepC.backQueue, [pressedC]);
+    assert.deepEqual(keepC.confirmed, []);
+    // 같은 마감의 되돌리기가 이미 대기 중이면 하나 더 넣지 않는다
+    const undoQueued = { date: TODAY, by: '21:00', undo: true, atMs: T('14:30') };
+    const once = undoStaleConfirms({ tripPlan, confirmed: [sentB], backQueue: [undoQueued], lastUploaded: uploaded, nowMs: T('15:00') });
+    assert.deepEqual(once.backQueue, [undoQueued]);
+    assert.deepEqual(once.confirmed, []);
+  });
+
+  test('undoStaleConfirms: 되돌리기 마감이 지났으면 아무것도 넣지 않는다', () => {
+    const tripPlan = planOf({ [TODAY]: dayBC() });
+    const entry = { date: TODAY, by: '21:00', atMs: T('14:00') };
+    const pending = { date: TODAY, by: '21:00', undo: false, atMs: T('14:00') };
+    // 되돌리기 마감 21:09:30
+    assert.equal(undoStaleConfirms({ tripPlan, confirmed: [entry], backQueue: [], lastUploaded: uploaded, nowMs: at('2026-11-20T21:09:29+09:00') }).changed, true);
+    const late = undoStaleConfirms({ tripPlan, confirmed: [entry], backQueue: [pending], lastUploaded: uploaded, nowMs: at('2026-11-20T21:09:30+09:00') });
+    assert.deepEqual(late, { backQueue: [pending], confirmed: [entry], cleared: [], changed: false });
+    // 누른 시각이 없는 예전 대기 항목은 덮는지 알 수 없어 그대로다
+    const legacy = { date: TODAY, by: '21:00', undo: false };
+    assert.equal(undoStaleConfirms({ tripPlan, confirmed: [], backQueue: [legacy], lastUploaded: uploaded, nowMs: T('15:00') }).changed, false);
+  });
+
+  test('pruneConfirmed 와 undoStaleConfirms 는 어제보다 앞 날짜를 버리고 20개를 넘지 않는다', () => {
+    const list = [
+      { date: '2026-11-18', by: '21:00', atMs: at('2026-11-18T14:00:00+09:00') },
+      { date: YESTERDAY, by: '21:00', atMs: at('2026-11-19T14:00:00+09:00') },
+      { date: TODAY, by: '12:00', atMs: T('11:00') },
+      { date: 'x', by: '12:00', atMs: 1 },
+    ];
+    assert.deepEqual(pruneConfirmed(list, NOW), list.slice(1, 3));
+    assert.deepEqual(pruneConfirmed(list, at('2026-11-21T00:05:00+09:00')), [list[2]]);
+    const result = undoStaleConfirms({ tripPlan: planOf({}), confirmed: list, backQueue: [], lastUploaded: {}, nowMs: NOW });
+    assert.deepEqual(result.confirmed, list.slice(1, 3));
+    assert.equal(result.changed, true);
+    const long = Array.from({ length: 23 }, (_, i) => ({ date: TODAY, by: `1${Math.floor(i / 6)}:${i % 6}0`, atMs: T('09:00') + i }));
+    assert.deepEqual(pruneConfirmed(long, NOW), long.slice(-20));
+    assert.deepEqual(pruneConfirmed('x', NOW), []);
+  });
+
+  test('applyBackAction 은 누른 시각을 싣는다(형식이 틀리면 싣지 않는다)', () => {
+    assert.deepEqual(applyBackAction([], { date: TODAY, by: '21:00', undo: false, atMs: T('14:00') }), [{ date: TODAY, by: '21:00', undo: false, atMs: T('14:00') }]);
+    assert.deepEqual(applyBackAction([], { date: TODAY, by: '21:00', undo: false, atMs: 'x' }), [{ date: TODAY, by: '21:00', undo: false }]);
+    // 대기 중인 확인을 되돌리면 누른 시각과 상관없이 둘 다 사라진다
+    assert.deepEqual(applyBackAction([{ date: TODAY, by: '21:00', undo: false, atMs: T('14:00') }], { date: TODAY, by: '21:00', undo: true, atMs: T('14:01') }), []);
   });
 });

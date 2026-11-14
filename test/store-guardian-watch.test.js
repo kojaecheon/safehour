@@ -19,8 +19,10 @@ import assert from 'node:assert/strict';
 
 import {
   BACK_QUEUE_MAX,
+  CONFIRMED_MAX,
   PENDING_DELETE_MAX,
   normalizeBackQueue,
+  normalizeConfirmed,
   normalizeGuardianWatch,
   normalizePendingDelete,
 } from '../lib/store/guardianWatch.js';
@@ -55,6 +57,7 @@ function watchRecord(n = 1, overrides = {}) {
     lastUploaded: { '2026-10-02': ['14:30', '18:00'], '2026-10-03': [] },
     uploadPending: false,
     backQueue: [],
+    confirmed: [],
     state: 'ON',
     ...overrides,
   };
@@ -222,17 +225,55 @@ describe('guardianWatch 레코드', () => {
       lat: 37.5,
       conditions: { diet: 'x' },
       backQueue: [{ date: '2026-10-02', by: '14:30', undo: false, place: 'x' }, { date: 'bad', by: '14:30', undo: false }, { date: '2026-10-02', by: '18:00', undo: 'no' }],
+      confirmed: [{ date: '2026-10-02', by: '12:00', atMs: T0, place: 'x' }, { date: '2026-10-02', by: '13:00' }],
     };
+    // confirmed 가 생기면서 정규화 결과에 confirmed 가 늘 있다(이 시험은 예전에 confirmed 없는 모양을 고정했다).
+    // 누른 시각이 없는 confirmed 항목은 버린다
     assert.deepEqual(normalizeGuardianWatch(value), {
       ...idsOf(1),
       expiresOn: '2026-10-08',
       lastUploaded: { '2026-10-02': ['14:30', '18:00'] },
       uploadPending: false,
       backQueue: [{ date: '2026-10-02', by: '14:30', undo: false }],
+      confirmed: [{ date: '2026-10-02', by: '12:00', atMs: T0 }],
       state: 'ON',
     });
-    assert.deepEqual(Object.keys(normalizeGuardianWatch(value)), ['watchId', 'writeToken', 'expiresOn', 'lastUploaded', 'uploadPending', 'backQueue', 'state']);
+    assert.deepEqual(Object.keys(normalizeGuardianWatch(value)), ['watchId', 'writeToken', 'expiresOn', 'lastUploaded', 'uploadPending', 'backQueue', 'confirmed', 'state']);
     assert.equal(normalizeGuardianWatch(watchRecord(1, { state: 'REPLACED' })).state, 'REPLACED');
+  });
+
+  test('confirmed 와 대기열의 누른 시각: 이 필드가 없던 레코드도 읽히고, 틀린 항목만 버리며 20개를 넘지 않는다', () => {
+    // confirmed 가 생기기 전에 쓴 레코드(필드 없음)와 목록이 아닌 값은 빈 목록이다. 레코드 전체를 버리지 않는다
+    const legacy = watchRecord(1);
+    delete legacy.confirmed;
+    assert.deepEqual(normalizeGuardianWatch(legacy).confirmed, []);
+    assert.deepEqual(normalizeGuardianWatch({ ...legacy, confirmed: 'x' }).confirmed, []);
+
+    // 대기열 항목은 형식이 맞는 누른 시각만 싣는다(없어도 항목은 남는다)
+    assert.deepEqual(normalizeBackQueue([
+      { date: '2026-10-02', by: '14:30', undo: false, atMs: T0 },
+      { date: '2026-10-02', by: '15:00', undo: false, atMs: -1 },
+      { date: '2026-10-02', by: '16:00', undo: true, atMs: 1.5 },
+      { date: '2026-10-02', by: '17:00', undo: true, atMs: '1' },
+    ]), [
+      { date: '2026-10-02', by: '14:30', undo: false, atMs: T0 },
+      { date: '2026-10-02', by: '15:00', undo: false },
+      { date: '2026-10-02', by: '16:00', undo: true },
+      { date: '2026-10-02', by: '17:00', undo: true },
+    ]);
+
+    // 같은 (date, by)는 나중 것 하나, 틀린 항목은 버리고 상한을 넘으면 오래된 것(앞)부터 버린다
+    assert.deepEqual(normalizeConfirmed([
+      { date: '2026-10-02', by: '14:30', atMs: T0 },
+      { date: '2026-10-02', by: '14:30', atMs: T0 + 1 },
+      { date: '2026-10-02', by: '24:00', atMs: T0 },
+      { date: '2026-10-02', by: '15:00', atMs: null },
+      null,
+    ]), [{ date: '2026-10-02', by: '14:30', atMs: T0 + 1 }]);
+    const many = Array.from({ length: CONFIRMED_MAX + 3 }, (_, i) => ({ date: '2026-10-02', by: `1${Math.floor(i / 6)}:${(i % 6)}0`, atMs: T0 + i }));
+    assert.equal(CONFIRMED_MAX, 20);
+    assert.deepEqual(normalizeConfirmed(many), many.slice(-CONFIRMED_MAX));
+    assert.deepEqual(normalizeConfirmed(undefined), []);
   });
 
   test('writeGuardianWatch 는 쓰기 가능할 때만 되고 null 이면 지운다', () => {
@@ -553,6 +594,41 @@ describe('backQueue 덮어쓰기 막기', () => {
     store.writeGuardianWatch(null);
     store.writeGuardianWatch(watchRecord(3, { backQueue: queue }));
     assert.deepEqual(store.readGuardianWatch().backQueue, queue);
+  });
+
+  test('confirmed 도 writeBackQueue 로만 바뀌고, 같은 watchId 다시 쓰기(다시 등록)에는 남고 다른 watchId 면 비어서 시작한다', () => {
+    const { storage, clock, fake, store } = setup();
+    store.writeGuardianWatch(watchRecord(1));
+    const older = store.readGuardianWatch();
+    const confirmed = [{ date: '2026-10-02', by: '14:30', atMs: T0 }];
+    const queue = [{ date: '2026-10-02', by: '18:00', undo: true, atMs: T0 + 1 }];
+
+    // 대기열과 confirmed 를 한 번에 쓴다. confirmed 를 넘기지 않으면 저장된 값 그대로다
+    assert.deepEqual(store.writeBackQueue(queue, { confirmed }), { ok: true });
+    assert.deepEqual(store.readGuardianWatch().confirmed, confirmed);
+    assert.deepEqual(store.readGuardianWatch().backQueue, queue);
+    assert.deepEqual(store.writeBackQueue([]), { ok: true });
+    assert.deepEqual(store.readGuardianWatch().confirmed, confirmed);
+    assert.deepEqual(store.writeBackQueue([], { confirmed: 'x' }), { ok: false, code: STORE_ERROR.INVALID });
+
+    // 보기 전용(세션 없음)에서도 대기열처럼 쓴다
+    const noSession = makeStore({ storage, clock, fake });
+    noSession.setSession({ authenticated: false });
+    assert.deepEqual(noSession.writeBackQueue([], { confirmed: [] }), { ok: true });
+    assert.deepEqual(store.readGuardianWatch().confirmed, []);
+    assert.deepEqual(store.writeBackQueue([], { confirmed }), { ok: true });
+
+    // 앞서 읽은 레코드로 쓰거나, 같은 watchId 에 새 토큰으로 다시 등록해도(REPLACED 에서 켬) 저장된 confirmed 가 남는다
+    store.writeGuardianWatch({ ...older, uploadPending: true, confirmed: [] });
+    assert.deepEqual(store.readGuardianWatch().confirmed, confirmed);
+    store.writeGuardianWatch({ ...older, state: 'REPLACED' });
+    store.writeGuardianWatch({ ...older, writeToken: idsOf(7).writeToken, state: 'ON', backQueue: [], confirmed: [] });
+    assert.equal(store.readGuardianWatch().writeToken, idsOf(7).writeToken);
+    assert.deepEqual(store.readGuardianWatch().confirmed, confirmed);
+
+    // 다른 watchId 는 받은 값(새 등록은 빈 목록)으로 시작한다
+    store.writeGuardianWatch(watchRecord(2, { confirmed: [] }));
+    assert.deepEqual(store.readGuardianWatch().confirmed, []);
   });
 });
 

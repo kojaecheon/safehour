@@ -80,7 +80,7 @@ const BASE_DAYS = Object.freeze([
 const BASE_UPLOADED = Object.freeze(Object.fromEntries(BASE_DAYS.map(({ date, deadlines }) => [date, deadlines])));
 
 function watchRecord(overrides = {}) {
-  return { ...W1, expiresOn: '2026-10-08', lastUploaded: {}, uploadPending: true, backQueue: [], state: 'ON', ...overrides };
+  return { ...W1, expiresOn: '2026-10-08', lastUploaded: {}, uploadPending: true, backQueue: [], confirmed: [], state: 'ON', ...overrides };
 }
 
 const ok = (data = {}) => ({ ok: true, status: 200, data: { ok: true, ...data }, kind: WATCH_KIND.OK });
@@ -230,9 +230,9 @@ function harness({ at = kst(TODAY, '12:00'), record = null, plan = basePlan(), s
       writes.push(next === null ? null : JSON.parse(JSON.stringify(next)));
       return store.writeGuardianWatch(next);
     },
-    writeBackQueue(queue) {
+    writeBackQueue(queue, options) {
       queueWrites.push(JSON.parse(JSON.stringify(queue)));
-      return store.writeBackQueue(queue);
+      return store.writeBackQueue(queue, options);
     },
   };
   const timers = fakeTimers(clock);
@@ -242,6 +242,8 @@ function harness({ at = kst(TODAY, '12:00'), record = null, plan = basePlan(), s
 }
 
 const phaseOf = (sync, target = BACK) => sync.backStatus(target)?.phase ?? null;
+/** 하네스 기본 시각(10-02 12:00)에 누른 대기열 항목. 누른 시각(atMs)은 기기에만 두고 요청 본문에는 싣지 않는다 */
+const AT_NOON = kst(TODAY, '12:00');
 
 // ── 등록 (ensureRegistered, D6·다르게 정한 것 12) ─────────────────────────────
 
@@ -260,7 +262,7 @@ describe('등록', () => {
     assert.deepEqual(h.api.calls[0].body, { ...expected, expiresOn: '2026-10-08' });
 
     // 먼저 ON, uploadPending: true 로 쓰고, 그다음 올린 결과를 쓴다
-    assert.deepEqual(h.writes[0], { ...expected, expiresOn: '2026-10-08', lastUploaded: {}, uploadPending: true, backQueue: [], state: 'ON' });
+    assert.deepEqual(h.writes[0], { ...expected, expiresOn: '2026-10-08', lastUploaded: {}, uploadPending: true, backQueue: [], confirmed: [], state: 'ON' });
     assert.deepEqual(h.api.calls[1].body, { ...expected, expiresOn: '2026-10-08', days: BASE_DAYS });
     assert.deepEqual(h.store.readGuardianWatch(), {
       ...expected,
@@ -268,6 +270,7 @@ describe('등록', () => {
       lastUploaded: BASE_UPLOADED,
       uploadPending: false,
       backQueue: [],
+      confirmed: [],
       state: 'ON',
     });
   });
@@ -295,7 +298,7 @@ describe('등록', () => {
     assert.match(body.writeToken, WRITE_TOKEN_RE);
     assert.equal(body.expiresOn, '2026-10-08');
     // 마지막으로 올린 것은 그대로 두고(서버의 지난 마감 확인을 위해) 켠 뒤 새 토큰으로 올린다
-    assert.deepEqual(h.writes[0], { ...W1, writeToken: body.writeToken, expiresOn: '2026-10-08', lastUploaded, uploadPending: true, backQueue: [], state: 'ON' });
+    assert.deepEqual(h.writes[0], { ...W1, writeToken: body.writeToken, expiresOn: '2026-10-08', lastUploaded, uploadPending: true, backQueue: [], confirmed: [], state: 'ON' });
     assert.deepEqual(h.api.names(), ['register', 'deadlines']);
     assert.equal(h.api.calls[1].body.writeToken, body.writeToken);
     assert.equal(h.store.readGuardianWatch().state, 'ON');
@@ -606,7 +609,7 @@ describe("'돌아왔어요'", () => {
     await h.sync.idle();
     assert.deepEqual(h.api.calls, []);
     assert.equal(phaseOf(h.sync), BACK_PHASE.QUEUED);
-    assert.deepEqual(h.store.readGuardianWatch().backQueue, [{ ...BACK, undo: false }]);
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, [{ ...BACK, undo: false, atMs: AT_NOON }]);
 
     h.store.setOnline(true);
     await h.sync.idle();
@@ -628,7 +631,7 @@ describe("'돌아왔어요'", () => {
     h.sync.pressBack(BACK);
     await until(() => h.api.open === 1);
     assert.equal(phaseOf(h.sync), BACK_PHASE.SENDING);
-    assert.deepEqual(h.store.readGuardianWatch().backQueue, [{ ...BACK, undo: false }], '응답 전에는 대기열에 남는다');
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, [{ ...BACK, undo: false, atMs: AT_NOON }], '응답 전에는 대기열에 남는다');
     gate.resolve();
     await h.sync.idle();
     assert.equal(phaseOf(h.sync), BACK_PHASE.SENT);
@@ -706,15 +709,16 @@ describe("'돌아왔어요'", () => {
     await until(() => h.api.open === 1);
     const queued = h.store.readGuardianWatch();
     assert.deepEqual({ ...queued, backQueue: before.backQueue }, before, 'backQueue 말고는 그대로');
-    assert.deepEqual(queued.backQueue, [{ ...BACK, undo: false }]);
+    assert.deepEqual(queued.backQueue, [{ ...BACK, undo: false, atMs: AT_NOON }]);
 
     gate.resolve();
     await h.sync.idle();
     assert.deepEqual(h.api.names(), ['back'], '보기 전용에서는 마감을 올리지 않는다(uploadPending 이어도)');
     assert.equal(phaseOf(h.sync), BACK_PHASE.SENT);
-    assert.deepEqual(h.store.readGuardianWatch(), before, '보낸 뒤 대기열이 비고 다른 필드는 그대로');
+    // 보낸 확인은 confirmed 에 누른 시각과 함께 남는다(다르게 정한 것 25. 예전에는 레코드 전체가 before 와 같았다)
+    assert.deepEqual(h.store.readGuardianWatch(), { ...before, confirmed: [{ ...BACK, atMs: AT_NOON }] }, '보낸 뒤 대기열이 비고 다른 필드는 그대로');
     assert.deepEqual(h.writes, [], 'writeGuardianWatch 를 부르지 않는다');
-    assert.deepEqual(h.queueWrites, [[{ ...BACK, undo: false }], []]);
+    assert.deepEqual(h.queueWrites, [[{ ...BACK, undo: false, atMs: AT_NOON }], []]);
   });
 
   test('자정: 23:58 에 오프라인으로 누른 23:55 확인을 00:05 에 어제 날짜로 보낸다', async () => {
@@ -773,7 +777,7 @@ describe("'돌아왔어요'", () => {
     assert.equal(phaseOf(sent.sync), BACK_PHASE.SENDING);
     sent.sync.undoBack(BACK);
     sent.sync.pressBack(BACK);
-    assert.deepEqual(sent.store.readGuardianWatch().backQueue, [{ ...BACK, undo: true }], '보내는 중에는 누름을 받지 않는다');
+    assert.deepEqual(sent.store.readGuardianWatch().backQueue, [{ ...BACK, undo: true, atMs: AT_NOON }], '보내는 중에는 누름을 받지 않는다');
     gate.resolve();
     await sent.sync.idle();
     assert.deepEqual(sent.api.bodies('back'), [
@@ -1013,6 +1017,189 @@ describe('계기', () => {
     h.sync.start();
     assert.equal(h.timers.pending().length, 1);
     h.sync.stop();
+  });
+});
+
+// ── 같은 마감을 가진 외출과 덮는 확인 (다르게 정한 것 25) ─────────────────────
+
+describe('같은 마감의 나중 외출을 덮는 확인', () => {
+  // 10-02: B 는 12:41 출발(13:47 귀가 예정), C 는 17:17 출발. 둘 다 21:00 마감
+  const B_OUT = { id: 'b', departAt: '12:41', returnBy: '21:00', slackMin: 300 };
+  const C_OUT = { id: 'c', departAt: '17:17', returnBy: '21:00', slackMin: 120 };
+  const planB = () => basePlan({ [TODAY]: makeDayPlan(TODAY, { outings: [patientOuting(B_OUT)] }) });
+  const planBC = () => basePlan({ [TODAY]: makeDayPlan(TODAY, { outings: [patientOuting(B_OUT), patientOuting(C_OUT)] }) });
+  const DUSK = Object.freeze({ date: TODAY, by: '21:00' });
+  const backBodies = (h) => h.api.bodies('back');
+
+  test('재계획으로 C 가 생기면 B 에서 보낸 확인을 되돌리고 메모리 단계를 비운다(C 의 버튼이 전달했어요를 물려받지 않는다)', async () => {
+    const h = harness({ at: kst(TODAY, '14:00'), plan: planB(), record: watchRecord() });
+    h.sync.start();
+    h.sync.pressBack(DUSK);
+    await h.sync.idle();
+    assert.equal(phaseOf(h.sync, DUSK), BACK_PHASE.SENT);
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, [{ ...DUSK, atMs: kst(TODAY, '14:00') }]);
+
+    // 15:00 재계획: C 가 생긴다. 되돌리기를 보내는 동안 단계는 SENT 가 아니다
+    h.clock.set(kst(TODAY, '15:00'));
+    const gate = deferred();
+    h.api.reply('back', async () => {
+      await gate.promise;
+      return ok({ recorded: true });
+    });
+    assert.equal(h.store.writeTripPlan(planBC()).ok, true);
+    await until(() => h.api.open === 1);
+    assert.equal(phaseOf(h.sync, DUSK), BACK_PHASE.SENDING);
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, [{ ...DUSK, undo: true, atMs: kst(TODAY, '15:00') }]);
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, [], '되돌리기를 넣을 때 confirmed 에서 뺀다');
+    gate.resolve();
+    await h.sync.idle();
+    assert.deepEqual(backBodies(h), [{ ...W1, ...DUSK }, { ...W1, ...DUSK, undo: true }]);
+    assert.equal(phaseOf(h.sync, DUSK), null, '되돌린 뒤 C 의 카드는 누르기 전과 같다');
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, []);
+
+    // 다음 비우기는 아무것도 다시 보내지 않는다
+    await h.sync.kick('resume');
+    assert.equal(backBodies(h).length, 2);
+    h.sync.stop();
+  });
+
+  test('되돌리기를 보내지 못하면(연결 없음) 되돌리기 대기로 남고 SENT 를 보이지 않는다', async () => {
+    const h = harness({ at: kst(TODAY, '14:00'), plan: planB(), record: watchRecord() });
+    h.sync.pressBack(DUSK);
+    await h.sync.idle();
+    assert.equal(phaseOf(h.sync, DUSK), BACK_PHASE.SENT);
+    h.clock.set(kst(TODAY, '15:00'));
+    assert.equal(h.store.writeTripPlan(planBC()).ok, true);
+    h.api.reply('back', () => failed('NETWORK'));
+    await h.sync.kick('plan');
+    assert.equal(phaseOf(h.sync, DUSK), BACK_PHASE.UNDO_QUEUED);
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, []);
+    // 다음 계기에 보낸다
+    await h.sync.kick('online');
+    assert.deepEqual(backBodies(h).at(-1), { ...W1, ...DUSK, undo: true });
+    assert.equal(phaseOf(h.sync, DUSK), null);
+  });
+
+  test('C 가 출발한 뒤 C 에서 누른 확인은 되돌리지 않는다', async () => {
+    const h = harness({ at: kst(TODAY, '19:00'), plan: planBC(), record: watchRecord() });
+    h.sync.start();
+    h.sync.pressBack(DUSK);
+    await h.sync.idle();
+    assert.equal(phaseOf(h.sync, DUSK), BACK_PHASE.SENT);
+    // 일정이 다시 바뀌어도(같은 외출) 그대로다
+    h.clock.set(kst(TODAY, '19:30'));
+    assert.equal(h.store.writeTripPlan(planBC()).ok, true);
+    await h.sync.kick('plan');
+    assert.deepEqual(backBodies(h), [{ ...W1, ...DUSK }]);
+    assert.equal(phaseOf(h.sync, DUSK), BACK_PHASE.SENT);
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, [{ ...DUSK, atMs: kst(TODAY, '19:00') }]);
+    h.sync.stop();
+  });
+
+  test('오프라인에서 누른 B 의 확인은 C 가 생기면 요청 없이 사라진다', async () => {
+    const h = harness({ at: kst(TODAY, '14:00'), plan: planB(), record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED }) });
+    h.store.setOnline(false);
+    h.sync.pressBack(DUSK);
+    await h.sync.idle();
+    assert.equal(phaseOf(h.sync, DUSK), BACK_PHASE.QUEUED);
+    // 연결되기 전에 C 가 생겼다(다른 탭의 재계획)
+    h.clock.set(kst(TODAY, '15:00'));
+    h.store.setOnline(true);
+    assert.equal(h.store.writeTripPlan(planBC()).ok, true);
+    await h.sync.kick('online');
+    assert.deepEqual(backBodies(h), [], '대기 중인 확인과 되돌리기가 함께 사라져 보낼 것이 없다');
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, []);
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, []);
+    assert.equal(phaseOf(h.sync, DUSK), null);
+  });
+
+  test('보기 전용(세션 없음)에서도 덮는 확인을 되돌린다(대기열 보내기와 같다)', async () => {
+    const confirmed = [{ ...DUSK, atMs: kst(TODAY, '14:00') }];
+    const h = harness({ at: kst(TODAY, '15:00'), plan: planBC(), record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED, confirmed }) });
+    signOut(h.store);
+    await h.sync.kick('resume');
+    assert.deepEqual(h.api.names(), ['back']);
+    assert.deepEqual(backBodies(h), [{ ...W1, ...DUSK, undo: true }]);
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, []);
+    assert.deepEqual(h.writes, [], 'writeGuardianWatch 를 부르지 않는다');
+  });
+
+  test('되돌리기 마감이 지났으면 아무것도 넣지 않는다', async () => {
+    const confirmed = [{ ...DUSK, atMs: kst(TODAY, '14:00') }];
+    const h = harness({ at: kst(TODAY, '21:09', '30'), plan: planBC(), record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED, confirmed }) });
+    await h.sync.kick('resume');
+    assert.deepEqual(backBodies(h), []);
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, confirmed);
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, []);
+  });
+
+  test('덮는 확인을 저장소에 쓰지 못하면 그대로 두고 이번에는 대기열을 보내지 않는다(다음 비우기에서 다시)', async () => {
+    const pending = [{ ...DUSK, undo: false, atMs: kst(TODAY, '14:00') }];
+    const h = harness({ at: kst(TODAY, '15:00'), plan: planBC(), record: watchRecord({ uploadPending: false, lastUploaded: BASE_UPLOADED, backQueue: pending }) });
+    let failWrites = true;
+    const store = { ...h.store, writeBackQueue: (...args) => (failWrites ? { ok: false, code: 'STORAGE_FAILED' } : h.store.writeBackQueue(...args)) };
+    const sync = createWatchSync({ store, api: h.api, now: h.clock.now });
+    await sync.kick('resume');
+    assert.deepEqual(h.api.bodies('back'), [], '덮는 확인을 보내지 않는다');
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, pending);
+    failWrites = false;
+    await sync.kick('resume');
+    assert.deepEqual(h.api.bodies('back'), []);
+    assert.deepEqual(h.store.readGuardianWatch().backQueue, []);
+  });
+
+  test('요청 본문은 { watchId, writeToken, date, by, undo } 그대로다(누른 시각을 싣지 않는다)', async () => {
+    const h = harness({ at: kst(TODAY, '14:00'), plan: planB(), record: watchRecord() });
+    const inputs = [];
+    const back = h.api.back;
+    h.api.back = (input) => {
+      inputs.push(input);
+      return back(input);
+    };
+    h.sync.pressBack(DUSK);
+    await h.sync.idle();
+    h.clock.set(kst(TODAY, '15:00'));
+    assert.equal(h.store.writeTripPlan(planBC()).ok, true);
+    await h.sync.kick('plan');
+    assert.deepEqual(inputs, [{ ...W1, ...DUSK, undo: false }, { ...W1, ...DUSK, undo: true }]);
+    assert.deepEqual(inputs.map((input) => Object.keys(input).sort()), [
+      ['by', 'date', 'undo', 'watchId', 'writeToken'],
+      ['by', 'date', 'undo', 'watchId', 'writeToken'],
+    ]);
+    assert.deepEqual(backBodies(h), [{ ...W1, ...DUSK }, { ...W1, ...DUSK, undo: true }]);
+  });
+
+  test('confirmed 는 같은 watchId 다시 등록(REPLACED 에서 켬)에는 남고, 새 watchId 면 비어서 시작한다', async () => {
+    const confirmed = [{ ...DUSK, atMs: kst(TODAY, '14:00') }];
+    const replaced = harness({ at: kst(TODAY, '14:30'), plan: planB(), record: watchRecord({ state: 'REPLACED', confirmed }) });
+    assert.equal((await replaced.sync.ensureRegistered({ stay: replaced.store.readStay() })).ok, true);
+    await replaced.sync.idle();
+    assert.equal(replaced.store.readGuardianWatch().state, 'ON');
+    assert.notEqual(replaced.store.readGuardianWatch().writeToken, W1.writeToken);
+    assert.deepEqual(replaced.store.readGuardianWatch().confirmed, confirmed);
+    // 다시 켠 뒤 C 가 생기면 남은 확인을 새 토큰으로 되돌린다
+    replaced.clock.set(kst(TODAY, '15:00'));
+    assert.equal(replaced.store.writeTripPlan(planBC()).ok, true);
+    await replaced.sync.kick('plan');
+    const [undo] = replaced.api.bodies('back');
+    assert.deepEqual({ ...undo, writeToken: 'x' }, { ...W1, ...DUSK, undo: true, writeToken: 'x' });
+    assert.equal(undo.writeToken, replaced.store.readGuardianWatch().writeToken);
+
+    // 끈 뒤 새로 켜면(새 watchId) 빈 목록이다
+    const fresh = harness({ at: kst(TODAY, '14:30'), plan: planB(), record: watchRecord({ confirmed }) });
+    assert.equal((await fresh.sync.retire()).ok, true);
+    const next = await fresh.sync.ensureRegistered({ stay: fresh.store.readStay() });
+    await fresh.sync.idle();
+    assert.notEqual(next.watchId, W1.watchId);
+    assert.deepEqual(fresh.store.readGuardianWatch().confirmed, []);
+  });
+
+  test('확인을 보낼 때 confirmed 의 어제보다 앞 날짜를 버린다', async () => {
+    const old = [{ date: '2026-09-30', by: '21:00', atMs: kst('2026-09-30', '14:00') }, { date: '2026-10-01', by: '21:00', atMs: kst('2026-10-01', '14:00') }];
+    const h = harness({ at: kst(TODAY, '14:00'), plan: planB(), record: watchRecord({ confirmed: old }) });
+    h.sync.pressBack(DUSK);
+    await h.sync.idle();
+    assert.deepEqual(h.store.readGuardianWatch().confirmed, [old[1], { ...DUSK, atMs: kst(TODAY, '14:00') }]);
   });
 });
 
