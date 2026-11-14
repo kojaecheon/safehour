@@ -6,7 +6,7 @@
 //   - 본문은 허용 목록 필드만 싣는다. undo 는 true 일 때만 싣는다
 //   - 형식이 틀리면 TypeError 이고 메시지에 값이 없다
 //   - 응답 분류(200, 404, 401, 429, 400, 503 OFF, 503 그 밖, 500, 네트워크)
-//   - 클라이언트 모듈(요청 모듈, 기기 저장소, 올릴 상태 계산)은 서버 전용 모듈을 불러오지 않는다
+//   - 클라이언트 모듈(요청 모듈, 기기 저장소, 올릴 상태 계산, 동기화 실행기, 화면 훅)은 서버 전용 모듈을 불러오지 않는다
 //   - 기기 저장소(lib/store)는 lib/trip 에 닿지 않는다
 //
 // 외부 호출은 없다.
@@ -242,6 +242,8 @@ describe('모듈 경계', () => {
     'src/guardian/deadlines.js',
     ...STORE_ENTRIES,
     'lib/trip/watchPlan.js',
+    'lib/trip/watchSync.js',
+    'lib/trip/useWatch.js',
   ];
   const FORBIDDEN = /lib\/server\/|src\/auth\/|src\/push\/|^node:|^@\//;
 
