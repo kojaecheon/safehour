@@ -5,6 +5,7 @@
 //   - 상태 줄 키는 ON, REPLACED, NONE 마다 다르다. ON 인데 서버가 스위치가 꺼졌다고 답했으면 멈춤 줄(안전 문구)이고,
 //     읽지 못했으면 예전 줄이다
 //   - '내 정보 지우기' 안내는 지켜보기 레코드(ON·REPLACED)가 있으면 서버 알림 저장을 적은 줄, 없으면 예전 줄이다
+//   - 끄기 확인 시트의 제목은 messages, 본문(보호자에게 알림이 가는지)은 safety 다
 //   - 끄기는 ON·REPLACED 이고 쓰기 가능할 때, 서버 지우기는 쓰기 가능하고 온라인일 때만
 //   - 끄기 결과: { ok: true, pending: false } 일 때만 '껐어요', pending 이면 알림이 갈 수 있다는 줄, 실패면 끄지 못했다는 줄
 //     (뒤의 둘은 안전 문구, 작업 7 검토 반영)
@@ -143,8 +144,14 @@ describe('문구', () => {
     'settings.serverPushRemoveLogin',
     'settings.serverPushRemoveFailed',
     'clear.noteServerPush',
+    'settings.serverPushTurnOffTitle',
   ];
-  const SAFETY_KEYS = ['settings.serverPushTurnOffPending', 'settings.serverPushTurnOffFailed', 'settings.serverPushPaused'];
+  const SAFETY_KEYS = [
+    'settings.serverPushTurnOffPending',
+    'settings.serverPushTurnOffFailed',
+    'settings.serverPushPaused',
+    'settings.serverPushTurnOffBody',
+  ];
   const dashes = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
 
   function checkEntry(key, entry) {
@@ -204,6 +211,12 @@ describe('문구', () => {
     assert.equal(
       settingsMessages['clear.noteServerPush'].ko,
       "체류·조건·일정은 이 기기에만 저장됩니다. 서버 알림을 켜 두면 날짜별 복귀 마감 시각과 '돌아왔어요' 기록이 서버에 저장됩니다.",
+    );
+    // 끄기 확인 시트(화면 검토 M6)
+    assert.equal(settingsMessages['settings.serverPushTurnOffTitle'].ko, '서버 알림을 끌까요?');
+    assert.equal(
+      settingsSafety['settings.serverPushTurnOffBody'].ko,
+      '끄면 보호자에게 서버 알림이 가지 않아요. 다시 켜려면 보호자 링크를 새로 만들어 보내야 해요.',
     );
     // 레코드가 없을 때의 예전 안내는 그대로다
     assert.equal(settingsMessages['clear.note'].ko, '체류·조건·일정은 이 기기에만 저장됩니다. 서버에는 저장되지 않습니다.');

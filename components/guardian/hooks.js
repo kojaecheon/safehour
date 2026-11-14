@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { getStore } from '@/lib/store/index.js';
-import { useGuardianWatch } from '@/lib/trip/useWatch.js';
+import { useGuardianWatch } from '@/lib/trip/useGuardianWatch.js';
 import { parseGuardianLink } from '@/src/guardian/index.js';
 import { createGuardianLockout } from './lockoutStorage.js';
 import { isGuardianResendNeeded, isGuardianWindowPassed } from './share.js';

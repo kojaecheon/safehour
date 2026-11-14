@@ -183,7 +183,7 @@
 .guardian-push-list .guardian-list-icon {
   color: var(--ink-soft);
 }
-/* 링크를 만든 뒤 서버 알림 결과 줄(role=status): 문장으로 뜻을 말하고 색으로 나누지 않는다 */
+/* 링크를 만든 뒤 서버 알림 결과 줄(결과 제목의 aria-describedby 로 읽힌다): 문장으로 뜻을 말하고 색으로 나누지 않는다 */
 .guardian-push-result {
   display: grid;
   gap: var(--space-1);

@@ -5,6 +5,8 @@
 //   serverPushSubmitPlan({ visible, checked, state, watchId }) 링크를 만들 때 지켜보기를 어떻게 할지와 스냅샷에 실을 watchId
 //   serverPushResultKeys(result)                              링크를 만든 뒤 결과 줄 문구 키(등록)
 //   serverPushRetireKeys(result)                              링크를 만든 뒤 결과 줄 안전 문구 키(끄기)
+//   applyServerPush(plan, { stay, sync })                     계획대로 지켜보기를 켜거나 끄고 스냅샷에 실을 watchId 를 준다
+//   submitWithServerPush({ option, stay, sync, makeLink })    링크 만들기 순서(지켜보기 먼저, 그 id 로 링크, 그다음 비우기)
 //   SERVER_PUSH_CONSENT_KEYS                                  동의 목록 문구 키(설계서 5.5)
 //
 // 정한 것
@@ -16,9 +18,11 @@
 //     항목이 숨어 있으면 지켜보기를 건드리지 않고, 켜진 지켜보기의 id 를 그대로 싣는다.
 //   - 등록이 실패해도 링크는 만든다(D6). 결과 줄은 이유별로 하나다.
 //   - 끄기가 실패해도 링크는 만들고(watchId 없음) 끄지 못했다는 줄을 보인다. 서버 삭제가 남았으면 그 전까지 보호자에게
-//     알림이 갈 수 있다는 줄을 보인다(작업 7 검토 반영).
+//     알림이 갈 수 있다는 줄을, 이 기기와 서버 모두에서 껐으면 껐다는 줄을 보인다(작업 7 검토 반영, 화면 검토 M10).
+//   - 순서: 지켜보기를 켜거나 끈 결과의 watchId 로 스냅샷을 만든다(등록이 스냅샷보다 먼저다). 링크를 만든 뒤에 비우기를 건다.
 //
-// 순수 모듈이다(React·저장소·네트워크 없음). node --test 가 읽으므로 상대 경로로만 불러온다.
+// React·저장소·네트워크를 직접 쓰지 않는다. 동기화 실행기(getWatchSync())는 부르는 쪽이 넣는다.
+// node --test 가 읽으므로 상대 경로로만 불러온다.
 
 import { isDateString } from '../../src/stay/time.js';
 
@@ -101,7 +105,7 @@ export function serverPushResultKeys(result) {
 
 /**
  * 체크를 끈 채 링크를 만들어 지켜보기를 끈(retire) 결과 줄의 안전 문구 키(guardian safety 블록, 작업 7 검토 반영).
- *   - 끄지 않았으면(null) 줄이 없다. 이 기기와 서버 모두에서 지웠으면({ ok: true, pending: false }) 줄이 없다.
+ *   - 끄지 않았으면(null) 줄이 없다. 이 기기와 서버 모두에서 지웠으면({ ok: true, pending: false }) 껐다는 줄(화면 검토 M10).
  *   - 이 기기에서는 껐지만 서버 삭제가 남았으면(pending: true) 그 전까지 알림이 갈 수 있다는 줄.
  *   - 끄지 못했으면(ok: false, 모양이 틀린 결과 포함) 끄지 못했다는 줄. 꺼졌다고 쓰지 않는다.
  * @param {null | { ok: true, pending: boolean } | { ok: false, reason?: string }} result  retire 결과
@@ -109,7 +113,61 @@ export function serverPushResultKeys(result) {
  */
 export function serverPushRetireKeys(result) {
   if (result === null || result === undefined) return [];
-  if (result?.ok === true && result.pending === false) return [];
+  if (result?.ok === true && result.pending === false) return ['guardian.serverPushTurnedOff'];
   if (result?.ok === true && result.pending === true) return ['guardian.serverPushTurnOffPending'];
   return ['guardian.serverPushTurnOffFailed'];
+}
+
+/**
+ * 링크를 만들기 전에 계획대로 서버 알림 지켜보기를 켜거나 끈다. 던지지 않는다.
+ *   - REGISTER: ensureRegistered. 성공하면 그 watchId 를 싣는다. 실패하거나 실행기가 없으면 id 없이 이유를 돌려준다(링크는 막지 않는다)
+ *   - RETIRE: retire. 결과와 상관없이 id 를 싣지 않는다. 실행기가 없거나 던지면 끄지 못한 것({ ok: false })으로 본다
+ *   - KEEP: 요청 없이 계획의 watchId(숨은 항목의 켜진 지켜보기 id, 아니면 null)를 싣는다
+ * @param {{ action: string, watchId: string|null }} plan  serverPushSubmitPlan 결과
+ * @param {{ stay: object|null, sync: { ensureRegistered: Function, retire: Function } | null | undefined }} deps
+ * @returns {Promise<{ watchId: string|null, serverPush: null | { ok: true } | { ok: false, reason: string }, serverPushRetire: null | object }>}
+ *   serverPush: 등록을 시도했을 때만 그 결과(결과 줄), 아니면 null
+ *   serverPushRetire: 끄기를 시도했을 때만 retire 결과(결과 줄), 아니면 null
+ */
+export async function applyServerPush(plan, { stay, sync } = {}) {
+  if (plan?.action === SERVER_PUSH_ACTION.REGISTER) {
+    let registered;
+    try {
+      registered = sync ? await sync.ensureRegistered({ stay }) : null;
+    } catch {
+      registered = null;
+    }
+    if (registered?.ok === true) return { watchId: registered.watchId, serverPush: { ok: true }, serverPushRetire: null };
+    return { watchId: null, serverPush: { ok: false, reason: registered?.reason ?? 'UNAVAILABLE' }, serverPushRetire: null };
+  }
+  if (plan?.action === SERVER_PUSH_ACTION.RETIRE) {
+    let retired;
+    try {
+      retired = sync ? await sync.retire() : null;
+    } catch {
+      retired = null;
+    }
+    // 끄지 못해도 링크는 만들고 id 는 싣지 않는다. 결과 줄이 끄지 못했다고 알린다
+    return { watchId: null, serverPush: null, serverPushRetire: retired ?? { ok: false } };
+  }
+  return { watchId: plan?.watchId ?? null, serverPush: null, serverPushRetire: null };
+}
+
+/**
+ * 보호자 링크 만들기 순서. 항목 상태로 계획을 세우고(serverPushSubmitPlan), 지켜보기를 켜거나 끈 뒤(applyServerPush) 그 결과의
+ * watchId 로 링크를 만들고(makeLink), 링크를 만든 뒤 비우기를 건다(kick('register')). makeLink 가 던지면 그대로 던진다
+ * (지켜보기 결과와 상관없이 링크를 만들지 못한 것이다).
+ * @template T
+ * @param {object} args
+ * @param {{ visible: boolean, checked: boolean, state: 'ON'|'REPLACED'|'NONE', watchId: string|null }} args.option  항목 상태
+ * @param {object|null} args.stay
+ * @param {{ ensureRegistered: Function, retire: Function, kick?: Function } | null | undefined} args.sync  getWatchSync()
+ * @param {(watchId: string|null) => Promise<T>} args.makeLink  스냅샷·암호화·링크·공유 기록
+ * @returns {Promise<{ link: T, serverPush: object|null, serverPushRetire: object|null }>}
+ */
+export async function submitWithServerPush({ option, stay, sync, makeLink }) {
+  const push = await applyServerPush(serverPushSubmitPlan(option), { stay, sync });
+  const link = await makeLink(push.watchId);
+  void sync?.kick?.('register');
+  return { link, serverPush: push.serverPush, serverPushRetire: push.serverPushRetire };
 }

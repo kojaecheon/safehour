@@ -185,6 +185,13 @@ export const messages = {
     zh: '服务器提醒已关闭。您可以在创建陪同者链接时开启。',
   },
   'settings.serverPushTurnOff': { ko: '서버 알림 끄기', en: 'Turn off server alerts', ja: 'サーバー通知をオフにする', zh: '关闭服务器提醒' },
+  // 끄기 확인 시트 제목(본문은 safety 의 settings.serverPushTurnOffBody, 화면 검토 M6)
+  'settings.serverPushTurnOffTitle': {
+    ko: '서버 알림을 끌까요?',
+    en: 'Turn off server alerts?',
+    ja: 'サーバー通知をオフにしますか？',
+    zh: '要关闭服务器提醒吗？',
+  },
   'settings.serverPushTurnedOff': {
     ko: '서버 알림을 껐어요. 보호자에게 링크를 다시 보내면 반영돼요.',
     en: 'Server alerts are off. Send the link to your guardian again to update their copy.',
@@ -318,6 +325,13 @@ export const safety = {
     en: 'Server alerts are paused right now. While they are paused, your guardian will not get server alerts.',
     ja: 'サーバー通知は現在止まっています。その間、付き添い者にサーバー通知は届きません。',
     zh: '服务器提醒目前已暂停。在此期间，陪同者不会收到服务器提醒。',
+  },
+  // 서버 알림 끄기 확인 시트 본문(화면 검토 M6). 보호자에게 알림이 가는지를 말하는 문장이다
+  'settings.serverPushTurnOffBody': {
+    ko: '끄면 보호자에게 서버 알림이 가지 않아요. 다시 켜려면 보호자 링크를 새로 만들어 보내야 해요.',
+    en: 'If you turn them off, your guardian will not get server alerts. To turn them on again, you need to create and send a new guardian link.',
+    ja: 'オフにすると、付き添い者にサーバー通知が届かなくなります。もう一度オンにするには、付き添い者用リンクを新しく作成して送る必要があります。',
+    zh: '关闭后，陪同者将不会收到服务器提醒。如需重新开启，需要重新创建并发送陪同者链接。',
   },
   // 서버 알림 끄기 결과 중 보호자에게 알림이 갈 수 있는지를 말하는 줄(계획 2026-11-15 Task 10, 작업 7 검토 반영)
   'settings.serverPushTurnOffPending': {

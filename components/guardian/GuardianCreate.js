@@ -18,7 +18,10 @@
 //   - 공유 동의 체크 아래에 체크 하나와 동의 목록, 법률 검토 안내 줄(conditions.consentLegalReview)을 둔다. 배지는 없다(D12).
 //   - 서버 알림 스위치가 꺼져 있거나 출국일이 지났으면 항목이 숨고 화면은 예전과 같다. 숨어 있으면 지켜보기를 건드리지 않는다.
 //   - 만들기를 누르면 검증 뒤, 스냅샷을 만들기 전에 지켜보기를 켜거나(ensureRegistered) 끈다(retire). 등록이 실패해도 링크는
-//     만들고(D6) 결과 줄에 이유 하나를 보인다. 스냅샷에는 켜진 지켜보기의 watchId 만 싣는다.
+//     만들고(D6) 결과 줄에 이유 하나를 보인다. 스냅샷에는 켜진 지켜보기의 watchId 만 싣는다. 순서는 serverPush.js
+//     submitWithServerPush 하나다.
+//   - 결과 줄은 링크 결과 제목(포커스를 받는다)의 aria-describedby 로 읽힌다(이미 채워진 채 나타나 상태 알림으로는 읽히지 않는다).
+//     끄기 결과 줄은 안전 문구라 주 언어와 병기 언어 두 줄이다.
 //
 // 보기 전용(로그인 안 함·만료·오프라인)에서는 만들기를 막는다(docs/platform/IA_AND_FLOWS.md '보기 전용 상태': 공유 차단).
 // PIN 은 화면 상태에만 잠시 있고, 링크를 만든 뒤 바로 지운다. 저장하거나 기록하지 않는다.
@@ -45,13 +48,12 @@ import { ErrorText, WarningNote } from './Feedback.js';
 import { useGuardianResendNeeded, useHydrated, useStoreRecord } from './hooks.js';
 import SafetyNote from './SafetyNote.js';
 import {
-  SERVER_PUSH_ACTION,
   SERVER_PUSH_CONSENT_KEYS,
   serverPushInitialChecked,
   serverPushOptionVisible,
   serverPushResultKeys,
   serverPushRetireKeys,
-  serverPushSubmitPlan,
+  submitWithServerPush,
 } from './serverPush.js';
 import { buildShareSnapshot, shareRecordFor } from './share.js';
 
@@ -141,6 +143,7 @@ function LinkResult({ result, onNewLink, headingRef }) {
   const { t, pair, locale } = useLang();
   const hydrated = useHydrated();
   const fieldId = useId();
+  const pushResultId = useId();
   const linkRef = useRef(null);
   const [feedback, setFeedback] = useState(null);
   const canShare = hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function';
@@ -148,6 +151,7 @@ function LinkResult({ result, onNewLink, headingRef }) {
   // 서버 알림 결과 줄: 체크해 등록을 시도했을 때(pushKeys), 체크를 꺼서 끄기를 시도했을 때(retireKeys, 안전 문구)만 있다
   const pushKeys = serverPushResultKeys(result.serverPush ?? null);
   const retireKeys = serverPushRetireKeys(result.serverPushRetire ?? null);
+  const hasPushResult = pushKeys.length + retireKeys.length > 0;
 
   async function copyLink() {
     try {
@@ -184,7 +188,7 @@ function LinkResult({ result, onNewLink, headingRef }) {
 
   return (
     <section className="guardian-result" aria-labelledby="guardian-result-title">
-      <h2 id="guardian-result-title" ref={headingRef} tabIndex={-1}>
+      <h2 id="guardian-result-title" ref={headingRef} tabIndex={-1} aria-describedby={hasPushResult ? pushResultId : undefined}>
         {t('guardian.linkTitle')}
       </h2>
       <div className="field">
@@ -214,17 +218,21 @@ function LinkResult({ result, onNewLink, headingRef }) {
       <p className="guardian-feedback" role="status">
         {feedback ? t(feedback) : ''}
       </p>
-      {pushKeys.length + retireKeys.length > 0 && (
-        <div className="guardian-push-result" role="status">
+      {/* 결과와 함께 채워진 채 나타나므로 상태 알림이 아니라 제목의 설명(aria-describedby)으로 읽힌다 */}
+      {hasPushResult && (
+        <div id={pushResultId} className="guardian-push-result">
           {pushKeys.map((key) => (
             <p key={key}>{t(key)}</p>
           ))}
           {retireKeys.map((key) => {
-            const text = pair(key).primary;
+            const text = pair(key);
             return (
-              <p key={key} lang={text.lang}>
-                {text.text}
-              </p>
+              <div key={key}>
+                <p lang={text.primary.lang}>{text.primary.text}</p>
+                <p lang={text.secondary.lang} className="guardian-note-secondary">
+                  {text.secondary.text}
+                </p>
+              </div>
             );
           })}
         </div>
@@ -253,37 +261,6 @@ function previewCoverage(stay, tripPlan, locale) {
 /** 오늘(KST) 날짜 */
 function todayKst() {
   return kstDate(Date.now());
-}
-
-/**
- * 링크를 만들기 전에 서버 알림 지켜보기를 켜거나 끈다. 던지지 않는다.
- * @returns {Promise<{ watchId: string|null, serverPush: null | { ok: true } | { ok: false, reason: string }, serverPushRetire: null | object }>}
- *   serverPush: 등록을 시도했을 때만 그 결과(결과 줄), 아니면 null
- *   serverPushRetire: 끄기를 시도했을 때만 retire 결과(결과 줄), 아니면 null. 실행기가 없거나 던지면 끄지 못한 것으로 본다
- */
-async function applyServerPush(plan, stay) {
-  const sync = getWatchSync();
-  if (plan.action === SERVER_PUSH_ACTION.REGISTER) {
-    let registered;
-    try {
-      registered = sync ? await sync.ensureRegistered({ stay }) : null;
-    } catch {
-      registered = null;
-    }
-    if (registered?.ok === true) return { watchId: registered.watchId, serverPush: { ok: true }, serverPushRetire: null };
-    return { watchId: null, serverPush: { ok: false, reason: registered?.reason ?? 'UNAVAILABLE' }, serverPushRetire: null };
-  }
-  if (plan.action === SERVER_PUSH_ACTION.RETIRE) {
-    let retired;
-    try {
-      retired = sync ? await sync.retire() : null;
-    } catch {
-      retired = null;
-    }
-    // 끄지 못해도 링크는 만들고 id 는 싣지 않는다. 결과 줄이 끄지 못했다고 알린다
-    return { watchId: null, serverPush: null, serverPushRetire: retired ?? { ok: false } };
-  }
-  return { watchId: plan.watchId, serverPush: null, serverPushRetire: null };
 }
 
 function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consentHeadingRef }) {
@@ -328,17 +305,23 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
 
     setBusy(true);
     try {
-      // 서버 알림: 항목이 보일 때만 켜거나 끈다. 등록이 실패해도 링크는 만든다(D6)
-      const pushPlan = serverPushSubmitPlan({ visible: pushVisible, checked: pushChecked, state: watch.state, watchId: watch.watchId });
-      const push = await applyServerPush(pushPlan, stay);
+      // 서버 알림: 항목이 보일 때만 켜거나 끈다. 등록이 실패해도 링크는 만든다(D6). 등록 결과의 id 로 스냅샷을 만든다
       const origin = window.location.origin;
       const nowMs = Date.now();
-      const snapshot = buildShareSnapshot({ stay, tripPlan, now: nowMs, watchId: push.watchId });
-      const size = await measureGuardianLink(snapshot, { origin });
-      const fragment = await encryptSnapshot(snapshot, pin);
-      const link = buildGuardianLink(origin, fragment);
-      const saved = getStore().writeGuardianShare(await shareRecordFor(snapshot));
-      void getWatchSync()?.kick('register');
+      const made = await submitWithServerPush({
+        option: { visible: pushVisible, checked: pushChecked, state: watch.state, watchId: watch.watchId },
+        stay,
+        sync: getWatchSync(),
+        makeLink: async (watchId) => {
+          const snapshot = buildShareSnapshot({ stay, tripPlan, now: nowMs, watchId });
+          const size = await measureGuardianLink(snapshot, { origin });
+          const fragment = await encryptSnapshot(snapshot, pin);
+          const link = buildGuardianLink(origin, fragment);
+          const saved = getStore().writeGuardianShare(await shareRecordFor(snapshot));
+          return { snapshot, size, link, saved };
+        },
+      });
+      const { snapshot, size, link, saved } = made.link;
       // PIN·동의는 이 링크로 끝난다 — 다음 링크는 다시 받는다
       setPin('');
       setPin2('');
@@ -350,8 +333,8 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
         expiresAt: snapshot.expiresAt,
         coverage: coverageView(snapshot, locale, nowMs),
         shareSaved: saved?.ok === true,
-        serverPush: push.serverPush,
-        serverPushRetire: push.serverPushRetire,
+        serverPush: made.serverPush,
+        serverPushRetire: made.serverPushRetire,
       });
     } catch (err) {
       const code = err?.code;
@@ -498,7 +481,8 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
       <div className="guardian-bar sticky-return is-flow">
         {errors.form && <ErrorText>{t(errors.form)}</ErrorText>}
         {readOnlyShown && <p className="guardian-meta guardian-bar-note">{t('guardian.readOnlyBlocked')}</p>}
-        <Button type="submit" disabled={!canCreate || busy}>
+        {/* 처리 중에는 disabled 대신 loading 으로 막아 포커스를 지킨다(Button 계약) */}
+        <Button type="submit" disabled={!canCreate} loading={busy}>
           {busy ? t('guardian.creating') : t('guardian.createButton')}
         </Button>
       </div>

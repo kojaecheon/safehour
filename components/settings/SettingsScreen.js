@@ -213,8 +213,9 @@ export default function SettingsScreen() {
   const noteKey = status.reason === READ_ONLY_REASON.OFFLINE ? 'settings.offlineNote' : 'settings.readOnlyNote';
   // 동의 철회 시트가 열려 있는 동안 다른 설정 묶음은 누를 수 없게 한다(시트 뒤 배경 — aria-modal 과 같은 뜻)
   const [sheetOpen, setSheetOpen] = useState(false);
-  // 서버 알림 '서버에 남은 내 정보 지우기' 확인 시트. 열려 있는 동안 다른 묶음을 같은 방식으로 막는다
-  const [pushSheetOpen, setPushSheetOpen] = useState(false);
+  // 서버 알림 확인 시트('turnOff' 끄기 · 'removeAll' 서버에 남은 내 정보 지우기). 열려 있는 동안 다른 묶음을 같은 방식으로 막는다
+  const [pushSheet, setPushSheet] = useState(null);
+  const pushSheetOpen = pushSheet !== null;
   const anySheet = sheetOpen || pushSheetOpen;
   return (
     <>
@@ -233,8 +234,8 @@ export default function SettingsScreen() {
         showReadOnly={showReadOnly}
         noteKey={noteKey}
         inert={sheetOpen}
-        sheetOpen={pushSheetOpen}
-        setSheetOpen={setPushSheetOpen}
+        sheet={pushSheet}
+        setSheet={setPushSheet}
       />
       <section className="ui-block settings-section" aria-labelledby="settings-data-title" inert={anySheet}>
         <h2 id="settings-data-title">{t('settings.dataTitle')}</h2>
