@@ -5,6 +5,7 @@
 //   - 처음 체크 상태는 ON 일 때만 켜짐(다르게 정한 것 20), REPLACED 는 꺼짐에서 시작해 체크하면 다시 등록한다
 //   - 체크를 끄고 만들면 있는 지켜보기를 끄고, 항목이 숨어 있으면 건드리지 않는다
 //   - 등록 실패는 링크를 막지 않고 이유별 결과 줄 하나를 보인다
+//   - 끄기 실패는 링크를 막지 않고 끄지 못했다는 줄을, 서버 삭제가 남으면 알림이 갈 수 있다는 줄을 보인다(작업 7 검토 반영)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,6 +16,7 @@ import {
   serverPushInitialChecked,
   serverPushOptionVisible,
   serverPushResultKeys,
+  serverPushRetireKeys,
   serverPushSubmitPlan,
 } from '../components/guardian/serverPush.js';
 import { messages as guardianMessages, safety as guardianSafety } from '../src/i18n/messages/guardian.js';
@@ -132,6 +134,22 @@ describe('링크를 만든 뒤 결과 줄', () => {
     assert.deepEqual(serverPushResultKeys({ ok: false, reason: 'NETWORK' }), ['guardian.serverPushNotOn', 'guardian.serverPushUnavailable']);
     assert.deepEqual(serverPushResultKeys({ ok: false }), ['guardian.serverPushNotOn', 'guardian.serverPushUnavailable']);
   });
+
+  test('끄기 결과 줄: 다 지웠으면 없음, 서버 삭제가 남으면 알림이 갈 수 있다는 줄, 끄지 못했으면 그 줄(꺼졌다고 쓰지 않는다)', () => {
+    assert.deepEqual(serverPushRetireKeys(null), []);
+    assert.deepEqual(serverPushRetireKeys(undefined), []);
+    assert.deepEqual(serverPushRetireKeys({ ok: true, pending: false }), []);
+    assert.deepEqual(serverPushRetireKeys({ ok: true, pending: true }), ['guardian.serverPushTurnOffPending']);
+    assert.deepEqual(serverPushRetireKeys({ ok: false, reason: 'LOGIN_REQUIRED' }), ['guardian.serverPushTurnOffFailed']);
+    assert.deepEqual(serverPushRetireKeys({ ok: false, reason: 'UNAVAILABLE' }), ['guardian.serverPushTurnOffFailed']);
+    assert.deepEqual(serverPushRetireKeys({ ok: false }), ['guardian.serverPushTurnOffFailed']);
+  });
+
+  test('모양이 틀린 끄기 결과는 끄지 못한 것으로 본다', () => {
+    assert.deepEqual(serverPushRetireKeys({}), ['guardian.serverPushTurnOffFailed']);
+    assert.deepEqual(serverPushRetireKeys({ ok: true }), ['guardian.serverPushTurnOffFailed']);
+    assert.deepEqual(serverPushRetireKeys('done'), ['guardian.serverPushTurnOffFailed']);
+  });
 });
 
 describe('문구', () => {
@@ -166,6 +184,25 @@ describe('문구', () => {
         assert.ok(!/[\u2013\u2014]/.test(entry[lang]), `${key}.${lang} 에 대시`);
       }
     }
+  });
+
+  test('끄기 결과 줄은 safety 블록의 네 언어 문장이고 꺼졌다고 단정하지 않는다', () => {
+    const dashes = new RegExp(`[${String.fromCharCode(0x2013, 0x2014)}]`);
+    for (const key of ['guardian.serverPushTurnOffFailed', 'guardian.serverPushTurnOffPending']) {
+      const entry = guardianSafety[key];
+      assert.ok(entry, `${key} 는 safety 에 있다`);
+      assert.equal(guardianMessages[key], undefined, `${key} 는 messages 가 아니다`);
+      for (const lang of LANGS) {
+        assert.equal(typeof entry[lang], 'string', `${key}.${lang}`);
+        assert.ok(entry[lang].trim().length > 0, `${key}.${lang}`);
+        assert.ok(!dashes.test(entry[lang]), `${key}.${lang} 에 대시`);
+      }
+      assert.ok(!/안전합니다|안전해요/.test(entry.ko), `${key}.ko`);
+      assert.ok(!/\bsafe\b/i.test(entry.en), `${key}.en`);
+      assert.ok(!/安全/.test(entry.ja) && !/安全/.test(entry.zh), `${key} ja·zh`);
+    }
+    assert.match(guardianSafety['guardian.serverPushTurnOffFailed'].ko, /끄지 못했어요/);
+    assert.match(guardianSafety['guardian.serverPushTurnOffPending'].ko, /알림이 갈 수 있어요/);
   });
 
   test('보관 기간·저장 위치 빈칸은 확인 결과로 채웠다(다르게 정한 것 19)', () => {

@@ -780,4 +780,17 @@ export const safety = {
     ja: '患者に同行が必要な日です。患者のそばにいてください。',
     zh: '当天患者需要有人陪同。请留在患者身边。',
   },
+  // 서버 알림을 끄고 링크를 만들 때의 결과 줄(계획 Task 8, 작업 7 검토 반영). 보호자에게 알림이 갈 수 있는지를 말하는 문장이다
+  'guardian.serverPushTurnOffFailed': {
+    ko: '서버 알림을 끄지 못했어요. 보호자에게 알림이 계속 갈 수 있어요. 연결과 로그인을 확인한 뒤 설정에서 꺼 주세요.',
+    en: 'Server alerts could not be turned off. Your guardian may still get alerts. Check your connection and sign-in, then turn them off in Settings.',
+    ja: 'サーバー通知をオフにできませんでした。付き添い者に通知が届き続ける可能性があります。接続とログインを確認してから、設定でオフにしてください。',
+    zh: '未能关闭服务器提醒。陪同者可能仍会收到提醒。请检查网络连接和登录状态后，在设置中关闭。',
+  },
+  'guardian.serverPushTurnOffPending': {
+    ko: '이 기기에서는 서버 알림을 껐어요. 서버에 남은 정보는 연결되면 지워요. 그 전까지는 보호자에게 알림이 갈 수 있어요.',
+    en: 'Server alerts are off on this device. The information left on the server will be deleted once you are connected. Until then, your guardian may still get alerts.',
+    ja: 'この端末ではサーバー通知をオフにしました。サーバーに残っている情報は、接続されたときに削除します。それまでは付き添い者に通知が届く可能性があります。',
+    zh: '已在此设备上关闭服务器提醒。服务器上剩余的信息会在连接后删除。在此之前，陪同者仍可能收到提醒。',
+  },
 };

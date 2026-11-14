@@ -3,7 +3,8 @@
 //   serverPushOptionVisible({ enabled, departureDate, today })  항목을 보이는가
 //   serverPushInitialChecked(state)                           처음 체크 상태
 //   serverPushSubmitPlan({ visible, checked, state, watchId }) 링크를 만들 때 지켜보기를 어떻게 할지와 스냅샷에 실을 watchId
-//   serverPushResultKeys(result)                              링크를 만든 뒤 결과 줄 문구 키
+//   serverPushResultKeys(result)                              링크를 만든 뒤 결과 줄 문구 키(등록)
+//   serverPushRetireKeys(result)                              링크를 만든 뒤 결과 줄 안전 문구 키(끄기)
 //   SERVER_PUSH_CONSENT_KEYS                                  동의 목록 문구 키(설계서 5.5)
 //
 // 정한 것
@@ -14,6 +15,8 @@
 //   - 체크를 끈 채 링크를 만들면 있는 지켜보기(ON·REPLACED)를 끈다(보호자 사본과 서버 상태가 어긋나지 않게).
 //     항목이 숨어 있으면 지켜보기를 건드리지 않고, 켜진 지켜보기의 id 를 그대로 싣는다.
 //   - 등록이 실패해도 링크는 만든다(D6). 결과 줄은 이유별로 하나다.
+//   - 끄기가 실패해도 링크는 만들고(watchId 없음) 끄지 못했다는 줄을 보인다. 서버 삭제가 남았으면 그 전까지 보호자에게
+//     알림이 갈 수 있다는 줄을 보인다(작업 7 검토 반영).
 //
 // 순수 모듈이다(React·저장소·네트워크 없음). node --test 가 읽으므로 상대 경로로만 불러온다.
 
@@ -94,4 +97,19 @@ export function serverPushResultKeys(result) {
   if (!result || typeof result !== 'object') return [];
   if (result.ok === true) return ['guardian.serverPushOn'];
   return ['guardian.serverPushNotOn', REASON_KEY[result.reason] ?? REASON_KEY.UNAVAILABLE];
+}
+
+/**
+ * 체크를 끈 채 링크를 만들어 지켜보기를 끈(retire) 결과 줄의 안전 문구 키(guardian safety 블록, 작업 7 검토 반영).
+ *   - 끄지 않았으면(null) 줄이 없다. 이 기기와 서버 모두에서 지웠으면({ ok: true, pending: false }) 줄이 없다.
+ *   - 이 기기에서는 껐지만 서버 삭제가 남았으면(pending: true) 그 전까지 알림이 갈 수 있다는 줄.
+ *   - 끄지 못했으면(ok: false, 모양이 틀린 결과 포함) 끄지 못했다는 줄. 꺼졌다고 쓰지 않는다.
+ * @param {null | { ok: true, pending: boolean } | { ok: false, reason?: string }} result  retire 결과
+ * @returns {string[]}
+ */
+export function serverPushRetireKeys(result) {
+  if (result === null || result === undefined) return [];
+  if (result?.ok === true && result.pending === false) return [];
+  if (result?.ok === true && result.pending === true) return ['guardian.serverPushTurnOffPending'];
+  return ['guardian.serverPushTurnOffFailed'];
 }

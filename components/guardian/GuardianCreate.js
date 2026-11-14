@@ -50,6 +50,7 @@ import {
   serverPushInitialChecked,
   serverPushOptionVisible,
   serverPushResultKeys,
+  serverPushRetireKeys,
   serverPushSubmitPlan,
 } from './serverPush.js';
 import { buildShareSnapshot, shareRecordFor } from './share.js';
@@ -137,15 +138,16 @@ function ResendNotice({ share, needed, windowPassed, locale, onNewLink }) {
 }
 
 function LinkResult({ result, onNewLink, headingRef }) {
-  const { t, locale } = useLang();
+  const { t, pair, locale } = useLang();
   const hydrated = useHydrated();
   const fieldId = useId();
   const linkRef = useRef(null);
   const [feedback, setFeedback] = useState(null);
   const canShare = hydrated && typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   const expires = kstLabel(result.expiresAt, locale);
-  // 서버 알림 결과 줄: 체크해 등록을 시도했을 때만 있다
+  // 서버 알림 결과 줄: 체크해 등록을 시도했을 때(pushKeys), 체크를 꺼서 끄기를 시도했을 때(retireKeys, 안전 문구)만 있다
   const pushKeys = serverPushResultKeys(result.serverPush ?? null);
+  const retireKeys = serverPushRetireKeys(result.serverPushRetire ?? null);
 
   async function copyLink() {
     try {
@@ -212,11 +214,19 @@ function LinkResult({ result, onNewLink, headingRef }) {
       <p className="guardian-feedback" role="status">
         {feedback ? t(feedback) : ''}
       </p>
-      {pushKeys.length > 0 && (
+      {pushKeys.length + retireKeys.length > 0 && (
         <div className="guardian-push-result" role="status">
           {pushKeys.map((key) => (
             <p key={key}>{t(key)}</p>
           ))}
+          {retireKeys.map((key) => {
+            const text = pair(key).primary;
+            return (
+              <p key={key} lang={text.lang}>
+                {text.text}
+              </p>
+            );
+          })}
         </div>
       )}
       {result.overBudget && <WarningNote>{t('guardian.longLink', { n: result.linkChars })}</WarningNote>}
@@ -247,8 +257,9 @@ function todayKst() {
 
 /**
  * 링크를 만들기 전에 서버 알림 지켜보기를 켜거나 끈다. 던지지 않는다.
- * @returns {Promise<{ watchId: string|null, serverPush: null | { ok: true } | { ok: false, reason: string } }>}
+ * @returns {Promise<{ watchId: string|null, serverPush: null | { ok: true } | { ok: false, reason: string }, serverPushRetire: null | object }>}
  *   serverPush: 등록을 시도했을 때만 그 결과(결과 줄), 아니면 null
+ *   serverPushRetire: 끄기를 시도했을 때만 retire 결과(결과 줄), 아니면 null. 실행기가 없거나 던지면 끄지 못한 것으로 본다
  */
 async function applyServerPush(plan, stay) {
   const sync = getWatchSync();
@@ -259,17 +270,20 @@ async function applyServerPush(plan, stay) {
     } catch {
       registered = null;
     }
-    if (registered?.ok === true) return { watchId: registered.watchId, serverPush: { ok: true } };
-    return { watchId: null, serverPush: { ok: false, reason: registered?.reason ?? 'UNAVAILABLE' } };
+    if (registered?.ok === true) return { watchId: registered.watchId, serverPush: { ok: true }, serverPushRetire: null };
+    return { watchId: null, serverPush: { ok: false, reason: registered?.reason ?? 'UNAVAILABLE' }, serverPushRetire: null };
   }
   if (plan.action === SERVER_PUSH_ACTION.RETIRE) {
+    let retired;
     try {
-      await sync?.retire();
+      retired = sync ? await sync.retire() : null;
     } catch {
-      // 실행기는 던지지 않는 것이 약속이다. 남은 서버 삭제는 저장소가 다음 온라인·앱 열기에 다시 보낸다
+      retired = null;
     }
+    // 끄지 못해도 링크는 만들고 id 는 싣지 않는다. 결과 줄이 끄지 못했다고 알린다
+    return { watchId: null, serverPush: null, serverPushRetire: retired ?? { ok: false } };
   }
-  return { watchId: plan.watchId, serverPush: null };
+  return { watchId: plan.watchId, serverPush: null, serverPushRetire: null };
 }
 
 function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consentHeadingRef }) {
@@ -337,6 +351,7 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
         coverage: coverageView(snapshot, locale, nowMs),
         shareSaved: saved?.ok === true,
         serverPush: push.serverPush,
+        serverPushRetire: push.serverPushRetire,
       });
     } catch (err) {
       const code = err?.code;
