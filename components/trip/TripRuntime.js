@@ -9,6 +9,7 @@
 //      이미 늦음으로 오늘이 returnNow 가 되면 지금 보고 있는 화면 위에 연다. 뒤로 가기는 시트만 닫는다(페이지를 떠나지 않는다).
 //   3. 즉시 복귀가 아니고 외출의 복귀 마감이 지났으면(overdueReturn, 마감 지남 설계서 4.2) 마감 지남 시트(PASSED)를 연다.
 //      저장 일정은 그대로다. 닫으면(확인했어요·Escape·뒤로 가기) 그 외출로는 다시 열지 않는다. 즉시 복귀 시트가 우선이다.
+//      지난 마감(passedBy)을 넘겨 시트의 서버 알림 '돌아왔어요'가 그 마감을 확인하게 한다(계획 2026-11-15 Task 9).
 //
 // 달지 않는 곳
 //   - /design-board: 고정 데모 데이터만 쓰는 화면이다(사용자 데이터를 읽지 않는다). 실행기도 켜지 않는다.
@@ -41,6 +42,7 @@ function TripSync({ showSheet }) {
       day={trip.tripPlan?.days?.[passed.date] ?? null}
       stay={trip.stay}
       outingId={passed.outingId}
+      passedBy={passed.returnBy}
       onClose={trip.dismissOverdueReturn}
     />
   );

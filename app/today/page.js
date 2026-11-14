@@ -28,6 +28,7 @@ import DailyCheckCard from '@/components/trip/DailyCheckCard.js';
 import MapLinks from '@/components/trip/MapLinks.js';
 import NoPlanState from '@/components/trip/NoPlanState.js';
 import RegenerateSheet from '@/components/trip/RegenerateSheet.js';
+import ReturnedConfirm from '@/components/trip/ReturnedConfirm.js';
 import TripNotice from '@/components/trip/TripNotice.js';
 import UpdateFailedNotice from '@/components/trip/UpdateFailedNotice.js';
 import useKstClock from '@/components/trip/useKstClock.js';
@@ -331,6 +332,8 @@ export default function TodayPage() {
                 <h2 id="today-focus-h">{focus.phase === 'OUT' ? t('today.nextOutTitle') : t('today.nextNextTitle')}</h2>
                 <p className="today-focus-depart">{t('today.departAt', { time: focus.outing.departAt })}</p>
                 <Deadline outing={focus.outing} day={day} stay={stay} />
+                {/* 서버 알림 '돌아왔어요'(계획 2026-11-15 Task 9): 외출 중 카드에만. 지켜보기가 켜져 있지 않으면 그리지 않는다 */}
+                {focus.phase === 'OUT' && <ReturnedConfirm day={day} outing={focus.outing} className="today-back" />}
                 {focus.stop && (
                   <div className="today-next-stop">
                     <h3>{t('today.nextStop')}</h3>
