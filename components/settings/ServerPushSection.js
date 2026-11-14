@@ -9,18 +9,20 @@
 //   없으면 아무것도 그리지 않는다. 끄거나 지운 뒤 절이 숨을 조건이 되어도 결과 줄을 보일 동안은 그 줄만 남긴다.
 // - 끄기는 확인 시트 뒤 실행기 retire()(동의 철회와 같은 모양, 화면 검토 M6), 서버 지우기는 확인 시트 뒤 removeAll()(로그인 계정의
 //   지켜보기를 모두 지운다). 요청은 실행기가 보낸다. 두 시트는 하나씩만 열리고, 열린 시트는 설정 화면이 sheet 로 들고 있다.
+//   시트가 열린 채 절이 숨거나(스위치 꺼짐, 다른 탭에서 레코드 지움) 끌 레코드가 사라지면, 또는 이 절이 사라지면 그 상태를 비운다
+//   (serverPushOpenSheet). 남기면 다른 절이 inert 로 막힌 채 남는다.
 // - 처리 중에는 누른 버튼을 disabled 대신 loading 으로 막아 포커스를 지킨다(Button 계약, 화면 검토 M8).
 // - 보기 전용이면 두 버튼을 막고 다른 절과 같은 안내 줄(settings.offlineNote·settings.readOnlyNote)을 보인다.
 // - 누른 버튼이 사라져도 포커스를 잃지 않게 결과 줄로 옮긴다.
 // - watchId·쓰기 토큰을 화면에 보이거나 기록하지 않는다.
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getWatchSync } from '@/lib/trip/client.js';
 import { useGuardianWatch, useServerPushConfig } from '@/lib/trip/useWatch.js';
 import { useLang } from '../LanguageProvider.js';
 import { Button, Sheet } from '../ui/index.js';
 import PairText from './PairText.js';
-import { serverPushRemoveResult, serverPushSectionView, serverPushTurnOffResult } from './serverPushView.js';
+import { serverPushOpenSheet, serverPushRemoveResult, serverPushSectionView, serverPushTurnOffResult } from './serverPushView.js';
 
 /**
  * @param {object} props
@@ -45,9 +47,16 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
     readOnly: status.readOnly,
     online: status.online,
   });
+  const exists = watch.state === 'ON' || watch.state === 'REPLACED';
+  const openSheet = serverPushOpenSheet({ sheet, visible: view.visible, exists });
+
+  // 절이 숨거나 끌 레코드가 사라지면 열린 시트 상태를 비운다(다른 절의 inert 를 푼다)
+  useEffect(() => {
+    if (sheet !== openSheet) setSheet(openSheet);
+  }, [sheet, openSheet, setSheet]);
+  useEffect(() => () => setSheet(null), [setSheet]);
 
   if (!view.visible && !outcome) return null;
-  const exists = watch.state === 'ON' || watch.state === 'REPLACED';
 
   async function turnOff(requestClose) {
     if (busy || !view.canTurnOff) return;
@@ -112,7 +121,7 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
         {outcome && (outcome.pair ? <PairText k={outcome.key} /> : <p>{t(outcome.key, outcome.vars)}</p>)}
       </div>
 
-      {sheet === 'turnOff' && (
+      {openSheet === 'turnOff' && (
         <Sheet
           title={t('settings.serverPushTurnOffTitle')}
           onClose={() => setSheet(null)}
@@ -131,7 +140,7 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
         </Sheet>
       )}
 
-      {sheet === 'removeAll' && (
+      {openSheet === 'removeAll' && (
         <Sheet
           title={t('settings.serverPushRemoveAll')}
           onClose={() => setSheet(null)}

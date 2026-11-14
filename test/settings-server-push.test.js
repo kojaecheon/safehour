@@ -7,6 +7,7 @@
 //   - '내 정보 지우기' 안내는 지켜보기 레코드(ON·REPLACED)가 있으면 서버 알림 저장을 적은 줄, 없으면 예전 줄이다
 //   - 끄기 확인 시트의 제목은 messages, 본문(보호자에게 알림이 가는지)은 safety 다
 //   - 끄기는 ON·REPLACED 이고 쓰기 가능할 때, 서버 지우기는 쓰기 가능하고 온라인일 때만
+//   - 열린 확인 시트는 절이 숨거나 끌 레코드가 사라지면 닫힌다(남으면 다른 절이 inert 로 막힌 채 남는다)
 //   - 끄기 결과: { ok: true, pending: false } 일 때만 '껐어요', pending 이면 알림이 갈 수 있다는 줄, 실패면 끄지 못했다는 줄
 //     (뒤의 둘은 안전 문구, 작업 7 검토 반영)
 //   - 서버 지우기 결과: 성공(지운 수), 로그인 필요, 그 밖 실패
@@ -15,7 +16,13 @@
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { clearNoteKey, serverPushRemoveResult, serverPushSectionView, serverPushTurnOffResult } from '../components/settings/serverPushView.js';
+import {
+  clearNoteKey,
+  serverPushOpenSheet,
+  serverPushRemoveResult,
+  serverPushSectionView,
+  serverPushTurnOffResult,
+} from '../components/settings/serverPushView.js';
 import { messages as settingsMessages, safety as settingsSafety } from '../src/i18n/messages/settings.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { LANGS } from '../src/i18n/index.js';
@@ -107,6 +114,31 @@ describe('버튼', () => {
   function pick({ canTurnOff, canRemoveAll }) {
     return { canTurnOff, canRemoveAll };
   }
+});
+
+describe('열린 확인 시트', () => {
+  test('절이 숨거나 끌 레코드가 사라지면 열린 시트를 닫는다(다른 절이 막힌 채 남지 않게)', () => {
+    assert.equal(serverPushOpenSheet({ sheet: 'turnOff', visible: true, exists: true }), 'turnOff');
+    assert.equal(serverPushOpenSheet({ sheet: 'removeAll', visible: true, exists: true }), 'removeAll');
+    assert.equal(serverPushOpenSheet({ sheet: 'removeAll', visible: true, exists: false }), 'removeAll', '스위치가 켜져 있으면 레코드 없이도 서버 지우기는 남는다');
+    assert.equal(serverPushOpenSheet({ sheet: 'turnOff', visible: true, exists: false }), null, '다른 탭에서 레코드를 지웠다');
+    assert.equal(serverPushOpenSheet({ sheet: 'turnOff', visible: false, exists: false }), null, '스위치가 꺼지고 레코드가 없다');
+    assert.equal(serverPushOpenSheet({ sheet: 'removeAll', visible: false, exists: false }), null, '스위치가 꺼지고 레코드가 없다');
+    assert.equal(serverPushOpenSheet({ sheet: null, visible: true, exists: true }), null);
+    assert.equal(serverPushOpenSheet({ sheet: 'other', visible: true, exists: true }), null);
+    assert.equal(serverPushOpenSheet(), null);
+  });
+
+  test('절이 보이는 조건과 함께 쓰면 스위치가 꺼지고 레코드가 사라진 순간 시트가 닫힌다', () => {
+    const openAfter = (sheet, { enabled, state }) => {
+      const view = serverPushSectionView({ enabled, state, ...WRITABLE });
+      return serverPushOpenSheet({ sheet, visible: view.visible, exists: state === 'ON' || state === 'REPLACED' });
+    };
+    assert.equal(openAfter('removeAll', { enabled: false, state: 'ON' }), 'removeAll');
+    assert.equal(openAfter('removeAll', { enabled: false, state: 'NONE' }), null);
+    assert.equal(openAfter('turnOff', { enabled: true, state: 'REPLACED' }), 'turnOff');
+    assert.equal(openAfter('turnOff', { enabled: true, state: 'NONE' }), null);
+  });
 });
 
 describe('결과 줄', () => {

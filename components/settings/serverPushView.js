@@ -4,6 +4,7 @@
 //                                       → { visible, stateKey, statePair, canTurnOff, canRemoveAll }
 //   serverPushTurnOffResult(result)     → { key, pair }   끄기(retire) 결과 줄
 //   serverPushRemoveResult(result)      → { key, vars }   서버 지우기(removeAll) 결과 줄
+//   serverPushOpenSheet({ sheet, visible, exists }) → 'turnOff'|'removeAll'|null   지금도 열어 둘 수 있는 확인 시트
 //   clearNoteKey(state)                 → '내 정보 지우기' 아래 안내 줄 키
 //
 // 정한 것
@@ -44,6 +45,20 @@ export function serverPushSectionView({ enabled, checked, state, readOnly, onlin
     canTurnOff: exists && writable,
     canRemoveAll: writable && online !== false,
   };
+}
+
+/**
+ * 열린 확인 시트를 지금도 열어 둘 수 있는가. 절이 숨었거나(스위치가 꺼지고 레코드가 없다) 끌 레코드가 사라졌으면(다른 탭에서
+ * 끔) null 이다. 설정 화면은 열린 시트가 있는 동안 다른 절을 inert 로 막으므로, 숨은 절의 시트 상태가 남으면 화면이 막힌 채 남는다.
+ * @param {{ sheet: 'turnOff'|'removeAll'|null, visible: boolean, exists: boolean }} args
+ *   sheet: 설정 화면이 들고 있는 열린 시트 · visible: serverPushSectionView().visible · exists: 레코드가 ON·REPLACED 인가
+ * @returns {'turnOff'|'removeAll'|null}
+ */
+export function serverPushOpenSheet({ sheet, visible, exists } = {}) {
+  if (visible !== true) return null;
+  if (sheet === 'turnOff') return exists === true ? 'turnOff' : null;
+  if (sheet === 'removeAll') return 'removeAll';
+  return null;
 }
 
 /**
