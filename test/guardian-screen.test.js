@@ -185,6 +185,22 @@ describe("'보호자 링크 다시 보내기' 판단", () => {
     assert.equal((await shareRecordFor(withId)).planFingerprint, await computeShareFingerprint({ ...pair, since: T0, watchId: WATCH_ID }));
   });
 
+  test('watchId 가 없는 지문은 watchId 를 더하기 전과 바이트까지 같다(고정값)', async () => {
+    // 고정값은 watchId 를 더하기 전 코드(937f7f0 의 components/guardian/share.js)로 같은 픽스처를 계산한 값이다.
+    // 이 값이 바뀌면 이미 보낸 링크의 기록이 모두 '다시 보내기'로 바뀐다
+    const stay = makeGuardianStay({ guardianShare: null });
+    stay.lodgings[1].name = '가상 숙소 지문';
+    const tripPlan = makeTripPlan();
+    tripPlan.lang = 'en';
+    tripPlan.days['2026-10-06'].outings[0].returnBy = '11:40';
+    tripPlan.days['2026-10-04'].guardianOutings = [guardianOuting('2026-10-04', { returnBy: '15:20' })];
+    const since = '2026-10-03T08:30:00+09:00';
+    const GOLDEN = '1ec75f9a6dcbc2e23c5fb71c2441d5aab589ef11266c2da32ca4da7dd2ae67db';
+    assert.equal(await computeShareFingerprint({ stay, tripPlan, since }), GOLDEN);
+    assert.equal(await computeShareFingerprint({ stay, tripPlan, since, watchId: null }), GOLDEN);
+    assert.notEqual(await computeShareFingerprint({ stay, tripPlan, since, watchId: WATCH_ID }), GOLDEN);
+  });
+
   test('watchId 가 생기거나 바뀌거나 사라지면 다시 보내기가 필요하다', async () => {
     const pair = stayAndPlan();
     const without = await shareRecordFor(buildShareSnapshot({ ...pair, now: T0 }));

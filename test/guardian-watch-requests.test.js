@@ -6,7 +6,8 @@
 //   - 본문은 허용 목록 필드만 싣는다. undo 는 true 일 때만 싣는다
 //   - 형식이 틀리면 TypeError 이고 메시지에 값이 없다
 //   - 응답 분류(200, 404, 401, 429, 400, 503 OFF, 503 그 밖, 500, 네트워크)
-//   - 클라이언트 모듈은 서버 전용 모듈을 불러오지 않는다
+//   - 클라이언트 모듈(요청 모듈, 기기 저장소, 올릴 상태 계산)은 서버 전용 모듈을 불러오지 않는다
+//   - 기기 저장소(lib/store)는 lib/trip 에 닿지 않는다
 //
 // 외부 호출은 없다.
 
@@ -233,7 +234,15 @@ describe('응답 분류', () => {
 });
 
 describe('모듈 경계', () => {
-  const ENTRIES = ['src/guardian/watchRequests.js', 'src/guardian/watchSend.js', 'lib/trip/watchApi.js', 'src/guardian/deadlines.js'];
+  const STORE_ENTRIES = ['lib/store/store.js', 'lib/store/index.js', 'lib/store/guardianWatch.js'];
+  const ENTRIES = [
+    'src/guardian/watchRequests.js',
+    'src/guardian/watchSend.js',
+    'lib/trip/watchApi.js',
+    'src/guardian/deadlines.js',
+    ...STORE_ENTRIES,
+    'lib/trip/watchPlan.js',
+  ];
   const FORBIDDEN = /lib\/server\/|src\/auth\/|src\/push\/|^node:|^@\//;
 
   /** 파일 하나의 import·export 지정자 (여러 줄 import, 부수 효과 import, 동적 import 포함) */
@@ -281,6 +290,17 @@ describe('모듈 경계', () => {
       if (ENTRIES.includes(name)) assert.ok(specifiers.length > 0, name);
       assert.deepEqual(violationsOf(file, specifiers), [], name);
     }
+  });
+
+  test('기기 저장소는 불러오는 모듈을 끝까지 따라가도 lib/trip 에 닿지 않는다', () => {
+    const reached = [...walk(STORE_ENTRIES).keys()].map((file) => file.slice(ROOT.length + 1));
+    // 저장소가 서버 삭제 대기에 쓰는 요청 모듈까지 따라갔다
+    for (const file of [...STORE_ENTRIES, 'src/guardian/watchSend.js', 'src/guardian/watchRequests.js']) {
+      assert.ok(reached.includes(file), file);
+    }
+    assert.deepEqual(reached.filter((file) => file.startsWith('lib/trip/')), []);
+    // 반대 방향(lib/trip 이 lib/store 를 부름)은 된다: 검사가 실제로 경로를 풀어 보는지 확인한다
+    assert.ok([...walk(['lib/trip/watchPlan.js']).keys()].some((file) => file.slice(ROOT.length + 1).startsWith('lib/store/')));
   });
 
   test('경계 검사는 여러 줄·부수 효과·동적 import 와 상대 경로로 숨은 서버 전용 모듈을 찾아낸다', () => {

@@ -3,8 +3,11 @@
 // 이 파일이 고정하는 것
 //   - guardianWatch 는 계정 이름공간 레코드다. 형식이 틀리면 읽을 때 null 이다
 //   - writeGuardianWatch 는 쓰기 가능할 때만. writeBackQueue 는 보기 전용 예외 하나이고 backQueue 만 바꾼다
+//   - writeGuardianWatch 는 같은 watchId 의 저장된 backQueue 를 덮지 않는다(새로 만들 때만 받은 값을 쓴다)
 //   - backQueue 20개, 서버 삭제 대기 10개 상한
 //   - 서버 삭제 대기: 지켜보기마다 하나씩 동시에 보내고, 200·404·400 은 빼고 네트워크·429·503 은 남긴다. 겹쳐 불러도 요청은 하나
+//   - 보내는 동안 들어온 항목은 같은 호출에서 한 번만 더 보낸다(실패한 항목은 같은 호출에서 다시 보내지 않는다)
+//   - 대기를 저장소에 쓰지 못해도 쓰기 토큰을 메모리에 남겨 보낸다. 내 정보 지우기는 키를 지운 뒤 대기를 쓴다
 //   - 지우기 경로: 서버 알림 끄기, 내 정보 지우기, 출국 7일 뒤 자동 삭제, 체류 삭제, 민감정보 동의 철회
 //
 // 저장소는 메모리, 시계와 fetch 는 주입한다. 외부 호출은 없다.
@@ -117,6 +120,55 @@ function storageKeys(storage) {
 
 function putRaw(storage, key, data) {
   storage.setItem(key, JSON.stringify({ schemaVersion: SCHEMA_VERSION, data }));
+}
+
+/** 고른 키의 setItem 이 던지는 저장소(쓰기 막힘 흉내) */
+function throwingStorage(shouldThrow) {
+  const inner = createMemoryStorage();
+  return {
+    get length() {
+      return inner.length;
+    },
+    key: (index) => inner.key(index),
+    getItem: (key) => inner.getItem(key),
+    setItem(key, value) {
+      if (shouldThrow(key)) throw new Error('QuotaExceededError');
+      inner.setItem(key, value);
+    },
+    removeItem: (key) => inner.removeItem(key),
+    clear: () => inner.clear(),
+  };
+}
+
+/** 쓴 글자 수가 capacity 를 넘으면 setItem 이 던지는 저장소(할당량 초과 흉내) */
+function quotaStorage() {
+  const inner = createMemoryStorage();
+  const used = () => {
+    let total = 0;
+    for (let i = 0; i < inner.length; i += 1) {
+      const key = inner.key(i);
+      total += key.length + inner.getItem(key).length;
+    }
+    return total;
+  };
+  const storage = {
+    capacity: Infinity,
+    used,
+    get length() {
+      return inner.length;
+    },
+    key: (index) => inner.key(index),
+    getItem: (key) => inner.getItem(key),
+    setItem(key, value) {
+      const previous = inner.getItem(key);
+      const next = used() - (previous === null ? 0 : key.length + previous.length) + key.length + String(value).length;
+      if (next > storage.capacity) throw new Error('QuotaExceededError');
+      inner.setItem(key, value);
+    },
+    removeItem: (key) => inner.removeItem(key),
+    clear: () => inner.clear(),
+  };
+  return storage;
 }
 
 describe('guardianWatch 레코드', () => {
@@ -374,16 +426,51 @@ describe('서버 삭제 대기', () => {
     assert.deepEqual(await first, { remaining: 0 });
     assert.equal(fake.deletes().length, 3);
 
-    // 보내는 동안 더해진 항목은 지우지 않는다
+    // 보내는 동안 더해진 항목은 그 차례에 지우지 않고, 같은 호출의 두 번째 차례에서 그 항목만 한 번 보낸다.
+    // 거기서 실패해도(503) 같은 호출에서 다시 보내지 않는다
     fake.deleteStatus = () => 'hang';
     putRaw(storage, DEVICE_KEY.pendingServerDelete, [idsOf(4)]);
     const third = store.retryPendingServerDelete();
     await new Promise((resolve) => setImmediate(resolve));
     store.writeGuardianWatch(watchRecord(5));
     store.retireGuardianWatch();
+    assert.equal(store.retryPendingServerDelete(), third, '끈 뒤에 기다리는 약속도 같은 약속이다');
+    assert.deepEqual(fake.deletes().slice(3).map((c) => c.body.watchId), [idsOf(4).watchId]);
+    fake.deleteStatus = () => 503;
     fake.release();
     assert.deepEqual(await third, { remaining: 1 });
+    assert.deepEqual(fake.deletes().slice(3).map((c) => c.body.watchId), [idsOf(4).watchId, idsOf(5).watchId]);
     assert.deepEqual(store.readPendingServerDelete(), [idsOf(5)]);
+  });
+
+  test('보내는 중에 들어온 삭제는 그 호출이 끝나기 전에 한 번 더 보내고, 두 번째 차례 중에 들어온 것은 다음 호출로 넘긴다', async () => {
+    const hang = new Set([idsOf(1).watchId, idsOf(2).watchId]);
+    const { storage, fake, store } = setup({ deleteStatus: (watchId) => (hang.has(watchId) ? 'hang' : 200) });
+    putRaw(storage, DEVICE_KEY.pendingServerDelete, [idsOf(1)]);
+    const tick = () => new Promise((resolve) => setImmediate(resolve));
+    const sent = () => fake.deletes().map((c) => c.body.watchId);
+
+    const running = store.retryPendingServerDelete();
+    await tick();
+    // 서버 알림 끄기를 기다리는 쪽은 자기 항목(2)이 시도된 뒤에 풀린다
+    store.writeGuardianWatch(watchRecord(2));
+    store.retireGuardianWatch();
+    const awaited = store.retryPendingServerDelete();
+    assert.equal(awaited, running);
+    fake.release();
+    for (let i = 0; i < 20 && sent().length < 2; i += 1) await tick();
+    assert.deepEqual(sent(), [idsOf(1).watchId, idsOf(2).watchId]);
+
+    // 두 번째 차례 중에 들어온 항목(3)은 이 호출에서 보내지 않는다(차례는 한 번만 더)
+    store.writeGuardianWatch(watchRecord(3));
+    store.retireGuardianWatch();
+    fake.release();
+    assert.deepEqual(await awaited, { remaining: 1 });
+    assert.deepEqual(sent(), [idsOf(1).watchId, idsOf(2).watchId]);
+    assert.deepEqual(store.readPendingServerDelete(), [idsOf(3)]);
+    // 다음 호출이 보낸다
+    assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+    assert.deepEqual(sent(), [1, 2, 3].map((n) => idsOf(n).watchId));
   });
 
   test('온라인 복귀와 앱 열기가 대기를 다시 보낸다', async () => {
@@ -410,6 +497,113 @@ describe('서버 삭제 대기', () => {
     reopened.setOnline(true);
     await new Promise((resolve) => setImmediate(resolve));
     assert.equal(fake.deletes().length, 2);
+  });
+});
+
+describe('backQueue 덮어쓰기 막기', () => {
+  test('writeGuardianWatch 는 같은 watchId 의 저장된 backQueue 를 덮지 않는다(대기열은 writeBackQueue 로만)', () => {
+    const { store } = setup();
+    store.writeGuardianWatch(watchRecord(1));
+    // 올리기를 보내기 전에 읽은 레코드
+    const older = store.readGuardianWatch();
+    // 그 사이 '돌아왔어요'를 눌렀다
+    const queue = [{ date: '2026-10-02', by: '14:30', undo: false }];
+    assert.deepEqual(store.writeBackQueue(queue), { ok: true });
+    // 앞서 읽은 레코드로 올리기 결과를 쓴다
+    assert.deepEqual(store.writeGuardianWatch({ ...older, uploadPending: true, lastUploaded: { '2026-10-02': ['18:00'] } }), { ok: true });
+    const current = store.readGuardianWatch();
+    assert.deepEqual(current.backQueue, queue);
+    assert.equal(current.uploadPending, true);
+    assert.deepEqual(current.lastUploaded, { '2026-10-02': ['18:00'] });
+    // 다른 backQueue 를 넘겨도 저장된 것이 남는다
+    store.writeGuardianWatch({ ...older, backQueue: [{ date: '2026-10-02', by: '18:00', undo: true }] });
+    assert.deepEqual(store.readGuardianWatch().backQueue, queue);
+
+    // 새로 만들 때(다른 watchId, 레코드 없음)만 받은 backQueue 를 쓴다
+    store.writeGuardianWatch(watchRecord(2, { backQueue: [] }));
+    assert.deepEqual(store.readGuardianWatch().backQueue, []);
+    store.writeGuardianWatch(null);
+    store.writeGuardianWatch(watchRecord(3, { backQueue: queue }));
+    assert.deepEqual(store.readGuardianWatch().backQueue, queue);
+  });
+});
+
+describe('삭제 대기 쓰기 실패', () => {
+  test('삭제 대기를 저장소에 쓰지 못해도 쓰기 토큰을 메모리에 남기고 DELETE 를 보낸다', async () => {
+    for (const status of [200, 404, 400]) {
+      const storage = throwingStorage((key) => key === DEVICE_KEY.pendingServerDelete);
+      const clock = { ms: T0 };
+      const fake = fakeFetch({ deleteStatus: () => 'network' });
+      const store = makeStore({ storage, clock, fake });
+      signIn(store, clock);
+      store.writeGuardianWatch(watchRecord(1));
+
+      assert.deepEqual(store.retireGuardianWatch(), { ok: true });
+      assert.equal(store.readGuardianWatch(), null);
+      assert.equal(storage.getItem(DEVICE_KEY.pendingServerDelete), null, '저장소에는 쓰지 못했다');
+      assert.deepEqual(store.readPendingServerDelete(), [idsOf(1)], '메모리에 남았다');
+      assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 1 });
+      assert.ok(fake.deletes().length >= 1);
+      for (const call of fake.deletes()) assert.deepEqual(call.body, idsOf(1));
+
+      // 다시 보내 끝나면(200·404·400) 메모리에서도 뺀다
+      fake.deleteStatus = () => status;
+      assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 }, String(status));
+      assert.deepEqual(store.readPendingServerDelete(), [], String(status));
+      const count = fake.deletes().length;
+      assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+      assert.equal(fake.deletes().length, count, '끝난 것은 다시 보내지 않는다');
+    }
+  });
+
+  test('내 정보 지우기: 지켜보기 식별 값을 먼저 모으고, 키를 지운 뒤 대기를 쓴다(저장 공간이 꽉 차도 저장소에 남는다)', async () => {
+    const storage = quotaStorage();
+    const clock = { ms: T0 };
+    const fake = fakeFetch({ logoutStatus: 'network', deleteStatus: () => 'network' });
+    const store = makeStore({ storage, clock, fake });
+    signIn(store, clock);
+    store.writeStay(makeStay());
+    store.writeGuardianWatch(watchRecord(1));
+    signIn(store, clock, ACCOUNT_B);
+    store.writeGuardianWatch(watchRecord(2));
+    // 지금 쓴 만큼이 끝: 새 키를 하나도 더 쓸 수 없다
+    storage.capacity = storage.used();
+    assert.throws(() => storage.setItem(DEVICE_KEY.pendingServerDelete, '[]'));
+
+    const result = await store.deleteAllMyData();
+    assert.equal(result.ok, true);
+    const raw = storage.getItem(DEVICE_KEY.pendingServerDelete);
+    assert.ok(raw !== null, '지운 뒤라 대기를 쓸 자리가 있다');
+    assert.deepEqual(JSON.parse(raw).data.map((item) => item.watchId).sort(), [idsOf(1).watchId, idsOf(2).watchId]);
+    assert.deepEqual(store.readPendingServerDelete().map((item) => item.watchId).sort(), [idsOf(1).watchId, idsOf(2).watchId]);
+  });
+
+  test('내 정보 지우기: 대기를 끝내 쓰지 못하면 메모리에 남겨 보내고, 끝나면 뺀다', async () => {
+    let blocked = false;
+    const storage = throwingStorage((key) => blocked && key === DEVICE_KEY.pendingServerDelete);
+    const clock = { ms: T0 };
+    const fake = fakeFetch({ logoutStatus: 200, deleteStatus: () => 503 });
+    const store = makeStore({ storage, clock, fake });
+    signIn(store, clock);
+    putRaw(storage, DEVICE_KEY.pendingServerDelete, [idsOf(9)]);
+    blocked = true;
+    store.writeGuardianWatch(watchRecord(1));
+    signIn(store, clock, ACCOUNT_B);
+    store.writeGuardianWatch(watchRecord(2));
+
+    await store.deleteAllMyData();
+    assert.equal(store.readGuardianWatch(), null);
+    // 저장소에 있던 대기(9)는 그대로이고, 새로 모은 것(1, 2)은 메모리에 있다
+    assert.deepEqual(JSON.parse(storage.getItem(DEVICE_KEY.pendingServerDelete)).data, [idsOf(9)]);
+    const expected = [1, 2, 9].map((n) => idsOf(n).watchId);
+    assert.deepEqual(store.readPendingServerDelete().map((item) => item.watchId).sort(), expected);
+    // 셋 다 DELETE 를 보냈다(503 이라 남는다)
+    assert.deepEqual(fake.deletes().map((c) => c.body.watchId).sort(), expected);
+
+    fake.deleteStatus = () => 200;
+    assert.deepEqual(await store.retryPendingServerDelete(), { remaining: 0 });
+    assert.deepEqual(store.readPendingServerDelete(), []);
+    assert.equal(storage.getItem(DEVICE_KEY.pendingServerDelete), null, '비면 기기 키를 지운다');
   });
 });
 

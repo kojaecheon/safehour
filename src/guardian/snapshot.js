@@ -8,7 +8,8 @@
 // - 담는 것: 만든 시각, 만료 시각(출국일 23:59 KST), 언어, 날짜별 {동행 필요, 보호자 단독 외출 가능,
 //   환자 복귀 마감·장소 이름·주소, 보호자 외출}, 긴급 번호(119, 1330), 서버 알림을 켰으면 지켜보기 id(watchId, 맨 끝 키)
 // - watchId 는 형식(WATCH_ID_RE, 22자 base64url)에 맞을 때만 담는다. 쓰기 토큰·마감 기록 같은 다른 서버 알림 값은 담지 않는다.
-//   담으면 링크가 약 30자 길어진다(docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 4, D7)
+//   담으면 링크가 약 48자 길어진다(난수 id 라 압축되지 않는다. test/guardian-size.test.js 가 잰다.
+//   docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 4, D7)
 // - 날짜는 만든 날(KST)과 입국일 중 늦은 날부터 7일(DEFAULTS.guardianLink.windowDays), 출국일에서 멈춘다. 지난 날은 보호자에게
 //   쓸모가 없고, 7일 뒤 날짜까지 담으면 긴 체류의 링크가 메신저 기준(8 KB)을 넘는다. 이후 날짜는 환자가 새 링크로 보낸다.
 //   담은 범위는 새 필드 없이 days[].date 의 처음·끝으로 읽는다(guardianCoverage)
