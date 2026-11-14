@@ -92,7 +92,9 @@ export function createVapidSigner({ publicKey, privateKey, subject }) {
 
       const nowSec = Math.floor(nowMs / 1000);
       const cached = cache.get(aud);
-      if (cached && cached.expSec - nowSec > JWT_REUSE_MIN_REMAINING_SEC) return cached.header;
+      // 남은 수명이 1시간을 넘고, 시계가 뒤로 가서 exp 가 수명보다 멀어지지 않았을 때만 다시 쓴다
+      const left = cached ? cached.expSec - nowSec : 0;
+      if (cached && left > JWT_REUSE_MIN_REMAINING_SEC && left <= JWT_LIFETIME_SEC) return cached.header;
 
       const expSec = nowSec + JWT_LIFETIME_SEC;
       const header = `vapid t=${makeJwt(aud, expSec)}, k=${k}`;

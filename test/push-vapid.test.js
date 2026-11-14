@@ -116,3 +116,13 @@ test('endpoint 가 URL 이 아니면 PUSH_VAPID 이고 메시지에 주소가 �
     (err) => err instanceof PushError && err.code === 'PUSH_VAPID' && !err.message.includes('secret-endpoint'),
   );
 });
+
+test('시계가 뒤로 가면 저장해 둔 JWT 를 다시 쓰지 않는다(exp 는 늘 지금 + 24시간 안)', () => {
+  const s = signer();
+  const url = 'https://fcm.googleapis.com/fcm/send/x';
+  const first = s.authorizationFor(url, NOW);
+  const back = s.authorizationFor(url, NOW - 20 * HOUR);
+  assert.notEqual(back, first);
+  const { claims } = parseHeader(back);
+  assert.ok(claims.exp - Math.floor((NOW - 20 * HOUR) / 1000) <= 24 * 3600);
+});

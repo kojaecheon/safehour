@@ -67,3 +67,11 @@ test('testOrigin 이 주어지면 그 출처만 더 받는다', () => {
   // testOrigin 이 있어도 허용 호스트는 그대로 받는다
   assert.equal(parsePushEndpoint('https://fcm.googleapis.com/fcm/send/abc', { testOrigin }).ok, true);
 });
+
+test('testOrigin 우회는 http·https 만 받고 사용자 정보와 불투명 출처를 거절한다', () => {
+  const origin = 'http://127.0.0.1:3199';
+  assert.equal(parsePushEndpoint('http://u:p@127.0.0.1:3199/push/abc', { testOrigin: origin }).ok, false);
+  assert.equal(parsePushEndpoint('data:text/plain,hi', { testOrigin: 'null' }).ok, false);
+  assert.equal(parsePushEndpoint('javascript:alert(1)', { testOrigin: 'null' }).ok, false);
+  assert.equal(parsePushEndpoint('http://127.0.0.1:3199/push/abc', { testOrigin: origin }).ok, true);
+});

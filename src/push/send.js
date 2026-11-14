@@ -53,20 +53,22 @@ function classify(status) {
  * @param {string|null} [input.testOrigin]  데모 모드에서만 넘기는 가짜 푸시 서비스 출처
  * @returns {Promise<{ outcome: 'SENT'|'GONE'|'RETRY'|'REJECTED', statusClass: '2xx'|'404/410'|'4xx'|'5xx'|'network' }>}
  */
-export async function sendPush({
-  subscription,
-  payload,
-  signer,
-  topic,
-  ttlSec = 3600,
-  urgency = 'high',
-  fetchImpl = globalThis.fetch,
-  nowMs,
-  timeoutMs = 5000,
-  testOrigin,
-}) {
+export async function sendPush(input) {
   let request;
   try {
+    // 인자가 없거나 객체가 아니어도 던지지 않는다(약속: 결과만 돌려준다)
+    const {
+      subscription,
+      payload,
+      signer,
+      topic,
+      ttlSec = 3600,
+      urgency = 'high',
+      fetchImpl = globalThis.fetch,
+      nowMs,
+      timeoutMs = 5000,
+      testOrigin,
+    } = input ?? {};
     const parsed = parsePushEndpoint(subscription?.endpoint, { testOrigin });
     if (!parsed.ok) return REJECTED();
     const body = encryptPushPayload({ plaintext: payload, p256dh: subscription.p256dh, auth: subscription.auth });
@@ -78,7 +80,10 @@ export async function sendPush({
       Urgency: URGENCIES.has(urgency) ? urgency : 'high',
     };
     if (typeof topic === 'string' && TOPIC_RE.test(topic)) headers.Topic = topic;
-    request = { url: parsed.url.href, headers, body };
+    // 시간 한도가 틀린 값이면 부르는 쪽 설정 실수다. 네트워크 실패(RETRY)로 보면 끝없이 다시 부르므로 REJECTED 로 둔다
+    if (!Number.isInteger(timeoutMs) || timeoutMs <= 0) return REJECTED();
+    if (typeof fetchImpl !== 'function') return REJECTED();
+    request = { url: parsed.url.href, headers, body, fetchImpl, signal: AbortSignal.timeout(timeoutMs) };
   } catch {
     // 키 형식 오류(PUSH_KEY), 본문 초과(PUSH_PAYLOAD_TOO_LARGE), 서명 실패(PUSH_VAPID). 원래 메시지는 버린다
     return REJECTED();
@@ -86,12 +91,12 @@ export async function sendPush({
 
   let response;
   try {
-    response = await fetchImpl(request.url, {
+    response = await request.fetchImpl(request.url, {
       method: 'POST',
       headers: request.headers,
       body: request.body,
       redirect: 'manual',
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: request.signal,
     });
   } catch {
     return result(PUSH_OUTCOME.RETRY, 'network');

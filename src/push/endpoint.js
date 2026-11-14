@@ -51,7 +51,15 @@ export function parsePushEndpoint(value, { testOrigin } = {}) {
   } catch {
     return { ok: false };
   }
-  if (typeof testOrigin === 'string' && testOrigin.length > 0 && url.origin === testOrigin) {
+  if (
+    typeof testOrigin === 'string' &&
+    testOrigin.length > 0 &&
+    testOrigin !== 'null' &&
+    url.origin === testOrigin &&
+    (url.protocol === 'http:' || url.protocol === 'https:') &&
+    url.username === '' &&
+    url.password === ''
+  ) {
     return { ok: true, url, audience: url.origin };
   }
   if (url.protocol !== 'https:') return { ok: false };

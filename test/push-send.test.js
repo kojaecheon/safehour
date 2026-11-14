@@ -170,3 +170,17 @@ test('결과 객체에는 outcome 과 statusClass 뿐이다', async () => {
   const rejected = await sendPush({ subscription: null, payload: PAYLOAD, signer: SIGNER, nowMs: NOW });
   assert.deepEqual(Object.keys(rejected).sort(), ['outcome', 'statusClass']);
 });
+
+test('인자가 없거나 null 이어도 던지지 않고 REJECTED 다', async () => {
+  assert.deepEqual(await sendPush(), { outcome: PUSH_OUTCOME.REJECTED, statusClass: '4xx' });
+  assert.deepEqual(await sendPush(null), { outcome: PUSH_OUTCOME.REJECTED, statusClass: '4xx' });
+});
+
+test('시간 한도가 틀린 값이면 fetch 없이 REJECTED 다(끝없는 재시도를 막는다)', async () => {
+  for (const timeoutMs of [-1, 0, null, 1.5, Number.NaN, '5000']) {
+    const { calls, fetchImpl } = fakeFetch();
+    const result = await send({ fetchImpl, timeoutMs });
+    assert.deepEqual(result, { outcome: PUSH_OUTCOME.REJECTED, statusClass: '4xx' }, String(timeoutMs));
+    assert.equal(calls.length, 0);
+  }
+});
