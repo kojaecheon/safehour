@@ -13,6 +13,7 @@ import { DAY_FIELD, findWatch, readDay, readSub, replaceDays, setDayField, write
 import { ownerHashOf, watchKeyOf, writeHashOf } from '../lib/server/watch/keys.js';
 import { KvError } from '../lib/server/watch/kv.js';
 import { DUE_OUTCOME, processDue } from '../lib/server/watch/due.js';
+import { armPending } from '../lib/server/watch/arm.js';
 import { translate } from '../src/i18n/index.js';
 import { IDS, SECRET, subscriptionFixture, testCtx } from './watch-fixtures.js';
 
@@ -319,6 +320,67 @@ test('구독: 구독의 만료는 지켜보기와 같다', async () => {
   assert.equal(await readSub(short, shortKey), null);
 });
 
+test('구독: 구독이 없어 건너뛴 마감은 늦은 한도 안에 구독하면 다시 걸리고, 그때 예약 처리가 보낸다', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  await armPending(ctx, watchKey, [TODAY]);
+  const due = { watchKey, date: TODAY, time: '14:30' };
+  ctx.clock.set('2026-11-20T05:40:00Z'); // 14:40 KST
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SKIP_NO_SUB);
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).armed, {});
+
+  ctx.clock.set('2026-11-20T05:50:00Z'); // 14:50 KST, 늦은 한도(15:30) 안
+  const before = ctx.scheduler.calls.length;
+  assert.equal((await subscribe(ctx, device())).ok, true);
+  const calls = ctx.scheduler.calls.slice(before);
+  assert.deepEqual(
+    calls.map((c) => c.body),
+    [{ k: watchKey, d: TODAY, t: '14:30' }],
+  );
+  assert.equal(calls[0].notBeforeMs, ctx.now(), '보낼 시각이 지났으므로 지금 건다');
+  assert.equal(Object.keys((await readDay(ctx, watchKey, TODAY)).armed).length, 1);
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SENT);
+  assert.equal(ctx.push.sent.length, 1);
+});
+
+test('구독: 자정을 넘겨 구독해도 어제 늦은 마감을 다시 건다', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['23:55'] }]);
+  ctx.clock.set('2026-11-20T15:20:00Z'); // 2026-11-21 00:20 KST
+  assert.equal((await subscribe(ctx, device())).ok, true);
+  assert.deepEqual(
+    ctx.scheduler.calls.map((c) => `${c.body.d} ${c.body.t}`),
+    [`${TODAY} 23:55`],
+  );
+});
+
+test('구독: 다시 걸기가 실패해도 구독은 성공한다', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  // 예약 업체가 던진다
+  ctx.scheduler.schedule = async () => {
+    throw new Error('어댑터 실패');
+  };
+  const first = await subscribe(ctx, device());
+  assert.equal(first.ok, true);
+  assert.equal((await readSub(ctx, watchKey)).subId, first.subId);
+  // 날짜 기록을 읽는 저장소가 실패한다
+  const inner = ctx.kv;
+  ctx.kv = {
+    async exec(batch) {
+      if (batch.some((c) => c[0] === 'HGETALL')) throw new KvError('KV_UNAVAILABLE');
+      return inner.exec(batch);
+    },
+  };
+  const second = await subscribe(ctx, device());
+  assert.deepEqual(Object.keys(second).sort(), ['ok', 'subId']);
+  assert.equal(second.ok, true);
+  assert.equal((await readSub(ctx, watchKey)).subId, second.subId);
+});
+
 // ---- 구독 해지 ----
 
 test('구독 해지: subId 가 맞으면 지우고, 틀리면 NOT_FOUND 이고 남는다', async () => {
@@ -485,6 +547,51 @@ test('함께 있음: 켜면 그날 예약 처리가 보내지 않고, 끄면 다
   assert.equal((await readDay(ctx, watchKey, TODAY)).muted, false);
   assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SENT);
   assert.equal(ctx.push.sent.length, 1);
+});
+
+test('함께 있음: 켠 동안 건너뛴 오늘 마감은 끄면 다시 걸리고, 예약 처리가 그 예약으로 보낸다', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30', '18:00'] }]);
+  const { subId } = await subscribe(ctx, device());
+  // 구독이 오늘 마감 둘을 걸었다
+  assert.equal(ctx.scheduler.calls.length, 2);
+  await muteToday(ctx, { watchId: IDS.watchId, subId, on: true });
+  const due = { watchKey, date: TODAY, time: '14:30' };
+  ctx.clock.set('2026-11-20T05:40:00Z');
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SKIP_MUTED);
+  assert.deepEqual(Object.keys((await readDay(ctx, watchKey, TODAY)).armed), ['18:00']);
+  // 켜기는 다시 걸지 않는다
+  await muteToday(ctx, { watchId: IDS.watchId, subId, on: true });
+  assert.equal(ctx.scheduler.calls.length, 2);
+
+  ctx.clock.set('2026-11-20T05:45:00Z');
+  assert.deepEqual(await muteToday(ctx, { watchId: IDS.watchId, subId, on: false }), { ok: true, muted: false });
+  // 걸림 표시가 남은 18:00 은 다시 걸지 않고, 지워진 14:30 만 지금으로 건다
+  assert.equal(ctx.scheduler.calls.length, 3);
+  const rearmed = ctx.scheduler.calls[2];
+  assert.deepEqual(rearmed.body, { k: watchKey, d: TODAY, t: '14:30' });
+  assert.equal(rearmed.notBeforeMs, ctx.now());
+  assert.deepEqual(Object.keys((await readDay(ctx, watchKey, TODAY)).armed).sort(), ['14:30', '18:00']);
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SENT);
+});
+
+test('함께 있음: 끈 뒤 다시 걸기가 실패해도 응답은 같다', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  const { subId } = await subscribe(ctx, device());
+  await muteToday(ctx, { watchId: IDS.watchId, subId, on: true });
+  const inner = ctx.kv;
+  ctx.kv = {
+    async exec(batch) {
+      if (batch.some((c) => c[0] === 'HGETALL')) throw new KvError('KV_UNAVAILABLE');
+      return inner.exec(batch);
+    },
+  };
+  assert.deepEqual(await muteToday(ctx, { watchId: IDS.watchId, subId, on: false }), { ok: true, muted: false });
+  ctx.kv = inner;
+  assert.equal((await readDay(ctx, watchKey, TODAY)).muted, false);
 });
 
 test('함께 있음: 날짜가 바뀌면 풀린다', async () => {

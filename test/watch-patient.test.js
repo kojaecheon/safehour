@@ -23,9 +23,11 @@ import {
   watchExpiryUnix,
   writeSub,
 } from '../lib/server/watch/records.js';
-import { newSubId, ownerHashOf, watchKeyOf, writeHashOf } from '../lib/server/watch/keys.js';
+import { newSubId, ownerHashOf, rateKeyOf, watchKeyOf, writeHashOf } from '../lib/server/watch/keys.js';
 import { KvError } from '../lib/server/watch/kv.js';
 import { DUE_OUTCOME, processDue } from '../lib/server/watch/due.js';
+import { EARLY_TOLERANCE_MS, fireAtMs } from '../lib/server/watch/arm.js';
+import { WATCH_LIMITS, hitRate } from '../lib/server/watch/limits.js';
 import { translate } from '../src/i18n/index.js';
 import { IDS, SECRET, subscriptionFixture, testCtx } from './watch-fixtures.js';
 
@@ -132,7 +134,11 @@ async function subscribe(ctx, { watchKey = WATCH_KEY, lang = 'ko', expiresOn = E
 async function seedFlow(ctx, { times = ['14:30'], sub = true } = {}) {
   assert.deepEqual(await register(ctx), { ok: true, expiresOn: EXPIRES_ON });
   if (sub) await subscribe(ctx);
-  assert.deepEqual(await deadlines(ctx, [{ date: TODAY, deadlines: times }]), { ok: true, expiresOn: EXPIRES_ON });
+  assert.deepEqual(await deadlines(ctx, [{ date: TODAY, deadlines: times }]), {
+    ok: true,
+    expiresOn: EXPIRES_ON,
+    armFailed: 0,
+  });
 }
 
 const at = (ctx, kst) => ctx.clock.set(`${kst}+09:00`);
@@ -214,6 +220,7 @@ test('등록: 같은 계정이 다시 등록하면 토큰이 바뀌고 이전 �
   assert.deepEqual(await deadlines(ctx, [], { writeToken: newToken, expiresOn: '2026-11-28' }), {
     ok: true,
     expiresOn: '2026-11-28',
+    armFailed: 0,
   });
 });
 
@@ -419,7 +426,7 @@ test('마감: 오늘·내일 것만 예약하고 그 뒤 날짜는 저장만 한
     { date: TOMORROW, deadlines: ['10:00', '18:00'] },
     { date: '2026-11-22', deadlines: ['14:30'] },
   ]);
-  assert.deepEqual(result, { ok: true, expiresOn: EXPIRES_ON });
+  assert.deepEqual(result, { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 });
   assert.deepEqual(
     ctx.scheduler.calls.map((c) => `${c.body.d} ${c.body.t}`),
     [`${TODAY} 14:30`, `${TOMORROW} 10:00`, `${TOMORROW} 18:00`],
@@ -450,7 +457,7 @@ test('마감: 지난 날짜와 출국일 뒤 날짜는 버린다', async () => {
     { date: EXPIRES_ON, deadlines: ['09:00'] },
     { date: '2026-11-26', deadlines: ['09:00'] },
   ]);
-  assert.deepEqual(result, { ok: true, expiresOn: EXPIRES_ON });
+  assert.deepEqual(result, { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 });
   assert.equal(await readDay(ctx, WATCH_KEY, YESTERDAY), null);
   assert.equal(await readDay(ctx, WATCH_KEY, '2026-11-26'), null);
   assert.deepEqual(await indexMembers(ctx, YESTERDAY), []);
@@ -506,7 +513,7 @@ test('마감: 출국일이 늘면 레코드와 만료가 갱신된다', async ()
   await register(ctx);
   await subscribe(ctx);
   const result = await deadlines(ctx, [{ date: '2026-11-28', deadlines: ['14:30'] }], { expiresOn: '2026-11-30' });
-  assert.deepEqual(result, { ok: true, expiresOn: '2026-11-30' });
+  assert.deepEqual(result, { ok: true, expiresOn: '2026-11-30', armFailed: 0 });
   assert.equal((await readWatch(ctx, WATCH_KEY)).expiresOn, '2026-11-30');
   assert.deepEqual((await readDay(ctx, WATCH_KEY, '2026-11-28')).deadlines, ['14:30']);
   // 처음 출국일의 만료를 지나도 지켜보기와 구독이 남는다
@@ -523,7 +530,7 @@ test('마감: 출국일도 오늘 + 46일로 깎인다', async () => {
   const ctx = testCtx();
   await register(ctx);
   const result = await deadlines(ctx, [{ date: '2027-01-06', deadlines: ['09:00'] }], { expiresOn: '2027-12-31' });
-  assert.deepEqual(result, { ok: true, expiresOn: '2027-01-05' });
+  assert.deepEqual(result, { ok: true, expiresOn: '2027-01-05', armFailed: 0 });
   assert.equal((await readWatch(ctx, WATCH_KEY)).expiresOn, '2027-01-05');
   assert.equal(await readDay(ctx, WATCH_KEY, '2027-01-06'), null);
 });
@@ -541,7 +548,7 @@ test('마감: 출국일을 줄이면 새 출국일 뒤에 남은 날짜 기록�
   assert.ok(tomorrowArmed);
   // 오늘 출국으로 줄인다. 클라이언트는 남은 날짜만 보낸다
   const result = await deadlines(ctx, [{ date: TODAY, deadlines: ['14:30'] }], { expiresOn: TODAY });
-  assert.deepEqual(result, { ok: true, expiresOn: TODAY });
+  assert.deepEqual(result, { ok: true, expiresOn: TODAY, armFailed: 0 });
   assert.equal(await readDay(ctx, WATCH_KEY, TOMORROW), null);
   assert.equal(await readDay(ctx, WATCH_KEY, '2026-11-23'), null);
   assert.deepEqual(await indexMembers(ctx, TOMORROW), []);
@@ -558,20 +565,41 @@ test('마감: 예약 업체가 실패해도 ok 이고 다음 업로드에서 다
   await register(ctx);
   ctx.scheduler.fail = true;
   const days = [{ date: TODAY, deadlines: ['14:30'] }];
-  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON });
+  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 1 });
   assert.equal(ctx.scheduler.calls.length, 1);
   assert.deepEqual((await readDay(ctx, WATCH_KEY, TODAY)).armed, {});
   // 예약 업체가 던져도 응답은 같다
   ctx.scheduler.schedule = async () => {
     throw new Error('boom');
   };
-  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON });
+  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 1 });
   // 업체가 돌아오면 같은 내용의 다음 업로드가 건다
   const fresh = testCtx();
   ctx.scheduler = fresh.scheduler;
-  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON });
+  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 });
   assert.equal(ctx.scheduler.calls.length, 1);
   assert.deepEqual((await readDay(ctx, WATCH_KEY, TODAY)).armed, { '14:30': 'm1' });
+});
+
+test('마감: armFailed 는 평소 0 이고, 예약 업체가 N번 실패하면 N 이다', async () => {
+  const ctx = testCtx();
+  await register(ctx);
+  const days = [
+    { date: TODAY, deadlines: ['14:30', '18:00'] },
+    { date: TOMORROW, deadlines: ['10:00'] },
+  ];
+  ctx.scheduler.fail = true;
+  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 3 });
+  // 18:00 만 실패
+  ctx.scheduler.fail = false;
+  const inner = ctx.scheduler.schedule;
+  ctx.scheduler.schedule = async (args) => (args.body.t === '18:00' ? { ok: false } : inner(args));
+  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 1 });
+  ctx.scheduler.schedule = inner;
+  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 });
+  assert.deepEqual(Object.keys((await readDay(ctx, WATCH_KEY, TODAY)).armed).sort(), ['14:30', '18:00']);
+  // 걸 것이 없어도 0 이다
+  assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 });
 });
 
 test('마감: 지켜보기마다 시간당 60회를 넘으면 RATE_LIMITED 이고, 모르는 id 도 같게 센다', async () => {
@@ -653,16 +681,21 @@ test('돌아왔어요: 되돌리면 예약 처리가 다시 보낸다', async ()
   assert.equal(ctx.push.sent.length, 1);
 });
 
-test('돌아왔어요: 마감 + 10분 뒤에는 되돌릴 수 없다', async () => {
+test('돌아왔어요: 보낼 시각 - 30초부터는 되돌릴 수 없다(예약 처리가 일찍 온 예약을 받기 시작하는 순간)', async () => {
   const ctx = testCtx();
   await seedFlow(ctx);
   at(ctx, '2026-11-20T14:35:00');
   await back(ctx);
-  at(ctx, '2026-11-20T14:40:00');
-  assert.deepEqual(await back(ctx, { undo: true }), { ok: true, recorded: false });
-  assert.deepEqual((await readDay(ctx, WATCH_KEY, TODAY)).confirmed, ['14:30']);
-  at(ctx, '2026-11-20T14:39:59');
+  // 마감 14:30 의 보낼 시각은 14:40:00(05:40:00Z). 경계는 그 30초 전이다
+  assert.equal(fireAtMs(TODAY, '14:30') - EARLY_TOLERANCE_MS, Date.parse('2026-11-20T05:39:30.000Z'));
+  for (const iso of ['2026-11-20T05:39:30.000Z', '2026-11-20T05:39:59.000Z', '2026-11-20T05:40:00.000Z']) {
+    ctx.clock.set(iso);
+    assert.deepEqual(await back(ctx, { undo: true }), { ok: true, recorded: false }, iso);
+    assert.deepEqual((await readDay(ctx, WATCH_KEY, TODAY)).confirmed, ['14:30'], iso);
+  }
+  ctx.clock.set('2026-11-20T05:39:29.999Z'); // 보낼 시각 - 30_001ms
   assert.deepEqual(await back(ctx, { undo: true }), { ok: true, recorded: true });
+  assert.deepEqual((await readDay(ctx, WATCH_KEY, TODAY)).confirmed, []);
 });
 
 test('돌아왔어요: 마감 지남 푸시를 보낸 뒤 확인하면 복귀 확인 푸시를 한 번만 보낸다', async () => {
@@ -724,6 +757,140 @@ test('돌아왔어요: 푸시를 보내지 않은 마감을 확인하면 아무�
   assert.deepEqual(await back(ctx), { ok: true, recorded: true });
   assert.equal(ctx.push.sent.length, 0);
   assert.deepEqual((await readDay(ctx, WATCH_KEY, TODAY)).closed, []);
+});
+
+test('돌아왔어요: 마감 지남 푸시가 보내는 중(p: 1)일 때 누르면 여기서는 보내지 않고, 예약 처리가 복귀 확인을 한 번 보낸다', async () => {
+  const ctx = testCtx();
+  await seedFlow(ctx);
+  at(ctx, '2026-11-20T14:40:00');
+  const send = ctx.push.send;
+  let inFlight = null;
+  ctx.push.send = async (input) => {
+    if (inFlight === null) {
+      inFlight = {};
+      // 마감 지남 푸시가 푸시 서비스로 가는 사이 환자가 '돌아왔어요'를 누른다
+      inFlight.result = await back(ctx);
+      inFlight.sent = ctx.push.sent.length;
+      inFlight.day = await readDay(ctx, WATCH_KEY, TODAY);
+    }
+    return send(input);
+  };
+  assert.equal((await processDue(ctx, due())).outcome, DUE_OUTCOME.SENT);
+  assert.deepEqual(inFlight.result, { ok: true, recorded: true });
+  assert.equal(inFlight.sent, 0, '돌아왔어요는 보내는 중인 마감에 복귀 확인을 보내지 않는다');
+  assert.deepEqual([inFlight.day.pushed, inFlight.day.claimed, inFlight.day.closed], [[], ['14:30'], []]);
+  // 예약 처리가 's' 를 쓰는 같은 exec 에서 확인을 보고 복귀 확인을 보냈다
+  assert.equal(ctx.push.sent.length, 2);
+  assert.equal(sentBody(ctx, 0), translate('notifications.serverCompanionOverdue', 'ko', { time: '14:30' }));
+  assert.equal(sentBody(ctx, 1), translate('notifications.serverCompanionConfirmed', 'ko', { time: '14:30' }));
+  const day = await readDay(ctx, WATCH_KEY, TODAY);
+  assert.deepEqual([day.pushed, day.claimed, day.closed], [['14:30'], [], ['14:30']]);
+  // 다시 눌러도 더 보내지 않는다
+  assert.deepEqual(await back(ctx), { ok: true, recorded: true });
+  assert.equal(ctx.push.sent.length, 2);
+});
+
+test('예약 처리: 보내는 사이 확인이 들어오면 보낸 뒤 복귀 확인을 한 번 보내고, 뒤이은 돌아왔어요는 더 보내지 않는다', async () => {
+  const ctx = testCtx();
+  await seedFlow(ctx);
+  at(ctx, '2026-11-20T14:40:00');
+  const inner = ctx.kv;
+  const dayKey = ctx.keys.day(WATCH_KEY, TODAY);
+  let injected = false;
+  ctx.kv = {
+    async exec(batch) {
+      const marksSent = batch.some((c) => c[0] === 'HSET' && c[2] === DAY_FIELD.pushed('14:30') && c[3] === 's');
+      if (marksSent && !injected) {
+        // 환자가 쓴 확인(c:)이 's' 를 쓰기 직전에 들어온다. 그 '돌아왔어요'의 다시 읽기는 '1' 을 보았다
+        injected = true;
+        await inner.exec([['HSET', dayKey, DAY_FIELD.confirmed('14:30'), '1']]);
+      }
+      return inner.exec(batch);
+    },
+  };
+  assert.deepEqual(await processDue(ctx, due()), { outcome: DUE_OUTCOME.SENT, retry: false, statusClass: '2xx' });
+  assert.equal(injected, true);
+  // 예약 처리가 끝난 시점에 이미 복귀 확인이 나갔다
+  assert.equal(ctx.push.sent.length, 2);
+  assert.equal(sentBody(ctx, 1), translate('notifications.serverCompanionConfirmed', 'ko', { time: '14:30' }));
+  at(ctx, '2026-11-20T14:45:00');
+  assert.deepEqual(await back(ctx), { ok: true, recorded: true });
+  const confirmedBodies = ctx.push.sent.filter(
+    (_, i) => sentBody(ctx, i) === translate('notifications.serverCompanionConfirmed', 'ko', { time: '14:30' }),
+  );
+  assert.equal(confirmedBodies.length, 1);
+  assert.equal(ctx.push.sent.length, 2);
+});
+
+test('돌아왔어요: 마감 지남 푸시가 나가지 못한 결과(NO_SUB·GONE·RETRY·CAPPED·REJECTED)는 p: 를 남기지 않아 뒤이은 확인이 아무것도 보내지 않는다', async () => {
+  const pushWindow = () => Math.floor(Date.parse('2026-11-20T05:40:00Z') / (WATCH_LIMITS.push.windowSec * 1000));
+  const cases = [
+    {
+      expect: DUE_OUTCOME.SKIP_NO_SUB,
+      prepare(ctx) {
+        // 권리를 얻은 직후 구독이 사라진다
+        const inner = ctx.kv;
+        ctx.kv = {
+          async exec(batch) {
+            const out = await inner.exec(batch);
+            if (batch.some((c) => c[0] === 'HSETNX' && c[2] === DAY_FIELD.pushed('14:30'))) {
+              await inner.exec([['DEL', ctx.keys.sub(WATCH_KEY)]]);
+            }
+            return out;
+          },
+        };
+        return () => {
+          ctx.kv = inner;
+        };
+      },
+    },
+    {
+      expect: DUE_OUTCOME.SUB_GONE,
+      prepare(ctx) {
+        ctx.push.outcome = 'GONE';
+      },
+    },
+    {
+      expect: DUE_OUTCOME.RETRY,
+      prepare(ctx) {
+        ctx.push.outcome = 'RETRY';
+      },
+    },
+    {
+      expect: DUE_OUTCOME.SKIP_CAP,
+      async prepare(ctx) {
+        for (let i = 0; i < WATCH_LIMITS.push.limit; i += 1) await hitRate(ctx, 'push', WATCH_KEY);
+        // 한도 창이 바뀌어 다시 보낼 수 있게 된 상황을 계수기를 지워 만든다
+        return () =>
+          ctx.kv.exec([['DEL', ctx.keys.rate(rateKeyOf({ bucket: 'push', subject: WATCH_KEY }, SECRET), pushWindow())]]);
+      },
+    },
+    {
+      expect: DUE_OUTCOME.SEND_REJECTED,
+      prepare(ctx) {
+        ctx.push.outcome = 'REJECTED';
+      },
+    },
+  ];
+  for (const c of cases) {
+    const ctx = testCtx();
+    await seedFlow(ctx);
+    at(ctx, '2026-11-20T14:40:00');
+    const restore = await c.prepare(ctx);
+    assert.equal((await processDue(ctx, due())).outcome, c.expect);
+    const sentAfterDue = ctx.push.sent.length;
+    const day = await readDay(ctx, WATCH_KEY, TODAY);
+    assert.deepEqual([day.pushed, day.claimed], [[], []], `${c.expect}: p: 가 남지 않는다`);
+
+    // 푸시를 보낼 수 있는 상태로 돌린다(구독이 다시 생기고 한도가 풀린다)
+    if (restore) await restore();
+    ctx.push.outcome = 'SENT';
+    if (!(await readSub(ctx, WATCH_KEY))) await subscribe(ctx);
+    at(ctx, '2026-11-20T14:50:00');
+    assert.deepEqual(await back(ctx), { ok: true, recorded: true }, c.expect);
+    assert.equal(ctx.push.sent.length, sentAfterDue, `${c.expect}: 복귀 확인을 보내지 않는다`);
+    assert.deepEqual((await readDay(ctx, WATCH_KEY, TODAY)).closed, [], c.expect);
+  }
 });
 
 test('돌아왔어요: 토큰이 틀리면 NOT_FOUND 다', async () => {
@@ -833,7 +1000,7 @@ test('결과는 정해진 키만 담는다', async () => {
   const ctx = testCtx();
   const keysOf = (r) => Object.keys(r).sort();
   assert.deepEqual(keysOf(await register(ctx)), ['expiresOn', 'ok']);
-  assert.deepEqual(keysOf(await deadlines(ctx, [{ date: TODAY, deadlines: ['14:30'] }])), ['expiresOn', 'ok']);
+  assert.deepEqual(keysOf(await deadlines(ctx, [{ date: TODAY, deadlines: ['14:30'] }])), ['armFailed', 'expiresOn', 'ok']);
   assert.deepEqual(keysOf(await back(ctx)), ['ok', 'recorded']);
   assert.deepEqual(keysOf(await back(ctx, { writeToken: otherToken(1) })), ['ok', 'reason']);
   assert.deepEqual(keysOf(await deleteOwnedWatches(ctx, { accountKey: IDS.otherAccountKey })), ['deleted', 'ok']);

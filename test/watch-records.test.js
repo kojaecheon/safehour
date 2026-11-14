@@ -21,6 +21,8 @@ import {
   replaceDays,
   setDayField,
   claimDayField,
+  claimAndReadDay,
+  markSentAndReadDay,
   clearDayField,
   readSub,
   writeSub,
@@ -185,6 +187,7 @@ test('replaceDays: 새 날짜는 마감을 저장하고 색인에 넣는다', as
     confirmed: [],
     armed: {},
     pushed: [],
+    claimed: [],
     closed: [],
     muted: false,
   });
@@ -204,6 +207,7 @@ test('replaceDays: 같은 목록을 다시 올리면 changed 가 0 이고 확인
   await setDayField(ctx, watchKey, TODAY, DAY_FIELD.confirmed('14:30'), '1');
   await setDayField(ctx, watchKey, TODAY, DAY_FIELD.armed('18:00'), 'm7');
   assert.equal(await claimDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('18:00')), true);
+  await markSentAndReadDay(ctx, watchKey, TODAY, '14:30');
   const before = await readDay(ctx, watchKey, TODAY);
 
   const commands = recordKv(ctx);
@@ -215,7 +219,8 @@ test('replaceDays: 같은 목록을 다시 올리면 changed 가 0 이고 확인
   assert.deepEqual(await readDay(ctx, watchKey, TODAY), before);
   assert.deepEqual(before.confirmed, ['14:30']);
   assert.deepEqual(before.armed, { '18:00': 'm7' });
-  assert.deepEqual(before.pushed, ['18:00']);
+  assert.deepEqual(before.pushed, ['14:30']);
+  assert.deepEqual(before.claimed, ['18:00']);
 });
 
 test('replaceDays: 빠진 시각의 표시를 지우고 그 예약 메시지 id 를 돌려준다', async () => {
@@ -227,6 +232,9 @@ test('replaceDays: 빠진 시각의 표시를 지우고 그 예약 메시지 id 
   await claimDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30'));
   await claimDayField(ctx, watchKey, TODAY, DAY_FIELD.closed('14:30'));
   await claimDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('18:00'));
+  // 16:00 은 마감 목록에 없고 보내는 중(p: 1) 표시만 남아 있다(예약 처리가 권리를 얻은 뒤 마감이 빠진 경우). 이것도 지운다
+  await claimDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('16:00'));
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).claimed, ['14:30', '16:00', '18:00']);
 
   const out = await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['18:00'] }]);
   assert.deepEqual(out, { removedMessageIds: ['m1'], changed: 1 });
@@ -234,8 +242,14 @@ test('replaceDays: 빠진 시각의 표시를 지우고 그 예약 메시지 id 
   assert.deepEqual(day.deadlines, ['18:00']);
   assert.deepEqual(day.confirmed, []);
   assert.deepEqual(day.armed, {});
-  assert.deepEqual(day.pushed, ['18:00']);
+  assert.deepEqual(day.pushed, []);
+  assert.deepEqual(day.claimed, ['18:00']);
   assert.deepEqual(day.closed, []);
+  // 보냄(s) 표시도 빠지면 지운다
+  await markSentAndReadDay(ctx, watchKey, TODAY, '18:00');
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['20:00'] }]);
+  const later = await readDay(ctx, watchKey, TODAY);
+  assert.deepEqual([later.pushed, later.claimed], [[], []]);
 });
 
 test('replaceDays: 빈 목록이면 날짜 기록과 색인 항목을 지운다', async () => {
@@ -282,6 +296,53 @@ test('claimDayField 는 처음만 true 다', async () => {
   // 돌려놓으면 다시 얻을 수 있다
   await clearDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30'));
   assert.equal(await claimDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30')), true);
+});
+
+test('claimAndReadDay·markSentAndReadDay 는 exec 한 번에 쓰고, 만료를 걸고, 다시 읽는다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.confirmed('14:30'), '1');
+  const key = ctx.keys.day(watchKey, TODAY);
+  const batches = [];
+  const inner = ctx.kv;
+  ctx.kv = {
+    async exec(batch) {
+      batches.push(batch.map((c) => [...c]));
+      return inner.exec(batch);
+    },
+  };
+
+  const first = await claimAndReadDay(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30'));
+  assert.equal(first.claimed, true);
+  assert.deepEqual([first.day.deadlines, first.day.confirmed], [['14:30'], ['14:30']]);
+  assert.deepEqual([first.day.pushed, first.day.claimed], [[], ['14:30']]);
+  assert.deepEqual(batches[0], [
+    ['HSETNX', key, 'p:14:30', '1'],
+    ['EXPIREAT', key, dayExpiryUnix(TODAY)],
+    ['HGETALL', key],
+  ]);
+  const second = await claimAndReadDay(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30'));
+  assert.equal(second.claimed, false);
+  assert.deepEqual(second.day.claimed, ['14:30']);
+
+  const sent = await markSentAndReadDay(ctx, watchKey, TODAY, '14:30');
+  assert.deepEqual([sent.pushed, sent.claimed, sent.confirmed], [['14:30'], [], ['14:30']]);
+  assert.deepEqual(batches[2], [
+    ['HSET', key, 'p:14:30', 's'],
+    ['EXPIREAT', key, dayExpiryUnix(TODAY)],
+    ['HGETALL', key],
+  ]);
+  assert.equal(batches.length, 3);
+  // 's' 가 아닌 값은 모두 보내는 중으로 읽는다
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30'), 'x');
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).claimed, ['14:30']);
+  // 여러 필드를 HDEL 한 번에 지운다
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.armed('14:30'), 'm1');
+  await clearDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30'), DAY_FIELD.armed('14:30'));
+  assert.deepEqual(batches.at(-1), [['HDEL', key, 'p:14:30', 'a:14:30']]);
+  const cleared = await readDay(ctx, watchKey, TODAY);
+  assert.deepEqual([cleared.claimed, cleared.armed], [[], {}]);
 });
 
 test('setDayField·claimDayField 는 날짜 기록의 만료를 함께 건다', async () => {
@@ -524,6 +585,7 @@ test('replaceDays: 빈 목록으로 날짜를 지워도 함께 있음 표시는 
     confirmed: [],
     armed: {},
     pushed: [],
+    claimed: [],
     closed: [],
     muted: true,
   });

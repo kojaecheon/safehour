@@ -530,11 +530,22 @@ describe('판정은 언어와 무관하다 — i18n 은 표시 계층에만 있�
     // 예외 (AX-309 · docs/business-rules.md 'AI 소개 문장'): AI 일정 소개 모듈은 대체 템플릿(aiIntro 이름공간) 한 파일만 읽는다.
     // 소개 문장은 표시 문구이고 판정 입력이 아니다. 이 파일도 다른 i18n 모듈(런타임·검수 스위치)은 가져오지 못한다.
     // 예외 (ADR-0012 · 서버 알림 계획 작업 5): 서버 푸시 문구 모듈은 보호자 잠금 화면에 뜨는 표시 문구만 만든다.
-    // 예약 처리 판정표(lib/server/watch/due.js)는 언어를 보지 않는다. 이 파일은 i18n 입구(safetyPair·translate) 하나만
-    // 가져오고, 검수 스위치 값(SAFETY_COPY_REVIEWED)은 이름조차 쓰지 못한다(부르는 쪽이 ctx.reviewed 로 넘긴다).
+    // 예약 처리 판정표(lib/server/watch/due.js)는 언어를 보지 않는다. 이 파일은 i18n 입구에서 safetyPair·translate
+    // 두 이름만 가져오고, 검수 스위치 값(SAFETY_COPY_REVIEWED)은 이름조차 쓰지 못한다(부르는 쪽이 ctx.reviewed 로 넘긴다).
+    // 값: 그 파일이 가져와도 되는 i18n 경로마다 가져와도 되는 이름 목록. null 이면 이름을 보지 않는다.
     const ALLOWED_I18N_IMPORTS = {
-      [join('lib', 'server', 'ai-intro.js')]: ['../../src/i18n/messages/aiIntro.js'],
-      [join('lib', 'server', 'watch', 'text.js')]: ['../../../src/i18n/index.js'],
+      [join('lib', 'server', 'ai-intro.js')]: { '../../src/i18n/messages/aiIntro.js': null },
+      [join('lib', 'server', 'watch', 'text.js')]: { '../../../src/i18n/index.js': ['safetyPair', 'translate'] },
+    };
+    /** import { a, b } 꼴의 이름 목록. 기본·이름공간 가져오기, 별칭이면 null */
+    const namedImports = (clause) => {
+      const braces = /^\{([^}]*)\}$/.exec(clause.trim());
+      if (!braces) return null;
+      const names = braces[1]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return names.every((n) => /^\w+$/.test(n)) ? names : null;
     };
     const offenders = [];
     const visit = (path) => {
@@ -546,9 +557,23 @@ describe('판정은 언어와 무관하다 — i18n 은 표시 계층에만 있�
         }
         if (!/\.(m?js)$/.test(full)) continue;
         const source = readFileSync(full, 'utf8');
-        const allowed = ALLOWED_I18N_IMPORTS[full] ?? [];
+        const allowed = ALLOWED_I18N_IMPORTS[full] ?? {};
         const i18nImports = [...source.matchAll(/from\s+['"]([^'"]*i18n[^'"]*)['"]/g)].map((m) => m[1]);
-        if (i18nImports.some((spec) => !allowed.includes(spec)) || /SAFETY_COPY_REVIEWED/.test(source)) {
+        // 줄 머리의 import 문만 본다(주석 속 낱말과 섞이지 않게)
+        const statements = [...source.matchAll(/^import\s+([^;]*?)\s+from\s+['"]([^'"]*i18n[^'"]*)['"]/gm)];
+        const badNames = statements.some(([, clause, spec]) => {
+          const names = allowed[spec];
+          if (!Array.isArray(names)) return false;
+          const got = namedImports(clause);
+          return got === null || got.some((n) => !names.includes(n));
+        });
+        if (
+          i18nImports.some((spec) => !Object.hasOwn(allowed, spec)) ||
+          // 허용된 경로도 import 문으로만 가져온다(export … from 으로 다시 내보내지 않는다)
+          i18nImports.length !== statements.length ||
+          badNames ||
+          /SAFETY_COPY_REVIEWED/.test(source)
+        ) {
           offenders.push(full);
         }
       }
