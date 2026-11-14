@@ -47,6 +47,7 @@ import {
   welcomeNoticeReady,
 } from '../components/trip/viewModel.js';
 import { buildMapLinks } from '../lib/maps.js';
+import { isClampedOverdueOuting } from '../src/domain/states.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { planTrip } from '../src/engine/tripPlan.js';
 import { AIRPORT_TRAVEL, SET, at, byLodging, tripPool, tripStay } from './trip-fixtures.js';
@@ -469,6 +470,33 @@ describe('이동 중에 비운 정거장 0개 외출 (findings 10 화면)', () =
 
   test('즉시 복귀가 아니면 기존 규칙대로(마감 뒤 DONE)', () => {
     assert.equal(todayFocus(day({ outings: [empty] }), 10 * 60 + 45).phase, 'DONE');
+  });
+
+  test('오늘 카드가 붙잡는 외출은 공용 판정 isClampedOverdueOuting 이 참인 외출과 같다', () => {
+    const early = outing('o0', { departAt: '09:00', plannedReturnAt: '09:40', returnBy: '10:00', stops: [stop('9', { arriveAt: '09:10', leaveAt: '09:30' })] });
+    const stringSlack = { ...empty, slackMin: '-15' };
+    const positive = { ...empty, slackMin: 5 };
+    const cases = [
+      day({ returnNow: true, reasons: ['OUTING_OVERDUE'], outings: [early, empty, later] }),
+      day({ returnNow: true, reasons: ['OUTING_OVERDUE'], outings: [early, positive] }),
+      day({ returnNow: true, reasons: ['OUTING_OVERDUE'], outings: [stringSlack] }),
+      day({ returnNow: false, reasons: ['OUTING_OVERDUE'], outings: [empty] }),
+      ...['PATIENT_RECALLED', 'PLAN_REVOKED', 'PLAN_EXPIRED'].map((reason) => day({ returnNow: true, reasons: [reason], outings: [early, empty] })),
+    ];
+    // 모든 외출이 끝난 뒤(다음 외출 출발 전)에 OUT 으로 남는 외출이 공용 판정의 외출이다
+    for (const d of cases) {
+      const f = todayFocus(d, 16 * 60);
+      const held = f?.phase === 'OUT' ? f.outing.id : null;
+      const clamped = d.outings.find((o) => isClampedOverdueOuting(d, o))?.id ?? null;
+      assert.equal(held, clamped, JSON.stringify({ reasons: d.reasons, returnNow: d.returnNow }));
+    }
+    assert.equal(todayFocus(cases[0], 16 * 60).outing.id, empty.id);
+
+    // 같은 판정의 두 번째 경로를 두지 않는다: todayFocus 는 공용 판정으로 외출을 고른다
+    const source = readFileSync(new URL('../components/trip/viewModel.js', import.meta.url), 'utf8');
+    const body = source.slice(source.indexOf('export function todayFocus('), source.indexOf('export function needsInputFix('));
+    assert.match(body, /isClampedOverdueOuting\(day, o\)/);
+    assert.doesNotMatch(body, /overdueOutingOf\(|isOverdueClampedDay\(|slackMin/);
   });
 
   test('타임라인과 오늘 화면은 정거장 0개 외출의 예상 귀가를 보이지 않고 복귀 마감만 보인다', () => {

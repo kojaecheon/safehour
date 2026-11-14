@@ -1,7 +1,7 @@
 // 서버 알림 클라이언트·서버 이음매 (docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 3, D16 ·
 // docs/standards.md '클라이언트와 서버가 주고받는 요청 모양은 양쪽을 이은 테스트로 묶는다')
 //
-// 진짜 요청 모양(src/guardian/watchRequests.js)과 진짜 sendWatchRequest(lib/trip/watchApi.js)를 진짜 처리기
+// 진짜 요청 모양(src/guardian/watchRequests.js)과 진짜 sendWatchRequest(src/guardian/watchSend.js, lib/trip/watchApi.js 가 다시 내보냄)를 진짜 처리기
 // createWatchHandlers({ env: watchRouteEnv(), now: ctx.now, ctx: testCtx() })에 잇는다. 서버 검증은 느슨하게 하지 않는다.
 // fetchImpl 어댑터는 받은 (경로, init)을 그대로 Request 로 만들어 메서드·경로에 맞는 처리기에 넣는다(쿠키만 더한다).
 // 저장소는 메모리, 예약과 푸시는 기록기라 외부 호출이 없다. 시계는 testCtx 기본값 2026-11-20 12:00 KST 에서 ctx.clock 으로만 움직인다.
@@ -47,12 +47,11 @@ before(() => {
 after(() => mock.restoreAll());
 
 /**
- * 진짜 처리기에 이은 요청 함수. session 이 false 면 쿠키 없이 보낸다.
+ * 진짜 처리기에 이은 요청 함수. session 이 false 면 쿠키 없이 보낸다. env 를 주면 그 환경변수로 처리기를 만든다.
  * @returns {{ ctx: object, api: object, fetchImpl: Function, seen: Array<{ path: string, init: object }> }}
  */
-function connect({ at, session = true } = {}) {
+function connect({ at, session = true, env = watchRouteEnv() } = {}) {
   const ctx = testCtx(at ? { at } : undefined);
-  const env = watchRouteEnv();
   const h = createWatchHandlers({ env, now: ctx.now, ctx });
   const routes = new Map([
     [`GET ${WATCH_PATHS.config}`, h.pushConfig],
@@ -165,6 +164,27 @@ describe('라우트와 이은 요청', () => {
     assert.deepEqual(lastDay.deadlines, times);
     const back = await api.back({ ...ids, date: TODAY, by: times[times.length - 1] });
     assert.equal(back.data.recorded, true);
+  });
+
+  test('스위치가 꺼진 서버: 등록은 503 OFF, config 는 꺼짐을 읽는다', async () => {
+    const { SAFEHOUR_SERVER_PUSH: _on, ...offEnv } = watchRouteEnv();
+    assert.equal(Object.hasOwn(offEnv, 'SAFEHOUR_SERVER_PUSH'), false);
+    const { ctx, api } = connect({ env: offEnv });
+    const ids = newWatchIds();
+
+    const registered = await api.register({ ...ids, expiresOn: EXPIRES_ON });
+    expectKind(registered, WATCH_KIND.OFF, 503);
+    assert.equal(registered.network, false);
+    assert.equal(registered.errorCode, 'SAFEHOUR_SERVER_PUSH_OFF');
+    const uploaded = await api.deadlines({ ...ids, expiresOn: EXPIRES_ON, days: [{ date: TODAY, deadlines: ['14:30'] }] });
+    expectKind(uploaded, WATCH_KIND.OFF, 503);
+    expectKind(await api.back({ ...ids, date: TODAY, by: '14:30' }), WATCH_KIND.OFF, 503);
+    assert.equal(ctx.scheduler.calls.length, 0);
+
+    const config = await api.config();
+    expectKind(config, WATCH_KIND.OK, 200);
+    assert.equal(config.data.enabled, false);
+    assert.equal(config.data.vapidPublicKey, null);
   });
 
   test('세션 없이 등록하면 kind 가 LOGIN_REQUIRED 다', async () => {

@@ -233,15 +233,74 @@ describe('응답 분류', () => {
 });
 
 describe('모듈 경계', () => {
-  test('클라이언트 요청 모듈은 서버 전용 모듈을 불러오지 않는다', () => {
-    for (const file of ['src/guardian/watchRequests.js', 'lib/trip/watchApi.js']) {
-      const source = readFileSync(join(ROOT, file), 'utf8');
-      const specifiers = [...source.matchAll(/^\s*(?:import|export)[^'"]*from\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]);
-      assert.ok(specifiers.length > 0, file);
+  const ENTRIES = ['src/guardian/watchRequests.js', 'src/guardian/watchSend.js', 'lib/trip/watchApi.js', 'src/guardian/deadlines.js'];
+  const FORBIDDEN = /lib\/server\/|src\/auth\/|src\/push\/|^node:|^@\//;
+
+  /** 파일 하나의 import·export 지정자 (여러 줄 import, 부수 효과 import, 동적 import 포함) */
+  function specifiersOf(source) {
+    const patterns = [
+      /^\s*(?:import|export)\s[^'"]*?\sfrom\s+['"]([^'"]+)['"]/gm,
+      /^\s*import\s+['"]([^'"]+)['"]/gm,
+      /\bimport\(\s*['"]([^'"]+)['"]\s*\)/g,
+    ];
+    return patterns.flatMap((re) => [...source.matchAll(re)].map((m) => m[1]));
+  }
+
+  /** 시작 파일들에서 상대 경로 import 를 끝까지 따라간다. { 파일: 지정자 목록 } */
+  function walk(entries) {
+    const seen = new Map();
+    const queue = entries.map((file) => join(ROOT, file));
+    while (queue.length > 0) {
+      const file = queue.shift();
+      if (seen.has(file)) continue;
+      const specifiers = specifiersOf(readFileSync(file, 'utf8'));
+      seen.set(file, specifiers);
       for (const specifier of specifiers) {
-        assert.ok(!/lib\/server\/|src\/auth\/|src\/push\/|^node:|^@\//.test(specifier), `${file}: ${specifier}`);
+        if (specifier.startsWith('.')) queue.push(join(dirname(file), specifier));
       }
-      assert.ok(!/console\./.test(source), `${file}: console 출력이 없어야 한다`);
+    }
+    return seen;
+  }
+
+  /** 지정자가 서버 전용이거나, 상대 경로를 풀어 보니 서버 전용 폴더 안이면 위반이다 */
+  function violationsOf(file, specifiers) {
+    return specifiers.filter((specifier) => {
+      if (FORBIDDEN.test(specifier)) return true;
+      return specifier.startsWith('.') && FORBIDDEN.test(join(dirname(file), specifier).slice(ROOT.length + 1));
+    });
+  }
+
+  test('클라이언트 요청 모듈은 불러오는 모듈을 끝까지 따라가도 서버 전용 모듈을 불러오지 않는다', () => {
+    const graph = walk(ENTRIES);
+    // 시작 파일과 그 아래 공용 규칙 모듈까지 따라갔다
+    for (const file of [...ENTRIES, 'src/guardian/crypto.js', 'src/stay/index.js', 'src/domain/states.js']) {
+      assert.ok(graph.has(join(ROOT, file)), file);
+    }
+    for (const [file, specifiers] of graph) {
+      const name = file.slice(ROOT.length + 1);
+      if (ENTRIES.includes(name)) assert.ok(specifiers.length > 0, name);
+      assert.deepEqual(violationsOf(file, specifiers), [], name);
+    }
+  });
+
+  test('경계 검사는 여러 줄·부수 효과·동적 import 와 상대 경로로 숨은 서버 전용 모듈을 찾아낸다', () => {
+    const sample = [
+      "import { a } from '../../lib/server/watch/keys.js';",
+      'import {\n  b,\n  c,\n} from "node:crypto";',
+      "import '@/src/push/send.js';",
+      "export { d } from '../auth/session.js';",
+      "const e = await import('../push/vapid.js');",
+      "import { f } from './watchRequests.js';",
+    ].join('\n');
+    const file = join(ROOT, 'src/guardian/sample.js');
+    const found = specifiersOf(sample);
+    assert.equal(found.length, 6, JSON.stringify(found));
+    assert.deepEqual(violationsOf(file, found).sort(), ['../../lib/server/watch/keys.js', '../auth/session.js', '../push/vapid.js', '@/src/push/send.js', 'node:crypto'].sort());
+  });
+
+  test('요청 모듈에는 console 출력이 없다', () => {
+    for (const file of ENTRIES) {
+      assert.ok(!/console\./.test(readFileSync(join(ROOT, file), 'utf8')), `${file}: console 출력이 없어야 한다`);
     }
   });
 });
