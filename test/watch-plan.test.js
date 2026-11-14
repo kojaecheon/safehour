@@ -291,6 +291,8 @@ describe('backTargetOf', () => {
     const target = (times, nowMs = NOW) => backTargetOf({ day, outing: clamped, lastUploaded: { [TODAY]: times }, nowMs });
 
     // 출발(13:00) 이전 시각은 이 외출의 마감이 아니다
+    // 출발과 같은 시각(바로 앞 외출이 13:00 에 돌아오는 마감이었고 그 외출은 일정에서 빠졌다)도 아니다
+    assert.deepEqual(target(['13:00', '16:30', '19:00']), { date: TODAY, by: '16:30' });
     assert.deepEqual(target(['11:00', '14:30', '16:30']), { date: TODAY, by: '14:30' });
     // 원래 마감이 아직 미래여도 그 시각이다
     assert.deepEqual(target(['11:00', '16:30', '19:00']), { date: TODAY, by: '16:30' });
