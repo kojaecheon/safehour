@@ -529,8 +529,12 @@ describe('판정은 언어와 무관하다 — i18n 은 표시 계층에만 있�
     const roots = ['src/engine', 'src/stay', 'src/recovery', 'lib/server', 'app/api'];
     // 예외 (AX-309 · docs/business-rules.md 'AI 소개 문장'): AI 일정 소개 모듈은 대체 템플릿(aiIntro 이름공간) 한 파일만 읽는다.
     // 소개 문장은 표시 문구이고 판정 입력이 아니다. 이 파일도 다른 i18n 모듈(런타임·검수 스위치)은 가져오지 못한다.
+    // 예외 (ADR-0012 · 서버 알림 계획 작업 5): 서버 푸시 문구 모듈은 보호자 잠금 화면에 뜨는 표시 문구만 만든다.
+    // 예약 처리 판정표(lib/server/watch/due.js)는 언어를 보지 않는다. 이 파일은 i18n 입구(safetyPair·translate) 하나만
+    // 가져오고, 검수 스위치 값(SAFETY_COPY_REVIEWED)은 이름조차 쓰지 못한다(부르는 쪽이 ctx.reviewed 로 넘긴다).
     const ALLOWED_I18N_IMPORTS = {
       [join('lib', 'server', 'ai-intro.js')]: ['../../src/i18n/messages/aiIntro.js'],
+      [join('lib', 'server', 'watch', 'text.js')]: ['../../../src/i18n/index.js'],
     };
     const offenders = [];
     const visit = (path) => {

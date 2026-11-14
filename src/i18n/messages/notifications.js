@@ -94,4 +94,28 @@ export const safety = {
     ja: 'お連れの方の戻り期限{time}を過ぎました。一緒にいない場合は、今すぐ連絡してみてください',
     zh: '同伴的返回截止时间{time}已过。如果你们不在一起，请立即联系对方',
   },
+  /**
+   * 서버 푸시(보호자 기기): 복귀 마감 + 유예가 지나도록 복귀 확인이 없음 (lib/server/watch/text.js).
+   * 확인이 '없다'는 사실만 쓴다. 돌아오지 않았다고 단정하지 않는다. ja·zh 는 검수 전 번역
+   */
+  'notifications.serverCompanionOverdue': {
+    ko: '일행의 복귀 마감 {time}이 지났고 아직 복귀 확인이 없어요. 함께 있지 않다면 지금 연락해 보세요',
+    en: "Your companion's {time} return time has passed with no check-in yet. If you're not together, contact them now",
+    ja: 'お連れの方の戻り期限{time}を過ぎましたが、まだ戻りの確認がありません。一緒にいない場合は、今すぐ連絡してみてください',
+    zh: '同伴的返回截止时间{time}已过，尚未收到返回确认。如果你们不在一起，请立即联系对方',
+  },
+  /** 서버 푸시(보호자 기기): 마감 지남 푸시를 보낸 뒤 일행이 복귀를 확인함. ja·zh 는 검수 전 번역 */
+  'notifications.serverCompanionConfirmed': {
+    ko: '일행이 {time} 마감 뒤 복귀를 확인했어요',
+    en: 'Your companion checked in after the {time} return time',
+    ja: 'お連れの方が{time}の戻り期限のあと、戻りを確認しました',
+    zh: '同伴已在{time}的返回截止时间之后确认返回',
+  },
+  /** 서버 푸시(이전 보호자 기기): 알림 받는 기기가 바뀜. 자리표시자가 없다. ja·zh 는 검수 전 번역 */
+  'notifications.serverDeviceChanged': {
+    ko: '알림 받는 기기가 바뀌었어요. 직접 바꾼 것이 아니라면 일행에게 알려 주세요',
+    en: "Alerts now go to a different device. If you didn't change it, let your companion know",
+    ja: '通知を受け取る端末が変わりました。ご自身で変更していない場合は、お連れの方に知らせてください',
+    zh: '接收提醒的设备已更换。如果不是你本人操作，请告知同伴',
+  },
 };
