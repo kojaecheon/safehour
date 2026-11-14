@@ -24,6 +24,8 @@ import {
   claimAndReadDay,
   markSentAndReadDay,
   clearDayField,
+  clearArmedAndReadSubExists,
+  clearArmedAndReadDay,
   readSub,
   writeSub,
   deleteSub,
@@ -559,15 +561,94 @@ test('writeWatch 는 소유 집합에 넣고 그 만료를 늦춰, 연장한 지
   assert.deepEqual(await ownerWatchKeys(ctx, ownerHash), [watchKey]);
 });
 
-test('writeWatch onlyIfAbsent 가 실패하면 소유 집합을 건드리지 않는다', async () => {
+// 검토 E2 반영으로 바뀌었다: 소유 집합에 먼저 넣고 만든다. 만들지 못하면(남의 지켜보기) 넣었던 항목을 다시 뺀다
+test('writeWatch onlyIfAbsent 는 소유 집합에 먼저 넣고, 남의 지켜보기라 실패하면 그 항목을 다시 뺀다', async () => {
   const ctx = testCtx();
   const watchKey = watchKeyOf(IDS.watchId, SECRET);
   await writeWatch(ctx, watchKey, watchRecord());
   const otherOwner = ownerHashOf(IDS.otherAccountKey, SECRET);
   const commands = recordKv(ctx);
   assert.equal(await writeWatch(ctx, watchKey, watchRecord({ ownerHash: otherOwner }), { onlyIfAbsent: true }), false);
-  assert.ok(commands.every((c) => c[0] === 'SET'));
+  assert.deepEqual(
+    commands.map((c) => c[0]),
+    ['SADD', 'EXPIREAT', 'SET', 'GET', 'SREM'],
+  );
   assert.deepEqual(await ownerWatchKeys(ctx, otherOwner), []);
+  // 원래 소유자의 집합은 그대로다
+  assert.deepEqual(await ownerWatchKeys(ctx, watchRecord().ownerHash), [watchKey]);
+
+  // 같은 소유자의 것이면(동시에 만든 경우) 빼지 않는다
+  const same = testCtx();
+  await writeWatch(same, watchKey, watchRecord(), { onlyIfAbsent: true });
+  assert.equal(await writeWatch(same, watchKey, watchRecord(), { onlyIfAbsent: true }), false);
+  assert.deepEqual(await ownerWatchKeys(same, watchRecord().ownerHash), [watchKey]);
+});
+
+test('writeWatch 는 덮어쓸 때 같은 exec 에서 구독 키의 만료도 새 출국일에 맞춘다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seedWatch(ctx, { expiresOn: '2026-11-21' });
+  const { subscription } = subscriptionFixture();
+  await writeSub(ctx, watchKey, { subId: 'SUBidFixture_0123456-a', ...subscription, lang: 'ko' }, '2026-11-21');
+  const commands = recordKv(ctx);
+  await writeWatch(ctx, watchKey, watchRecord({ expiresOn: '2026-11-30' }));
+  assert.equal(commands.length, 4, 'exec 한 번에 지켜보기·구독 만료·소유 집합을 쓴다');
+  assert.deepEqual(commands[1], ['EXPIREAT', ctx.keys.sub(watchKey), watchExpiryUnix('2026-11-30')]);
+  ctx.clock.set('2026-11-29T00:00:00Z');
+  assert.ok(await readSub(ctx, watchKey));
+  // 구독이 없으면 EXPIREAT 는 아무것도 만들지 않는다
+  const bare = testCtx();
+  await seedWatch(bare);
+  assert.equal(await readSub(bare, watchKey), null);
+  const [exists] = await bare.kv.exec([['EXISTS', bare.keys.sub(watchKey)]]);
+  assert.equal(exists, 0);
+});
+
+test('writeSub 는 같은 exec 에서 지켜보기를 다시 읽어 돌려주고, 출국일이 다르면 구독 만료를 지켜보기에 맞춘다', async () => {
+  const ctx = testCtx();
+  const sub = { subId: 'SUBidFixture_0123456-a', ...subscriptionFixture().subscription, lang: 'ko' };
+  const watchKey = watchKeyOf(IDS.watchId, SECRET);
+  // 지켜보기가 없으면 null 이고 구독은 지우지 않는다(지울지는 부르는 쪽이 정한다)
+  assert.equal(await writeSub(ctx, watchKey, sub, '2026-11-25'), null);
+  assert.ok(await readSub(ctx, watchKey));
+  // 앞에서 읽은 출국일(11-21)보다 지켜보기가 늘어나 있다(11-30)
+  const { record } = await seedWatch(ctx, { expiresOn: '2026-11-30' });
+  const commands = recordKv(ctx);
+  assert.deepEqual(await writeSub(ctx, watchKey, sub, '2026-11-21'), record);
+  assert.deepEqual(commands.slice(0, 2).map((c) => c[0]), ['SET', 'GET']);
+  assert.deepEqual(commands[2], ['EXPIREAT', ctx.keys.sub(watchKey), watchExpiryUnix('2026-11-30')]);
+  ctx.clock.set('2026-11-30T03:00:00Z');
+  assert.ok(await readSub(ctx, watchKey));
+});
+
+test('clearArmedAndReadSubExists·clearArmedAndReadDay 는 걸림(과 권리)을 지우는 exec 에서 구독·날짜 기록을 다시 읽는다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.armed('14:30'), 'm1');
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.pushed('14:30'), '1');
+  const commands = recordKv(ctx);
+  assert.equal(await clearArmedAndReadSubExists(ctx, watchKey, TODAY, '14:30'), false);
+  assert.deepEqual(commands, [
+    ['HDEL', ctx.keys.day(watchKey, TODAY), 'a:14:30'],
+    ['EXISTS', ctx.keys.sub(watchKey)],
+  ]);
+  // 권리는 alsoPushed 일 때만 지운다
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).claimed, ['14:30']);
+  await writeSub(ctx, watchKey, { subId: 'SUBidFixture_0123456-a', ...subscriptionFixture().subscription, lang: 'ko' }, '2026-11-25');
+  assert.equal(await clearArmedAndReadSubExists(ctx, watchKey, TODAY, '14:30', { alsoPushed: true }), true);
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).claimed, []);
+
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.armed('14:30'), 'm2');
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.muted, '1');
+  const before = commands.length;
+  const day = await clearArmedAndReadDay(ctx, watchKey, TODAY, '14:30');
+  assert.deepEqual(commands.slice(before), [
+    ['HDEL', ctx.keys.day(watchKey, TODAY), 'a:14:30'],
+    ['HGETALL', ctx.keys.day(watchKey, TODAY)],
+  ]);
+  assert.deepEqual([day.deadlines, day.armed, day.muted], [['14:30'], {}, true]);
+  // 기록이 통째로 없으면 null
+  assert.equal(await clearArmedAndReadDay(ctx, watchKey, '2026-11-22', '14:30', { alsoPushed: true }), null);
 });
 
 test('replaceDays: 빈 목록으로 날짜를 지워도 함께 있음 표시는 남는다', async () => {

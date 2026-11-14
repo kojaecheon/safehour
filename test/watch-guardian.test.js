@@ -13,7 +13,8 @@ import { DAY_FIELD, findWatch, readDay, readSub, replaceDays, setDayField, write
 import { ownerHashOf, watchKeyOf, writeHashOf } from '../lib/server/watch/keys.js';
 import { KvError } from '../lib/server/watch/kv.js';
 import { DUE_OUTCOME, processDue } from '../lib/server/watch/due.js';
-import { armPending } from '../lib/server/watch/arm.js';
+import { armIndexedDates, armPending } from '../lib/server/watch/arm.js';
+import { deleteWatch, putDeadlines } from '../lib/server/watch/patient.js';
 import { translate } from '../src/i18n/index.js';
 import { IDS, SECRET, subscriptionFixture, testCtx } from './watch-fixtures.js';
 
@@ -88,6 +89,30 @@ function assertNoInternals(result, watchKey, devices = []) {
 }
 
 const sentBody = (ctx, i = 0) => JSON.parse(ctx.push.sent[i].payload);
+
+/** 마감 지남 푸시 중 그 endpoint 로 간 것 */
+const overdueTo = (ctx, endpoint, time = '14:30') =>
+  ctx.push.sent.filter((s) => s.subscription.endpoint === endpoint && JSON.parse(s.payload).tag === `sh-watch-${TODAY}-${time}`);
+
+/**
+ * kv.exec 를 감싼다. match(batch) 가 처음 참인 배치 직전에 race(엇갈려 끼어드는 요청)를 한 번 돌린다.
+ * race 는 감싸지 않은 저장소를 쓰는 ctx 를 받는다. 감싼 것을 풀 때 쓰도록 원래 저장소를 돌려준다
+ */
+function raceBefore(ctx, match, race) {
+  const inner = ctx.kv;
+  let done = false;
+  ctx.kv = {
+    async exec(batch) {
+      if (!done && match(batch)) {
+        done = true;
+        await race({ ...ctx, kv: inner });
+      }
+      return inner.exec(batch);
+    },
+  };
+  return inner;
+}
+const isClearArmed = (batch) => batch.some((c) => c[0] === 'HDEL' && c.includes(DAY_FIELD.armed('14:30')));
 
 // ---- 구독 ----
 
@@ -381,6 +406,116 @@ test('구독: 다시 걸기가 실패해도 구독은 성공한다', async () =>
   assert.equal((await readSub(ctx, watchKey)).subId, second.subId);
 });
 
+test('구독: 마감 지남 푸시를 보내는 사이 새 기기로 다시 구독해도, 그 마감은 새 기기로 한 번 나간다(검토 N2)', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  const old = device();
+  await subscribe(ctx, old); // 오늘 14:30 을 건다
+  const fresh = device({ endpoint: OTHER_ENDPOINT });
+  ctx.clock.set('2026-11-20T05:40:00Z');
+  const send = ctx.push.send;
+  let resub = null;
+  ctx.push.send = async (input) => {
+    if (resub === null) {
+      resub = 'pending';
+      // 옛 기기로 보내는 중에 새 기기가 구독한다. 다시 걸기는 걸림(a:)과 보내는 중(p:)을 보고 건너뛴다
+      resub = await subscribe(ctx, fresh);
+      ctx.push.sent.push(input);
+      return { outcome: 'GONE', statusClass: '404/410' };
+    }
+    return send(input);
+  };
+  const due = { watchKey, date: TODAY, time: '14:30' };
+  assert.deepEqual(await processDue(ctx, due), { outcome: DUE_OUTCOME.RETRY, retry: true, statusClass: '404/410' });
+  assert.equal(resub.ok, true);
+  assert.equal((await readSub(ctx, watchKey)).subId, resub.subId, '새 구독은 지우지 않는다');
+  assert.equal(ctx.scheduler.calls.length, 1, '다시 걸기는 건너뛰었다');
+  // 예약 업체가 다시 부른다
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SENT);
+  assert.equal(overdueTo(ctx, OTHER_ENDPOINT).length, 1);
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SKIP_DUP);
+  assert.equal(overdueTo(ctx, OTHER_ENDPOINT).length, 1);
+});
+
+test('구독: 구독 없음으로 걸림을 지우기 직전에 구독하면, 예약 처리가 다시 불려 한 번 보낸다(검토 N3)', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  await armPending(ctx, watchKey, [TODAY]);
+  ctx.clock.set('2026-11-20T05:40:00Z');
+  const dev = device();
+  let sub = null;
+  const inner = raceBefore(ctx, isClearArmed, async (plain) => {
+    // 구독을 쓴 뒤 다시 걸기가 날짜 기록을 읽는다. 아직 남은 a: 를 보고 건너뛴다
+    sub = await subscribe(plain, dev);
+  });
+  const due = { watchKey, date: TODAY, time: '14:30' };
+  assert.deepEqual(await processDue(ctx, due), { outcome: DUE_OUTCOME.SKIP_NO_SUB, retry: true });
+  ctx.kv = inner;
+  assert.equal(sub.ok, true);
+  assert.equal(ctx.scheduler.calls.length, 1);
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SENT);
+  assert.equal(overdueTo(ctx, dev.subscription.endpoint).length, 1);
+
+  // 걸림을 지운 뒤에 구독하면 다시 걸기가 건다(예약 처리는 다시 부르지 않는다)
+  const later = testCtx();
+  const laterKey = await seedWatch(later);
+  await replaceDays(later, laterKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  await armPending(later, laterKey, [TODAY]);
+  later.clock.set('2026-11-20T05:40:00Z');
+  assert.deepEqual(await processDue(later, { ...due, watchKey: laterKey }), { outcome: DUE_OUTCOME.SKIP_NO_SUB, retry: false });
+  assert.equal((await subscribe(later, device())).ok, true);
+  assert.equal(later.scheduler.calls.length, 2);
+});
+
+test('구독: 구독과 지켜보기 삭제가 겹치면 봉인한 구독을 남기지 않고 NOT_FOUND 다(검토 N7)', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  const subKey = ctx.keys.sub(watchKey);
+  let removed = null;
+  // 구독이 지켜보기를 찾은 뒤, 구독을 쓰기 직전에 환자가 지켜보기를 지운다
+  const inner = raceBefore(
+    ctx,
+    (batch) => batch[0][0] === 'SET' && batch[0][1] === subKey,
+    async (plain) => {
+      removed = await deleteWatch(plain, { watchId: IDS.watchId, writeToken: IDS.writeToken });
+    },
+  );
+  assert.deepEqual(await subscribe(ctx, device()), NOT_FOUND);
+  ctx.kv = inner;
+  assert.deepEqual(removed, { ok: true });
+  assert.deepEqual(await ctx.kv.exec([['GET', subKey], ['GET', ctx.keys.watch(watchKey)]]), [null, null]);
+  assert.equal(ctx.push.sent.length, 0);
+});
+
+test('구독: 구독과 출국일 연장이 겹쳐도 구독은 늘어난 출국일까지 남는다(검토 E4)', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx, { expiresOn: '2026-11-21' });
+  const subKey = ctx.keys.sub(watchKey);
+  let extended = null;
+  // 구독이 옛 출국일(11-21)을 읽은 뒤, 구독을 쓰기 직전에 환자 앱이 출국일을 12-20 으로 늘린다
+  const inner = raceBefore(
+    ctx,
+    (batch) => batch[0][0] === 'SET' && batch[0][1] === subKey,
+    async (plain) => {
+      extended = await putDeadlines(plain, {
+        watchId: IDS.watchId,
+        writeToken: IDS.writeToken,
+        expiresOn: '2026-12-20',
+        days: [],
+      });
+    },
+  );
+  assert.equal((await subscribe(ctx, device())).ok, true);
+  ctx.kv = inner;
+  assert.deepEqual(extended, { ok: true, expiresOn: '2026-12-20', armFailed: 0 });
+  // 옛 출국일의 만료(11-29 00:00 KST)를 지나도 구독이 남는다
+  ctx.clock.set('2026-11-30T03:00:00Z');
+  assert.notEqual(await findWatch(ctx, IDS.watchId), null);
+  assert.notEqual(await readSub(ctx, watchKey), null);
+});
+
 // ---- 구독 해지 ----
 
 test('구독 해지: subId 가 맞으면 지우고, 틀리면 NOT_FOUND 이고 남는다', async () => {
@@ -574,6 +709,61 @@ test('함께 있음: 켠 동안 건너뛴 오늘 마감은 끄면 다시 걸리�
   assert.equal(rearmed.notBeforeMs, ctx.now());
   assert.deepEqual(Object.keys((await readDay(ctx, watchKey, TODAY)).armed).sort(), ['14:30', '18:00']);
   assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SENT);
+});
+
+test('함께 있음: 함께 있음으로 걸림을 지우기 직전에 끄면, 예약 처리가 다시 불려 한 번 보낸다(검토 N4)', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['14:30'] }]);
+  const dev = device();
+  const { subId } = await subscribe(ctx, dev); // 오늘 14:30 을 건다
+  await muteToday(ctx, { watchId: IDS.watchId, subId, on: true });
+  ctx.clock.set('2026-11-20T05:40:00Z');
+  let off = null;
+  const inner = raceBefore(ctx, isClearArmed, async (plain) => {
+    // m 을 지운 뒤 다시 걸기가 날짜 기록을 읽는다. 아직 남은 a: 를 보고 건너뛴다
+    off = await muteToday(plain, { watchId: IDS.watchId, subId, on: false });
+  });
+  const due = { watchKey, date: TODAY, time: '14:30' };
+  assert.deepEqual(await processDue(ctx, due), { outcome: DUE_OUTCOME.SKIP_MUTED, retry: true });
+  ctx.kv = inner;
+  assert.deepEqual(off, { ok: true, muted: false });
+  assert.equal(ctx.scheduler.calls.length, 1, '다시 걸기는 건너뛰었다');
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SENT);
+  assert.equal(overdueTo(ctx, dev.subscription.endpoint).length, 1);
+  assert.equal((await processDue(ctx, due)).outcome, DUE_OUTCOME.SKIP_DUP);
+});
+
+test('함께 있음: 켠 동안은 업로드·하루 1회 예약·다시 구독이 오늘 마감을 걸지 않고, 끄면 걸어 보낸다(검토 B2)', async () => {
+  const ctx = testCtx();
+  const watchKey = await seedWatch(ctx);
+  const first = await subscribe(ctx, device());
+  assert.deepEqual(await muteToday(ctx, { watchId: IDS.watchId, subId: first.subId, on: true }), { ok: true, muted: true });
+
+  const upload = (deadlines) =>
+    putDeadlines(ctx, {
+      watchId: IDS.watchId,
+      writeToken: IDS.writeToken,
+      expiresOn: EXPIRES_ON,
+      days: [{ date: TODAY, deadlines }],
+    });
+  for (const deadlines of [['14:30'], ['14:30', '18:00'], ['15:00'], ['14:30'], ['14:30', '16:00']]) {
+    assert.deepEqual(await upload(deadlines), { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 }, deadlines.join(','));
+  }
+  assert.deepEqual(await armIndexedDates(ctx, [TODAY]), { watches: 1, armed: 0, failed: 0 });
+  const again = await subscribe(ctx, device({ endpoint: OTHER_ENDPOINT }));
+  assert.equal(again.ok, true);
+  assert.equal(ctx.scheduler.calls.length, 0, '함께 있음인 날은 예약 업체에 발행하지 않는다');
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).armed, {});
+
+  assert.deepEqual(await muteToday(ctx, { watchId: IDS.watchId, subId: again.subId, on: false }), { ok: true, muted: false });
+  assert.deepEqual(
+    ctx.scheduler.calls.map((c) => c.body.t),
+    ['14:30', '16:00'],
+  );
+  ctx.clock.set('2026-11-20T05:40:00Z');
+  assert.equal((await processDue(ctx, { watchKey, date: TODAY, time: '14:30' })).outcome, DUE_OUTCOME.SENT);
+  assert.equal(overdueTo(ctx, OTHER_ENDPOINT).length, 1);
 });
 
 test('함께 있음: 끈 뒤 다시 걸기가 실패해도 응답은 같다', async () => {

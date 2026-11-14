@@ -27,7 +27,7 @@ import {
   writeSub,
   writeWatch,
 } from '../lib/server/watch/records.js';
-import { dedupIdOf, newSubId, ownerHashOf, topicOf, watchKeyOf, writeHashOf } from '../lib/server/watch/keys.js';
+import { dedupIdOf, newSubId, ownerHashOf, rateKeyOf, topicOf, watchKeyOf, writeHashOf } from '../lib/server/watch/keys.js';
 import { countRate, hitRate, peekRate } from '../lib/server/watch/limits.js';
 import { KvError } from '../lib/server/watch/kv.js';
 import { safety } from '../src/i18n/messages/notifications.js';
@@ -268,7 +268,7 @@ test('pushToGuardian: GONE 이면 구독을 지운다', async () => {
   assert.equal(await readSub(ctx, watchKey), null);
 });
 
-test('pushToGuardian: GONE 을 받는 사이 새로 구독했으면 새 구독은 지우지 않는다', async () => {
+test('pushToGuardian: GONE 을 받는 사이 새로 구독했으면 새 구독은 지우지 않고 RETRY 로 알린다', async () => {
   const ctx = testCtx();
   const { watchKey } = await seed(ctx);
   const fresh = { subId: newSubId(), ...subscriptionFixture().subscription, lang: 'en' };
@@ -280,7 +280,8 @@ test('pushToGuardian: GONE 을 받는 사이 새로 구독했으면 새 구독�
     return send(input);
   };
   const r = await pushToGuardian(ctx, watchKey, { kind: PUSH_KIND.OVERDUE, date: TODAY, time: '14:30' });
-  assert.equal(r.outcome, 'GONE');
+  // 예약 처리가 권리만 돌려놓고 다시 불려 새 구독으로 보내게 한다
+  assert.deepEqual(r, { outcome: 'RETRY', statusClass: '404/410' });
   assert.equal((await readSub(ctx, watchKey))?.subId, fresh.subId);
 });
 
@@ -526,6 +527,47 @@ test('armPending: 저장소 장애는 KvError 를 그대로 던진다', async ()
   const seeded = await seed(other);
   failKvWhen(other, (batch) => hasCommand(batch, 'HSET'));
   await assert.rejects(armPending(other, seeded.watchKey, [TODAY]), KvError);
+});
+
+test('armPending: 오늘 함께 있음인 날짜는 걸지 않는다(검토 B2)', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx, { deadlines: ['14:30', '18:00'] });
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.muted, '1');
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY]), { armed: 0, failed: 0 });
+  assert.deepEqual(await armIndexedDates(ctx, [TODAY]), { watches: 1, armed: 0, failed: 0 });
+  assert.equal(ctx.scheduler.calls.length, 0);
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).armed, {});
+});
+
+test('armPending: 지켜보기마다 하루 120건까지 발행하고, 넘으면 이번 호출의 남은 마감을 모두 실패로 센다(검토 I2)', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx, { deadlines: ['14:30', '15:00', '16:00'] });
+  await replaceDays(ctx, watchKey, [{ date: TOMORROW, deadlines: ['10:00'] }]);
+  for (let i = 0; i < 119; i += 1) await hitRate(ctx, 'arm', watchKey);
+  // 120번째는 발행하고, 121번째에서 막히면 그날 남은 마감과 다음 날짜의 마감까지 발행하지 않는다
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 1, failed: 3 });
+  assert.deepEqual(
+    ctx.scheduler.calls.map((c) => `${c.body.d} ${c.body.t}`),
+    [`${TODAY} 14:30`],
+  );
+  // 막힌 뒤로는 계수기를 더 올리지 않는다(121 에서 멈춘다)
+  const counter = ctx.keys.rate(rateKeyOf({ bucket: 'arm', subject: watchKey }, SECRET), Math.floor(ctx.now() / 86_400_000));
+  assert.deepEqual(await ctx.kv.exec([['GET', counter]]), ['121']);
+  // 걸지 못한 마감은 표시가 없어 다음 창(UTC 자정 = 09:00 KST)에 다시 건다
+  ctx.clock.set('2026-11-21T00:00:00Z');
+  assert.deepEqual(await armPending(ctx, watchKey, [TOMORROW]), { armed: 1, failed: 0 });
+});
+
+test('armIndexedDates: 하루 발행 한도는 지켜보기마다 따로 센다', async () => {
+  const ctx = testCtx();
+  const capped = await seed(ctx, { deadlines: ['14:30', '15:00'] });
+  const other = await seed(ctx, { watchId: OTHER_WATCH_ID, deadlines: ['14:30', '15:00'] });
+  for (let i = 0; i < 120; i += 1) await hitRate(ctx, 'arm', capped.watchKey);
+  assert.deepEqual(await armIndexedDates(ctx, [TODAY]), { watches: 2, armed: 2, failed: 2 });
+  assert.deepEqual(
+    ctx.scheduler.calls.map((c) => c.body.k),
+    [other.watchKey, other.watchKey],
+  );
 });
 
 test('armIndexedDates: 색인의 지켜보기를 돌며 걸고, 날짜 기록이 없는 항목은 색인에서 뺀다', async () => {
@@ -1033,6 +1075,133 @@ test('processDue: SKIP_CHANGED(빠진 마감)·SKIP_MUTED·SKIP_NO_SUB·SUB_GONE
     assert.equal(Object.hasOwn(day.armed, '14:30'), false, c.name);
     assert.deepEqual([day.pushed, day.claimed], [[], []], c.name);
   }
+});
+
+test('processDue: 걸림을 지우는 순간 이유가 사라졌으면 retry 가 참이고, 다시 부르면 한 번 보낸다(검토 M2)', async () => {
+  const isClearArmed = (batch) => batch.some((c) => c[0] === 'HDEL' && c.includes(DAY_FIELD.armed('14:30')));
+  const cases = [
+    {
+      name: 'SKIP_CHANGED',
+      async prepare(ctx, watchKey) {
+        await replaceDays(ctx, watchKey, [{ date: TODAY, deadlines: ['18:00'] }]);
+        await setDayField(ctx, watchKey, TODAY, DAY_FIELD.armed('14:30'), 'm1');
+      },
+      // 업로드가 14:30 을 다시 넣었다(목록을 쓴 뒤 다시 걸기가 읽는다)
+      race: (ctx, watchKey, inner) =>
+        inner.exec([['HSET', ctx.keys.day(watchKey, TODAY), DAY_FIELD.deadlines, JSON.stringify(['14:30', '18:00'])]]),
+    },
+    {
+      name: 'SKIP_MUTED',
+      prepare: (ctx, watchKey) => setDayField(ctx, watchKey, TODAY, DAY_FIELD.muted, '1'),
+      race: (ctx, watchKey, inner) => inner.exec([['HDEL', ctx.keys.day(watchKey, TODAY), DAY_FIELD.muted]]),
+    },
+    {
+      name: 'SKIP_NO_SUB',
+      prepare: (ctx, watchKey) => ctx.kv.exec([['DEL', ctx.keys.sub(watchKey)]]),
+      race: (ctx, watchKey) =>
+        writeSub({ ...ctx }, watchKey, { subId: newSubId(), ...subscriptionFixture().subscription, lang: 'ko' }, '2026-11-25'),
+    },
+    {
+      name: 'SUB_GONE',
+      statusClass: '404/410',
+      prepare(ctx) {
+        ctx.push.outcome = 'GONE';
+      },
+      async race(ctx, watchKey, inner) {
+        ctx.push.outcome = 'SENT';
+        await writeSub({ ...ctx, kv: inner }, watchKey, { subId: newSubId(), ...subscriptionFixture().subscription, lang: 'ko' }, '2026-11-25');
+      },
+    },
+  ];
+  for (const c of cases) {
+    const ctx = testCtx();
+    const { watchKey } = await seed(ctx);
+    await armPending(ctx, watchKey, [TODAY]);
+    await c.prepare(ctx, watchKey);
+    ctx.clock.set('2026-11-20T05:40:00Z');
+    let raced = false;
+    const inner = beforeExec(ctx, async (batch, kv) => {
+      if (!raced && isClearArmed(batch)) {
+        raced = true;
+        await c.race({ ...ctx, kv }, watchKey, kv);
+      }
+    });
+    const statusClass = c.statusClass ? { statusClass: c.statusClass } : {};
+    assert.deepEqual(await processDue(ctx, due(watchKey)), { outcome: c.name, retry: true, ...statusClass }, c.name);
+    assert.equal(raced, true, c.name);
+    ctx.kv = inner;
+    const day = await readDay(ctx, watchKey, TODAY);
+    assert.deepEqual([day.pushed, day.claimed, day.armed], [[], [], {}], c.name);
+    // 예약 업체가 다시 부른다
+    const before = ctx.push.sent.length;
+    assert.equal((await processDue(ctx, due(watchKey))).outcome, DUE_OUTCOME.SENT, c.name);
+    assert.equal(ctx.push.sent.length, before + 1, c.name);
+  }
+});
+
+test('processDue: 권리를 얻은 뒤 함께 있음으로 끝내는 순간 꺼졌으면 권리와 걸림을 함께 돌려놓고 다시 부르게 한다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx);
+  await armPending(ctx, watchKey, [TODAY]);
+  ctx.clock.set('2026-11-20T05:40:00Z');
+  const dayKey = ctx.keys.day(watchKey, TODAY);
+  const inner = beforeExec(ctx, async (batch, kv) => {
+    if (isClaim(batch)) await kv.exec([['HSET', dayKey, DAY_FIELD.muted, '1']]);
+    if (batch.some((c) => c[0] === 'HDEL' && c.includes(DAY_FIELD.armed('14:30')))) {
+      // 권리(p:)와 걸림(a:)을 한 HDEL 로 지운다
+      assert.deepEqual(batch[0], ['HDEL', dayKey, DAY_FIELD.pushed('14:30'), DAY_FIELD.armed('14:30')]);
+      await kv.exec([['HDEL', dayKey, DAY_FIELD.muted]]);
+    }
+  });
+  assert.deepEqual(await processDue(ctx, due(watchKey)), { outcome: DUE_OUTCOME.SKIP_MUTED, retry: true });
+  ctx.kv = inner;
+  const day = await readDay(ctx, watchKey, TODAY);
+  assert.deepEqual([day.pushed, day.claimed, day.armed, day.muted], [[], [], {}, false]);
+  assert.equal((await processDue(ctx, due(watchKey))).outcome, DUE_OUTCOME.SENT);
+});
+
+test('processDue: 보내는 사이 새 구독이 들어와 옛 구독이 GONE 이면 새 구독을 지우지 않고 권리만 돌려놓아 다시 부르게 한다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx);
+  await armPending(ctx, watchKey, [TODAY]);
+  ctx.clock.set('2026-11-20T05:40:00Z');
+  const fresh = { subId: newSubId(), ...subscriptionFixture().subscription, endpoint: 'https://updates.push.services.mozilla.com/wpush/v2/new', lang: 'ko' };
+  const send = ctx.push.send.bind(ctx.push);
+  let swapped = false;
+  ctx.push.send = async (input) => {
+    if (!swapped) {
+      swapped = true;
+      await writeSub(ctx, watchKey, fresh, '2026-11-25');
+      ctx.push.sent.push(input);
+      return { outcome: 'GONE', statusClass: '404/410' };
+    }
+    return send(input);
+  };
+  assert.deepEqual(await processDue(ctx, due(watchKey)), { outcome: DUE_OUTCOME.RETRY, retry: true, statusClass: '404/410' });
+  assert.equal((await readSub(ctx, watchKey)).subId, fresh.subId);
+  const day = await readDay(ctx, watchKey, TODAY);
+  assert.deepEqual([day.pushed, day.claimed, day.armed], [[], [], { '14:30': 'm1' }]);
+  assert.equal((await processDue(ctx, due(watchKey))).outcome, DUE_OUTCOME.SENT);
+  assert.equal(ctx.push.sent.at(-1).subscription.endpoint, fresh.endpoint);
+});
+
+test('processDue: 일찍 온 예약은 확인됨·함께 있음보다 먼저 보고 걸림을 남긴 채 다시 부르게 한다(검토 M1)', async () => {
+  for (const field of [DAY_FIELD.confirmed('14:30'), DAY_FIELD.muted]) {
+    const ctx = testCtx();
+    const { watchKey } = await seed(ctx);
+    await armPending(ctx, watchKey, [TODAY]);
+    await setDayField(ctx, watchKey, TODAY, field, '1');
+    ctx.clock.set('2026-11-20T05:30:00Z'); // 14:30 KST, 10분 일찍
+    assert.deepEqual(await processDue(ctx, due(watchKey)), { outcome: DUE_OUTCOME.SKIP_EARLY, retry: true }, field);
+    assert.deepEqual((await readDay(ctx, watchKey, TODAY)).armed, { '14:30': 'm1' }, field);
+  }
+  // 목록에서 빠진 마감은 일찍 와도 걸림을 지우고 끝낸다
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx, { deadlines: ['18:00'] });
+  await setDayField(ctx, watchKey, TODAY, DAY_FIELD.armed('14:30'), 'm9');
+  ctx.clock.set('2026-11-20T05:30:00Z');
+  assert.deepEqual(await processDue(ctx, due(watchKey)), { outcome: DUE_OUTCOME.SKIP_CHANGED, retry: false });
+  assert.deepEqual((await readDay(ctx, watchKey, TODAY)).armed, {});
 });
 
 test('processDue: 보내지 못한 RETRY·SKIP_CAP·SEND_REJECTED 는 보냄 표시를 남기지 않고 걸림 표시는 남긴다', async () => {
