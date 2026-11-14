@@ -29,6 +29,9 @@ import {
 } from './guardian-fixtures.js';
 
 const NOW = '2026-10-01T09:30:00+09:00';
+/** 형식에 맞는 지켜보기 id (22자 base64url, 테스트 전용) */
+const WATCH_ID = 'AbCdEfGhIjKlMnOpQrSt_-';
+const BASE_KEYS = ['v', 'createdAt', 'expiresAt', 'lang', 'days', 'emergency'];
 
 function build(overrides = {}) {
   return buildGuardianSnapshot({
@@ -421,6 +424,41 @@ describe('보호자 외출 (Outing − deadlineReason)', () => {
         ['2026-10-06:G:2', '16:00'],
       ],
     );
+  });
+});
+
+describe('지켜보기 id (서버 알림, 계획 2026-11-15 Task 4 · D7)', () => {
+  test('watchId 를 주면 최상위 키가 v, createdAt, expiresAt, lang, days, emergency, watchId 다', () => {
+    const s = build({ watchId: WATCH_ID });
+    assert.deepEqual(Object.keys(s), [...BASE_KEYS, 'watchId']);
+    assert.equal(s.watchId, WATCH_ID);
+    // 나머지 내용은 watchId 없이 만든 것과 같다
+    const { watchId: _id, ...rest } = s;
+    assert.deepEqual(rest, build());
+  });
+
+  test('watchId 가 없거나 형식이 틀리면(21자, 공백, 숫자) 키 집합은 지금과 같다', () => {
+    const wrong = [undefined, null, WATCH_ID.slice(1), `${WATCH_ID}A`, ' '.repeat(22), `${WATCH_ID.slice(0, 21)} `, 1234567890123456789012, '', 'AbCdEfGhIjKlMnOpQrSt+/'];
+    for (const watchId of wrong) {
+      const s = build({ watchId });
+      assert.deepEqual(Object.keys(s), BASE_KEYS, String(watchId));
+      assert.equal(Object.hasOwn(s, 'watchId'), false, String(watchId));
+    }
+  });
+
+  test('정규화는 맞는 watchId 를 남기고 틀린 watchId 와 다른 새 필드를 버린다', () => {
+    const s = build({ watchId: WATCH_ID });
+    const kept = normalizeGuardianSnapshot(s);
+    assert.deepEqual(kept, s, '만든 스냅샷은 정규화해도 그대로다');
+    assert.deepEqual(Object.keys(kept), [...BASE_KEYS, 'watchId']);
+
+    for (const watchId of [WATCH_ID.slice(1), ' '.repeat(22), 42, { id: WATCH_ID }, [WATCH_ID]]) {
+      const n = normalizeGuardianSnapshot({ ...build(), watchId, writeToken: 'FORBIDDEN_TOKEN', expiresOn: '2026-10-08' });
+      assert.deepEqual(Object.keys(n), BASE_KEYS, JSON.stringify(watchId));
+    }
+    const mixed = normalizeGuardianSnapshot({ ...build(), watchId: WATCH_ID, writeToken: 'FORBIDDEN_TOKEN', lastUploaded: {} });
+    assert.deepEqual(Object.keys(mixed), [...BASE_KEYS, 'watchId']);
+    assert.equal(JSON.stringify(mixed).includes(FORBIDDEN_MARK), false);
   });
 });
 

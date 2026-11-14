@@ -70,6 +70,22 @@ describe('링크 길이 측정', () => {
     assert.deepEqual(await decryptSnapshot(link.split('#')[1], PIN), worstSnapshot(45));
   });
 
+  test('watchId 를 담아도 링크가 8000자 아래다', async (t) => {
+    const watchId = 'AbCdEfGhIjKlMnOpQrSt_-';
+    for (const nights of [7, 14, 45]) {
+      const { stay, tripPlan, now } = makeWorstCase(nights);
+      const snapshot = buildGuardianSnapshot({ stay, tripPlan, now, lang: 'en', watchId });
+      assert.equal(snapshot.watchId, watchId);
+      const size = await measureGuardianLink(snapshot, { origin: ORIGIN });
+      const without = await measureGuardianLink(worstSnapshot(nights), { origin: ORIGIN });
+      t.diagnostic(`${nights}박 watchId: 링크 ${size.linkChars}자 (없으면 ${without.linkChars}자)`);
+      assert.ok(size.linkChars < 8000, `${nights}박 링크 ${size.linkChars}자`);
+      assert.ok(size.linkChars > without.linkChars, 'watchId 만큼 길어진다');
+      const link = buildGuardianLink(ORIGIN, await encryptSnapshot(snapshot, PIN));
+      assert.deepEqual(await decryptSnapshot(link.split('#')[1], PIN), snapshot);
+    }
+  });
+
   test('1박 최악 크기 체류는 2일을 담고 풀린다', async () => {
     const snapshot = worstSnapshot(1);
     assert.equal(snapshot.days.length, 2);
