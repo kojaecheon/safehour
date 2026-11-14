@@ -38,7 +38,10 @@ ADR-0012(`docs/decisions/0012-server-minimal-storage-guardian-push.md`)의 서�
   `SENT`로 끝낸다(알림은 이미 나갔다).
 - **마감 올리기와 '돌아왔어요'는 쓰기 토큰을 먼저 확인하고 센다.** 토큰이 맞으면 `deadlines`·`back`, 틀리거나 모르는 id면
   `deadlinesBad`·`backBad`를 센다. 실패 한도를 미리 엿보고 막지 않는다(그러면 틀린 토큰으로 환자를 다시 막을 수 있다).
-- **예약 발행은 지켜보기당 하루 120건(`arm`)이다.** `armDay`가 발행마다 센다. 넘으면 남은 마감은 실패로 세고 멈춘다.
+- **예약 발행은 지켜보기당 하루 120건(`arm`)이고, 예약 업체가 받은 것만 센다.** `armDay`가 발행 전에 `peekRate`로 엿보고, 받았을 때만
+  걸림 표시를 쓰기 전에 `countRate`로 센다. 한도에 닿으면 남은 마감은 실패로 세고 멈춘다. 실패한 발행은 `armFail`(하루 40건)에 따로
+  센다. 넘으면 그 호출에서 그 지켜보기의 남은 마감을 시도하지 않지만, 다음 호출의 성공은 막지 않는다. 실패를 `arm`에 세면 예약 업체
+  장애 동안의 다시 올리기가 그날의 한도를 써 버려, 업체가 돌아와도 하루 이틀 알림이 나가지 않는다(최종 검토 I1).
   오늘 함께 있음이 켜진 날은 걸지 않는다(끄면 다시 건다).
 - **예약 표시(`a:`)를 지우는 판정은 지우기와 이유 다시 읽기를 한 배치에서 한다**(`clearArmedAndReadDay`,
   `clearArmedAndReadSubExists`). 이유가 사라졌으면 `retry: true`로 다시 부르게 한다. 구독(`writeSub` 뒤 `armPending`),
@@ -84,10 +87,14 @@ ADR-0012(`docs/decisions/0012-server-minimal-storage-guardian-push.md`)의 서�
 - 예약 처리 경로만 순서가 다르다: 본문 읽기(서명 검증용) → 인증(401) → 본문이 JSON 객체인가(400) → 저장소 설정이 없으면 200 →
   필드 형식(400) → 판정. 인증을 저장소 설정과 본문 형식보다 먼저 본다.
 - 보호자 경로(구독, 상태, 함께 있음)는 `SAFEHOUR_WATCH_GUARDIAN_NO_LOGIN`이 `'1'`이 아니면 세션을 요구한다. 해지는 세션을 요구하지 않는다.
+  `'1'`이면 처리기가 ctx 에 `guardianOpen: true`를 넣고, `guardian.js`는 더 엄격한 `subscribeOpen`(하루 3)·`statusOpen`(시간당 30)·
+  `muteOpen`(시간당 10)에 센다(ADR-0012 결정 22). 값이 없거나 참이 아니면 기본 항목이다.
 - VAPID 서명기는 같은 키 묶음이면 인스턴스 안에서 하나를 다시 쓴다(`context.js`). 출처별 JWT 재사용이 요청마다 사라지지 않게 하려는 것이다.
 - 하루 1회 예약은 15:10 UTC(00:10 KST)에 운영 배포에서만 돈다(`vercel.json`). 미리보기에서는 `/api/cron/watch-arm`과
-  `/api/watch/due`를 Bearer로 직접 부른다. 두 라우트는 `maxDuration = 60`이다. 하루 1회 예약은 마감을 하나씩 걸고, Vercel은
-  시간 초과한 예약 실행을 다시 부르지 않는다.
+  `/api/watch/due`를 Bearer로 직접 부른다. 예약 업체를 부르는 다섯 라우트(마감 올리기, 구독, 함께 있음, 예약 처리, 하루 1회 예약)는
+  `maxDuration = 60`이다. 하루 1회 예약은 마감을 하나씩 걸고(동시에 여러 개를 발행하지 않는다), Vercel은 시간 초과한 예약 실행을
+  다시 부르지 않는다. 그래서 `armIndexedDates`는 시작에서 `CRON_BUDGET_MS`(45초)가 지나면 멈추고 `partial: true`를 돌려준다.
+  남은 마감은 다음 업로드나 다음 날의 하루 1회 예약이 건다.
 
 ## 테스트
 

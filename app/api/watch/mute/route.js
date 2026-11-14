@@ -17,5 +17,7 @@ import { createWatchHandlers } from '../../../../lib/server/watch/handlers.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// 끄면 오늘 마감을 다시 건다(예약 업체 발행). 기본 제한에 걸려 끊기지 않게 넉넉히 둔다
+export const maxDuration = 60;
 
 export const POST = createWatchHandlers().mute;

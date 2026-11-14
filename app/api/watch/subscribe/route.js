@@ -24,6 +24,8 @@ import { createWatchHandlers } from '../../../../lib/server/watch/handlers.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// 구독 뒤 이전 기기 알림과 어제·오늘 마감 다시 걸기(예약 업체 발행)가 이어진다. 기본 제한에 걸려 끊기지 않게 넉넉히 둔다
+export const maxDuration = 60;
 
 const handlers = createWatchHandlers();
 

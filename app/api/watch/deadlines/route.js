@@ -20,5 +20,7 @@ import { createWatchHandlers } from '../../../../lib/server/watch/handlers.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// 예약 업체 발행을 마감마다 하나씩(최대 20건) 이어 부른다. 예약 업체가 느리면 기본 제한에 걸려 중간에 끊기지 않게 넉넉히 둔다
+export const maxDuration = 60;
 
 export const PUT = createWatchHandlers().deadlines;

@@ -594,6 +594,39 @@ describe('환자와 보호자 흐름', () => {
     assert.deepEqual(statuses, [200, 200, 200, 200, 200, 429]);
   });
 
+  test('로그인 없는 보호자 설정이면 보호자 경로의 횟수 제한이 더 엄격하다(결정 22)', async () => {
+    const { ctx, h } = setup();
+    await seedPatient(h, ctx);
+    const open = handlersFor(ctx, NO_LOGIN_ENV);
+    const { subscription } = subscriptionFixture();
+    const subscribe = () => open.subscribe(call('POST', '/api/watch/subscribe', subscribeBody(subscription)));
+    const statuses = async (n, make) => {
+      const out = [];
+      for (let i = 0; i < n; i += 1) out.push((await make()).status);
+      return out;
+    };
+    // 구독: 하루 3회
+    const subscribed = await statuses(4, subscribe);
+    assert.deepEqual(subscribed, [200, 200, 200, 429]);
+    const { subId } = await readSub(ctx, WATCH_KEY);
+    // 상태 조회: 시간당 30회
+    const status = () => open.status(call('POST', '/api/watch/status', { watchId: IDS.watchId, subId }));
+    assert.deepEqual(new Set(await statuses(30, status)), new Set([200]));
+    assert.equal((await expectStatus(await status(), 429)).errorCode, 'SAFEHOUR_RATE_LIMITED');
+    // 함께 있음: 시간당 10회
+    const mute = () => open.mute(call('POST', '/api/watch/mute', { watchId: IDS.watchId, subId, on: false }));
+    assert.deepEqual(new Set(await statuses(10, mute)), new Set([200]));
+    await expectStatus(await mute(), 429);
+    // 로그인을 요구하는 기본 설정의 한도(구독 시간당 10, 상태 시간당 120)는 그대로다
+    const guardian = cookieFor(ctx, 'guardian-1');
+    const signedSubscribe = () =>
+      h.subscribe(call('POST', '/api/watch/subscribe', subscribeBody(subscription), { cookie: guardian }));
+    assert.deepEqual(new Set(await statuses(10, signedSubscribe)), new Set([200]));
+    await expectStatus(await signedSubscribe(), 429);
+    const signedStatus = () => h.status(call('POST', '/api/watch/status', { watchId: IDS.watchId }, { cookie: guardian }));
+    assert.deepEqual(new Set(await statuses(31, signedStatus)), new Set([200]));
+  });
+
   test('본문이 16KB 를 넘거나 JSON 이 아니면 400 이다', async () => {
     const { ctx, h } = setup();
     const patient = cookieFor(ctx, 'patient-1');
@@ -1303,7 +1336,14 @@ describe('조립', () => {
   });
 
   test('라우트 파일이 처리기를 내보낸다', async () => {
-    const LONG_RUNNING = new Set(['../app/api/watch/due/route.js', '../app/api/cron/watch-arm/route.js']);
+    // 예약 업체 발행이 이어지는 경로. 마감 올리기·구독·함께 있음은 최종 검토(2026-11-15)에서 더했다
+    const LONG_RUNNING = new Set([
+      '../app/api/watch/deadlines/route.js',
+      '../app/api/watch/subscribe/route.js',
+      '../app/api/watch/mute/route.js',
+      '../app/api/watch/due/route.js',
+      '../app/api/cron/watch-arm/route.js',
+    ]);
     const expected = [
       ['../app/api/push/config/route.js', ['GET']],
       ['../app/api/watch/route.js', ['POST', 'DELETE']],
@@ -1323,7 +1363,7 @@ describe('조립', () => {
       }
       assert.equal(mod.runtime, 'nodejs', path);
       assert.equal(mod.dynamic, 'force-dynamic', path);
-      // 예약 처리와 하루 1회 예약만 실행 시간을 늘린다
+      // 예약 업체를 부르는 다섯 경로만 실행 시간을 늘린다
       assert.equal(mod.maxDuration, LONG_RUNNING.has(path) ? 60 : undefined, path);
     }
   });

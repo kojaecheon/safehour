@@ -426,9 +426,19 @@ describe('watchConfig', () => {
     );
   });
 
-  test('보호 우회 비밀은 VERCEL_AUTOMATION_BYPASS_SECRET 에서 읽는다', () => {
-    assert.equal(watchConfig({ ...FULL, VERCEL_AUTOMATION_BYPASS_SECRET: 'bypass-value' }).protectionBypass, 'bypass-value');
-    assert.equal(watchConfig(FULL).protectionBypass, null);
+  // 최종 검토(2026-11-15)에서 운영은 읽지 않게 바꿨다. 운영 예약 메시지에 미리보기 보호 우회 비밀을 싣지 않는다
+  test('보호 우회 비밀은 운영 배포가 아닐 때만 VERCEL_AUTOMATION_BYPASS_SECRET 에서 읽는다', () => {
+    const bypass = { VERCEL_AUTOMATION_BYPASS_SECRET: 'bypass-value' };
+    for (const vercelEnv of ['preview', 'development', undefined]) {
+      const env = { ...FULL, ...bypass, VERCEL_ENV: vercelEnv };
+      assert.equal(watchConfig(env).protectionBypass, 'bypass-value', String(vercelEnv));
+    }
+    assert.equal(watchConfig({ ...FULL, VERCEL_ENV: 'preview' }).protectionBypass, null);
+    // 운영 배포는 값이 있어도 null 이고, 준비 상태는 그대로다
+    const prod = watchConfig({ ...FULL, ...bypass });
+    assert.equal(FULL.VERCEL_ENV, 'production');
+    assert.equal(prod.protectionBypass, null);
+    assert.equal(prod.ready, true);
   });
 
   test('guardianLoginRequired 는 기본이 참이고 "1" 일 때만 거짓이다', () => {

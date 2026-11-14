@@ -856,6 +856,61 @@ test('함께 있음: 시간당 30회를 넘으면 RATE_LIMITED 다', async () =>
   assert.equal((await readDay(ctx, watchKey, TODAY))?.muted ?? false, false);
 });
 
+// ---- 로그인 없는 보호자 설정(ADR-0012 결정 22) ----
+
+test('로그인 없는 보호자(ctx.guardianOpen): 구독은 지켜보기마다 하루 3회까지다', async () => {
+  const ctx = testCtx();
+  ctx.guardianOpen = true;
+  const watchKey = await seedWatch(ctx);
+  const dev = device();
+  let last = null;
+  for (let i = 0; i < 3; i += 1) {
+    last = await subscribe(ctx, dev);
+    assert.equal(last.ok, true, `${i + 1}번째`);
+  }
+  assert.deepEqual(await subscribe(ctx, dev), RATE_LIMITED);
+  assert.equal((await readSub(ctx, watchKey)).subId, last.subId);
+  // 하루 창이라 한 시간 뒤에도 막히고, 다음 UTC 날짜(09:00 KST)에 다시 받는다
+  ctx.clock.advanceMin(60);
+  assert.deepEqual(await subscribe(ctx, dev), RATE_LIMITED);
+  ctx.clock.set('2026-11-21T00:00:00Z');
+  assert.equal((await subscribe(ctx, dev)).ok, true);
+});
+
+test('로그인 없는 보호자(ctx.guardianOpen): 상태 조회는 시간당 30회, 함께 있음은 시간당 10회까지다', async () => {
+  const ctx = testCtx();
+  ctx.guardianOpen = true;
+  await seedWatch(ctx);
+  const { subId } = await subscribe(ctx, device());
+  for (let i = 0; i < 30; i += 1) assert.equal((await watchStatus(ctx, { watchId: IDS.watchId, subId })).ok, true, `${i + 1}번째`);
+  assert.deepEqual(await watchStatus(ctx, { watchId: IDS.watchId, subId }), RATE_LIMITED);
+  for (let i = 0; i < 10; i += 1) {
+    assert.equal((await muteToday(ctx, { watchId: IDS.watchId, subId, on: i % 2 === 0 })).ok, true, `${i + 1}번째`);
+  }
+  assert.deepEqual(await muteToday(ctx, { watchId: IDS.watchId, subId, on: true }), RATE_LIMITED);
+  ctx.clock.advanceMin(60);
+  assert.equal((await watchStatus(ctx, { watchId: IDS.watchId, subId })).ok, true);
+  assert.equal((await muteToday(ctx, { watchId: IDS.watchId, subId, on: false })).ok, true);
+});
+
+test('로그인 없는 보호자 한도는 ctx.guardianOpen 이 정확히 참일 때만 쓰고, 기본 한도와 따로 센다', async () => {
+  // 참이 아닌 값은 기본(시간당 120회)이다
+  for (const value of [undefined, false, 'true', 1]) {
+    const ctx = testCtx();
+    if (value !== undefined) ctx.guardianOpen = value;
+    await seedWatch(ctx);
+    for (let i = 0; i < 31; i += 1) assert.equal((await watchStatus(ctx, { watchId: IDS.watchId })).ok, true, String(value));
+  }
+  // 엄격한 한도를 다 써도 기본 쪽 계수기는 그대로다(설정을 되돌리면 기본 한도로 다시 센다)
+  const ctx = testCtx();
+  await seedWatch(ctx);
+  ctx.guardianOpen = true;
+  for (let i = 0; i < 30; i += 1) await watchStatus(ctx, { watchId: IDS.watchId });
+  assert.deepEqual(await watchStatus(ctx, { watchId: IDS.watchId }), RATE_LIMITED);
+  ctx.guardianOpen = false;
+  assert.equal((await watchStatus(ctx, { watchId: IDS.watchId })).ok, true);
+});
+
 // ---- 공통 ----
 
 test('찾지 못한 경우는 네 동작 모두 바이트까지 같은 NOT_FOUND 다', async () => {

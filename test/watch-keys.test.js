@@ -194,7 +194,7 @@ test('키가 틀리거나 형식이 아니면 null 이고 던지지 않는다', 
   assert.equal(openJson(sealJson(null, SEAL_KEY), [SEAL_KEY]), null);
 });
 
-// backBad·deadlinesBad·arm 은 서비스 검토(2026-11-15)에서 더했다
+// backBad·deadlinesBad·arm 은 서비스 검토(2026-11-15)에서, armFail 과 로그인 없는 보호자의 *Open 셋은 최종 검토(같은 날)에서 더했다
 test('WATCH_LIMITS 는 계획의 값이고 고쳐지지 않는다', () => {
   assert.deepEqual(WATCH_LIMITS, {
     create: { limit: 10, windowSec: 3600 },
@@ -205,8 +205,12 @@ test('WATCH_LIMITS 는 계획의 값이고 고쳐지지 않는다', () => {
     subscribe: { limit: 10, windowSec: 3600 },
     status: { limit: 120, windowSec: 3600 },
     mute: { limit: 30, windowSec: 3600 },
+    subscribeOpen: { limit: 3, windowSec: 86400 },
+    statusOpen: { limit: 30, windowSec: 3600 },
+    muteOpen: { limit: 10, windowSec: 3600 },
     push: { limit: 20, windowSec: 86400 },
     arm: { limit: 120, windowSec: 86400 },
+    armFail: { limit: 40, windowSec: 86400 },
     maxWatchesPerOwner: 3,
     maxRegistrations: 5,
     maxDays: 46,

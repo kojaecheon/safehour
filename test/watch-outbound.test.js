@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { PUSH_KIND, PUSH_TEXT_KEY, pushPayload } from '../lib/server/watch/text.js';
 import { pushToGuardian, pushToSubscription } from '../lib/server/watch/notify.js';
 import {
+  CRON_BUDGET_MS,
   EARLY_TOLERANCE_MS,
   armIndexedDates,
   armPending,
@@ -539,23 +540,72 @@ test('armPending: 오늘 함께 있음인 날짜는 걸지 않는다(검토 B2)'
   assert.deepEqual((await readDay(ctx, watchKey, TODAY)).armed, {});
 });
 
+/** 지켜보기의 지금 하루 창 계수기 값(없으면 null) */
+async function dailyCount(ctx, bucket, watchKey) {
+  const counter = ctx.keys.rate(rateKeyOf({ bucket, subject: watchKey }, SECRET), Math.floor(ctx.now() / 86_400_000));
+  const [value] = await ctx.kv.exec([['GET', counter]]);
+  return value;
+}
+
+// 최종 검토(2026-11-15)에서 성공한 발행만 세게 바꿨다. 한도에 닿으면 엿보기만 하므로 계수기는 120 에서 멈춘다(예전에는 121)
 test('armPending: 지켜보기마다 하루 120건까지 발행하고, 넘으면 이번 호출의 남은 마감을 모두 실패로 센다(검토 I2)', async () => {
   const ctx = testCtx();
   const { watchKey } = await seed(ctx, { deadlines: ['14:30', '15:00', '16:00'] });
   await replaceDays(ctx, watchKey, [{ date: TOMORROW, deadlines: ['10:00'] }]);
-  for (let i = 0; i < 119; i += 1) await hitRate(ctx, 'arm', watchKey);
+  for (let i = 0; i < 119; i += 1) await countRate(ctx, 'arm', watchKey);
   // 120번째는 발행하고, 121번째에서 막히면 그날 남은 마감과 다음 날짜의 마감까지 발행하지 않는다
   assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 1, failed: 3 });
   assert.deepEqual(
     ctx.scheduler.calls.map((c) => `${c.body.d} ${c.body.t}`),
     [`${TODAY} 14:30`],
   );
-  // 막힌 뒤로는 계수기를 더 올리지 않는다(121 에서 멈춘다)
-  const counter = ctx.keys.rate(rateKeyOf({ bucket: 'arm', subject: watchKey }, SECRET), Math.floor(ctx.now() / 86_400_000));
-  assert.deepEqual(await ctx.kv.exec([['GET', counter]]), ['121']);
+  // 막힌 뒤로는 계수기를 더 올리지 않는다(120 에서 멈춘다). 한도에 막힌 것은 실패한 발행이 아니라 armFail 에도 세지 않는다
+  assert.equal(await dailyCount(ctx, 'arm', watchKey), '120');
+  assert.equal(await dailyCount(ctx, 'armFail', watchKey), null);
+  // 다음 호출도 발행하지 않는다
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 0, failed: 3 });
+  assert.equal(ctx.scheduler.calls.length, 1);
   // 걸지 못한 마감은 표시가 없어 다음 창(UTC 자정 = 09:00 KST)에 다시 건다
   ctx.clock.set('2026-11-21T00:00:00Z');
   assert.deepEqual(await armPending(ctx, watchKey, [TOMORROW]), { armed: 1, failed: 0 });
+});
+
+test('armPending: 예약 업체가 실패한 발행은 arm 한도를 쓰지 않고 armFail 에 센다(최종 검토 I1)', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx, { deadlines: ['14:30', '15:00', '16:00'] });
+  await replaceDays(ctx, watchKey, [{ date: TOMORROW, deadlines: ['10:00'] }]);
+  for (let i = 0; i < 118; i += 1) await countRate(ctx, 'arm', watchKey);
+  // 장애 동안의 실패는 arm 을 늘리지 않는다
+  ctx.scheduler.fail = true;
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 0, failed: 4 });
+  assert.equal(await dailyCount(ctx, 'arm', watchKey), '118');
+  assert.equal(await dailyCount(ctx, 'armFail', watchKey), '4');
+  // 돌아오면 남은 한도(2건)만큼 건다. 성공 한도 120 은 그대로다
+  ctx.scheduler.fail = false;
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 2, failed: 2 });
+  assert.equal(await dailyCount(ctx, 'arm', watchKey), '120');
+  const tries = ctx.scheduler.calls.length;
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 0, failed: 2 });
+  assert.equal(ctx.scheduler.calls.length, tries);
+  assert.equal(await dailyCount(ctx, 'arm', watchKey), '120');
+});
+
+test('armPending: 실패가 하루 40건(armFail)을 넘으면 이번 호출에서는 더 시도하지 않지만, 다음 호출의 성공은 막지 않는다', async () => {
+  const ctx = testCtx();
+  const { watchKey } = await seed(ctx, { deadlines: ['14:30', '15:00', '16:00'] });
+  await replaceDays(ctx, watchKey, [{ date: TOMORROW, deadlines: ['10:00'] }]);
+  for (let i = 0; i < 40; i += 1) await hitRate(ctx, 'armFail', watchKey);
+  ctx.scheduler.fail = true;
+  // 41번째 실패에서 멈추고 남은 셋은 시도하지 않고 실패로 센다
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 0, failed: 4 });
+  assert.equal(ctx.scheduler.calls.length, 1);
+  // 장애가 이어지면 호출마다 한 번만 시도한다
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 0, failed: 4 });
+  assert.equal(ctx.scheduler.calls.length, 2);
+  // 예약 업체가 돌아오면 같은 창 안에서도 모두 건다
+  ctx.scheduler.fail = false;
+  assert.deepEqual(await armPending(ctx, watchKey, [TODAY, TOMORROW]), { armed: 4, failed: 0 });
+  assert.equal(await dailyCount(ctx, 'arm', watchKey), '4');
 });
 
 test('armIndexedDates: 하루 발행 한도는 지켜보기마다 따로 센다', async () => {
@@ -665,6 +715,38 @@ test('armIndexedDates: 지켜보기 레코드는 한 번 부를 때 watchKey 마
   };
   assert.deepEqual(await armIndexedDates(ctx, [TODAY, TOMORROW]), { watches: 1, armed: 2, failed: 0 });
   assert.equal(watchReads.length, 1);
+});
+
+test('armIndexedDates: 시작에서 45초가 지나면 남은 마감은 시도하지도 세지도 않고 partial 로 알린다(최종 검토 M5)', async () => {
+  assert.equal(CRON_BUDGET_MS, 45_000);
+  /** 발행 하나가 10초 걸리는 느린 예약 업체로 바꾸고 원래 것을 돌려준다 */
+  const slowScheduler = (target) => {
+    const original = target.scheduler.schedule;
+    target.scheduler.schedule = async (args) => {
+      target.clock.set(new Date(target.now() + 10_000).toISOString());
+      return original(args);
+    };
+    return original;
+  };
+  const ctx = testCtx();
+  const a = await seed(ctx, { deadlines: ['14:30', '15:00', '16:00', '17:00'] });
+  const b = await seed(ctx, { watchId: OTHER_WATCH_ID, deadlines: ['14:30', '15:00', '16:00', '17:00'] });
+  const inner = slowScheduler(ctx);
+  const first = await armIndexedDates(ctx, [TODAY, TOMORROW]);
+  // 0·10·20·30·40초에 시작한 다섯 건은 걸고, 50초에 멈춘다. 멈춘 뒤의 마감은 failed 로도 세지 않는다
+  assert.deepEqual(first, { watches: 2, armed: 5, failed: 0, partial: true });
+  assert.equal(ctx.scheduler.calls.length, 5);
+  const armedPerWatch = [];
+  for (const { watchKey } of [a, b]) armedPerWatch.push(Object.keys((await readDay(ctx, watchKey, TODAY)).armed).length);
+  assert.deepEqual(armedPerWatch.sort(), [1, 4]);
+  // 다음 실행이 남은 것을 건다
+  ctx.scheduler.schedule = inner;
+  assert.deepEqual(await armIndexedDates(ctx, [TODAY, TOMORROW]), { watches: 2, armed: 3, failed: 0 });
+  // 마감 올리기(armPending)에는 시간 예산이 없다
+  const slow = testCtx();
+  const s = await seed(slow, { deadlines: ['14:30', '15:00', '16:00', '17:00', '18:00', '19:00'] });
+  slowScheduler(slow);
+  assert.deepEqual(await armPending(slow, s.watchKey, [TODAY]), { armed: 6, failed: 0 });
 });
 
 test('cancelMessages 는 예약 업체가 실패해도 던지지 않는다', async () => {

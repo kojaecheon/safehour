@@ -26,7 +26,7 @@ import {
 import { newSubId, ownerHashOf, rateKeyOf, watchKeyOf, writeHashOf } from '../lib/server/watch/keys.js';
 import { KvError } from '../lib/server/watch/kv.js';
 import { DUE_OUTCOME, processDue } from '../lib/server/watch/due.js';
-import { EARLY_TOLERANCE_MS, fireAtMs } from '../lib/server/watch/arm.js';
+import { EARLY_TOLERANCE_MS, armIndexedDates, fireAtMs } from '../lib/server/watch/arm.js';
 import { WATCH_LIMITS, hitRate } from '../lib/server/watch/limits.js';
 import { translate } from '../src/i18n/index.js';
 import { IDS, SECRET, subscriptionFixture, testCtx } from './watch-fixtures.js';
@@ -745,6 +745,46 @@ test('마감: 한 계정이 지켜보기 셋에 마감 목록을 번갈아 올�
   assert.equal(ctx.scheduler.calls.length, 3 * WATCH_LIMITS.arm.limit);
   // 걸지 못한 마감은 armFailed 로 알린다
   assert.ok(failedReported > 0);
+});
+
+test('마감: 예약 업체 장애 동안 여섯 번 다시 올려도, 돌아온 뒤의 업로드와 하루 1회 예약이 모두 건다(최종 검토 I1)', async () => {
+  const TEN = ['12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'];
+  const DAY_AFTER = '2026-11-22';
+  const days = [TODAY, TOMORROW, DAY_AFTER].map((date) => ({ date, deadlines: TEN }));
+  /** 10:00 KST 에 등록하고, 장애 동안 1분 간격으로 같은 전체를 여섯 번 올린다 */
+  async function outage() {
+    const ctx = testCtx({ at: '2026-11-20T01:00:00Z' });
+    await register(ctx);
+    ctx.scheduler.fail = true;
+    for (let i = 0; i < 6; i += 1) {
+      ctx.clock.advanceMin(1);
+      // 오늘·내일 스무 건을 걸지 못한다
+      assert.deepEqual(await deadlines(ctx, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 20 });
+    }
+    // 실패 한도(하루 40)를 넘긴 뒤로는 업로드마다 한 번만 시도한다: 20 + 20 + 1 + 1 + 1 + 1
+    assert.equal(ctx.scheduler.calls.length, 44);
+    ctx.scheduler.fail = false;
+    return ctx;
+  }
+  const armedCount = async (ctx, date) => Object.keys((await readDay(ctx, WATCH_KEY, date)).armed).length;
+
+  // 돌아온 뒤 다음 업로드가 오늘·내일 스무 건을 모두 건다
+  const upload = await outage();
+  upload.clock.advanceMin(5);
+  const before = upload.scheduler.calls.length;
+  assert.deepEqual(await deadlines(upload, days), { ok: true, expiresOn: EXPIRES_ON, armFailed: 0 });
+  assert.equal(upload.scheduler.calls.length - before, 20);
+  assert.deepEqual([await armedCount(upload, TODAY), await armedCount(upload, TOMORROW)], [10, 10]);
+  // 같은 UTC 창의 하루 1회 예약(00:10 KST)이 모레 열 건을 건다
+  upload.clock.set('2026-11-20T15:10:00Z');
+  assert.deepEqual(await armIndexedDates(upload, [TODAY, TOMORROW, DAY_AFTER]), { watches: 1, armed: 10, failed: 0 });
+  assert.equal(await armedCount(upload, DAY_AFTER), 10);
+
+  // 업로드 없이 하루 1회 예약만 돌아도 장애 동안 걸지 못한 마감을 모두 건다(오늘 마감은 늦은 한도가 지났다)
+  const cron = await outage();
+  cron.clock.set('2026-11-20T15:10:00Z');
+  assert.deepEqual(await armIndexedDates(cron, [TODAY, TOMORROW, DAY_AFTER]), { watches: 1, armed: 20, failed: 0 });
+  assert.deepEqual([await armedCount(cron, TOMORROW), await armedCount(cron, DAY_AFTER)], [10, 10]);
 });
 
 test('마감: 쓰기 토큰 없이 61번 틀려도 환자의 진짜 업로드는 막히지 않는다(검토 N8)', async () => {
