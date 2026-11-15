@@ -13,6 +13,7 @@
 //     stop() 은 타이머와 구독을 지운다
 //   - 끄기(retire)는 진행 중 요청이 끝난 뒤 저장소 retireGuardianWatch 와 서버 삭제 대기를 부르고 { ok, pending } 을 돌려준다.
 //     쓰기 가능하지 않거나 옮기지 못하면 ok: false 이고 아무것도 바꾸지 않는다. 서버 지우기(removeAll)
+//   - 등록·끄기에 accountKey 를 넘기면, 줄 서 있던 일이 시작될 때 계정이 다르면 아무것도 하지 않고 UNAVAILABLE 이다(A-3 검토)
 //   - 'open' 계기는 실행기 하나에 한 번. 대기열을 쓰지 못한 누르기·되돌리기는 FAILED·UNDO_FAILED. 되돌리기는 ON 에서만
 //
 // 저장소는 메모리, 시계·타이머·난수·요청 함수는 주입한다. 가짜 요청 함수는 진짜 요청 모양(src/guardian/watchRequests.js)으로
@@ -524,6 +525,42 @@ describe('등록', () => {
     await sameAccount.store.retryPendingServerDelete();
     assert.deepEqual(sameAccount.deletes, []);
     assert.deepEqual(sameAccount.store.readPendingServerDelete(), []);
+  });
+
+  test('등록: accountKey 를 넘겼는데 앞선 비우기를 기다리는 사이 다른 계정으로 바뀌면 아무것도 하지 않고 UNAVAILABLE 이다(A-3 검토)', async () => {
+    // A(ACCOUNT)의 마감을 올리는 중에 링크 만들기가 등록을 줄 세웠고, 그 일이 시작되기 전에 B 가 들어왔다. B 에게는 체류·일정이 있다
+    const h = harness({ record: watchRecord() });
+    const gate = deferred();
+    h.api.reply('deadlines', async (input) => {
+      await gate.promise;
+      return ok({ expiresOn: input.expiresOn, armFailed: 0 });
+    });
+    const run = h.sync.kick('plan');
+    await until(() => h.api.open === 1);
+    const pending = h.sync.ensureRegistered({ stay: h.store.readStay(), accountKey: ACCOUNT });
+    h.store.setSession({ authenticated: true, accountKey: 'acct_watch_sync_test_0002', expiresAt: new Date(h.clock.now() + HOUR).toISOString() });
+    assert.equal(h.store.writeStay(makeStay()).ok, true);
+    assert.equal(h.store.writeTripPlan(basePlan()).ok, true);
+    gate.resolve();
+    await run;
+    assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' });
+    await h.sync.idle();
+    assert.deepEqual(h.api.names(), ['deadlines'], 'B 로 등록하지 않고 B 의 마감도 올리지 않는다(B 는 켜지 않았다)');
+    assert.equal(h.store.readGuardianWatch(), null, 'B 에게 지켜보기가 생기지 않는다');
+    assert.deepEqual(h.writes, []);
+    await h.store.retryPendingServerDelete();
+    assert.deepEqual(h.deletes, []);
+    assert.deepEqual(h.store.readPendingServerDelete(), []);
+    signIn(h.store, h.clock);
+    assert.equal(h.store.readGuardianWatch().watchId, W1.watchId, 'A 의 지켜보기는 그대로다');
+
+    // 일이 시작될 때 계정이 넘긴 것과 같으면 예전처럼 등록한다
+    const same = harness();
+    const result = await same.sync.ensureRegistered({ stay: same.store.readStay(), accountKey: ACCOUNT });
+    await same.sync.idle();
+    assert.equal(result.ok, true);
+    assert.deepEqual(same.api.names(), ['register', 'deadlines']);
+    assert.equal(same.store.readGuardianWatch().watchId, result.watchId);
   });
 });
 
@@ -1633,6 +1670,66 @@ describe('끄기와 서버 지우기', () => {
     const none = harness();
     assert.deepEqual(await none.sync.retire(), { ok: true, pending: false });
     assert.deepEqual(none.deletes, []);
+  });
+
+  test('retire: 삭제 대기에 같은 watchId 의 보호자 구독 해지 항목({ watchId, subId })만 남으면 pending: false 다', async () => {
+    // 구독 해지 항목은 지켜보기 삭제가 아니다. 지금 저장소의 정규화는 그 항목을 버리므로 대기를 읽는 함수를 바꿔 끼운다
+    const unsubscribe = Object.freeze({ watchId: W1.watchId, subId: 'SUBsyncFixture_0123-ab' });
+    const withUnsubscribe = (h) =>
+      createWatchSync({
+        store: { ...h.store, readPendingServerDelete: () => [...h.store.readPendingServerDelete(), unsubscribe] },
+        api: h.api,
+        now: h.clock.now,
+      });
+
+    const h = harness({ record: watchRecord() });
+    assert.deepEqual(await withUnsubscribe(h).retire(), { ok: true, pending: false });
+    assert.deepEqual(h.deletes, [{ ...W1 }]);
+
+    // 지켜보기 삭제가 남았으면 그대로 pending: true 다
+    const failing = harness({
+      record: watchRecord(),
+      deleteReply: () => {
+        throw new TypeError('network down');
+      },
+    });
+    assert.deepEqual(await withUnsubscribe(failing).retire(), { ok: true, pending: true });
+  });
+
+  test('retire: accountKey 를 넘겼는데 앞선 비우기를 기다리는 사이 다른 계정으로 바뀌면 그 계정의 지켜보기를 끄지 않는다(A-3 검토)', async () => {
+    const other = 'acct_watch_sync_test_0002';
+    const signInOther = (h) => h.store.setSession({ authenticated: true, accountKey: other, expiresAt: new Date(h.clock.now() + HOUR).toISOString() });
+    const h = harness({ record: watchRecord() });
+    // B 에게도 켜진 지켜보기(W2)가 있다
+    signInOther(h);
+    assert.equal(h.store.writeGuardianWatch(watchRecord({ ...W2 })).ok, true);
+    signIn(h.store, h.clock);
+    const gate = deferred();
+    h.api.reply('deadlines', async (input) => {
+      await gate.promise;
+      return ok({ expiresOn: input.expiresOn, armFailed: 0 });
+    });
+    const run = h.sync.kick('plan');
+    await until(() => h.api.open === 1);
+    const retired = h.sync.retire({ accountKey: ACCOUNT });
+    signInOther(h);
+    gate.resolve();
+    await run;
+    assert.deepEqual(await retired, { ok: false, reason: 'UNAVAILABLE' });
+    await h.sync.idle();
+    assert.equal(h.store.readGuardianWatch().watchId, W2.watchId, 'B 의 지켜보기는 켜진 그대로다');
+    assert.equal(h.store.readGuardianWatch().state, 'ON');
+    await h.store.retryPendingServerDelete();
+    assert.deepEqual(h.deletes, [], 'B 의 지켜보기에 DELETE 를 보내지 않는다');
+    assert.deepEqual(h.store.readPendingServerDelete(), []);
+    signIn(h.store, h.clock);
+    assert.equal(h.store.readGuardianWatch().watchId, W1.watchId, 'A 의 지켜보기도 그대로다(다시 끌 수 있다)');
+
+    // 일이 시작될 때 계정이 넘긴 것과 같으면 예전처럼 끈다
+    const same = harness({ record: watchRecord() });
+    assert.deepEqual(await same.sync.retire({ accountKey: ACCOUNT }), { ok: true, pending: false });
+    assert.equal(same.store.readGuardianWatch(), null);
+    assert.deepEqual(same.deletes, [{ ...W1 }]);
   });
 
   test('removeAll: OK 면 레코드를 지우고 deleted 를 돌려준다, 401 은 LOGIN_REQUIRED', async () => {

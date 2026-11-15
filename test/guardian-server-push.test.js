@@ -10,6 +10,8 @@
 //   - 링크 만들기 순서(submitWithServerPush, 화면 검토 M9): 등록이 스냅샷보다 먼저이고 등록한 id 를 싣는다. 숨은 항목은 켜진
 //     지켜보기의 id 만 싣고 요청하지 않는다. 끄기 실패·등록 실패는 링크를 막지 않는다(id 없음). 비우기는 링크를 만든 뒤에 건다
 //   - 기다리는 동안 계정이 바뀌면 공유 기록을 쓰지 않고 던진다(A-2 마지막 검토, 앞 계정의 사본이 바뀐 계정의 저장소에 쓰이지 않게)
+//   - 첫 기다림 전에 읽은 계정 키를 켜기·끄기에 넘긴다. 줄 선 일이 시작될 때 계정이 바뀌었으면 바뀐 계정의 지켜보기를 켜거나
+//     끄지 않는다(A-3 검토, 실제 저장소와 실행기로 확인)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,9 +28,14 @@ import {
   serverPushSubmitPlan,
   submitWithServerPush,
 } from '../components/guardian/serverPush.js';
+import { createMemoryStorage, createStore } from '../lib/store/index.js';
+import { createWatchSync } from '../lib/trip/watchSync.js';
+import { WATCH_KIND, WATCH_PATHS } from '../src/guardian/watchRequests.js';
 import { messages as guardianMessages, safety as guardianSafety } from '../src/i18n/messages/guardian.js';
 import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { LANGS } from '../src/i18n/index.js';
+import { makeDayPlan, patientOuting } from './guardian-fixtures.js';
+import { makeStay } from './stay-fixtures.js';
 
 const WATCH_ID = 'AAAAAAAAAAAAAAAAAAAAAA';
 
@@ -299,8 +306,40 @@ describe('링크 만들기 순서 (submitWithServerPush, 화면 검토 M9)', () 
       },
       readAccountKey: () => 'acct_a',
     });
-    assert.deepEqual(sync.log, [['ensureRegistered', { stay: STAY }], ['makeLink', WATCH_ID], ['saveLink', WATCH_ID], ['kick', 'register']]);
+    // 첫 기다림 전에 읽은 계정 키를 등록에 넘긴다(A-3 검토: 줄 서 있던 등록이 시작될 때 계정이 다르면 실행기가 등록하지 않는다)
+    assert.deepEqual(sync.log, [
+      ['ensureRegistered', { stay: STAY, accountKey: 'acct_a' }],
+      ['makeLink', WATCH_ID],
+      ['saveLink', WATCH_ID],
+      ['kick', 'register'],
+    ]);
     assert.deepEqual(made.saved, { ok: true });
+  });
+
+  test('계정 키를 받으면 실행기의 켜기·끄기에 넘기고, 받지 않으면 넘기지 않는다', async () => {
+    const seen = [];
+    const sync = {
+      ensureRegistered: async (input) => {
+        seen.push(['ensureRegistered', input]);
+        return { ok: true, watchId: WATCH_ID };
+      },
+      retire: async (input) => {
+        seen.push(['retire', input]);
+        return { ok: true, pending: false };
+      },
+    };
+    const register = { action: SERVER_PUSH_ACTION.REGISTER, watchId: null };
+    const retire = { action: SERVER_PUSH_ACTION.RETIRE, watchId: null };
+    await applyServerPush(register, { stay: STAY, sync, accountKey: 'acct_a' });
+    await applyServerPush(retire, { stay: STAY, sync, accountKey: 'acct_a' });
+    await applyServerPush(register, { stay: STAY, sync });
+    await applyServerPush(retire, { stay: STAY, sync });
+    assert.deepEqual(seen, [
+      ['ensureRegistered', { stay: STAY, accountKey: 'acct_a' }],
+      ['retire', { accountKey: 'acct_a' }],
+      ['ensureRegistered', { stay: STAY }],
+      ['retire', {}],
+    ]);
   });
 
   test('등록·끄기·링크를 기다리는 동안 계정이 바뀌면 기록하지 않고 SUBMIT_ACCOUNT_CHANGED 를 던진다(값 없는 메시지, 비우기 없음)', async () => {
@@ -375,6 +414,130 @@ describe('링크 만들기 순서 (submitWithServerPush, 화면 검토 M9)', () 
     });
     assert.deepEqual(reads, ['acct_a', 'register', 'acct_a']);
     assert.deepEqual(made.saved, { ok: true });
+  });
+});
+
+describe('링크 만들기 중 계정 전환 (실제 저장소·실행기, A-3 검토)', () => {
+  // 같은 기기의 A·B 두 계정. A 의 마감 올리기가 도는 동안 A 가 만들기를 누르고(켜기·끄기가 그 뒤에 줄 선다), 다른 탭에서 B 가
+  // 로그인한 것을 이 탭이 받아들인 뒤에 줄 선 일이 시작된다. 식별 값은 형식만 맞춘 테스트 값이다
+  const A = 'acct_server_push_test_A01';
+  const B = 'acct_server_push_test_B02';
+  const TODAY = '2026-10-02';
+  const WA = Object.freeze({ watchId: 'WATCHpushFixtureA_01ab', writeToken: 'WRITEpushFixtureA_0123456789-abcdefghijklmn' });
+  const WB = Object.freeze({ watchId: 'WATCHpushFixtureB_02cd', writeToken: 'WRITEpushFixtureB_9876543210-onmlkjihgfedcb' });
+
+  async function until(predicate) {
+    for (let i = 0; i < 1000 && !predicate(); i += 1) await Promise.resolve();
+    assert.ok(predicate(), '조건에 닿지 않았다');
+  }
+
+  /** 두 계정 모두 체류·일정이 있고 A 는 지켜보기가 켜져 있다(B 는 bWatch 일 때만). 마지막 로그인은 A 다 */
+  function twoAccounts({ bWatch }) {
+    const clock = { ms: Date.parse(`${TODAY}T12:00:00+09:00`), now: () => clock.ms };
+    const deletes = [];
+    const store = createStore({
+      storage: createMemoryStorage(),
+      now: clock.now,
+      fetchImpl: async (url, init = {}) => {
+        if (url === WATCH_PATHS.watch && init.method === 'DELETE') deletes.push(JSON.parse(init.body));
+        return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } });
+      },
+    });
+    store.setOnline(true);
+    const login = (accountKey) =>
+      store.setSession({ authenticated: true, accountKey, expiresAt: new Date(clock.now() + 7 * 24 * 3600_000).toISOString() });
+    const plan = { days: { [TODAY]: makeDayPlan(TODAY, { outings: [patientOuting({ departAt: '10:00', returnBy: '12:30' })] }) } };
+    for (const [accountKey, ids] of [
+      [B, bWatch ? WB : null],
+      [A, WA],
+    ]) {
+      login(accountKey);
+      assert.equal(store.writeStay(makeStay()).ok, true);
+      assert.equal(store.writeTripPlan(plan).ok, true);
+      if (ids) {
+        const record = { ...ids, expiresOn: '2026-10-08', lastUploaded: {}, uploadPending: true, backQueue: [], confirmed: [], state: 'ON' };
+        assert.equal(store.writeGuardianWatch(record).ok, true);
+      }
+    }
+    const reply = (data) => ({ ok: true, status: 200, data: { ok: true, ...data }, kind: WATCH_KIND.OK });
+    let release;
+    const held = new Promise((resolve) => {
+      release = resolve;
+    });
+    const calls = [];
+    const api = {
+      config: async () => reply({ enabled: true }),
+      register: async (input) => {
+        calls.push(['register', input.watchId]);
+        return reply({ expiresOn: input.expiresOn });
+      },
+      deadlines: async (input) => {
+        calls.push(['deadlines', input.watchId]);
+        await held;
+        return reply({ expiresOn: input.expiresOn, armFailed: 0 });
+      },
+      back: async () => reply({ recorded: true }),
+      removeAll: async () => reply({ deleted: 0 }),
+    };
+    const runner = createWatchSync({ store, api, now: clock.now, randomBytes: (n) => new Uint8Array(n).fill(7) });
+    const kicks = [];
+    const sync = {
+      ...runner,
+      kick: (reason) => {
+        kicks.push(reason);
+        return runner.kick(reason);
+      },
+    };
+    return { store, runner, sync, calls, deletes, kicks, login, release };
+  }
+
+  /** A 의 마감 올리기를 붙잡아 둔 채 만들기를 누르고, B 로 바꾼 뒤 올리기를 놓는다. submitWithServerPush 가 던진 오류를 돌려준다 */
+  async function submitWhileSwitching(h, option) {
+    void h.runner.kick('plan');
+    await until(() => h.calls.length === 1);
+    const submitting = submitWithServerPush({
+      option,
+      stay: h.store.readStay(),
+      sync: h.sync,
+      makeLink: async (watchId) => ({ link: 'L', watchId }),
+      saveLink: () => ({ ok: true }),
+      readAccountKey: () => h.store.getStatus().accountKey,
+    }).then(
+      () => null,
+      (err) => err,
+    );
+    h.login(B);
+    h.release();
+    const error = await submitting;
+    await h.runner.idle();
+    await h.store.retryPendingServerDelete();
+    return error;
+  }
+
+  test('끄기: 줄 선 끄기가 시작될 때 B 로 바뀌었으면 B 의 지켜보기를 끄지 않고 DELETE 도 보내지 않는다', async () => {
+    const h = twoAccounts({ bWatch: true });
+    const error = await submitWhileSwitching(h, { visible: true, checked: false, state: 'ON', watchId: WA.watchId });
+    assert.equal(error?.code, SUBMIT_ACCOUNT_CHANGED);
+    assert.equal(h.store.readGuardianWatch()?.watchId, WB.watchId, 'B 의 지켜보기는 켜진 그대로다');
+    assert.equal(h.store.readGuardianWatch()?.state, 'ON');
+    assert.deepEqual(h.deletes, [], 'B 의 지켜보기에 DELETE 를 보내지 않는다');
+    assert.deepEqual(h.store.readPendingServerDelete(), []);
+    assert.deepEqual(h.kicks, [], '링크 만들기는 비우기를 걸지 않는다');
+    h.login(A);
+    assert.equal(h.store.readGuardianWatch()?.watchId, WA.watchId, 'A 의 지켜보기도 그대로다(일반 실패 줄을 보고 다시 만든다)');
+  });
+
+  test('켜기: 줄 선 등록이 시작될 때 B 로 바뀌었으면 B 로 등록하지 않고 B 의 마감도 올리지 않는다(B 는 동의하지 않았다)', async () => {
+    const h = twoAccounts({ bWatch: false });
+    const error = await submitWhileSwitching(h, { visible: true, checked: true, state: 'ON', watchId: WA.watchId });
+    assert.equal(error?.code, SUBMIT_ACCOUNT_CHANGED);
+    assert.deepEqual(h.calls, [['deadlines', WA.watchId]], 'A 의 올리기 하나뿐이다(등록도 B 의 올리기도 없다)');
+    assert.equal(h.store.readGuardianWatch(), null, 'B 에게 지켜보기가 생기지 않는다');
+    assert.deepEqual(h.deletes, []);
+    assert.deepEqual(h.store.readPendingServerDelete(), []);
+    assert.deepEqual(h.kicks, [], '링크 만들기는 비우기를 걸지 않는다');
+    h.login(A);
+    assert.equal(h.store.readGuardianWatch()?.watchId, WA.watchId);
   });
 });
 

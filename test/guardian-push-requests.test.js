@@ -144,6 +144,7 @@ describe('구독 요청 (subscribeRequest)', () => {
       { p256dh: keyOf(66), auth: AUTH },
       { p256dh: keyOf(65, 0x03), auth: AUTH },
       { p256dh: `${P256DH}=`, auth: `${AUTH}==` },
+      { p256dh: `${P256DH}==`, auth: `${AUTH}=` },
       { p256dh: `${P256DH}===`, auth: AUTH },
       { p256dh: P256DH, auth: keyOf(15, 0x11) },
       { p256dh: P256DH, auth: keyOf(17, 0x11) },
