@@ -13,7 +13,7 @@
 //     stop() 은 타이머와 구독을 지운다
 //   - 끄기(retire)는 진행 중 요청이 끝난 뒤 저장소 retireGuardianWatch 와 서버 삭제 대기를 부르고 { ok, pending } 을 돌려준다.
 //     쓰기 가능하지 않거나 옮기지 못하면 ok: false 이고 아무것도 바꾸지 않는다. 서버 지우기(removeAll)
-//   - 등록·끄기에 accountKey 를 넘기면, 줄 서 있던 일이 시작될 때 계정이 다르면 아무것도 하지 않고 UNAVAILABLE 이다(A-3 검토)
+//   - 등록·끄기·서버 지우기에 accountKey 를 넘기면, 줄 서 있던 일이 시작될 때 계정이 다르면 아무것도 하지 않고 UNAVAILABLE 이다(A-3 검토)
 //   - 'open' 계기는 실행기 하나에 한 번. 대기열을 쓰지 못한 누르기·되돌리기는 FAILED·UNDO_FAILED. 되돌리기는 ON 에서만
 //
 // 저장소는 메모리, 시계·타이머·난수·요청 함수는 주입한다. 가짜 요청 함수는 진짜 요청 모양(src/guardian/watchRequests.js)으로
@@ -1773,6 +1773,43 @@ describe('끄기와 서버 지우기', () => {
     gate.resolve();
     assert.deepEqual(await pending, { ok: true, deleted: 1 });
     assert.equal(h.store.readGuardianWatch().watchId, W2.watchId, '다른 계정의 레코드는 그대로다');
+  });
+
+  test('removeAll: accountKey 를 넘겼는데 앞선 비우기를 기다리는 사이 다른 계정으로 바뀌면 서버 지우기를 보내지 않는다(A-3 검토)', async () => {
+    // 설정 화면을 그린 계정(A)이 누른 뒤, A 의 마감 올리기를 기다리는 사이 B 가 들어왔다. 보내면 B 의 세션으로 B 의 지켜보기가 모두 지워진다
+    const other = 'acct_watch_sync_test_0002';
+    const signInOther = (h) => h.store.setSession({ authenticated: true, accountKey: other, expiresAt: new Date(h.clock.now() + HOUR).toISOString() });
+    const h = harness({ record: watchRecord() });
+    signInOther(h);
+    assert.equal(h.store.writeGuardianWatch(watchRecord({ ...W2 })).ok, true);
+    signIn(h.store, h.clock);
+    const gate = deferred();
+    h.api.reply('deadlines', async (input) => {
+      await gate.promise;
+      return ok({ expiresOn: input.expiresOn, armFailed: 0 });
+    });
+    const run = h.sync.kick('plan');
+    await until(() => h.api.open === 1);
+    const removed = h.sync.removeAll({ accountKey: ACCOUNT });
+    signInOther(h);
+    gate.resolve();
+    await run;
+    assert.deepEqual(await removed, { ok: false, reason: 'UNAVAILABLE' });
+    await h.sync.idle();
+    assert.deepEqual(h.api.names(), ['deadlines'], 'B 의 세션으로 서버 지우기를 보내지 않는다');
+    assert.equal(h.store.readGuardianWatch().watchId, W2.watchId, 'B 의 지켜보기는 그대로다');
+    assert.deepEqual(h.writes, []);
+    await h.store.retryPendingServerDelete();
+    assert.deepEqual(h.deletes, []);
+    assert.deepEqual(h.store.readPendingServerDelete(), []);
+    signIn(h.store, h.clock);
+    assert.equal(h.store.readGuardianWatch().watchId, W1.watchId, 'A 의 지켜보기도 그대로다(다시 지울 수 있다)');
+
+    // 일이 시작될 때 계정이 넘긴 것과 같으면 예전처럼 지운다
+    const same = harness({ record: watchRecord() });
+    assert.deepEqual(await same.sync.removeAll({ accountKey: ACCOUNT }), { ok: true, deleted: 1 });
+    assert.deepEqual(same.api.names(), ['removeAll']);
+    assert.equal(same.store.readGuardianWatch(), null);
   });
 
   test('config: 한 번 읽고 5분 기억한다, 실패는 { enabled: false, checked: false } 이고 기억하지 않는다', async () => {

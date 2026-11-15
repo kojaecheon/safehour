@@ -8,8 +8,8 @@
 // - 보이는 조건과 버튼을 누를 수 있는지는 serverPushView.js 하나가 정한다. 스위치가 꺼져 있고 이 기기에 지켜보기 레코드가
 //   없으면 아무것도 그리지 않는다. 끄거나 지운 뒤 절이 숨을 조건이 되어도 결과 줄을 보일 동안은 그 줄만 남긴다.
 // - 끄기는 확인 시트 뒤 실행기 retire()(동의 철회와 같은 모양, 화면 검토 M6), 서버 지우기는 확인 시트 뒤 removeAll()(로그인 계정의
-//   지켜보기를 모두 지운다). 요청은 실행기가 보낸다. 끄기는 절을 그린 계정 키를 넘긴다(앞선 요청을 기다리는 사이 계정이 바뀌면
-//   실행기가 끄지 않는다, A-3 검토). 두 시트는 하나씩만 열리고, 열린 시트는 설정 화면이 sheet 로 들고 있다.
+//   지켜보기를 모두 지운다). 요청은 실행기가 보낸다. 끄기와 서버 지우기는 절을 그린 계정 키를 넘긴다(앞선 요청을 기다리는 사이
+//   계정이 바뀌면 실행기가 끄거나 지우지 않는다, A-3 검토). 두 시트는 하나씩만 열리고, 열린 시트는 설정 화면이 sheet 로 들고 있다.
 //   시트가 열린 채 절이 숨거나(스위치 꺼짐, 다른 탭에서 레코드 지움) 끌 레코드가 사라지면, 또는 이 절이 사라지면 그 상태를 비운다
 //   (serverPushOpenSheet). 남기면 다른 절이 inert 로 막힌 채 남는다.
 // - 처리 중에는 누른 버튼을 disabled 대신 loading 으로 막아 포커스를 지킨다(Button 계약, 화면 검토 M8).
@@ -81,7 +81,7 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
     setBusy('removeAll');
     let result = null;
     try {
-      result = (await getWatchSync()?.removeAll()) ?? null;
+      result = (await getWatchSync()?.removeAll({ accountKey: status.accountKey })) ?? null;
     } catch {
       result = null;
     } finally {
