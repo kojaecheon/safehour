@@ -6,7 +6,8 @@
 //   serverPushResultKeys(result)                              링크를 만든 뒤 결과 줄 문구 키(등록)
 //   serverPushRetireKeys(result)                              링크를 만든 뒤 결과 줄 안전 문구 키(끄기)
 //   applyServerPush(plan, { stay, sync })                     계획대로 지켜보기를 켜거나 끄고 스냅샷에 실을 watchId 를 준다
-//   submitWithServerPush({ option, stay, sync, makeLink })    링크 만들기 순서(지켜보기 먼저, 그 id 로 링크, 그다음 비우기)
+//   submitWithServerPush({ option, stay, sync, makeLink, saveLink, readAccountKey })
+//                                                             링크 만들기 순서(지켜보기 먼저, 그 id 로 링크, 계정을 다시 보고 기록, 그다음 비우기)
 //   SERVER_PUSH_CONSENT_KEYS                                  동의 목록 문구 키(설계서 5.5)
 //
 // 정한 것
@@ -20,6 +21,8 @@
 //   - 끄기가 실패해도 링크는 만들고(watchId 없음) 끄지 못했다는 줄을 보인다. 서버 삭제가 남았으면 그 전까지 보호자에게
 //     알림이 갈 수 있다는 줄을, 이 기기와 서버 모두에서 껐으면 껐다는 줄을 보인다(작업 7 검토 반영, 화면 검토 M10).
 //   - 순서: 지켜보기를 켜거나 끈 결과의 watchId 로 스냅샷을 만든다(등록이 스냅샷보다 먼저다). 링크를 만든 뒤에 비우기를 건다.
+//   - 기다리는 동안(등록·끄기·암호화) 계정이 바뀌면 공유 기록을 쓰지 않고 링크도 보이지 않는다(일반 실패 줄). 스냅샷은 양식을 그린
+//     계정의 것이라 바뀐 계정의 저장소에 쓰면 안 된다.
 //
 // React·저장소·네트워크를 직접 쓰지 않는다. 동기화 실행기(getWatchSync())는 부르는 쪽이 넣는다.
 // node --test 가 읽으므로 상대 경로로만 불러온다.
@@ -153,21 +156,34 @@ export async function applyServerPush(plan, { stay, sync } = {}) {
   return { watchId: plan?.watchId ?? null, serverPush: null, serverPushRetire: null };
 }
 
+/** 링크를 만드는 동안 계정이 바뀌어 기록도 표시도 하지 않았다(submitWithServerPush 가 던지는 오류의 code). 화면은 일반 실패 줄을 보인다 */
+export const SUBMIT_ACCOUNT_CHANGED = 'GUARDIAN_SUBMIT_ACCOUNT_CHANGED';
+
 /**
  * 보호자 링크 만들기 순서. 항목 상태로 계획을 세우고(serverPushSubmitPlan), 지켜보기를 켜거나 끈 뒤(applyServerPush) 그 결과의
- * watchId 로 링크를 만들고(makeLink), 링크를 만든 뒤 비우기를 건다(kick('register')). makeLink 가 던지면 그대로 던진다
- * (지켜보기 결과와 상관없이 링크를 만들지 못한 것이다).
- * @template T
+ * watchId 로 링크를 만들고(makeLink), 공유 기록을 쓰고(saveLink), 비우기를 건다(kick('register')). makeLink·saveLink 가 던지면
+ * 그대로 던진다(지켜보기 결과와 상관없이 링크를 만들지 못한 것이다).
+ * 계정: 스냅샷은 양식을 그린 계정의 체류·일정으로 만든다. 그래서 첫 기다림 전에 계정 키(readAccountKey)를 잡아 두고 기록 직전에
+ * 다시 본다. 바뀌었으면 기록하지 않고 SUBMIT_ACCOUNT_CHANGED 를 던진다(앞 계정의 사본이 바뀐 계정의 저장소에 쓰이거나
+ * 화면에 보이지 않게). 다시 보는 것과 기록 사이에는 기다림이 없다.
+ * @template T, S
  * @param {object} args
  * @param {{ visible: boolean, checked: boolean, state: 'ON'|'REPLACED'|'NONE', watchId: string|null }} args.option  항목 상태
  * @param {object|null} args.stay
  * @param {{ ensureRegistered: Function, retire: Function, kick?: Function } | null | undefined} args.sync  getWatchSync()
- * @param {(watchId: string|null) => Promise<T>} args.makeLink  스냅샷·암호화·링크·공유 기록
- * @returns {Promise<{ link: T, serverPush: object|null, serverPushRetire: object|null }>}
+ * @param {(watchId: string|null) => Promise<T>} args.makeLink  스냅샷·크기·암호화·링크(기기에 쓰지 않는다)
+ * @param {((link: T) => S) | null} [args.saveLink]  공유 기록 쓰기(동기). 없으면 saved 는 null
+ * @param {(() => string|null) | null} [args.readAccountKey]  지금 계정 키. 없으면 계정을 보지 않는다
+ * @returns {Promise<{ link: T, saved: S|null, serverPush: object|null, serverPushRetire: object|null }>}
  */
-export async function submitWithServerPush({ option, stay, sync, makeLink }) {
+export async function submitWithServerPush({ option, stay, sync, makeLink, saveLink = null, readAccountKey = null }) {
+  const accountKey = readAccountKey ? readAccountKey() : null;
   const push = await applyServerPush(serverPushSubmitPlan(option), { stay, sync });
   const link = await makeLink(push.watchId);
+  if (readAccountKey && readAccountKey() !== accountKey) {
+    throw Object.assign(new Error('submitWithServerPush: accountKey'), { code: SUBMIT_ACCOUNT_CHANGED });
+  }
+  const saved = saveLink ? saveLink(link) : null;
   void sync?.kick?.('register');
-  return { link, serverPush: push.serverPush, serverPushRetire: push.serverPushRetire };
+  return { link, saved, serverPush: push.serverPush, serverPushRetire: push.serverPushRetire };
 }

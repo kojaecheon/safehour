@@ -19,7 +19,7 @@
 //   - 서버 알림 스위치가 꺼져 있거나 출국일이 지났으면 항목이 숨고 화면은 예전과 같다. 숨어 있으면 지켜보기를 건드리지 않는다.
 //   - 만들기를 누르면 검증 뒤, 스냅샷을 만들기 전에 지켜보기를 켜거나(ensureRegistered) 끈다(retire). 등록이 실패해도 링크는
 //     만들고(D6) 결과 줄에 이유 하나를 보인다. 스냅샷에는 켜진 지켜보기의 watchId 만 싣는다. 순서는 serverPush.js
-//     submitWithServerPush 하나다.
+//     submitWithServerPush 하나다. 기다리는 동안 계정이 바뀌면 공유 기록을 쓰지 않고 링크도 보이지 않는다(일반 실패 줄).
 //   - 결과 줄은 링크 결과 제목(포커스를 받는다)의 aria-describedby 로 읽힌다(이미 채워진 채 나타나 상태 알림으로는 읽히지 않는다).
 //     끄기 결과 줄은 안전 문구라 주 언어와 병기 언어 두 줄이다.
 //
@@ -305,9 +305,11 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
 
     setBusy(true);
     try {
-      // 서버 알림: 항목이 보일 때만 켜거나 끈다. 등록이 실패해도 링크는 만든다(D6). 등록 결과의 id 로 스냅샷을 만든다
+      // 서버 알림: 항목이 보일 때만 켜거나 끈다. 등록이 실패해도 링크는 만든다(D6). 등록 결과의 id 로 스냅샷을 만든다.
+      // 기다리는 동안 계정이 바뀌면 공유 기록을 쓰지 않고 던진다(아래 catch 의 일반 실패 줄, serverPush.js)
       const origin = window.location.origin;
       const nowMs = Date.now();
+      const store = getStore();
       const made = await submitWithServerPush({
         option: { visible: pushVisible, checked: pushChecked, state: watch.state, watchId: watch.watchId },
         stay,
@@ -317,11 +319,14 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
           const size = await measureGuardianLink(snapshot, { origin });
           const fragment = await encryptSnapshot(snapshot, pin);
           const link = buildGuardianLink(origin, fragment);
-          const saved = getStore().writeGuardianShare(await shareRecordFor(snapshot));
-          return { snapshot, size, link, saved };
+          const share = await shareRecordFor(snapshot);
+          return { snapshot, size, link, share };
         },
+        saveLink: ({ share }) => store.writeGuardianShare(share),
+        readAccountKey: () => store.getStatus().accountKey,
       });
-      const { snapshot, size, link, saved } = made.link;
+      const { snapshot, size, link } = made.link;
+      const saved = made.saved;
       // PIN·동의는 이 링크로 끝난다 — 다음 링크는 다시 받는다
       setPin('');
       setPin2('');

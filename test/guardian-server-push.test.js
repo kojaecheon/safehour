@@ -9,6 +9,7 @@
 //     모두 껐으면 껐다는 줄을 보인다(화면 검토 M10)
 //   - 링크 만들기 순서(submitWithServerPush, 화면 검토 M9): 등록이 스냅샷보다 먼저이고 등록한 id 를 싣는다. 숨은 항목은 켜진
 //     지켜보기의 id 만 싣고 요청하지 않는다. 끄기 실패·등록 실패는 링크를 막지 않는다(id 없음). 비우기는 링크를 만든 뒤에 건다
+//   - 기다리는 동안 계정이 바뀌면 공유 기록을 쓰지 않고 던진다(A-2 마지막 검토, 앞 계정의 사본이 바뀐 계정의 저장소에 쓰이지 않게)
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +17,7 @@ import assert from 'node:assert/strict';
 import {
   SERVER_PUSH_ACTION,
   SERVER_PUSH_CONSENT_KEYS,
+  SUBMIT_ACCOUNT_CHANGED,
   applyServerPush,
   serverPushInitialChecked,
   serverPushOptionVisible,
@@ -198,7 +200,8 @@ describe('링크 만들기 순서 (submitWithServerPush, 화면 검토 M9)', () 
         makeLink: linkMaker(sync.log),
       });
       assert.deepEqual(sync.log, [['ensureRegistered', { stay: STAY }], ['makeLink', WATCH_ID], ['kick', 'register']], state);
-      assert.deepEqual(made, { link: { link: 'L', watchId: WATCH_ID }, serverPush: { ok: true }, serverPushRetire: null });
+      // saved 는 공유 기록 결과다(saveLink 를 넘기지 않으면 null, 계정 확인과 함께 더했다)
+      assert.deepEqual(made, { link: { link: 'L', watchId: WATCH_ID }, saved: null, serverPush: { ok: true }, serverPushRetire: null });
     }
   });
 
@@ -281,6 +284,97 @@ describe('링크 만들기 순서 (submitWithServerPush, 화면 검토 M9)', () 
       /crypto/,
     );
     assert.deepEqual(sync.log, [['ensureRegistered', { stay: STAY }]]);
+  });
+
+  test('공유 기록은 링크를 만든 뒤 한 번 쓰고 그 결과를 saved 로 돌려준다(계정이 그대로면)', async () => {
+    const sync = fakeSync();
+    const made = await submitWithServerPush({
+      option: { visible: true, checked: true, state: 'NONE', watchId: null },
+      stay: STAY,
+      sync,
+      makeLink: linkMaker(sync.log),
+      saveLink: (link) => {
+        sync.log.push(['saveLink', link.watchId]);
+        return { ok: true };
+      },
+      readAccountKey: () => 'acct_a',
+    });
+    assert.deepEqual(sync.log, [['ensureRegistered', { stay: STAY }], ['makeLink', WATCH_ID], ['saveLink', WATCH_ID], ['kick', 'register']]);
+    assert.deepEqual(made.saved, { ok: true });
+  });
+
+  test('등록·끄기·링크를 기다리는 동안 계정이 바뀌면 기록하지 않고 SUBMIT_ACCOUNT_CHANGED 를 던진다(값 없는 메시지, 비우기 없음)', async () => {
+    const cases = [
+      ['등록 중', { visible: true, checked: true, state: 'NONE', watchId: null }, 'ensureRegistered'],
+      ['끄기 중', { visible: true, checked: false, state: 'ON', watchId: WATCH_ID }, 'retire'],
+      ['링크 만드는 중(숨은 항목)', { visible: false, checked: false, state: 'ON', watchId: WATCH_ID }, 'makeLink'],
+    ];
+    for (const [label, option, switchAt] of cases) {
+      let account = 'acct_a';
+      const sync = fakeSync();
+      const switching = {
+        ...sync,
+        ensureRegistered: async (input) => {
+          const result = await sync.ensureRegistered(input);
+          if (switchAt === 'ensureRegistered') account = 'acct_b';
+          return result;
+        },
+        retire: async () => {
+          const result = await sync.retire();
+          if (switchAt === 'retire') account = 'acct_b';
+          return result;
+        },
+      };
+      const saves = [];
+      const error = await submitWithServerPush({
+        option,
+        stay: STAY,
+        sync: switching,
+        makeLink: async (watchId) => {
+          sync.log.push(['makeLink', watchId]);
+          if (switchAt === 'makeLink') account = 'acct_b';
+          return { link: 'L', watchId };
+        },
+        saveLink: (link) => saves.push(link),
+        readAccountKey: () => account,
+      }).then(
+        () => null,
+        (err) => err,
+      );
+      assert.ok(error, label);
+      assert.equal(error.code, SUBMIT_ACCOUNT_CHANGED, label);
+      assert.equal(error.message, 'submitWithServerPush: accountKey', label);
+      assert.deepEqual(saves, [], `${label}: 바뀐 계정의 저장소에 쓰지 않는다`);
+      assert.ok(!sync.log.some(([name]) => name === 'kick'), `${label}: 비우기를 걸지 않는다`);
+    }
+  });
+
+  test('계정 키는 첫 기다림 전에 한 번, 기록 직전에 한 번 읽는다(같은 계정으로 돌아와 있으면 기록한다)', async () => {
+    const reads = [];
+    let account = 'acct_a';
+    const sync = fakeSync({
+      register: () => {
+        reads.push('register');
+        account = 'acct_b';
+        return { ok: true, watchId: WATCH_ID };
+      },
+    });
+    const made = await submitWithServerPush({
+      option: { visible: true, checked: true, state: 'NONE', watchId: null },
+      stay: STAY,
+      sync,
+      makeLink: async (watchId) => {
+        account = 'acct_a';
+        return { link: 'L', watchId };
+      },
+      saveLink: () => ({ ok: true }),
+      readAccountKey: () => {
+        reads.push(account);
+        return account;
+      },
+    });
+    assert.deepEqual(reads, ['acct_a', 'register', 'acct_a']);
+    assert.deepEqual(made.saved, { ok: true });
   });
 });
 

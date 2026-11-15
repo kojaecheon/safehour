@@ -408,6 +408,59 @@ describe('등록', () => {
     assert.deepEqual(h.store.readPendingServerDelete(), [{ watchId, writeToken }], '다음 온라인·앱 열기에 다시 보낸다');
   });
 
+  test('등록: 서버에는 만들었는데 응답 사이에 세션이 만료돼 기기에 쓰지 못하면 그 한 쌍을 삭제 대기에 넣고 보낸다', async () => {
+    const h = harness();
+    h.store.setSession({ authenticated: true, accountKey: ACCOUNT, expiresAt: new Date(h.clock.now() + 60_000).toISOString() });
+    const gate = deferred();
+    h.api.reply('register', async () => {
+      await gate.promise;
+      return ok({});
+    });
+    const pending = h.sync.ensureRegistered({ stay: h.store.readStay() });
+    await until(() => h.api.open === 1);
+    // 같은 계정의 세션이 만료됐다(읽는 계정은 그대로라 계정 전환 분기를 타지 않는다)
+    h.clock.set(h.clock.now() + 120_000);
+    assert.equal(h.store.getStatus().readOnly, true);
+    assert.equal(h.store.getStatus().accountKey, ACCOUNT);
+    gate.resolve();
+    assert.deepEqual(await pending, { ok: false, reason: 'UNAVAILABLE' });
+    assert.equal(h.writes.length, 1, '쓰기를 시도했다');
+    assert.equal(h.store.readGuardianWatch(), null, '레코드는 없다');
+    const { watchId, writeToken } = h.api.calls[0].body;
+    await until(() => h.deletes.length === 1);
+    await h.store.retryPendingServerDelete();
+    assert.deepEqual(h.deletes, [{ watchId, writeToken }], '그 한 쌍만 지운다(쓰기 토큰으로 인증, 보기 전용에서도 보낸다)');
+    assert.deepEqual(h.store.readPendingServerDelete(), [], '지웠으면 대기에서 빠진다');
+    assert.deepEqual(h.api.names(), ['register'], '올리기는 하지 않는다');
+  });
+
+  test('등록: 저장소가 쓰지 못하면(STORAGE_FAILED) 새 지켜보기는 삭제 대기에 남고, REPLACED 다시 등록은 넣지 않는다', async () => {
+    const failing = (h) =>
+      createWatchSync({
+        store: { ...h.store, writeGuardianWatch: () => ({ ok: false, code: 'STORAGE_FAILED' }) },
+        api: h.api,
+        now: h.clock.now,
+        timers: h.timers,
+        randomBytes: countingBytes(),
+      });
+
+    const fresh = harness({ deleteReply: () => json(503, { ok: false }) });
+    assert.deepEqual(await failing(fresh).ensureRegistered({ stay: fresh.store.readStay() }), { ok: false, reason: 'UNAVAILABLE' });
+    const created = fresh.api.calls[0].body;
+    await until(() => fresh.deletes.length === 1);
+    await fresh.store.retryPendingServerDelete();
+    assert.deepEqual(fresh.store.readPendingServerDelete(), [{ watchId: created.watchId, writeToken: created.writeToken }], '다음 온라인·앱 열기에 다시 보낸다');
+
+    const again = harness({ record: watchRecord({ state: 'REPLACED' }) });
+    assert.deepEqual(await failing(again).ensureRegistered({ stay: again.store.readStay() }), { ok: false, reason: 'UNAVAILABLE' });
+    assert.equal(again.api.calls[0].body.watchId, W1.watchId, '같은 watchId 로 다시 등록했다');
+    await again.store.retryPendingServerDelete();
+    assert.deepEqual(again.deletes, [], '레코드가 그 watchId 를 들고 있다(다음 켜기가 같은 watchId 로 다시 등록한다)');
+    assert.deepEqual(again.store.readPendingServerDelete(), []);
+    assert.equal(again.store.readGuardianWatch().state, 'REPLACED');
+    assert.equal(again.store.readGuardianWatch().writeToken, W1.writeToken);
+  });
+
   test('등록: REPLACED 다시 등록 중 계정이 바뀌면 그 watchId 를 삭제 대기에 넣지 않는다(앞 계정의 링크가 쓴다)', async () => {
     const h = harness({ record: watchRecord({ state: 'REPLACED' }) });
     const gate = deferred();
