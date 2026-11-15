@@ -4,7 +4,8 @@
 //                                       → { visible, stateKey, statePair, canTurnOff, canRemoveAll }
 //   serverPushTurnOffResult(result)     → { key, pair }   끄기(retire) 결과 줄
 //   serverPushRemoveResult(result)      → { key, vars }   서버 지우기(removeAll) 결과 줄
-//   serverPushOpenSheet({ sheet, visible, exists }) → 'turnOff'|'removeAll'|null   지금도 열어 둘 수 있는 확인 시트
+//   serverPushOpenSheet({ sheet, visible, exists, openedFor, accountKey }) → 'turnOff'|'removeAll'|null   지금도 열어 둘 수 있는 확인 시트
+//   runServerPushAction(action, { sync, accountKey }) → 확인 시트의 버튼이 부르는 실행기 결과(끄기 retire, 서버 지우기 removeAll)
 //   clearNoteKey(state)                 → '내 정보 지우기' 아래 안내 줄 키
 //
 // 정한 것
@@ -17,8 +18,11 @@
 //   - 끄기는 레코드가 있고(ON·REPLACED) 쓰기 가능할 때, 서버 지우기는 쓰기 가능하고 온라인일 때만 된다.
 //   - 끄기 결과: { ok: true, pending: false } 일 때만 '껐어요'. 서버 삭제가 남았으면(pending) 그 전까지 보호자에게 알림이 갈 수
 //     있다는 줄, 끄지 못했으면 그 줄(작업 7 검토 반영). 뒤의 두 줄은 안전 문구(settings safety 블록)라 pair 로 그린다.
+//   - 확인 시트는 연 때의 계정에서만 열어 둔다. 계정이 바뀌면(다른 탭의 로그인 등) 닫는다. 끄기·서버 지우기는 절을 그린 계정 키를
+//     실행기에 넘긴다(줄 서 있다가 시작될 때 계정이 다르면 실행기가 아무것도 하지 않는다, A-3 검토).
 //
-// 순수 모듈이다(React·저장소·네트워크 없음). node --test 가 읽으므로 상대 경로로만 불러온다.
+// React·저장소·네트워크를 직접 쓰지 않는다. 동기화 실행기(getWatchSync())는 부르는 쪽이 넣는다.
+// node --test 가 읽으므로 상대 경로로만 불러온다.
 
 const STATE_KEY = Object.freeze({
   ON: 'settings.serverPushOn',
@@ -50,14 +54,38 @@ export function serverPushSectionView({ enabled, checked, state, readOnly, onlin
 /**
  * 열린 확인 시트를 지금도 열어 둘 수 있는가. 절이 숨었거나(스위치가 꺼지고 레코드가 없다) 끌 레코드가 사라졌으면(다른 탭에서
  * 끔) null 이다. 설정 화면은 열린 시트가 있는 동안 다른 절을 inert 로 막으므로, 숨은 절의 시트 상태가 남으면 화면이 막힌 채 남는다.
- * @param {{ sheet: 'turnOff'|'removeAll'|null, visible: boolean, exists: boolean }} args
- *   sheet: 설정 화면이 들고 있는 열린 시트 · visible: serverPushSectionView().visible · exists: 레코드가 ON·REPLACED 인가
+ * 시트를 연 때의 계정(openedFor)을 받았는데 지금 계정과 다르면 null 이다(앞 계정에서 연 확인으로 바뀐 계정의 지켜보기를 끄거나
+ * 지우지 않게).
+ * @param {{ sheet: 'turnOff'|'removeAll'|null, visible: boolean, exists: boolean, openedFor?: string|null, accountKey?: string|null }} args
+ *   sheet: 설정 화면이 들고 있는 열린 시트 · visible: serverPushSectionView().visible · exists: 레코드가 ON·REPLACED 인가 ·
+ *   openedFor: 시트를 연 때의 계정 키(받지 않으면 계정을 보지 않는다) · accountKey: 지금 계정 키
  * @returns {'turnOff'|'removeAll'|null}
  */
-export function serverPushOpenSheet({ sheet, visible, exists } = {}) {
+export function serverPushOpenSheet({ sheet, visible, exists, openedFor, accountKey } = {}) {
   if (visible !== true) return null;
+  if (openedFor !== undefined && openedFor !== accountKey) return null;
   if (sheet === 'turnOff') return exists === true ? 'turnOff' : null;
   if (sheet === 'removeAll') return 'removeAll';
+  return null;
+}
+
+/**
+ * 확인 시트의 버튼이 실행기를 부른다: 끄기(turnOff)는 retire, 서버 지우기(removeAll)는 removeAll. 둘 다 절을 그린 계정 키를
+ * 넘긴다(줄 서 있다가 시작될 때 계정이 다르면 실행기가 아무것도 하지 않는다). 키가 없으면 null 을 넘겨 그래도 계정을 보게 한다.
+ * 실행기가 없거나 던지거나 결과가 없으면 null(결과 줄은 실패 줄이다).
+ * @param {'turnOff'|'removeAll'} action
+ * @param {{ sync: { retire: Function, removeAll: Function } | null | undefined, accountKey: string|null|undefined }} deps
+ *   sync: getWatchSync() · accountKey: useStoreStatus().accountKey
+ * @returns {Promise<object|null>}  retire·removeAll 결과
+ */
+export async function runServerPushAction(action, { sync, accountKey } = {}) {
+  const scope = { accountKey: accountKey ?? null };
+  try {
+    if (action === 'turnOff') return (await sync?.retire(scope)) ?? null;
+    if (action === 'removeAll') return (await sync?.removeAll(scope)) ?? null;
+  } catch {
+    // 실행기는 던지지 않는 것이 약속이다. 던지면 하지 못한 것으로 본다
+  }
   return null;
 }
 

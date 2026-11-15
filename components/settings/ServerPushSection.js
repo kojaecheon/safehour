@@ -9,9 +9,9 @@
 //   없으면 아무것도 그리지 않는다. 끄거나 지운 뒤 절이 숨을 조건이 되어도 결과 줄을 보일 동안은 그 줄만 남긴다.
 // - 끄기는 확인 시트 뒤 실행기 retire()(동의 철회와 같은 모양, 화면 검토 M6), 서버 지우기는 확인 시트 뒤 removeAll()(로그인 계정의
 //   지켜보기를 모두 지운다). 요청은 실행기가 보낸다. 끄기와 서버 지우기는 절을 그린 계정 키를 넘긴다(앞선 요청을 기다리는 사이
-//   계정이 바뀌면 실행기가 끄거나 지우지 않는다, A-3 검토). 두 시트는 하나씩만 열리고, 열린 시트는 설정 화면이 sheet 로 들고 있다.
-//   시트가 열린 채 절이 숨거나(스위치 꺼짐, 다른 탭에서 레코드 지움) 끌 레코드가 사라지면, 또는 이 절이 사라지면 그 상태를 비운다
-//   (serverPushOpenSheet). 남기면 다른 절이 inert 로 막힌 채 남는다.
+//   계정이 바뀌면 실행기가 끄거나 지우지 않는다, A-3 검토, runServerPushAction). 두 시트는 하나씩만 열리고, 열린 시트는 설정 화면이
+//   sheet 로 들고 있다. 시트가 열린 채 절이 숨거나(스위치 꺼짐, 다른 탭에서 레코드 지움) 끌 레코드가 사라지거나 계정이 바뀌면(연 때의
+//   계정 키를 기억한다), 또는 이 절이 사라지면 그 상태를 비운다(serverPushOpenSheet). 남기면 다른 절이 inert 로 막힌 채 남는다.
 // - 처리 중에는 누른 버튼을 disabled 대신 loading 으로 막아 포커스를 지킨다(Button 계약, 화면 검토 M8).
 // - 보기 전용이면 두 버튼을 막고 다른 절과 같은 안내 줄(settings.offlineNote·settings.readOnlyNote)을 보인다.
 // - 누른 버튼이 사라져도 포커스를 잃지 않게 결과 줄로 옮긴다.
@@ -23,7 +23,13 @@ import { useGuardianWatch, useServerPushConfig } from '@/lib/trip/useWatch.js';
 import { useLang } from '../LanguageProvider.js';
 import { Button, Sheet } from '../ui/index.js';
 import PairText from './PairText.js';
-import { serverPushOpenSheet, serverPushRemoveResult, serverPushSectionView, serverPushTurnOffResult } from './serverPushView.js';
+import {
+  runServerPushAction,
+  serverPushOpenSheet,
+  serverPushRemoveResult,
+  serverPushSectionView,
+  serverPushTurnOffResult,
+} from './serverPushView.js';
 
 /**
  * @param {object} props
@@ -41,6 +47,8 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
   const statusRef = useRef(null);
   const [busy, setBusy] = useState(null);
   const [outcome, setOutcome] = useState(null);
+  /** 열린 시트를 연 때의 계정 키 */
+  const [sheetFor, setSheetFor] = useState(null);
   const view = serverPushSectionView({
     enabled: config.enabled,
     checked: config.checked,
@@ -49,9 +57,9 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
     online: status.online,
   });
   const exists = watch.state === 'ON' || watch.state === 'REPLACED';
-  const openSheet = serverPushOpenSheet({ sheet, visible: view.visible, exists });
+  const openSheet = serverPushOpenSheet({ sheet, visible: view.visible, exists, openedFor: sheetFor, accountKey: status.accountKey });
 
-  // 절이 숨거나 끌 레코드가 사라지면 열린 시트 상태를 비운다(다른 절의 inert 를 푼다)
+  // 절이 숨거나 끌 레코드가 사라지거나 계정이 바뀌면 열린 시트 상태를 비운다(다른 절의 inert 를 푼다)
   useEffect(() => {
     if (sheet !== openSheet) setSheet(openSheet);
   }, [sheet, openSheet, setSheet]);
@@ -59,13 +67,18 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
 
   if (!view.visible && !outcome) return null;
 
+  function open(next) {
+    setSheetFor(status.accountKey);
+    setSheet(next);
+  }
+
   async function turnOff(requestClose) {
     if (busy || !view.canTurnOff) return;
     requestClose();
     setBusy('turnOff');
     let result = null;
     try {
-      result = (await getWatchSync()?.retire({ accountKey: status.accountKey })) ?? null;
+      result = await runServerPushAction('turnOff', { sync: getWatchSync(), accountKey: status.accountKey });
     } catch {
       result = null;
     } finally {
@@ -81,7 +94,7 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
     setBusy('removeAll');
     let result = null;
     try {
-      result = (await getWatchSync()?.removeAll({ accountKey: status.accountKey })) ?? null;
+      result = await runServerPushAction('removeAll', { sync: getWatchSync(), accountKey: status.accountKey });
     } catch {
       result = null;
     } finally {
@@ -102,7 +115,7 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
               variant="secondary"
               disabled={!view.canTurnOff || (busy !== null && busy !== 'turnOff')}
               loading={busy === 'turnOff'}
-              onClick={() => setSheet('turnOff')}
+              onClick={() => open('turnOff')}
             >
               {t('settings.serverPushTurnOff')}
             </Button>
@@ -111,7 +124,7 @@ export default function ServerPushSection({ status, showReadOnly, noteKey, inert
             variant="secondary"
             disabled={!view.canRemoveAll || (busy !== null && busy !== 'removeAll')}
             loading={busy === 'removeAll'}
-            onClick={() => setSheet('removeAll')}
+            onClick={() => open('removeAll')}
           >
             {t('settings.serverPushRemoveAll')}
           </Button>
