@@ -1,17 +1,24 @@
-/* SafeHour 서비스 워커 (AX-319 · spec 4.18 · 4.13)
+/* SafeHour 서비스 워커 (AX-319 · docs/platform/IA_AND_FLOWS.md '보기 전용 상태' · docs/business-rules.md '알림과 카드' · ADR-0012)
  *
  * 하는 일
  *   1. 앱 셸과 보기 전용 화면(긴급 연락·한국어 카드·오늘/내일 일정·보호자 사본 보기·개인정보 고지)을
  *      오프라인에서 연다. 화면 HTML 은 네트워크 우선이고, 네트워크가 없으면 캐시한 사본을 준다.
  *   2. 화면이 쓰는 정적 파일(/_next/static — 파일 이름에 해시가 있어 바뀌지 않는다)과 아이콘·매니페스트를 캐시한다.
- *   3. 기기 알림을 누르면 앱(오늘 화면)을 연다.
+ *   3. 알림을 누르면 data.url 화면(허용 목록 /today, /g 안, 없으면 /today)을 연다. 서버 푸시는 /g 를 싣는다.
+ *   4. 서버 푸시(보호자 기기)를 받으면 알림 하나를 낸다. 본문이 없거나 깨져도 대체 문구로 늘 하나를 낸다
+ *      (조용한 푸시 0. 아이폰은 알림 없는 푸시가 쌓이면 권한을 거둔다).
+ *   5. 페이지의 준비 확인 메시지(SAFEHOUR_SW_INFO)에 판과 push 처리 여부를 답한다. 페이지는 이 답을 받은 뒤에만
+ *      구독한다(push 처리기가 없는 옛 워커가 구독을 받으면 푸시가 조용히 사라진다).
  *
  * 하지 않는 일 — 바꾸지 말 것
  *   - **API 응답(/api/**)은 가로채지도, 캐시에 넣지도 않는다.** 판정·일정·조건 데이터는 API 로만 오간다.
  *     test/pwa-sw.test.js 가 이 파일을 실제로 돌려 확인한다.
  *   - 보기 전용 화면 목록 밖의 화면 HTML·RSC 데이터·다른 출처의 응답은 캐시하지 않는다.
  *   - 서버가 `Cache-Control: no-store` 라고 한 응답은 캐시하지 않는다.
- *   - 알림 예약·발송은 여기서 하지 않는다(서비스 워커는 수시로 잠든다). 앱이 연 동안 lib/notify 가 한다.
+ *   - 알림 예약은 하지 않는다. 서버가 보낸 푸시만 보인다(서비스 워커는 수시로 잠든다). 기기 알림 예약은 앱이 연 동안
+ *     lib/notify 가 한다.
+ *   - 푸시 알림의 data 에는 열 화면(url) 하나만 둔다. 지켜보기 식별 값·날짜·시각을 싣지 않고 console 을 쓰지 않는다.
+ *   - pushsubscriptionchange 처리기와 IndexedDB 를 두지 않는다. 구독 주소가 바뀌면 앱을 열 때 다시 맞춘다.
  *
  * 캐시 이름에는 판(SW_VERSION)이 붙는다. 이 파일을 고치면 판을 올린다 — 새 워커가 켜질 때 옛 판을 지운다.
  * 등록은 운영 빌드에서만 한다(components/pwa/PwaRuntime.js).
@@ -19,13 +26,13 @@
 
 'use strict';
 
-const SW_VERSION = '2026-09-19.1';
+const SW_VERSION = '2026-11-16.1';
 const CACHE_PREFIX = 'safehour-';
 const PAGE_CACHE = `${CACHE_PREFIX}pages-${SW_VERSION}`;
 const ASSET_CACHE = `${CACHE_PREFIX}assets-${SW_VERSION}`;
 const CURRENT_CACHES = [PAGE_CACHE, ASSET_CACHE];
 
-/** 보기 전용 화면 — 오프라인에서도 연다 (spec 4.18). 설치 때 미리 받아 둔다(없는 화면은 건너뛴다) */
+/** 보기 전용 화면: 오프라인에서도 연다(docs/platform/IA_AND_FLOWS.md '보기 전용 상태'). 설치 때 미리 받아 둔다(없는 화면은 건너뛴다) */
 const READ_ONLY_ROUTES = ['/today', '/trip', '/emergency', '/cards', '/g', '/privacy'];
 /** 보기 전용 동적 경로 — 한 번 열었던 날짜만 오프라인에서 열린다 */
 const READ_ONLY_PATTERNS = [/^\/trip\/\d{4}-\d{2}-\d{2}$/];
@@ -48,6 +55,25 @@ const NETWORK_TIMEOUT_MS = 6000;
 const NOTIFICATION_URL = '/today';
 /** 알림 data.url 로 열어도 되는 화면 (이 목록 밖이면 기본 화면을 연다) */
 const NOTIFICATION_PATHS = ['/today', '/g'];
+/** 알림 아이콘. 기기 알림(lib/notify/device.js NOTIFICATION_ICON)과 같다 */
+const NOTIFICATION_ICON = '/icons/icon-192.png';
+
+/** 서버 푸시를 누르면 여는 기본 화면(받은 일정). 본문 url 이 허용 목록 밖이면 이 화면을 연다 */
+const PUSH_URL = '/g';
+/** 서버 푸시 제목·본문의 글자 수 상한. 비었거나 넘으면 대체 문구를 보인다 */
+const PUSH_TITLE_MAX = 80;
+const PUSH_BODY_MAX = 300;
+/** 서버 푸시 tag: 마감별(sh-watch-<날짜>-<HH:MM>)과 기기 바뀜(sh-watch-device)만 싣는다 (lib/server/watch/text.js) */
+const PUSH_TAG_RE = /^sh-watch-(\d{4}-\d{2}-\d{2}-\d{2}:\d{2}|device)$/;
+/**
+ * 푸시 본문을 읽지 못했을 때의 대체 문구. 서비스 워커는 사전을 읽지 못해 한국어 줄과 영어 줄을 글자 그대로 둔다.
+ * 정본은 'notifications.serverPushFallback'(src/i18n/messages/notifications.js)이고 test/pwa-sw.test.js 가 같은지 본다.
+ * 키를 따옴표째 둔다: test/i18n.test.js 의 '쓰지 않는 키' 검사가 이 따옴표 키를 보고 사용 중으로 센다
+ */
+const PUSH_FALLBACK_TITLE = 'SafeHour';
+const PUSH_FALLBACK_BODY = 'SafeHour 알림이 왔어요. 앱을 열어 확인해 주세요.' + '\n' + 'You have a SafeHour alert. Open the app to check.';
+/** 페이지의 준비 확인 메시지 종류. 이 type 에만 답한다 */
+const SW_INFO_TYPE = 'SAFEHOUR_SW_INFO';
 
 // ── 판정 도우미 (test/pwa-sw.test.js 가 직접 부른다) ─────────────────────
 
@@ -55,6 +81,47 @@ const NOTIFICATION_PATHS = ['/today', '/g'];
 function notificationTargetPath(data) {
   const url = data && typeof data.url === 'string' ? data.url : null;
   return url && NOTIFICATION_PATHS.includes(url) ? url : NOTIFICATION_URL;
+}
+
+/** 서버 푸시를 누르면 열 경로. 본문 url 이 허용 목록에 있으면 그 경로, 아니면 받은 일정(/g) */
+function pushTargetPath(data) {
+  const url = data && typeof data.url === 'string' ? data.url : null;
+  return url && NOTIFICATION_PATHS.includes(url) ? url : PUSH_URL;
+}
+
+/** 비지 않은(공백뿐이 아닌) 문자열이고 max 자 이하인가 */
+function isPushText(value, max) {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+}
+
+/**
+ * 서버 푸시 본문(JSON 을 읽은 값, 못 읽었으면 null)으로 낼 알림.
+ * title·body 가 둘 다 맞으면 그대로(서버가 구독 언어로 만든 문장), 아니면 대체 문구다.
+ * tag 는 형식에 맞을 때만 싣고 그때만 renotify 를 싣는다(tag 없는 renotify 는 브라우저가 TypeError 로 거절한다).
+ * data 에는 url 하나만 둔다.
+ */
+function pushNotification(data) {
+  const payload = data && typeof data === 'object' ? data : null;
+  const valid = payload !== null && isPushText(payload.title, PUSH_TITLE_MAX) && isPushText(payload.body, PUSH_BODY_MAX);
+  const options = {
+    body: valid ? payload.body : PUSH_FALLBACK_BODY,
+    icon: NOTIFICATION_ICON,
+    data: { url: pushTargetPath(payload) },
+  };
+  if (payload !== null && typeof payload.tag === 'string' && PUSH_TAG_RE.test(payload.tag)) {
+    options.tag = payload.tag;
+    options.renotify = true;
+  }
+  return { title: valid ? payload.title : PUSH_FALLBACK_TITLE, options };
+}
+
+/** push 이벤트의 본문을 JSON 으로 읽는다. 본문이 없거나 읽지 못하면 null */
+function readPushData(event) {
+  try {
+    return event && event.data ? event.data.json() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** API 경로인가 — 이 경로는 절대 캐시하지 않는다 */
@@ -305,4 +372,19 @@ self.addEventListener('notificationclick', (event) => {
       await self.clients.openWindow(target);
     })(),
   );
+});
+
+// 서버 푸시: 어떤 본문이 와도 알림 하나를 낸다. 누름 처리는 위 notificationclick 이 data.url 로 한다
+self.addEventListener('push', (event) => {
+  const { title, options } = pushNotification(readPushData(event));
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 준비 확인: 포트로 판과 push 처리 여부만 답한다. 다른 type 이나 포트 없는 메시지는 무시한다
+self.addEventListener('message', (event) => {
+  const data = event ? event.data : null;
+  const port = event && event.ports ? event.ports[0] : null;
+  if (!data || typeof data !== 'object' || data.type !== SW_INFO_TYPE) return;
+  if (!port || typeof port.postMessage !== 'function') return;
+  port.postMessage({ type: SW_INFO_TYPE, version: SW_VERSION, push: true });
 });

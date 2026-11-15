@@ -5,11 +5,18 @@
 //   - 보기 전용 화면은 네트워크 우선 + 캐시 사본, 목록 밖 화면은 캐시하지 않는다.
 //   - 오프라인에서 캐시에 없는 화면은 캐시한 셸 화면으로 보낸다.
 //   - 캐시 이름에 판이 붙고, 새 워커가 켜지면 옛 판을 지운다.
+//   - 서버 푸시(ADR-0012)는 어떤 본문에도 알림 하나를 낸다. data 에는 url 하나만 있고 tag 는 형식에 맞을 때만 싣는다.
+//   - 준비 확인 메시지(SAFEHOUR_SW_INFO)에 포트로 판과 push 처리 여부를 답한다.
 
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+
+import { messages as notificationMessages } from '../src/i18n/messages/notifications.js';
+import { LANGS } from '../src/i18n/index.js';
+import { NOTIFICATION_ICON } from '../lib/notify/device.js';
+import { PUSH_KIND, pushPayload } from '../lib/server/watch/text.js';
 
 const SOURCE = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
 const ORIGIN = 'http://localhost:3304';
@@ -104,9 +111,9 @@ function makeNetwork() {
 
 // ── 가짜 서비스 워커 전역 ───────────────────────────────────────────
 
-function loadWorker({ caches = new FakeCacheStorage(), network = makeNetwork() } = {}) {
+function loadWorker({ caches = new FakeCacheStorage(), network = makeNetwork(), console: consoleImpl = console } = {}) {
   const handlers = {};
-  const calls = { skipWaiting: 0, claim: 0, openWindow: [] };
+  const calls = { skipWaiting: 0, claim: 0, openWindow: [], notifications: [] };
   const self = {
     location: new URL('/sw.js', ORIGIN),
     addEventListener(type, fn) {
@@ -114,6 +121,13 @@ function loadWorker({ caches = new FakeCacheStorage(), network = makeNetwork() }
     },
     skipWaiting: async () => {
       calls.skipWaiting += 1;
+    },
+    registration: {
+      showNotification(title, options) {
+        const promise = Promise.resolve();
+        calls.notifications.push({ title, options, promise });
+        return promise;
+      },
     },
     clients: {
       claim: async () => {
@@ -133,7 +147,7 @@ function loadWorker({ caches = new FakeCacheStorage(), network = makeNetwork() }
     Response,
     Headers,
     URL,
-    console,
+    console: consoleImpl,
     setTimeout: (fn, ms) => {
       const t = setTimeout(fn, ms);
       t.unref?.();
@@ -502,6 +516,282 @@ describe('알림 누르기', () => {
       assert.deepEqual(navigated, expected, current);
       assert.deepEqual(worker.calls.openWindow, []);
     }
+  });
+});
+
+// ── 서버 푸시 (ADR-0012, 보호자 기기) ─────────────────────────────────
+
+/** PushEvent.data 흉내. 본문이 없으면 null(브라우저와 같다), json() 은 JSON 이 아니면 던진다 */
+function pushData(payload) {
+  if (payload === undefined) return null;
+  const text = typeof payload === 'string' ? payload : JSON.stringify(payload);
+  return { text: () => text, json: () => JSON.parse(text) };
+}
+
+/** push 이벤트를 보낸다. 이 이벤트로 낸 알림과 waitUntil 이 받은 약속을 돌려준다 */
+async function dispatchPush(worker, payload, data = pushData(payload)) {
+  const waits = [];
+  const before = worker.calls.notifications.length;
+  // 브라우저처럼: 이벤트를 보내는 동안(동기 구간)에만 waitUntil 을 받는다. await 뒤에 부르면 InvalidStateError 다
+  let dispatching = true;
+  worker.handlers.push({
+    data,
+    waitUntil(promise) {
+      if (!dispatching && waits.length === 0) throw new Error('InvalidStateError');
+      waits.push(promise);
+    },
+  });
+  dispatching = false;
+  await settle(waits);
+  return { waits, shown: worker.calls.notifications.slice(before) };
+}
+
+const FALLBACK_KEY = 'notifications.serverPushFallback';
+const FALLBACK_BODY = `${notificationMessages[FALLBACK_KEY].ko}\n${notificationMessages[FALLBACK_KEY].en}`;
+
+describe('서버 푸시', () => {
+  test('push: 올바른 본문이면 title·body 그대로, data.url 은 /g, tag 와 renotify 참, icon 이 있다', async () => {
+    const worker = loadWorker();
+    const payload = JSON.parse(pushPayload(PUSH_KIND.OVERDUE, { date: '2026-11-16', time: '18:00', lang: 'ko' }));
+    const { shown } = await dispatchPush(worker, payload);
+    assert.equal(shown.length, 1);
+    const [{ title, options }] = shown;
+    assert.equal(title, payload.title);
+    assert.equal(options.body, payload.body);
+    assert.equal(options.icon, NOTIFICATION_ICON, '기기 알림과 같은 아이콘');
+    assert.equal(options.tag, 'sh-watch-2026-11-16-18:00');
+    assert.equal(options.renotify, true);
+    assert.deepEqual(Object.keys(options).sort(), ['body', 'data', 'icon', 'renotify', 'tag']);
+    assert.deepEqual(Object.keys(options.data), ['url'], 'data 에는 url 하나만 둔다');
+    assert.equal(options.data.url, '/g');
+
+    // A-1 이 보내는 모든 종류·언어·검수 스위치의 본문이 대체 문구로 떨어지지 않고 tag 가 그대로 실린다
+    for (const kind of Object.values(PUSH_KIND)) {
+      for (const lang of LANGS) {
+        for (const reviewed of [
+          { ja: false, zh: false },
+          { ja: true, zh: true },
+        ]) {
+          const sent = JSON.parse(pushPayload(kind, { date: '2026-11-16', time: '23:55', lang }, reviewed));
+          const note = worker.context.pushNotification(sent);
+          const where = `${kind}/${lang}/${JSON.stringify(reviewed)}`;
+          assert.equal(note.title, sent.title, where);
+          assert.equal(note.options.body, sent.body, where);
+          assert.equal(note.options.tag, sent.tag, where);
+          assert.equal(note.options.renotify, true, where);
+          assert.equal(note.options.data.url, '/g', where);
+        }
+      }
+    }
+    const device = worker.context.pushNotification(JSON.parse(pushPayload(PUSH_KIND.DEVICE_CHANGED, { lang: 'en' })));
+    assert.equal(device.options.tag, 'sh-watch-device');
+  });
+
+  test('push: url 이 허용 목록 밖이면 /g 를 연다', async () => {
+    const worker = loadWorker();
+    const base = { title: 'SafeHour reminder', body: 'Your companion confirmed' };
+    for (const url of [undefined, null, 42, '', '/settings', 'https://evil.example/g', '//evil.example', '/g?x=1', '/g#w', '/G', '/today/']) {
+      const { shown } = await dispatchPush(worker, { ...base, url });
+      assert.equal(shown.length, 1);
+      assert.equal(shown[0].options.data.url, '/g', String(url));
+      assert.equal(worker.context.pushTargetPath({ url }), '/g', String(url));
+    }
+    const { shown } = await dispatchPush(worker, { ...base, url: '/today' });
+    assert.equal(shown[0].options.data.url, '/today');
+    for (const data of [undefined, null, {}, [], 'x']) assert.equal(worker.context.pushTargetPath(data), '/g', JSON.stringify(data));
+
+    // 누르면 data.url 화면을 연다(누름 처리는 기기 알림과 같다)
+    const waits = [];
+    worker.handlers.notificationclick({
+      notification: { data: shown[0].options.data, close() {} },
+      waitUntil(p) {
+        waits.push(p);
+      },
+    });
+    await settle(waits);
+    assert.deepEqual(worker.calls.openWindow, [`${ORIGIN}/today`]);
+  });
+
+  test('push: tag 가 형식 밖이면 tag 와 renotify 를 싣지 않는다', async () => {
+    const worker = loadWorker();
+    const base = { title: 'SafeHour reminder', body: 'Alert', url: '/g' };
+    for (const tag of [
+      undefined,
+      null,
+      42,
+      '',
+      'sh-watch-',
+      'sh-watch-2026-11-16',
+      'sh-watch-2026-11-16-18:00-x',
+      'sh-watch-2026-11-16-1800',
+      'sh-watch-26-11-16-18:00',
+      'sh-watch-device2',
+      'SH-WATCH-device',
+      ' sh-watch-device',
+      'sh-watch-device\n',
+      'other-tag',
+    ]) {
+      const { shown } = await dispatchPush(worker, { ...base, tag });
+      assert.equal(shown.length, 1, String(tag));
+      const { options } = shown[0];
+      assert.ok(!('tag' in options), `tag ${JSON.stringify(tag)} 를 실었다`);
+      assert.ok(!('renotify' in options), `tag ${JSON.stringify(tag)} 없이 renotify 를 실었다`);
+      assert.equal(shown[0].title, base.title, '본문은 그대로 보인다');
+    }
+    // 대체 문구여도 형식에 맞는 tag 는 싣는다(같은 마감 알림을 갈아 끼운다)
+    const { shown } = await dispatchPush(worker, { title: '', body: 'x', tag: 'sh-watch-2026-11-16-18:00' });
+    assert.equal(shown[0].title, 'SafeHour');
+    assert.equal(shown[0].options.tag, 'sh-watch-2026-11-16-18:00');
+    assert.equal(shown[0].options.renotify, true);
+  });
+
+  test('push: 본문이 없거나 JSON 이 아니거나 title·body 가 비었거나 너무 길면 대체 문구로 하나를 낸다', async () => {
+    const worker = loadWorker();
+    const cases = [
+      ['본문 없음', undefined],
+      ['빈 글', ''],
+      ['JSON 아님', 'not json'],
+      ['깨진 JSON', '{"title":'],
+      ['null', 'null'],
+      ['숫자', '42'],
+      ['배열', '[]'],
+      ['문자열', '"SafeHour"'],
+      ['빈 객체', {}],
+      ['title 빔', { title: '', body: 'x' }],
+      ['body 빔', { title: 'x', body: '' }],
+      ['title 공백뿐', { title: '   ', body: 'x' }],
+      ['body 공백뿐', { title: 'x', body: '\n\t ' }],
+      ['title 81자', { title: 'x'.repeat(81), body: 'x' }],
+      ['body 301자', { title: 'x', body: 'x'.repeat(301) }],
+      ['title 숫자', { title: 5, body: 'x' }],
+      ['body 객체', { title: 'x', body: { text: 'x' } }],
+    ];
+    for (const [label, payload] of cases) {
+      const { shown, waits } = await dispatchPush(worker, payload);
+      assert.equal(shown.length, 1, `${label}: 알림이 하나여야 한다`);
+      assert.equal(waits.length, 1, label);
+      assert.equal(shown[0].title, 'SafeHour', label);
+      assert.equal(shown[0].options.body, FALLBACK_BODY, label);
+      assert.equal(shown[0].options.icon, NOTIFICATION_ICON, label);
+      assert.deepEqual(Object.keys(shown[0].options.data), ['url'], label);
+      assert.equal(shown[0].options.data.url, '/g', label);
+    }
+    // data.json() 이 던지는 다른 경우도 하나를 낸다
+    const throwing = {
+      text: () => '',
+      json: () => {
+        throw new Error('boom');
+      },
+    };
+    const { shown } = await dispatchPush(worker, undefined, throwing);
+    assert.equal(shown.length, 1);
+    assert.equal(shown[0].options.body, FALLBACK_BODY);
+
+    // 경계: title 80자, body 300자는 그대로 보인다
+    const edge = await dispatchPush(worker, { title: 't'.repeat(80), body: 'b'.repeat(300) });
+    assert.equal(edge.shown[0].title, 't'.repeat(80));
+    assert.equal(edge.shown[0].options.body, 'b'.repeat(300));
+  });
+
+  test('push: event.waitUntil 이 showNotification 약속을 받는다(조용한 푸시 0)', async () => {
+    const worker = loadWorker();
+    for (const payload of [JSON.parse(pushPayload(PUSH_KIND.CONFIRMED, { date: '2026-11-16', time: '18:00', lang: 'en' })), 'not json', undefined]) {
+      const { shown, waits } = await dispatchPush(worker, payload);
+      assert.equal(waits.length, 1);
+      assert.equal(shown.length, 1);
+      assert.equal(waits[0], shown[0].promise, 'waitUntil 이 showNotification 이 돌려준 약속을 받아야 한다');
+    }
+  });
+
+  test('push: console 을 부르지 않는다', async () => {
+    const used = [];
+    const spy = new Proxy({}, { get: (_, name) => () => used.push(String(name)) });
+    const worker = loadWorker({ console: spy });
+    const payloads = [
+      JSON.parse(pushPayload(PUSH_KIND.OVERDUE, { date: '2026-11-16', time: '18:00', lang: 'ko' })),
+      'not json',
+      undefined,
+      { title: 'x'.repeat(81), body: 'x', tag: 'bad', url: '/settings' },
+    ];
+    for (const payload of payloads) await dispatchPush(worker, payload);
+    const throwing = {
+      json: () => {
+        throw new Error('boom');
+      },
+    };
+    await dispatchPush(worker, undefined, throwing);
+    assert.deepEqual(used, []);
+    assert.ok(!/\bconsole\s*[.[]/.test(SOURCE), 'public/sw.js 가 console 을 부르지 않아야 한다');
+  });
+
+  test('대체 본문은 notifications.serverPushFallback 의 ko 줄과 en 줄이다', () => {
+    const { context } = loadWorker();
+    assert.equal(vm.runInContext('PUSH_FALLBACK_BODY', context), FALLBACK_BODY);
+    assert.equal(vm.runInContext('PUSH_FALLBACK_TITLE', context), 'SafeHour');
+    const fallback = context.pushNotification(null);
+    assert.equal(fallback.title, 'SafeHour');
+    assert.equal(fallback.options.body, FALLBACK_BODY);
+    assert.equal(FALLBACK_BODY.split('\n').length, 2);
+  });
+});
+
+describe('준비 확인 메시지', () => {
+  function port() {
+    const sent = [];
+    return {
+      sent,
+      postMessage(message) {
+        sent.push(message);
+      },
+    };
+  }
+
+  test('message: SAFEHOUR_SW_INFO 에 포트로 { version, push: true } 를 답하고 다른 type 과 포트 없는 메시지는 무시한다', () => {
+    const worker = loadWorker();
+    const version = vm.runInContext('SW_VERSION', worker.context);
+
+    const ok = port();
+    worker.handlers.message({ data: { type: 'SAFEHOUR_SW_INFO' }, ports: [ok] });
+    assert.equal(ok.sent.length, 1);
+    assert.deepEqual(Object.keys(ok.sent[0]).sort(), ['push', 'type', 'version']);
+    assert.equal(ok.sent[0].type, 'SAFEHOUR_SW_INFO');
+    assert.equal(ok.sent[0].version, version);
+    assert.equal(ok.sent[0].push, true);
+
+    for (const data of [{ type: 'OTHER' }, { type: 'safehour_sw_info' }, 'SAFEHOUR_SW_INFO', null, undefined, 42, {}]) {
+      const other = port();
+      worker.handlers.message({ data, ports: [other] });
+      assert.deepEqual(other.sent, [], JSON.stringify(data));
+    }
+    for (const ports of [undefined, null, []]) {
+      assert.doesNotThrow(() => worker.handlers.message({ data: { type: 'SAFEHOUR_SW_INFO' }, ports }));
+    }
+    assert.doesNotThrow(() => worker.handlers.message({ data: { type: 'SAFEHOUR_SW_INFO' }, ports: [{}] }));
+    assert.equal(worker.calls.notifications.length, 0, '준비 확인은 알림을 내지 않는다');
+  });
+});
+
+describe('판과 머리 주석', () => {
+  test('SW_VERSION 은 2026-11-16.1 이고 캐시 이름에 새 판이 붙으며 옛 판은 켜질 때 지운다', async () => {
+    const caches = new FakeCacheStorage();
+    for (const name of ['safehour-pages-2026-09-19.1', 'safehour-assets-2026-09-19.1']) await caches.open(name);
+    const worker = loadWorker({ caches });
+    assert.equal(vm.runInContext('SW_VERSION', worker.context), '2026-11-16.1');
+    await dispatchLifecycle(worker, 'install');
+    await dispatchLifecycle(worker, 'activate');
+    const names = (await caches.keys()).sort();
+    assert.deepEqual(names, ['safehour-assets-2026-11-16.1', 'safehour-pages-2026-11-16.1']);
+  });
+
+  test('머리 주석에 spec 4.18, spec 4.13 이 없다', () => {
+    const header = SOURCE.slice(0, SOURCE.indexOf('*/'));
+    assert.ok(header.startsWith('/* SafeHour 서비스 워커'));
+    for (const old of ['spec 4.18', 'spec 4.13', '4.13']) assert.ok(!header.includes(old), old);
+    assert.ok(!/\bspec \d+\.\d+/.test(SOURCE), '파일 어디에도 옛 설계서 절 번호가 없다');
+    assert.ok(header.includes("docs/platform/IA_AND_FLOWS.md '보기 전용 상태'"));
+    assert.ok(header.includes("docs/business-rules.md '알림과 카드'"));
+    assert.ok(header.includes('알림 예약은 하지 않는다. 서버가 보낸 푸시만 보인다'));
+    assert.ok(header.includes('이 파일을 고치면 판을 올린다'));
   });
 });
 
