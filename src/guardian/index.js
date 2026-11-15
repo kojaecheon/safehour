@@ -31,4 +31,17 @@ export {
 export { PLAINTEXT_FORMAT, decodeSnapshotPlaintext, encodeSnapshotPlaintext } from './encoding.js';
 export { GUARDIAN_LINK_BUDGET_CHARS, GUARDIAN_PATH, buildGuardianLink, measureGuardianLink, parseGuardianLink } from './link.js';
 export { PIN_LOCKOUT_KEY_PREFIX, createPinLockout, pinLockoutKey } from './lockout.js';
+export {
+  MAX_ENDPOINT_CHARS,
+  PUSH_PATHS,
+  SUB_ID_RE,
+  muteRequest,
+  readConfigData,
+  readMuteData,
+  readStatusData,
+  readSubscribeData,
+  statusRequest,
+  subscribeRequest,
+  unsubscribeRequest,
+} from './pushRequests.js';
 export { unlockSnapshot } from './unlock.js';

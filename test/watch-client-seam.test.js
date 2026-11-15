@@ -1,7 +1,9 @@
 // 서버 알림 클라이언트·서버 이음매 (docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 3, D16 ·
 // docs/standards.md '클라이언트와 서버가 주고받는 요청 모양은 양쪽을 이은 테스트로 묶는다')
 //
-// 진짜 요청 모양(src/guardian/watchRequests.js)과 진짜 sendWatchRequest(src/guardian/watchSend.js, lib/trip/watchApi.js 가 다시 내보냄)를 진짜 처리기
+// 보호자 경로(구독·해지·상태 조회·함께 있음)는 docs/superpowers/plans/2026-11-15-server-push-guardian-ui.md Task 1 의 묶음이다.
+//
+// 진짜 요청 모양(src/guardian/watchRequests.js, 보호자는 src/guardian/pushRequests.js)과 진짜 sendWatchRequest(src/guardian/watchSend.js, lib/trip/watchApi.js 가 다시 내보냄)를 진짜 처리기
 // createWatchHandlers({ env: watchRouteEnv(), now: ctx.now, ctx: testCtx() })에 잇는다. 서버 검증은 느슨하게 하지 않는다.
 // fetchImpl 어댑터는 받은 (경로, init)을 그대로 Request 로 만들어 메서드·경로에 맞는 처리기에 넣는다(쿠키만 더한다).
 // 저장소는 메모리, 예약과 푸시는 기록기라 외부 호출이 없다. 시계는 testCtx 기본값 2026-11-20 12:00 KST 에서 ctx.clock 으로만 움직인다.
@@ -16,6 +18,18 @@ import { readDay } from '../lib/server/watch/records.js';
 import { CLIENT_INVALID, WATCH_API_TIMEOUT_MS, createWatchApi, sendWatchRequest } from '../lib/trip/watchApi.js';
 import { SESSION_COOKIE, createSessionToken } from '../src/auth/session.js';
 import {
+  PUSH_PATHS,
+  SUB_ID_RE,
+  muteRequest,
+  readConfigData,
+  readMuteData,
+  readStatusData,
+  readSubscribeData,
+  statusRequest,
+  subscribeRequest,
+  unsubscribeRequest,
+} from '../src/guardian/pushRequests.js';
+import {
   WATCH_KIND,
   WATCH_PATHS,
   WATCH_UPLOAD_MAX_DAYS,
@@ -29,7 +43,7 @@ import {
   removeRequest,
 } from '../src/guardian/watchRequests.js';
 import { addDays, eachDate } from '../src/stay/time.js';
-import { testCtx, watchRouteEnv } from './watch-fixtures.js';
+import { subscriptionFixture, testCtx, watchRouteEnv } from './watch-fixtures.js';
 
 const BASE = 'http://localhost';
 const TODAY = '2026-11-20';
@@ -48,10 +62,11 @@ after(() => mock.restoreAll());
 
 /**
  * 진짜 처리기에 이은 요청 함수. session 이 false 면 쿠키 없이 보낸다. env 를 주면 그 환경변수로 처리기를 만든다.
- * @returns {{ ctx: object, api: object, fetchImpl: Function, seen: Array<{ path: string, init: object }> }}
+ * ctx 를 주면 그 서버(메모리 저장소·시계)를 함께 쓴다: 환자 연결과 보호자 연결, 스위치가 꺼진 처리기가 같은 저장소를 본다.
+ * subject 는 세션 쿠키의 신원이다(환자 'patient-seam', 보호자는 다른 값).
+ * @returns {{ ctx: object, env: object, api: object, fetchImpl: Function, seen: Array<{ path: string, init: object }> }}
  */
-function connect({ at, session = true, env = watchRouteEnv() } = {}) {
-  const ctx = testCtx(at ? { at } : undefined);
+function connect({ at, session = true, env = watchRouteEnv(), ctx = testCtx(at ? { at } : undefined), subject = 'patient-seam' } = {}) {
   const h = createWatchHandlers({ env, now: ctx.now, ctx });
   const routes = new Map([
     [`GET ${WATCH_PATHS.config}`, h.pushConfig],
@@ -59,9 +74,13 @@ function connect({ at, session = true, env = watchRouteEnv() } = {}) {
     [`DELETE ${WATCH_PATHS.watch}`, h.remove],
     [`PUT ${WATCH_PATHS.deadlines}`, h.deadlines],
     [`POST ${WATCH_PATHS.back}`, h.back],
+    [`POST ${PUSH_PATHS.subscribe}`, h.subscribe],
+    [`DELETE ${PUSH_PATHS.subscribe}`, h.unsubscribe],
+    [`POST ${PUSH_PATHS.status}`, h.status],
+    [`POST ${PUSH_PATHS.mute}`, h.mute],
   ]);
   const cookie = session
-    ? `${SESSION_COOKIE}=${createSessionToken({ provider: 'demo', subject: 'patient-seam' }, env.SAFEHOUR_SESSION_SECRET, ctx.now())}`
+    ? `${SESSION_COOKIE}=${createSessionToken({ provider: 'demo', subject }, env.SAFEHOUR_SESSION_SECRET, ctx.now())}`
     : null;
   const seen = [];
   const fetchImpl = async (path, init) => {
@@ -71,7 +90,7 @@ function connect({ at, session = true, env = watchRouteEnv() } = {}) {
     if (!route) throw new Error('처리기가 없는 경로');
     return route(new Request(BASE + path, { ...init, headers: { ...init.headers, ...(cookie ? { cookie } : {}) } }));
   };
-  return { ctx, api: createWatchApi({ fetchImpl }), fetchImpl, seen };
+  return { ctx, env, api: createWatchApi({ fetchImpl }), fetchImpl, seen };
 }
 
 /** 결과 종류와 상태를 함께 본다 */
@@ -269,6 +288,180 @@ describe('라우트와 이은 요청', () => {
     assert.equal(removed.data.deleted, 2);
     expectKind(await api.deadlines({ ...two, expiresOn: EXPIRES_ON, days }), WATCH_KIND.NOT_FOUND, 404);
     expectKind(await api.back({ ...three, date: TODAY, by: '14:30' }), WATCH_KIND.NOT_FOUND, 404);
+  });
+});
+
+// ── 보호자 경로 (docs/superpowers/plans/2026-11-15-server-push-guardian-ui.md Task 1) ─────────────────
+// 진짜 보호자 요청 모양(src/guardian/pushRequests.js)을 진짜 sendWatchRequest 로 진짜 처리기에 보내고, 응답은 진짜 읽기 함수로 읽는다.
+// 환자 연결이 등록한 지켜보기를 같은 서버(ctx)에 이은 보호자 연결이 구독한다.
+
+describe('보호자 경로와 이은 요청', () => {
+  const OTHER_SUB_ID = 'OTHERsubIdFixture_01-x';
+
+  /** PushSubscription.toJSON() 모양의 구독(실제 P-256 키, 허용 목록 안의 테스트 주소) */
+  function pushSubscriptionJson() {
+    const { subscription } = subscriptionFixture();
+    return { endpoint: subscription.endpoint, expirationTime: null, keys: { p256dh: subscription.p256dh, auth: subscription.auth } };
+  }
+
+  /** 환자가 등록한 지켜보기 하나와 같은 서버에 이은 보호자 연결. send 는 보호자 쪽 진짜 sendWatchRequest 다 */
+  async function watched() {
+    const patient = connect();
+    const ids = newWatchIds();
+    expectKind(await patient.api.register({ ...ids, expiresOn: EXPIRES_ON }), WATCH_KIND.OK, 200);
+    const guardian = connect({ ctx: patient.ctx, env: patient.env, subject: 'guardian-seam' });
+    const send = (request) => sendWatchRequest(request, { fetchImpl: guardian.fetchImpl });
+    const subscribe = async (subscription = pushSubscriptionJson()) => {
+      const result = await send(subscribeRequest({ watchId: ids.watchId, subscription, lang: 'ja' }));
+      expectKind(result, WATCH_KIND.OK, 200);
+      return readSubscribeData(result.data)?.subId ?? null;
+    };
+    return { patient, guardian, ids, send, subscribe };
+  }
+
+  test('보호자 구독: 진짜 subscribeRequest 본문이 처리기를 통과해 { ok, subId } 이고 subId 가 SUB_ID_RE 에 맞는다', async () => {
+    const { guardian, ids, send } = await watched();
+    const subscription = pushSubscriptionJson();
+    const result = await send(subscribeRequest({ watchId: ids.watchId, subscription, lang: 'ja' }));
+    expectKind(result, WATCH_KIND.OK, 200);
+    assert.deepEqual(Object.keys(result.data).sort(), ['ok', 'subId']);
+    const read = readSubscribeData(result.data);
+    assert.ok(read, '읽기 함수가 응답을 받는다');
+    assert.match(read.subId, SUB_ID_RE);
+
+    // 식별 값·구독은 본문으로만 갔다
+    const [{ path, init }] = guardian.seen;
+    assert.equal(path, PUSH_PATHS.subscribe);
+    assert.equal(init.method, 'POST');
+    for (const value of [ids.watchId, read.subId, subscription.endpoint, subscription.keys.p256dh]) assert.ok(!path.includes(value));
+    assert.deepEqual(Object.keys(JSON.parse(init.body)), ['watchId', 'subscription', 'lang']);
+  });
+
+  test('같은 기기 다시 구독은 새 subId 이고, 예전 subId 의 해지는 NOT_FOUND 다', async () => {
+    const { patient, ids, send, subscribe } = await watched();
+    const subscription = pushSubscriptionJson();
+    const first = await subscribe(subscription);
+    const second = await subscribe(subscription);
+    assert.match(first, SUB_ID_RE);
+    assert.match(second, SUB_ID_RE);
+    assert.notEqual(first, second);
+    assert.equal(patient.ctx.push.sent.length, 0, '같은 기기라 기기 바뀜 알림을 보내지 않는다');
+
+    const stale = await send(unsubscribeRequest({ watchId: ids.watchId, subId: first }));
+    expectKind(stale, WATCH_KIND.NOT_FOUND, 404);
+    assert.equal(stale.errorCode, 'SAFEHOUR_WATCH_NOT_FOUND');
+    expectKind(await send(unsubscribeRequest({ watchId: ids.watchId, subId: second })), WATCH_KIND.OK, 200);
+    // 이미 지운 구독을 다시 지우면 404 다(서버 삭제 대기가 비워도 되는 결과)
+    expectKind(await send(unsubscribeRequest({ watchId: ids.watchId, subId: second })), WATCH_KIND.NOT_FOUND, 404);
+  });
+
+  test('상태 조회: 지금 subId 면 subscriptionActive 참, 다른 subId 면 거짓', async () => {
+    const { patient, guardian, ids, send, subscribe } = await watched();
+    // 환자가 오늘 14:30 을 올리고 '돌아왔어요'를 눌렀다
+    expectKind(await patient.api.deadlines({ ...ids, expiresOn: EXPIRES_ON, days: [{ date: TODAY, deadlines: ['14:30'] }] }), WATCH_KIND.OK);
+    assert.equal((await patient.api.back({ ...ids, date: TODAY, by: '14:30' })).data.recorded, true);
+    const subId = await subscribe();
+
+    const active = await send(statusRequest({ watchId: ids.watchId, subId }));
+    expectKind(active, WATCH_KIND.OK, 200);
+    assert.deepEqual(readStatusData(active.data), { date: TODAY, confirmed: ['14:30'], muted: false, subscriptionActive: true });
+
+    const other = await send(statusRequest({ watchId: ids.watchId, subId: OTHER_SUB_ID }));
+    expectKind(other, WATCH_KIND.OK, 200);
+    assert.equal(readStatusData(other.data).subscriptionActive, false);
+
+    const before = guardian.seen.length;
+    const none = await send(statusRequest({ watchId: ids.watchId }));
+    expectKind(none, WATCH_KIND.OK, 200);
+    assert.equal(readStatusData(none.data).subscriptionActive, false);
+    assert.deepEqual(JSON.parse(guardian.seen[before].init.body), { watchId: ids.watchId }, 'subId 키 없이 보냈다');
+  });
+
+  test('함께 있음을 켠 뒤 상태 조회의 muted 가 참이다', async () => {
+    const { ids, send, subscribe } = await watched();
+    const subId = await subscribe();
+
+    const on = await send(muteRequest({ watchId: ids.watchId, subId, on: true }));
+    expectKind(on, WATCH_KIND.OK, 200);
+    assert.deepEqual(readMuteData(on.data), { muted: true });
+    assert.equal(readStatusData((await send(statusRequest({ watchId: ids.watchId, subId }))).data).muted, true);
+
+    const off = await send(muteRequest({ watchId: ids.watchId, subId, on: false }));
+    expectKind(off, WATCH_KIND.OK, 200);
+    assert.deepEqual(readMuteData(off.data), { muted: false });
+    assert.equal(readStatusData((await send(statusRequest({ watchId: ids.watchId, subId }))).data).muted, false);
+
+    // 지금 구독이 아닌 subId 로는 바꾸지 못한다
+    expectKind(await send(muteRequest({ watchId: ids.watchId, subId: OTHER_SUB_ID, on: true })), WATCH_KIND.NOT_FOUND, 404);
+  });
+
+  test('서버 스위치가 꺼진 처리기에서도 해지는 OK 다', async () => {
+    const { patient, ids, subscribe } = await watched();
+    const subId = await subscribe();
+    const { SAFEHOUR_SERVER_PUSH: _on, ...offEnv } = patient.env;
+    const off = connect({ ctx: patient.ctx, env: offEnv, subject: 'guardian-seam' });
+    const sendOff = (request) => sendWatchRequest(request, { fetchImpl: off.fetchImpl });
+
+    const config = await off.api.config();
+    expectKind(config, WATCH_KIND.OK, 200);
+    assert.deepEqual(readConfigData(config.data), { enabled: false, vapidPublicKey: null, guardianLoginRequired: true });
+    // 구독·상태 조회·함께 있음은 꺼짐이다
+    expectKind(await sendOff(subscribeRequest({ watchId: ids.watchId, subscription: pushSubscriptionJson(), lang: 'ko' })), WATCH_KIND.OFF, 503);
+    expectKind(await sendOff(statusRequest({ watchId: ids.watchId, subId })), WATCH_KIND.OFF, 503);
+    expectKind(await sendOff(muteRequest({ watchId: ids.watchId, subId, on: true })), WATCH_KIND.OFF, 503);
+    // 해지는 스위치와 무관하게 된다
+    expectKind(await sendOff(unsubscribeRequest({ watchId: ids.watchId, subId })), WATCH_KIND.OK, 200);
+    expectKind(await sendOff(unsubscribeRequest({ watchId: ids.watchId, subId })), WATCH_KIND.NOT_FOUND, 404);
+  });
+
+  test('세션 없는 구독은 LOGIN_REQUIRED 다(guardianLoginRequired 기본값)', async () => {
+    const { patient, guardian, ids, subscribe } = await watched();
+    const config = await guardian.api.config();
+    expectKind(config, WATCH_KIND.OK, 200);
+    assert.deepEqual(readConfigData(config.data), {
+      enabled: true,
+      vapidPublicKey: patient.env.SAFEHOUR_VAPID_PUBLIC_KEY,
+      guardianLoginRequired: true,
+    });
+
+    const anonymous = connect({ ctx: patient.ctx, env: patient.env, session: false });
+    const sendAnonymous = (request) => sendWatchRequest(request, { fetchImpl: anonymous.fetchImpl });
+    const denied = await sendAnonymous(subscribeRequest({ watchId: ids.watchId, subscription: pushSubscriptionJson(), lang: 'en' }));
+    expectKind(denied, WATCH_KIND.LOGIN_REQUIRED, 401);
+    assert.equal(denied.errorCode, 'SAFEHOUR_AUTH_REQUIRED');
+
+    // 상태 조회와 함께 있음도 세션이 필요하고, 해지는 세션 없이 된다
+    const subId = await subscribe();
+    expectKind(await sendAnonymous(statusRequest({ watchId: ids.watchId, subId })), WATCH_KIND.LOGIN_REQUIRED, 401);
+    expectKind(await sendAnonymous(muteRequest({ watchId: ids.watchId, subId, on: true })), WATCH_KIND.LOGIN_REQUIRED, 401);
+    expectKind(await sendAnonymous(unsubscribeRequest({ watchId: ids.watchId, subId })), WATCH_KIND.OK, 200);
+  });
+
+  test('환자 다시 등록(같은 watchId, 새 토큰) 뒤에도 보호자 subscriptionActive 가 참이다', async () => {
+    const { patient, ids, send, subscribe } = await watched();
+    const subId = await subscribe();
+    const renewed = { watchId: ids.watchId, writeToken: newWatchIds().writeToken };
+    expectKind(await patient.api.register({ ...renewed, expiresOn: EXPIRES_ON }), WATCH_KIND.OK, 200);
+
+    const status = await send(statusRequest({ watchId: ids.watchId, subId }));
+    expectKind(status, WATCH_KIND.OK, 200);
+    assert.equal(readStatusData(status.data).subscriptionActive, true);
+    expectKind(await send(muteRequest({ watchId: ids.watchId, subId, on: true })), WATCH_KIND.OK, 200);
+  });
+
+  test('환자가 지켜보기를 끄면 보호자 상태 조회는 NOT_FOUND 다', async () => {
+    const { patient, ids, send, subscribe } = await watched();
+    const subId = await subscribe();
+    expectKind(await sendWatchRequest(removeRequest(ids), { fetchImpl: patient.fetchImpl }), WATCH_KIND.OK, 200);
+
+    const status = await send(statusRequest({ watchId: ids.watchId, subId }));
+    expectKind(status, WATCH_KIND.NOT_FOUND, 404);
+    assert.equal(status.errorCode, 'SAFEHOUR_WATCH_NOT_FOUND');
+    expectKind(await send(statusRequest({ watchId: ids.watchId })), WATCH_KIND.NOT_FOUND, 404);
+    expectKind(await send(muteRequest({ watchId: ids.watchId, subId, on: true })), WATCH_KIND.NOT_FOUND, 404);
+    expectKind(await send(subscribeRequest({ watchId: ids.watchId, subscription: pushSubscriptionJson(), lang: 'ko' })), WATCH_KIND.NOT_FOUND, 404);
+    // 서버가 구독을 지켜보기와 함께 지웠다(해지도 404 라 삭제 대기에서 빠진다)
+    expectKind(await send(unsubscribeRequest({ watchId: ids.watchId, subId })), WATCH_KIND.NOT_FOUND, 404);
   });
 });
 
