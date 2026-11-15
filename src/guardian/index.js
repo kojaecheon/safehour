@@ -4,6 +4,7 @@
 // 서버로 아무것도 보내지 않고, 브라우저 저장소를 직접 쓰지 않는다(잠금 저장소는 주입).
 
 export { GUARDIAN_ERROR, GuardianError } from './errors.js';
+export { patientDeadlineDays, patientReturnsOf } from './deadlines.js';
 export {
   EMERGENCY_NUMBERS,
   GUARDIAN_LANGS,

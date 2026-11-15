@@ -164,11 +164,42 @@ export const RETURN_NOW_CAUSES = Object.freeze([
 /**
  * 마감을 '지금'으로 당긴 즉시 복귀 날인가. 외출 중 재계획으로 늦어 OUTING_OVERDUE 가 켜진 날만 그렇다.
  * PATIENT_RECALLED·PLAN_REVOKED·PLAN_EXPIRED 로 켜진 날은 외출의 실제 마감(returnBy)이 그대로 남는다.
- * 쓰는 곳: lib/notify/schedule.js(마감 지남 알림 제외), components/trip/viewModel.js todayFocus(외출 중 유지).
+ * 쓰는 곳: isClampedOverdueOuting(아래).
  * @param {object|null} day  DayPlan
  */
 export function isOverdueClampedDay(day) {
   return day?.returnNow === true && Array.isArray(day.reasons) && day.reasons.includes(REASON.OUTING_OVERDUE);
+}
+
+/**
+ * 마감이 '지금'으로 당겨진 외출인가. OUTING_OVERDUE 즉시 복귀 날(isOverdueClampedDay)의 여유 음수 외출만 그렇다.
+ * 그 외출의 returnBy 는 엔진이 당겨 놓은 값이라 실제 마감 시각이 아니다. 같은 날의 다른 외출과 다른 즉시 복귀 원인의 날은
+ * 실제 마감이 남아 있다.
+ * 쓰는 곳: lib/notify/schedule.js(마감 지남 알림 제외), src/guardian/deadlines.js(서버 알림 업로드 제외),
+ * components/trip/viewModel.js todayFocus(오늘 카드의 외출 중 유지).
+ * @param {object|null} day  DayPlan
+ * @param {object|null} outing  그날의 환자 외출
+ */
+export function isClampedOverdueOuting(day, outing) {
+  return isOverdueClampedDay(day) && typeof outing?.slackMin === 'number' && outing.slackMin < 0;
+}
+
+/** "HH:MM" 24시간 표기인가. 이 층은 src/stay 를 불러오지 않으므로(모듈 경계) 여기서 따로 본다 */
+const CLOCK_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/**
+ * 마감이 예상 귀가보다 이른 외출인가: 여유가 음수이고 returnBy 가 plannedReturnAt(없으면 returnBy)보다 이르다.
+ * 엔진의 overdueSafe(src/engine/dayContext.js)가 마감을 출발·그때 시각으로 당긴 외출이다. overdueSafe 가 붙이는 pulled 는
+ * 저장되지 않으므로 저장된 외출에서는 이 식으로 다시 추정한다. 한쪽 기준을 바꾸면 다른 쪽도 본다.
+ * 시각은 0을 채운 "HH:MM"이라 문자열 비교가 분 비교와 같다. 시각이 아니면 거짓이다.
+ * 쓰는 곳: src/engine/tripPlan.js(해제할 때 다시 잴 외출), lib/trip/watchPlan.js(서버 알림의 묶인 외출).
+ * @param {object|null} outing  환자 외출
+ */
+export function isPulledDeadlineOuting(outing) {
+  if (typeof outing?.slackMin !== 'number' || !(outing.slackMin < 0)) return false;
+  const planned = outing.plannedReturnAt ?? outing.returnBy;
+  const isClock = (value) => typeof value === 'string' && CLOCK_RE.test(value);
+  return isClock(outing.returnBy) && isClock(planned) && outing.returnBy < planned;
 }
 
 /**

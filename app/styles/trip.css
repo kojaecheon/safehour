@@ -651,3 +651,21 @@ p.trip-notice > .trip-notice-body {
   font-weight: var(--weight-bold);
   color: var(--ink);
 }
+
+/* ── 서버 알림 '돌아왔어요' (계획 2026-11-15 Task 9) ── */
+/* 상태 줄(안전 문구 주 언어 + 병기) 다음 보조 버튼, 되돌리기는 조용한 버튼. 버튼 높이는 공용 .btn 이 44px 이상으로 정한다 */
+.trip-back {
+  display: grid;
+  gap: var(--space-2);
+}
+.trip-back-status {
+  display: grid;
+  gap: var(--space-1);
+}
+.trip-back-status p {
+  font-size: var(--text-body);
+  color: var(--ink);
+}
+.trip-back-status .trip-pair-secondary {
+  color: var(--ink-soft);
+}

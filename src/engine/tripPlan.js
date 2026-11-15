@@ -18,7 +18,7 @@
 // 결과가 같다. 고친 결과는 다시 고쳐도 그대로인 고정점이다. 변화가 없으면 전후 비교를 새로 만들지 않고 저장된 것을 둔다.
 // 사용자 편집(삭제·교체·비움)으로 생긴 변화는 '변경됨'으로 알리지 않는다. 보이는 변화에는 늘 원인 사유가 있다.
 
-import { REASON, RETURN_NOW_CAUSES, STATE } from '../domain/states.js';
+import { REASON, RETURN_NOW_CAUSES, STATE, isPulledDeadlineOuting } from '../domain/states.js';
 import { HOSPITAL_PERIOD_STATUS, hospitalPeriodStatus, periodAppliesOnDate, periodCoversDate } from '../stay/coverage.js';
 import { hasSensitiveConsent, isStayDate, lodgingForDate, pointOf, stayDates } from '../stay/stay.js';
 import { createFallbackEstimator, createTransitEstimator } from '../adapters/travelTime.js';
@@ -241,7 +241,9 @@ function planStructural({ context, common, fresh, prevDay, nowMin, emptyReasons,
         started.every((x, i) => f.stops[i]?.id === x.id && f.stops[i].arriveAt === x.arriveAt && f.stops[i].leaveAt === x.leaveAt),
     );
     if (same) return { ...same, id: o.id, stops: [...started, ...same.stops.slice(started.length)] };
-    return role === 'P' && pulledDeadline(o) ? remeasure(context, o, started, list, nowMin) : o;
+    // 마감이 당겨진 외출(isPulledDeadlineOuting, src/domain/states.js): overdueSafe 가 마감을 출발·그때 시각으로 당긴 외출
+    // (정거장에 아직 머무는 중이었거나 이동 중에 정거장을 모두 비움)이다
+    return role === 'P' && isPulledDeadlineOuting(o) ? remeasure(context, o, started, list, nowMin) : o;
   };
   const keptP = (prevDay?.outings ?? []).filter(departed).map((o) => restore(o, fresh.outings, 'P'));
   const keptG = (prevDay?.guardianOutings ?? []).filter(departed).map((o) => restore(o, fresh.guardianOutings, 'G'));
@@ -303,16 +305,6 @@ function mergeLog(to, from) {
   from.clearedSlots.forEach((x) => to.clearedSlots.add(x));
   to.replacements.push(...from.replacements);
   from.slotReasons.forEach((v, k) => to.slotReasons.set(k, v));
-}
-
-/**
- * 마감이 복귀 도착보다 이른 외출: overdueSafe 가 마감을 출발·그때 시각으로 당긴 외출(정거장에 아직 머무는 중이었거나
- * 이동 중에 정거장을 모두 비움)이다. 여유는 음수다.
- * dayContext.js 의 overdueSafe 가 붙이는 pulled 는 저장되지 않으므로(outingMeta 가 버림) 저장된 외출에서는 이 식으로 다시
- * 추정한다. 한쪽 기준을 바꾸면 다른 쪽도 본다.
- */
-function pulledDeadline(o) {
-  return o.slackMin < 0 && toMinutes(o.returnBy) < toMinutes(o.plannedReturnAt ?? o.returnBy);
 }
 
 /**

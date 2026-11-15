@@ -20,6 +20,13 @@ export const messages = {
     ja: '滞在・条件・予定はこの端末にのみ保存されます。サーバーには保存されません。',
     zh: '停留信息、条件和行程只保存在此设备上，不会保存在服务器上。',
   },
+  // 이 기기에 서버 알림 레코드(ON·REPLACED)가 있을 때 clear.note 대신 보인다(components/settings/serverPushView.js clearNoteKey)
+  'clear.noteServerPush': {
+    ko: "체류·조건·일정은 이 기기에만 저장됩니다. 서버 알림을 켜 두면 날짜별 복귀 마감 시각과 '돌아왔어요' 기록이 서버에 저장됩니다.",
+    en: 'Your stay, conditions and plans are stored on this device only. While server alerts are on, the return deadline times for each day and your “I’m back” records are stored on our server.',
+    ja: '滞在・条件・予定はこの端末にのみ保存されます。サーバー通知をオンにしている間は、日ごとの帰着期限の時刻と「戻りました」の記録がサーバーに保存されます。',
+    zh: '停留信息、条件和行程只保存在此设备上。开启服务器提醒期间，每天的返回截止时间和“我已返回”记录会保存在服务器上。',
+  },
   'clear.question': {
     ko: '이 기기에 저장된 체류·조건·일정·보호자 사본을 모두 지우고 로그아웃할까요? 언어 설정만 남습니다. 되돌릴 수 없습니다.',
     en: 'Delete your stay, conditions, plans and companion copies from this device and sign out? Only your language setting is kept. This cannot be undone.',
@@ -157,6 +164,71 @@ export const messages = {
   },
   'settings.dataTitle': { ko: '내 정보', en: 'Your data', ja: '自分の情報', zh: '我的信息' },
 
+  // ── 서버 알림 (계획 2026-11-15 Task 10). 스위치가 켜져 있거나 이 기기에 지켜보기가 있을 때만 보인다 ──
+  'settings.serverPushTitle': { ko: '서버 알림', en: 'Server alerts', ja: 'サーバー通知', zh: '服务器提醒' },
+  'settings.serverPushOn': {
+    ko: '서버 알림이 켜져 있어요.',
+    en: 'Server alerts are turned on.',
+    ja: 'サーバー通知はオンになっています。',
+    zh: '服务器提醒已开启。',
+  },
+  'settings.serverPushReplaced': {
+    ko: '다른 기기에서 서버 알림을 다시 설정했어요.',
+    en: 'Server alerts were set up again on another device.',
+    ja: '別の端末でサーバー通知が設定し直されました。',
+    zh: '服务器提醒已在其他设备上重新设置。',
+  },
+  'settings.serverPushOff': {
+    ko: '서버 알림이 꺼져 있어요. 보호자 링크를 만들 때 켤 수 있어요.',
+    en: 'Server alerts are turned off. You can turn them on when you create a guardian link.',
+    ja: 'サーバー通知はオフになっています。付き添い者用リンクを作成するときにオンにできます。',
+    zh: '服务器提醒已关闭。您可以在创建陪同者链接时开启。',
+  },
+  'settings.serverPushTurnOff': { ko: '서버 알림 끄기', en: 'Turn off server alerts', ja: 'サーバー通知をオフにする', zh: '关闭服务器提醒' },
+  // 끄기 확인 시트 제목(본문은 safety 의 settings.serverPushTurnOffBody, 화면 검토 M6)
+  'settings.serverPushTurnOffTitle': {
+    ko: '서버 알림을 끌까요?',
+    en: 'Turn off server alerts?',
+    ja: 'サーバー通知をオフにしますか？',
+    zh: '要关闭服务器提醒吗？',
+  },
+  'settings.serverPushTurnedOff': {
+    ko: '서버 알림을 껐어요. 보호자에게 링크를 다시 보내면 반영돼요.',
+    en: 'Server alerts are off. Send the link to your guardian again to update their copy.',
+    ja: 'サーバー通知をオフにしました。付き添い者にリンクを送り直すと反映されます。',
+    zh: '已关闭服务器提醒。重新向陪同者发送链接后即可更新。',
+  },
+  'settings.serverPushRemoveAll': {
+    ko: '서버에 남은 내 정보 지우기',
+    en: 'Delete my data left on the server',
+    ja: 'サーバーに残っている自分の情報を削除',
+    zh: '删除服务器上留存的我的信息',
+  },
+  'settings.serverPushRemoveConfirm': {
+    ko: "이 계정으로 서버에 남은 서버 알림 정보(날짜별 복귀 마감 시각, '돌아왔어요' 기록, 보호자 알림 받기 등록)를 모두 지울까요? 다른 기기에서 켠 서버 알림도 함께 꺼져요. 되돌릴 수 없어요.",
+    en: 'Delete all server alert information left on the server for this account (return deadline times for each day, “I’m back” records, and your guardian’s alert sign-up)? Server alerts turned on from other devices are turned off too. This cannot be undone.',
+    ja: 'このアカウントでサーバーに残っているサーバー通知の情報（日ごとの帰着期限の時刻、「戻りました」の記録、付き添い者の通知受け取りの登録）をすべて削除しますか？ほかの端末でオンにしたサーバー通知も一緒にオフになります。元に戻すことはできません。',
+    zh: '要删除此账号在服务器上留存的全部服务器提醒信息（每天的返回截止时间、“我已返回”记录、陪同者的提醒接收登记）吗？在其他设备上开启的服务器提醒也会一并关闭。删除后无法恢复。',
+  },
+  'settings.serverPushRemoved': {
+    ko: '서버에서 서버 알림 정보를 지웠어요. (지운 서버 알림 {count}개)',
+    en: 'Server alert information was deleted from the server. ({count} server alerts deleted)',
+    ja: 'サーバーからサーバー通知の情報を削除しました。（削除したサーバー通知 {count} 件）',
+    zh: '已从服务器删除服务器提醒信息。（已删除 {count} 项服务器提醒）',
+  },
+  'settings.serverPushRemoveLogin': {
+    ko: 'Google 또는 카카오로 로그인해야 지울 수 있어요.',
+    en: 'To delete it, sign in with Google or Kakao.',
+    ja: '削除するには、GoogleまたはKakaoでログインしてください。',
+    zh: '需要使用 Google 或 Kakao 登录后才能删除。',
+  },
+  'settings.serverPushRemoveFailed': {
+    ko: '지우지 못했어요. 잠시 뒤 다시 해 주세요.',
+    en: 'It could not be deleted. Please try again later.',
+    ja: '削除できませんでした。しばらくしてからもう一度お試しください。',
+    zh: '未能删除。请稍后重试。',
+  },
+
   // ── 더보기 (/more) ──
   'settings.moreHeader': { ko: '더보기', en: 'More', ja: 'その他', zh: '更多' },
   'settings.moreMenuAria': { ko: '더보기 메뉴', en: 'More menu', ja: 'その他のメニュー', zh: '更多菜单' },
@@ -246,5 +318,33 @@ export const safety = {
     en: 'Your plan is recalculated. Deleted conditions cannot be restored — after agreeing again you need to enter them again.',
     ja: '予定を計算し直します。削除した条件は元に戻せないため、もう一度同意したあとで入力し直す必要があります。',
     zh: '将重新计算行程。已删除的条件无法恢复，重新同意后需要再次填写。',
+  },
+  // 서버 알림 상태 줄: 이 기기의 지켜보기가 켜져 있는데 서버가 스위치가 꺼졌다고 답했을 때(보호자에게 알림이 가지 않는다)
+  'settings.serverPushPaused': {
+    ko: '서버 알림이 지금 멈춰 있어요. 그동안 보호자에게 서버 알림이 가지 않아요.',
+    en: 'Server alerts are paused right now. While they are paused, your guardian will not get server alerts.',
+    ja: 'サーバー通知は現在止まっています。その間、付き添い者にサーバー通知は届きません。',
+    zh: '服务器提醒目前已暂停。在此期间，陪同者不会收到服务器提醒。',
+  },
+  // 서버 알림 끄기 확인 시트 본문(화면 검토 M6). 보호자에게 알림이 가는지를 말하는 문장이다.
+  // 서버에서 지우지 못하면 연결될 때까지 알림이 갈 수 있으므로(serverPushTurnOffPending) '지워진 뒤부터'라고 쓴다(검토 M6)
+  'settings.serverPushTurnOffBody': {
+    ko: '끄면 서버에서 정보가 지워진 뒤부터 보호자에게 서버 알림이 가지 않아요. 다시 켜려면 보호자 링크를 새로 만들어 보내야 해요.',
+    en: 'If you turn them off, your guardian will stop getting server alerts once the information on the server is deleted. To turn them on again, you need to create and send a new guardian link.',
+    ja: 'オフにすると、サーバーの情報が削除されたあとは、付き添い者にサーバー通知が届かなくなります。もう一度オンにするには、付き添い者用リンクを新しく作成して送る必要があります。',
+    zh: '关闭后，服务器上的信息删除之后，陪同者就不会再收到服务器提醒。如需重新开启，需要重新创建并发送陪同者链接。',
+  },
+  // 서버 알림 끄기 결과 중 보호자에게 알림이 갈 수 있는지를 말하는 줄(계획 2026-11-15 Task 10, 작업 7 검토 반영)
+  'settings.serverPushTurnOffPending': {
+    ko: '이 기기에서는 껐어요. 서버에 남은 정보는 연결되면 지워요. 그 전까지는 보호자에게 알림이 갈 수 있어요.',
+    en: 'Turned off on this device. The information left on the server will be deleted once you are connected. Until then, your guardian may still get alerts.',
+    ja: 'この端末ではオフにしました。サーバーに残っている情報は、接続されたときに削除します。それまでは付き添い者に通知が届く可能性があります。',
+    zh: '已在此设备上关闭。服务器上剩余的信息会在连接后删除。在此之前，陪同者仍可能收到提醒。',
+  },
+  'settings.serverPushTurnOffFailed': {
+    ko: '서버 알림을 끄지 못했어요. 연결과 로그인을 확인한 뒤 다시 해 주세요.',
+    en: 'Server alerts could not be turned off. Check your connection and sign-in, then try again.',
+    ja: 'サーバー通知をオフにできませんでした。接続とログインを確認してから、もう一度お試しください。',
+    zh: '未能关闭服务器提醒。请检查网络连接和登录状态后重试。',
   },
 };

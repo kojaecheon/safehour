@@ -164,6 +164,36 @@
   align-items: center;
   cursor: pointer;
 }
+/* 서버 알림 선택 항목 (계획 2026-11-15 Task 8): 공유 동의 아래에 구역선 하나로 떼고, 체크·동의 목록·법률 검토 안내 줄 순서.
+   목록 아이콘은 장식(옅은 색)이고 뜻은 문장이 말한다. 배지는 두지 않는다 */
+.guardian-push {
+  margin-top: var(--space-6);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-section);
+}
+.guardian-push .guardian-list-title {
+  margin-top: var(--space-4);
+}
+.guardian-push-check {
+  margin-top: var(--space-2);
+}
+.guardian-push-list {
+  margin-top: var(--space-3);
+}
+.guardian-push-list .guardian-list-icon {
+  color: var(--ink-soft);
+}
+/* 링크를 만든 뒤 서버 알림 결과 줄(결과 제목의 aria-describedby 로 읽힌다): 문장으로 뜻을 말하고 색으로 나누지 않는다 */
+.guardian-push-result {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-3);
+}
+.guardian-push-result p {
+  color: var(--ink);
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+}
 /* 다시 보내기 안내 (SEED Callout · neutral): 코발트 면·띠 없이 회색 면. 안의 안내 문장은 상자 없이 둔다 */
 .guardian-resend {
   padding: var(--space-3-5) var(--space-4);

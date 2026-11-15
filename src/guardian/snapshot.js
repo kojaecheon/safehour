@@ -6,7 +6,10 @@
 // 스냅샷에 들어갈 길이 없다.
 //
 // - 담는 것: 만든 시각, 만료 시각(출국일 23:59 KST), 언어, 날짜별 {동행 필요, 보호자 단독 외출 가능,
-//   환자 복귀 마감·장소 이름·주소, 보호자 외출}, 긴급 번호(119, 1330)
+//   환자 복귀 마감·장소 이름·주소, 보호자 외출}, 긴급 번호(119, 1330), 서버 알림을 켰으면 지켜보기 id(watchId, 맨 끝 키)
+// - watchId 는 형식(WATCH_ID_RE, 22자 base64url)에 맞을 때만 담는다. 쓰기 토큰·마감 기록 같은 다른 서버 알림 값은 담지 않는다.
+//   담으면 링크가 약 48자 길어진다(난수 id 라 압축되지 않는다. test/guardian-size.test.js 가 잰다.
+//   docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 4, D7)
 // - 날짜는 만든 날(KST)과 입국일 중 늦은 날부터 7일(DEFAULTS.guardianLink.windowDays), 출국일에서 멈춘다. 지난 날은 보호자에게
 //   쓸모가 없고, 7일 뒤 날짜까지 담으면 긴 체류의 링크가 메신저 기준(8 KB)을 넘는다. 이후 날짜는 환자가 새 링크로 보낸다.
 //   담은 범위는 새 필드 없이 days[].date 의 처음·끝으로 읽는다(guardianCoverage)
@@ -17,7 +20,9 @@
 // 순수 함수 계층이다. 네트워크·저장소·브라우저 API 를 쓰지 않는다.
 
 import { DEFAULTS, KST_OFFSET_MIN, addDays, isClockTime, isDateString, lodgingForDate, parseInstantMs, stayDates } from '../stay/index.js';
+import { patientReturnsOf } from './deadlines.js';
 import { GUARDIAN_ERROR, GuardianError } from './errors.js';
+import { WATCH_ID_RE } from './watchRequests.js';
 
 export const GUARDIAN_SNAPSHOT_VERSION = 1;
 /** 긴급 번호: 스냅샷 입력과 무관하게 항상 이 값이다 (docs/business-rules.md '보호자', docs/platform/IA_AND_FLOWS.md '고정 요소') */
@@ -86,6 +91,7 @@ function windowFilter(dates, createdDate) {
  *   patientReturn: Array<{by: string, placeName: string|null, placeAddress: string|null}>,
  *   guardianOutings: GuardianOuting[]}>} days
  * @property {['119', '1330']} emergency
+ * @property {string} [watchId]  서버 알림 지켜보기 id. 형식에 맞을 때만 있다(맨 끝 키)
  */
 
 function isObject(value) {
@@ -110,6 +116,11 @@ function clock(value) {
 
 function oneOf(value, allowed) {
   return allowed.includes(value) ? value : null;
+}
+
+/** 형식에 맞는 지켜보기 id 면 { watchId }, 아니면 빈 객체. 스냅샷 맨 끝에 붙인다 */
+function watchIdField(value) {
+  return typeof value === 'string' && WATCH_ID_RE.test(value) ? { watchId: value } : {};
 }
 
 /**
@@ -228,7 +239,8 @@ function buildDay(stay, date, dayPlan) {
     escortRequired,
     // docs/business-rules.md '하루 일정 생성'의 보호자 단독 외출 조건 중 조건 쪽 세 가지: 동반 보호자 있음, 곁을 지킬 필요 없음, 동행 필수 아님
     guardianSoloAllowed: stay.hasCompanion === true && !escortRequired && !guardianMustStay,
-    patientReturn: listOf(dayPlan?.outings).map((o) => ({ by: o.returnBy, ...returnPlaceOf(o.returnPlace, lodging) })),
+    // 당겨진 외출의 마감도 지금처럼 담는다. 서버 알림 업로드만 뺀다(deadlines.js)
+    patientReturn: patientReturnsOf(dayPlan).map((r) => ({ by: r.by, ...returnPlaceOf(r.returnPlace, lodging) })),
     guardianOutings: dayPlan?.guardianOutings,
   });
 }
@@ -242,15 +254,17 @@ function buildDay(stay, date, dayPlan) {
  * - 환자 복귀: 그날 환자 외출마다 {복귀 마감, 장소 이름, 장소 주소}. 숙소면 그날 숙소 이름·도로명주소,
  *   병원이면 '병원' + null.
  * - 보호자 외출: 단독 외출이 가능한 날에만 옮긴다.
+ * - 지켜보기 id: 형식에 맞으면 맨 끝 키로 담는다. 맞지 않으면 없는 것과 같다.
  *
  * @param {object} args
  * @param {import('../stay/stay.js').Stay} args.stay
  * @param {{lang?: string, days: Record<string, object>}} args.tripPlan  TripPlan(기기에 저장한 전체 일정, lib/store/store.js readTripPlan)
  * @param {Date|number|string} [args.now]  만든 시각. 없으면 지금
  * @param {'ko'|'en'|'ja'|'zh'} [args.lang]  없으면 tripPlan.lang
+ * @param {string|null} [args.watchId]  켜진 서버 알림의 지켜보기 id
  * @returns {GuardianSnapshot}
  */
-export function buildGuardianSnapshot({ stay, tripPlan, now, lang } = {}) {
+export function buildGuardianSnapshot({ stay, tripPlan, now, lang, watchId = null } = {}) {
   if (!isObject(stay) || !isDateString(stay.arrival?.date) || !isDateString(stay.departure?.date)) {
     throw new TypeError('buildGuardianSnapshot: 체류(입국·출국 날짜)가 필요합니다');
   }
@@ -276,6 +290,7 @@ export function buildGuardianSnapshot({ stay, tripPlan, now, lang } = {}) {
     lang: snapshotLang,
     days,
     emergency: [...EMERGENCY_NUMBERS],
+    ...watchIdField(watchId),
   };
 }
 
@@ -283,7 +298,7 @@ export function buildGuardianSnapshot({ stay, tripPlan, now, lang } = {}) {
  * 스냅샷 모양의 값에 허용 목록을 다시 적용한다. 암호화 직전과 복호화 직후에 쓴다 —
  * 손으로 만든 스냅샷이나 다른 곳에서 만든 링크에 섞인 필드도 들어오지 못한다.
  * 만든 날(createdAt 의 KST 날짜)보다 이른 날짜를 버리고, 남은 날짜 중 가장 이른 날부터 7일 뒤의 날짜도 버린다.
- * 만든 스냅샷은 정규화해도 그대로다.
+ * 지켜보기 id 는 형식에 맞을 때만 남긴다. 만든 스냅샷은 정규화해도 그대로다.
  *
  * @param {unknown} snapshot
  * @returns {GuardianSnapshot}
@@ -326,6 +341,7 @@ export function normalizeGuardianSnapshot(snapshot) {
     lang: snapshot.lang,
     days,
     emergency: [...EMERGENCY_NUMBERS],
+    ...watchIdField(snapshot.watchId),
   };
 }
 

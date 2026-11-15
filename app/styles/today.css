@@ -202,6 +202,10 @@
 .today-estimate {
   color: var(--ink-soft);
 }
+/* 외출 중 카드의 서버 알림 '돌아왔어요'(계획 2026-11-15 Task 9): 복귀 마감 상자 아래, 다음 정거장 위 */
+.today-back {
+  margin-bottom: var(--space-4);
+}
 .today-next-stop h3 {
   margin-bottom: var(--space-2);
 }

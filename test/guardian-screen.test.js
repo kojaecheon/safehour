@@ -24,11 +24,13 @@ import {
   createLockoutStorage,
 } from '../components/guardian/lockoutStorage.js';
 import {
+  buildShareSnapshot,
   computeShareFingerprint,
   fingerprintContent,
   isGuardianResendNeeded,
   isGuardianWindowPassed,
   shareLang,
+  shareRecordFor,
 } from '../components/guardian/share.js';
 import { copyIdFor, guardianErrorView, kstClock, kstDate } from '../components/guardian/errorView.js';
 import { patientReturnStatus } from '../components/guardian/returnStatus.js';
@@ -36,6 +38,9 @@ import { makeGuardianStay, makeTripPlan, guardianOuting } from './guardian-fixtu
 
 const HOUR = 60 * 60 * 1000;
 const T0 = '2026-10-02T10:00:00+09:00';
+/** 형식에 맞는 지켜보기 id 둘 (22자 base64url, 테스트 전용) */
+const WATCH_ID = 'AbCdEfGhIjKlMnOpQrSt_-';
+const OTHER_WATCH_ID = 'ZyXwVuTsRqPoNmLkJiHg-_';
 
 function stayAndPlan() {
   return { stay: makeGuardianStay({ guardianShare: null }), tripPlan: makeTripPlan() };
@@ -161,6 +166,55 @@ describe("'보호자 링크 다시 보내기' 판단", () => {
     const share = await sentShare(pair);
     assert.equal(await isGuardianResendNeeded({ stay: null, tripPlan: pair.tripPlan, share }), false);
     assert.equal(await isGuardianResendNeeded({ stay: pair.stay, tripPlan: null, share }), false);
+  });
+
+  test('watchId 가 없으면 지문 내용에 watchId 키가 없다(기존 기록이 그대로 맞는다)', async () => {
+    const pair = stayAndPlan();
+    const snapshot = buildShareSnapshot({ ...pair, now: T0 });
+    assert.equal(Object.hasOwn(snapshot, 'watchId'), false);
+    assert.deepEqual(Object.keys(fingerprintContent(snapshot)).sort(), ['days', 'emergency', 'lang', 'v']);
+    // watchId 를 넘기지 않은 지문과 null·형식이 틀린 값을 넘긴 지문은 지금 기록과 같다
+    const share = await sentShare(pair);
+    for (const watchId of [undefined, null, WATCH_ID.slice(1)]) {
+      assert.equal(await computeShareFingerprint({ ...pair, since: T0, watchId }), share.planFingerprint, String(watchId));
+      assert.equal(await isGuardianResendNeeded({ ...pair, share, watchId }), false, String(watchId));
+    }
+    // watchId 를 담은 스냅샷은 지문 내용에 watchId 를 담는다
+    const withId = buildShareSnapshot({ ...pair, now: T0, watchId: WATCH_ID });
+    assert.equal(fingerprintContent(withId).watchId, WATCH_ID);
+    assert.equal((await shareRecordFor(withId)).planFingerprint, await computeShareFingerprint({ ...pair, since: T0, watchId: WATCH_ID }));
+  });
+
+  test('watchId 가 없는 지문은 watchId 를 더하기 전과 바이트까지 같다(고정값)', async () => {
+    // 고정값은 watchId 를 더하기 전 코드(937f7f0 의 components/guardian/share.js)로 같은 픽스처를 계산한 값이다.
+    // 이 값이 바뀌면 이미 보낸 링크의 기록이 모두 '다시 보내기'로 바뀐다
+    const stay = makeGuardianStay({ guardianShare: null });
+    stay.lodgings[1].name = '가상 숙소 지문';
+    const tripPlan = makeTripPlan();
+    tripPlan.lang = 'en';
+    tripPlan.days['2026-10-06'].outings[0].returnBy = '11:40';
+    tripPlan.days['2026-10-04'].guardianOutings = [guardianOuting('2026-10-04', { returnBy: '15:20' })];
+    const since = '2026-10-03T08:30:00+09:00';
+    const GOLDEN = '1ec75f9a6dcbc2e23c5fb71c2441d5aab589ef11266c2da32ca4da7dd2ae67db';
+    assert.equal(await computeShareFingerprint({ stay, tripPlan, since }), GOLDEN);
+    assert.equal(await computeShareFingerprint({ stay, tripPlan, since, watchId: null }), GOLDEN);
+    assert.notEqual(await computeShareFingerprint({ stay, tripPlan, since, watchId: WATCH_ID }), GOLDEN);
+  });
+
+  test('watchId 가 생기거나 바뀌거나 사라지면 다시 보내기가 필요하다', async () => {
+    const pair = stayAndPlan();
+    const without = await shareRecordFor(buildShareSnapshot({ ...pair, now: T0 }));
+    const withId = await shareRecordFor(buildShareSnapshot({ ...pair, now: T0, watchId: WATCH_ID }));
+    assert.notEqual(without.planFingerprint, withId.planFingerprint);
+    // 생김: watchId 없이 보낸 기록 + 켜진 지켜보기
+    assert.equal(await isGuardianResendNeeded({ ...pair, share: without, watchId: WATCH_ID }), true);
+    // 그대로
+    assert.equal(await isGuardianResendNeeded({ ...pair, share: withId, watchId: WATCH_ID }), false);
+    // 바뀜: 다른 watchId
+    assert.equal(await isGuardianResendNeeded({ ...pair, share: withId, watchId: OTHER_WATCH_ID }), true);
+    // 사라짐: 지켜보기를 끔
+    assert.equal(await isGuardianResendNeeded({ ...pair, share: withId, watchId: null }), true);
+    assert.equal(await isGuardianResendNeeded({ ...pair, share: withId }), true);
   });
 });
 

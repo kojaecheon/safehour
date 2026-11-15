@@ -12,7 +12,9 @@
 //   (SELF 기간·연동 지침 사본·연결 코드 삭제). 재계획은 저장소 구독자(일정 작업)가 한다.
 //   (확인 버튼만 긴급 빨강, 운영자 결정 2026-10)
 // - 내 정보 지우기: ClearSessionButton(stayOnPage) — 결과와 로그아웃 보류 여부를 이 자리에 보여준다.
-// - 보기 전용이면 알림·동의 철회를 막는다(저장소도 READ_ONLY 로 거절한다). 지우기와 언어는 된다.
+// - 서버 알림(ServerPushSection, 계획 2026-11-15 Task 10): 스위치가 켜져 있거나 이 기기에 지켜보기 레코드가 있을 때만
+//   내 정보 절 바로 위에 보인다. 끄기와 서버에 남은 내 정보 지우기(확인 시트). 스위치가 꺼져 있고 레코드가 없으면 예전과 같다.
+// - 보기 전용이면 알림·동의 철회·서버 알림 버튼을 막는다(저장소도 READ_ONLY 로 거절한다). 지우기와 언어는 된다.
 // - SEED ③층(설계서 6.2 12번): 회색 바탕 위 흰 블록. 언어(Radio 행) / 알림(Switch 행 + 안내) / 민감정보 동의 / 내 정보.
 
 import { useState } from 'react';
@@ -26,6 +28,7 @@ import { Button, Icon, Sheet } from '../ui/index.js';
 import useStoreStatus, { shouldShowReadOnly } from '../ui/useStoreStatus.js';
 import { useHydrated, usePrefs, useStay } from '../cards/useDeviceData.js';
 import PairText from './PairText.js';
+import ServerPushSection from './ServerPushSection.js';
 
 const NOTIFY_MESSAGE = Object.freeze({
   on: 'settings.notifyOn',
@@ -129,7 +132,7 @@ function NotificationSection({ readOnly, showReadOnly, noteKey, inert }) {
   );
 }
 
-function ConsentSection({ readOnly, showReadOnly, noteKey, sheetOpen, setSheetOpen }) {
+function ConsentSection({ readOnly, showReadOnly, noteKey, sheetOpen, setSheetOpen, inert }) {
   const { t, locale } = useLang();
   const stay = useStay();
   const hydrated = useHydrated();
@@ -148,7 +151,7 @@ function ConsentSection({ readOnly, showReadOnly, noteKey, sheetOpen, setSheetOp
   }
 
   return (
-    <section className="ui-block settings-section" aria-labelledby="settings-consent-title">
+    <section className="ui-block settings-section" aria-labelledby="settings-consent-title" inert={inert}>
       <h2 id="settings-consent-title">{t('settings.consentTitle')}</h2>
       {hydrated && (
         <p className="settings-text">
@@ -210,18 +213,31 @@ export default function SettingsScreen() {
   const noteKey = status.reason === READ_ONLY_REASON.OFFLINE ? 'settings.offlineNote' : 'settings.readOnlyNote';
   // 동의 철회 시트가 열려 있는 동안 다른 설정 묶음은 누를 수 없게 한다(시트 뒤 배경 — aria-modal 과 같은 뜻)
   const [sheetOpen, setSheetOpen] = useState(false);
+  // 서버 알림 확인 시트('turnOff' 끄기 · 'removeAll' 서버에 남은 내 정보 지우기). 열려 있는 동안 다른 묶음을 같은 방식으로 막는다
+  const [pushSheet, setPushSheet] = useState(null);
+  const pushSheetOpen = pushSheet !== null;
+  const anySheet = sheetOpen || pushSheetOpen;
   return (
     <>
-      <LanguageSection inert={sheetOpen} />
-      <NotificationSection readOnly={status.readOnly} showReadOnly={showReadOnly} noteKey={noteKey} inert={sheetOpen} />
+      <LanguageSection inert={anySheet} />
+      <NotificationSection readOnly={status.readOnly} showReadOnly={showReadOnly} noteKey={noteKey} inert={anySheet} />
       <ConsentSection
         readOnly={status.readOnly}
         showReadOnly={showReadOnly}
         noteKey={noteKey}
         sheetOpen={sheetOpen}
         setSheetOpen={setSheetOpen}
+        inert={pushSheetOpen}
       />
-      <section className="ui-block settings-section" aria-labelledby="settings-data-title" inert={sheetOpen}>
+      <ServerPushSection
+        status={status}
+        showReadOnly={showReadOnly}
+        noteKey={noteKey}
+        inert={sheetOpen}
+        sheet={pushSheet}
+        setSheet={setPushSheet}
+      />
+      <section className="ui-block settings-section" aria-labelledby="settings-data-title" inert={anySheet}>
         <h2 id="settings-data-title">{t('settings.dataTitle')}</h2>
         <ClearSessionButton stayOnPage />
       </section>

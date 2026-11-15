@@ -92,6 +92,8 @@ export const DEFAULTS = deepFreeze({
     returnPassedGraceMin: 60,
     /** 서버 푸시 유예(분): 복귀 마감 뒤 이만큼 지나도록 확인이 없으면 보호자에게 보낸다. 사람 검토 전 임시값 (ADR-0012 결정 6) */
     serverPushGraceMin: 10,
+    /** 서버 알림 예약이 보낼 시각보다 이만큼 일찍 와도 받아들이는 폭. '돌아왔어요' 되돌리기 마감(보낼 시각에서 이 값을 뺀 때)에도 쓴다. 안전 판정 숫자가 아니다. */
+    serverPushEarlyToleranceSec: 30,
   },
 
   stay: {

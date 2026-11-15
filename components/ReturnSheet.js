@@ -16,28 +16,48 @@
 //   - 긴급 연락: 119 전화 걸기와 /emergency.
 //   - 닫기(X)는 없다. '확인했어요' · Escape · 뒤로 가기가 모두 시트만 닫는다(useModalSheet — 페이지를 떠나지 않는다).
 //     닫아도 저장 일정의 returnNow 는 그대로다. 오늘 화면이 '복귀 안내 다시 보기'를 계속 보인다.
+//   - 서버 알림 '돌아왔어요'(components/trip/ReturnedConfirm.js, 계획 2026-11-15 Task 9): PASSED 와 OUTING_OVERDUE 시트에만
+//     본문 아래, 장소 절 위에 둔다. 지켜보기가 켜져 있지 않으면 아무것도 그리지 않는다(스위치가 꺼져 있으면 시트는 예전과 같다).
+//     눌러도 시트를 닫지 않고 일정을 바꾸지 않는다. '확인했어요'가 닫는다. 시트의 날이 시트가 열린 날(KST)일 때만 둔다:
+//     열어 둔 채 자정이 지나도 닫을 때까지 두고, 하루 화면에서 지난 날의 OUTING_OVERDUE 시트를 다시 열면 두지 않는다
+//     (returnedView.js sheetShowsConfirm, 화면 검토 M7, 검토 M2).
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useLang } from './LanguageProvider.js';
 import { Icon, Sheet } from './ui/index.js';
 import { REASON } from '@/src/domain/states.js';
+import { isDateString } from '@/src/stay/time.js';
+import ReturnedConfirm from './trip/ReturnedConfirm.js';
+import { sheetShowsConfirm } from './trip/returnedView.js';
+import useKstClock from './trip/useKstClock.js';
 import { overdueOutingOf, returnNoteKeyOf, returnTargetOf } from './trip/viewModel.js';
 
 const PLACE_ICON = Object.freeze({ LODGING: 'bed', HOSPITAL: 'hospital', PLANNED: 'flag' });
 
-/** 시트가 보일 돌아갈 곳과 본문 키, 판정을 새로 하지 않고 저장된 외출의 returnPlace 만 따른다 */
+/**
+ * 시트가 보일 돌아갈 곳과 본문 키, 판정을 새로 하지 않고 저장된 외출의 returnPlace 만 따른다.
+ * confirm: '돌아왔어요'를 둘지(PASSED·OUTING_OVERDUE 만)와 그 외출
+ */
 function sheetContent({ variant, day, stay, cause, outingId }) {
   if (variant === 'PASSED') {
     const outing = (day?.outings ?? []).find((o) => o?.id === outingId) ?? null;
     // 외출을 찾지 못하면 숙소로 추측하지 않는다
     const place = outing ? returnTargetOf({ day, stay, outing }) : { kind: 'PLANNED', name: null, address: null };
-    return { titleKey: 'return.passedTitle', bodyKey: 'return.passedBody', place, showCause: false };
+    return { titleKey: 'return.passedTitle', bodyKey: 'return.passedBody', place, showCause: false, confirm: { outing } };
   }
   if (cause === REASON.OUTING_OVERDUE) {
-    const place = returnTargetOf({ day, stay, outing: overdueOutingOf(day) });
-    return { titleKey: 'return.title', bodyKey: place.kind === 'LODGING' ? 'return.body' : 'return.bodyPlace', place, showCause: true };
+    const outing = overdueOutingOf(day);
+    const place = returnTargetOf({ day, stay, outing });
+    return {
+      titleKey: 'return.title',
+      bodyKey: place.kind === 'LODGING' ? 'return.body' : 'return.bodyPlace',
+      place,
+      showCause: true,
+      confirm: { outing },
+    };
   }
-  return { titleKey: 'return.title', bodyKey: 'return.body', place: returnTargetOf({ day, stay }), showCause: true };
+  return { titleKey: 'return.title', bodyKey: 'return.body', place: returnTargetOf({ day, stay }), showCause: true, confirm: null };
 }
 
 /**
@@ -48,11 +68,19 @@ function sheetContent({ variant, day, stay, cause, outingId }) {
  *                                       (PATIENT_RECALLED | PLAN_REVOKED | PLAN_EXPIRED | OUTING_OVERDUE)
  * @param {'CLEARED'|'PASSED'} [props.variant]  CLEARED: 즉시 복귀(returnNow) · PASSED: 복귀 마감 지남(일정 유지)
  * @param {string} [props.outingId]      PASSED 일 때 마감이 지난 환자 외출 id
+ * @param {string|null} [props.passedBy] PASSED 일 때 지난 복귀 마감(HH:MM). '돌아왔어요'가 확인할 마감이다
  * @param {() => void} props.onClose
  */
-export default function ReturnSheet({ day, stay, cause = null, variant = 'CLEARED', outingId, onClose }) {
+export default function ReturnSheet({ day, stay, cause = null, variant = 'CLEARED', outingId, passedBy = null, onClose }) {
   const { t, pair, safety, lang, reasonText } = useLang();
+  const clock = useKstClock();
   const content = sheetContent({ variant, day, stay, cause, outingId });
+  // 시트가 열린 날(KST). 같은 자리에서 다른 시트로 바뀌면(TripRuntime 이 즉시 복귀 다음에 마감 지남을 같은 자리에 그린다) 다시 잡는다
+  const sheetKey = [variant, day?.date, cause, outingId, passedBy].join(' ');
+  const [opened, setOpened] = useState(null);
+  if (isDateString(clock?.date) && opened?.key !== sheetKey) setOpened({ key: sheetKey, on: clock.date });
+  const openedOn = opened?.key === sheetKey ? opened.on : null;
+  const showConfirm = content.confirm !== null && sheetShowsConfirm({ day, today: clock?.date, openedOn });
   const title = pair(content.titleKey);
   const body = pair(content.bodyKey);
   const { place } = content;
@@ -84,6 +112,8 @@ export default function ReturnSheet({ day, stay, cause = null, variant = 'CLEARE
         <p className="trip-pair-secondary" lang={body.secondary.lang}>
           {body.secondary.text}
         </p>
+
+        {showConfirm && <ReturnedConfirm day={day} outing={content.confirm.outing} passedBy={variant === 'PASSED' ? passedBy : null} />}
 
         <section className="trip-return-place" aria-labelledby="trip-return-place-h">
           <h3 id="trip-return-place-h">

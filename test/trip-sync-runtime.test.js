@@ -853,4 +853,46 @@ describe('보호자 링크 다시 보내기 신호', () => {
     await sync.idle();
     assert.equal(sync.getState().guardianWindowPassed, true);
   });
+
+  test('보호자 다시 보내기 판단이 켜진 지켜보기의 watchId 를 함께 본다', async () => {
+    // 서버 알림 지켜보기(docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 7): 보호자 사본의 watchId 가
+    // 기기의 켜진(ON) 지켜보기와 맞아야 한다. REPLACED 는 켜진 것이 아니다(watchId 없음으로 본다)
+    const { store, sync } = await setup({ stayValue: selfStay() });
+    const watch = {
+      watchId: 'WATCHresendFixture_0ab',
+      writeToken: 'WRITEresendFixture_0123456789-abcdefghijklm',
+      expiresOn: '2026-10-10',
+      lastUploaded: {},
+      uploadPending: true,
+      backQueue: [],
+      state: 'ON',
+    };
+    const sentAt = new Date(kst('2026-10-02', '07:00')).toISOString();
+    const since = Date.parse(sentAt);
+    const plain = await computeShareFingerprint({ stay: store.readStay(), tripPlan: store.readTripPlan(), since });
+    store.writeGuardianShare({ lastSentAt: sentAt, planFingerprint: plain });
+    await sync.idle();
+    assert.equal(sync.getState().guardianResendNeeded, false, 'watchId 없이 보낸 링크, 지켜보기 없음');
+
+    // 지켜보기만 켜진다(체류·일정은 그대로): guardianWatch 구독으로 다시 판단한다
+    assert.equal(store.writeGuardianWatch(watch).ok, true);
+    await sync.idle();
+    assert.equal(sync.getState().guardianResendNeeded, true, 'watchId 없이 보낸 링크 + 켜진 지켜보기');
+
+    const withWatch = await computeShareFingerprint({ stay: store.readStay(), tripPlan: store.readTripPlan(), since, watchId: watch.watchId });
+    store.writeGuardianShare({ lastSentAt: sentAt, planFingerprint: withWatch });
+    await sync.idle();
+    assert.equal(sync.getState().guardianResendNeeded, false, 'watchId 를 담아 보낸 링크 + 같은 지켜보기');
+
+    // 다른 기기에서 갈아 끼움(REPLACED): 켜진 지켜보기가 아니므로 watchId 를 담은 링크는 다시 보내야 한다
+    assert.equal(store.writeGuardianWatch({ ...watch, state: 'REPLACED' }).ok, true);
+    await sync.idle();
+    assert.equal(sync.getState().guardianResendNeeded, true, 'REPLACED 는 watchId 없음과 같다');
+
+    // 끄면(레코드 없음) watchId 없이 보낸 링크가 다시 맞는다
+    assert.equal(store.writeGuardianWatch(null).ok, true);
+    store.writeGuardianShare({ lastSentAt: sentAt, planFingerprint: plain });
+    await sync.idle();
+    assert.equal(sync.getState().guardianResendNeeded, false);
+  });
 });

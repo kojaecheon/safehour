@@ -25,7 +25,7 @@ import { effectiveRows } from '../conditions/summary.js';
 import { safeStayDates } from '../../lib/trip/affected.js';
 import { canonicalJson } from '../../lib/store/fingerprint.js';
 import { declaredReturnHospitalId, returnHospitalOf } from '../../src/engine/returnTarget.js';
-import { REASON, RETURN_NOW_CAUSES, STATE, isOverdueClampedDay } from '../../src/domain/states.js';
+import { REASON, RETURN_NOW_CAUSES, STATE, isClampedOverdueOuting } from '../../src/domain/states.js';
 import { DEFAULTS } from '../../src/stay/defaults.js';
 import { appointmentsOnDate } from '../../src/stay/stay.js';
 import { toMinutes } from '../../src/stay/time.js';
@@ -274,7 +274,12 @@ export function plannedReturnOf(outing) {
   return typeof outing?.plannedReturnAt === 'string' && outing.plannedReturnAt ? outing.plannedReturnAt : null;
 }
 
-/** 저장된 하루에서 여유(slackMin)가 음수인 첫 환자 외출, 즉시 복귀 원인 OUTING_OVERDUE 의 외출. 없으면 null */
+/**
+ * 저장된 하루에서 여유(slackMin)가 음수인 첫 환자 외출. 없으면 null.
+ * 이 함수만으로는 그날이 OUTING_OVERDUE 즉시 복귀 날인지 보지 않는다. 복귀 시트(components/ReturnSheet.js)가 원인이
+ * OUTING_OVERDUE 일 때만 부르므로 그 조건 뒤에서만 'OUTING_OVERDUE 의 외출'이다. 다른 곳에서 당겨진 외출을 찾을 때는
+ * isClampedOverdueOuting(src/domain/states.js)을 쓴다.
+ */
 export function overdueOutingOf(day) {
   return outingsOf(day, 'P').find((o) => typeof o.slackMin === 'number' && o.slackMin < 0) ?? null;
 }
@@ -481,8 +486,9 @@ export function todayFocus(day, nowMin) {
   if (outings.length === 0) return null;
   const nextAppointment = nextAppointmentBlock(day, nowMin);
   const endOf = (o) => minutesOf(plannedReturnOf(o) || o.returnBy);
-  // 마감을 지금으로 당긴 날(OUTING_OVERDUE)만 붙잡는다. 다른 즉시 복귀 원인의 날에 끝난 여유 음수 외출을 OUT 으로 두지 않는다
-  const overdue = isOverdueClampedDay(day) ? overdueOutingOf(day) : null;
+  // 마감을 지금으로 당긴 외출(공용 판정 isClampedOverdueOuting)만 붙잡는다. 다른 즉시 복귀 원인의 날에 끝난 여유 음수 외출을
+  // OUT 으로 두지 않는다. 서버 알림의 '돌아왔어요' 대상과 같은 판정을 본다
+  const overdue = outingsOf(day, 'P').find((o) => isClampedOverdueOuting(day, o)) ?? null;
   const held = overdue && minutesOf(overdue.departAt) <= nowMin ? overdue : null;
   const current = held ?? outings.find((o) => minutesOf(o.departAt) <= nowMin && nowMin < endOf(o));
   if (current) {

@@ -493,6 +493,9 @@ export const messages = {
     ja: '帰着案内をもう一度見る',
     zh: '再次查看返回指引',
   },
+  // 서버 알림 '돌아왔어요' 버튼과 되돌리기 (계획 2026-11-15 Task 9). 누르면 확인 신호만 보낸다(일정·판정은 그대로)
+  'return.back': { ko: '돌아왔어요', en: 'I’m back', ja: '戻りました', zh: '我已返回' },
+  'return.backUndo': { ko: '되돌리기', en: 'Undo', ja: '取り消す', zh: '撤销' },
 };
 
 /** 안전 문구 — 복귀 안내(시트·마감·마감 이유·예상 귀가), 보호자 잠금 사유, 경고, 면책 */
@@ -529,6 +532,63 @@ export const safety = {
     en: 'If you are still out, go straight to the place below. If you are already back, close this with the button below.',
     ja: 'まだ外出中なら、下の場所へすぐ移動してください。すでに戻っている場合は、下のボタンで閉じてください。',
     zh: '如果你还在外面，请立即前往下方地点。如果已经返回，请点击下方按钮关闭。',
+  },
+  // 서버 알림 '돌아왔어요' 상태 줄 (계획 2026-11-15 Task 9, D10). '전달했어요'는 서버가 기록했다고 답한 뒤(SENT)에만 쓴다.
+  // 돌아왔는지를 앱이 판단하지 않는다: 버튼이 눌렸다는 신호만 보낸다. ja·zh 는 검수 스위치 전까지 영어+한국어로 보인다
+  'return.backHint': {
+    ko: '돌아왔다면 눌러 주세요. 누르지 않으면 마감 뒤 보호자에게 서버 알림이 갈 수 있어요.',
+    en: 'If you are back, tap this. If you do not tap it, a server alert may go to your guardian after the deadline.',
+    ja: '戻ったら押してください。押さないと、期限の後に付き添い者にサーバー通知が届くことがあります。',
+    zh: '如果已返回，请点击此处。如果不点击，截止时间过后陪同者可能会收到服务器提醒。',
+  },
+  'return.backSending': {
+    ko: '보내는 중이에요.',
+    en: 'Sending now.',
+    ja: '送信しています。',
+    zh: '正在发送。',
+  },
+  'return.backQueued': {
+    ko: "아직 전달하지 못했어요. 다시 보낼게요. 마감 뒤에도 '전달했어요'가 보이지 않으면 보호자에게 직접 연락해 주세요.",
+    en: 'It has not been passed on yet. We will send it again. If you do not see “Passed on to your guardian” after the deadline, please contact your guardian directly.',
+    ja: 'まだ伝えられていません。もう一度送ります。期限を過ぎても「伝えました」と表示されない場合は、付き添い者に直接連絡してください。',
+    zh: '尚未转达。我们会再次发送。如果截止时间过后仍未显示“已转达”，请直接联系陪同者。',
+  },
+  // 되돌리기 마감(그 마감의 서버 알림 30초 전)이 지나도록 대기 중이면 위 두 줄 대신 보인다(components/trip/returnedView.js)
+  'return.backQueuedLate': {
+    ko: '아직 전달하지 못했어요. 보호자에게 직접 연락해 주세요.',
+    en: 'It has not been passed on yet. Please contact your guardian directly.',
+    ja: 'まだ伝えられていません。付き添い者に直接連絡してください。',
+    zh: '尚未转达。请直接联系陪同者。',
+  },
+  'return.backUndoLate': {
+    ko: '되돌리지 못했을 수 있어요. 필요하면 보호자에게 직접 연락해 주세요.',
+    en: 'It may not have been undone. If needed, please contact your guardian directly.',
+    ja: '取り消せていない可能性があります。必要であれば付き添い者に直接連絡してください。',
+    zh: '可能未能撤销。如有需要，请直接联系陪同者。',
+  },
+  'return.backUndoQueued': {
+    ko: '연결되면 되돌려요. 늦으면 되돌리지 못할 수 있어요.',
+    en: 'It will be undone once you are connected. If that is too late, it may not be undone.',
+    ja: '接続されると取り消します。遅くなると取り消せないことがあります。',
+    zh: '联网后将撤销。如果太晚，可能无法撤销。',
+  },
+  'return.backSent': {
+    ko: '보호자에게 전달했어요.',
+    en: 'Passed on to your guardian.',
+    ja: '付き添い者に伝えました。',
+    zh: '已转达给陪同者。',
+  },
+  'return.backFailed': {
+    ko: '전달하지 못했어요. 보호자에게 직접 연락해 주세요.',
+    en: 'It could not be passed on. Please contact your guardian directly.',
+    ja: '伝えられませんでした。付き添い者に直接連絡してください。',
+    zh: '未能转达。请直接联系陪同者。',
+  },
+  'return.backUndoFailed': {
+    ko: '되돌리지 못했어요. 필요하면 보호자에게 직접 연락해 주세요.',
+    en: 'It could not be undone. If needed, please contact your guardian directly.',
+    ja: '取り消せませんでした。必要であれば付き添い者に直接連絡してください。',
+    zh: '未能撤销。如有需要，请直接联系陪同者。',
   },
   'return.deadline': { ko: '복귀 마감 {time}', en: 'Be back by {time}', ja: '帰着期限 {time}', zh: '返回截止 {time}' },
   'trip.plannedReturn': { ko: '예상 귀가 {time}', en: 'Expected back {time}', ja: '帰着予定 {time}', zh: '预计返回 {time}' },

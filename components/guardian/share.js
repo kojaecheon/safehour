@@ -10,6 +10,9 @@
 //     다시 판단할 때도 보낸 시각(lastSentAt)을 기준으로 스냅샷을 다시 만들어 같은 날짜 범위를 비교한다.
 //     그래서 날이 바뀌었다는 이유만으로 '다시 보내기'가 뜨지 않는다(지난 날짜의 일정은 바뀌지 않는다: docs/business-rules.md '전체 일정 확정과 변화 대응'의 재계획 규칙 2).
 //   - 스냅샷에 담기지 않는 값(병원 정보, 조건 세부, 마감 이유 등)이 바뀌어도 지문은 그대로다.
+//   - 서버 알림 지켜보기 id(watchId)는 스냅샷에 있을 때만 담는다. 없으면 지문 내용은 예전과 바이트까지 같아 이미 보낸 링크의
+//     기록이 그대로 맞는다. 지켜보기를 켜거나 끄거나 바꾸면 지문이 달라져 다시 보내기 안내가 뜬다(보호자 사본의 watchId 가
+//     기기 상태와 맞아야 한다, docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 4, D7).
 
 import { GUARDIAN_LANGS, buildGuardianSnapshot, guardianCoverage } from '../../src/guardian/index.js';
 import { KST_OFFSET_MIN, parseInstantMs } from '../../src/stay/index.js';
@@ -28,7 +31,7 @@ export function shareLang(tripPlan) {
 }
 
 /**
- * 지문에 넣을 내용 — 만든 시각·만료 시각을 뺀다.
+ * 지문에 넣을 내용: 만든 시각·만료 시각을 뺀다. 스냅샷에 watchId 가 있을 때만 watchId 를 담는다.
  * @param {import('../../src/guardian/snapshot.js').GuardianSnapshot} snapshot
  * @param {{fromDate?: string}} [options]  이 날짜(YYYY-MM-DD) 이후만 담는다
  */
@@ -37,23 +40,26 @@ export function fingerprintContent(snapshot, { fromDate } = {}) {
     throw new TypeError('fingerprintContent: 보호자 스냅샷이 필요합니다');
   }
   const days = typeof fromDate === 'string' ? snapshot.days.filter((d) => d?.date >= fromDate) : snapshot.days;
-  return { v: snapshot.v, lang: snapshot.lang, days, emergency: snapshot.emergency };
+  const content = { v: snapshot.v, lang: snapshot.lang, days, emergency: snapshot.emergency };
+  if (typeof snapshot.watchId === 'string') content.watchId = snapshot.watchId;
+  return content;
 }
 
 /**
  * 보호자 스냅샷을 만든다 — 링크 만들기와 다시 보내기 판단이 같은 인자로 부른다.
- * @param {{stay: object, tripPlan: object, now?: Date|number|string}} args
+ * @param {{stay: object, tripPlan: object, now?: Date|number|string, watchId?: string|null}} args
+ *   watchId: 켜진 서버 알림의 지켜보기 id. 형식이 틀리면 없는 것과 같다
  */
-export function buildShareSnapshot({ stay, tripPlan, now }) {
-  return buildGuardianSnapshot({ stay, tripPlan, now, lang: shareLang(tripPlan) });
+export function buildShareSnapshot({ stay, tripPlan, now, watchId = null }) {
+  return buildGuardianSnapshot({ stay, tripPlan, now, lang: shareLang(tripPlan), watchId });
 }
 
 /**
- * `since`(보낸 시각)의 날짜부터 본 현재 일정의 지문.
+ * `since`(보낸 시각)의 날짜부터 본 현재 일정의 지문. watchId 는 지금 기기의 켜진 지켜보기 id(없으면 null).
  * @returns {Promise<string>}
  */
-export async function computeShareFingerprint({ stay, tripPlan, since }) {
-  return planFingerprint(fingerprintContent(buildShareSnapshot({ stay, tripPlan, now: since })));
+export async function computeShareFingerprint({ stay, tripPlan, since, watchId = null }) {
+  return planFingerprint(fingerprintContent(buildShareSnapshot({ stay, tripPlan, now: since, watchId })));
 }
 
 /**
@@ -70,19 +76,20 @@ export async function shareRecordFor(snapshot) {
  *   - 체류·일정이 없거나 스냅샷을 만들 수 없음 → false (링크를 만들 수도 없다)
  *   - 기록이 깨짐(시각·지문 형식이 틀림) → true (무엇을 보냈는지 알 수 없다)
  *   - 보낸 날부터의 보호자 몫 내용이 지금과 다름 → true
+ *   - 보낸 링크의 지켜보기 id 와 지금 켜진 지켜보기 id(watchId)가 다름(생김, 바뀜, 사라짐) → true
  * 지금 시각에 기대지 않는다 — 같은 데이터면 언제 불러도 같은 답이다.
  *
- * @param {{stay: object|null, tripPlan: object|null, share: {lastSentAt: string, planFingerprint: string}|null}} args
+ * @param {{stay: object|null, tripPlan: object|null, share: {lastSentAt: string, planFingerprint: string}|null, watchId?: string|null}} args
  * @returns {Promise<boolean>}
  */
-export async function isGuardianResendNeeded({ stay, tripPlan, share }) {
+export async function isGuardianResendNeeded({ stay, tripPlan, share, watchId = null }) {
   if (!share) return false;
   if (!stay || !tripPlan) return false;
   const sentMs = typeof share.lastSentAt === 'string' ? parseInstantMs(share.lastSentAt) : null;
   if (sentMs === null || !FINGERPRINT_PATTERN.test(share.planFingerprint ?? '')) return true;
   let current;
   try {
-    current = await computeShareFingerprint({ stay, tripPlan, since: sentMs });
+    current = await computeShareFingerprint({ stay, tripPlan, since: sentMs, watchId });
   } catch {
     return false;
   }

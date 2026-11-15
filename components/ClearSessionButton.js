@@ -13,11 +13,14 @@
 //   - 로그아웃이 서버에 닿지 못했으면(오프라인) 이 자리에 결과를 남긴다: 기기 삭제는 끝났고,
 //     로그아웃은 인터넷에 연결되면 마무리된다(저장소가 온라인이 되면 다시 보낸다). 그동안 로그인으로 보지 않는다.
 //   - stayOnPage(설정 화면)면 로그아웃까지 끝나도 이동하지 않고 결과를 보여준다.
+//   - 버튼 아래 안내는 이 기기에 서버 알림 레코드가 있으면 서버에 저장되는 것(날짜별 복귀 마감 시각, '돌아왔어요' 기록)을 적는다.
 
 import { useState } from 'react';
 import { deleteAllMyData } from '@/lib/store/index.js';
 import { clearSafeHourSession } from '@/lib/session.js';
+import { useGuardianWatch } from '@/lib/trip/useGuardianWatch.js';
 import { useLang } from './LanguageProvider.js';
+import { clearNoteKey } from './settings/serverPushView.js';
 import useStoreStatus from './ui/useStoreStatus.js';
 
 /**
@@ -36,6 +39,8 @@ function goHome() {
 export default function ClearSessionButton({ stayOnPage = false, quietConfirm = false }) {
   const { t } = useLang();
   const status = useStoreStatus();
+  // 이 기기에 서버 알림 레코드(ON·REPLACED)가 있으면 서버에 저장되는 것을 적은 안내로 바꾼다(없으면 예전 그대로)
+  const watch = useGuardianWatch();
   /** 'idle' | 'confirm' | 'working' | 'done' */
   const [phase, setPhase] = useState('idle');
   const [result, setResult] = useState(null);
@@ -68,7 +73,7 @@ export default function ClearSessionButton({ stayOnPage = false, quietConfirm = 
           >
             {t('clear.cta')}
           </button>
-          <p className="settings-clear-note">{t('clear.note')}</p>
+          <p className="settings-clear-note">{t(clearNoteKey(watch.state))}</p>
         </>
       )}
 
