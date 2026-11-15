@@ -576,6 +576,45 @@ export const messages = {
     ja: '患者から受け取った付き添い者リンクをタップして開いてください。',
     zh: '请点击从患者处收到的陪同者链接打开。',
   },
+  // 받은 링크 붙여넣기(계획 2026-11-15 A-3 Task 6): 홈 화면 앱에서 사본을 다시 열 때 메신저의 링크를 붙여 넣는다
+  'guardian.pasteTitle': {
+    ko: '받은 링크 붙여넣기',
+    en: 'Paste a link you received',
+    ja: '受け取ったリンクを貼り付け',
+    zh: '粘贴收到的链接',
+  },
+  'guardian.pasteLabel': {
+    ko: '메신저로 받은 보호자 링크',
+    en: 'Guardian link from your messenger',
+    ja: 'メッセンジャーで受け取った付き添い者リンク',
+    zh: '通过聊天软件收到的陪同者链接',
+  },
+  'guardian.pasteHelp': {
+    ko: '링크 전체를 붙여 넣어 주세요. 링크는 서버로 보내지 않아요.',
+    en: 'Paste the whole link. The link is not sent to the server.',
+    ja: 'リンク全体を貼り付けてください。リンクはサーバーに送信されません。',
+    zh: '请粘贴完整链接。链接不会发送到服务器。',
+  },
+  // PIN 입력의 '열기'(guardian.unlockButton)와 이름을 나눈다: PIN 단계에서 절을 펼쳐도 '열기' 버튼이 둘이 되지 않는다
+  'guardian.pasteOpen': {
+    ko: '링크 열기',
+    en: 'Open link',
+    ja: 'リンクを開く',
+    zh: '打开链接',
+  },
+  'guardian.pasteInvalid': {
+    ko: 'SafeHour 보호자 링크가 아니에요. 메신저에서 받은 링크 전체를 다시 붙여 넣어 주세요.',
+    en: "This isn't a SafeHour guardian link. Paste the whole link from your messenger again.",
+    ja: 'SafeHourの付き添い者リンクではありません。メッセンジャーで受け取ったリンク全体をもう一度貼り付けてください。',
+    zh: '这不是SafeHour陪同者链接。请重新粘贴从聊天软件收到的完整链接。',
+  },
+  // 붙여 넣은 링크를 탭 저장소에 담지 못했을 때. guardian.holdFailed(로그인 뒤 링크 다시 누르기)는 로그인한 홈 화면 앱에 맞지 않는다
+  'guardian.pasteHoldFailed': {
+    ko: '링크를 잠시 담아 두지 못했어요. 앱을 다시 연 뒤 붙여 넣어 주세요.',
+    en: "Couldn't keep the link for now. Reopen the app and paste it again.",
+    ja: 'リンクを一時的に保管できませんでした。アプリを開き直してから、もう一度貼り付けてください。',
+    zh: '无法临时保存链接。请重新打开应用后再粘贴一次。',
+  },
   'guardian.copyTitle': {
     ko: '받은 일정',
     en: 'Received schedule',

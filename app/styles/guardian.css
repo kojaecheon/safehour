@@ -366,7 +366,8 @@
   color: var(--ink-soft);
   font-size: var(--text-body);
 }
-.guardian-others h2 {
+.guardian-others h2,
+.guardian-paste-title {
   font-size: var(--text-title-3);
 }
 .guardian-other-list {
@@ -482,8 +483,10 @@
   scroll-margin-top: calc(56px + env(safe-area-inset-top) + var(--space-3));
 }
 
-/* 오늘이 아닌 날짜: <details> 로 접는다. 요약 줄은 날짜 제목 + 펼침 화살표, 44px 이상, 초점 링이 보인다 */
-.guardian-day-summary {
+/* 오늘이 아닌 날짜: <details> 로 접는다. 요약 줄은 날짜 제목 + 펼침 화살표, 44px 이상, 초점 링이 보인다.
+   받은 링크 붙여넣기 절(계획 2026-11-15 A-3 Task 6)도 같은 요약 줄과 화살표를 쓴다 */
+.guardian-day-summary,
+.guardian-paste-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -493,14 +496,17 @@
   list-style: none;
   border-radius: var(--radius-10);
 }
-.guardian-day-summary::-webkit-details-marker {
+.guardian-day-summary::-webkit-details-marker,
+.guardian-paste-summary::-webkit-details-marker {
   display: none;
 }
-.guardian-day-summary:focus-visible {
+.guardian-day-summary:focus-visible,
+.guardian-paste-summary:focus-visible {
   outline: var(--focus-width) solid var(--accent);
   outline-offset: var(--space-0-5);
 }
-.guardian-day-summary .guardian-day-title {
+.guardian-day-summary .guardian-day-title,
+.guardian-paste-summary .guardian-paste-title {
   margin-bottom: 0;
 }
 .guardian-day-chevron {
@@ -510,11 +516,19 @@
   color: var(--ink-subtle);
   transition: transform var(--duration-fast) var(--ease-press);
 }
-.guardian-day-fold[open] .guardian-day-chevron {
+.guardian-day-fold[open] .guardian-day-chevron,
+.guardian-paste-fold[open] .guardian-day-chevron {
   transform: rotate(180deg);
 }
 .guardian-day-body {
   margin-top: var(--space-2);
+}
+/* 붙여넣기 입력: 링크 칸 모양(.guardian-link-field, 고정폭 글자·줄바꿈)을 그대로 쓴다. 열기 버튼은 52px 주 버튼 */
+.guardian-paste-form {
+  margin-top: var(--space-3);
+}
+.guardian-paste-open {
+  margin-top: var(--space-4);
 }
 /* 접힌 날짜끼리는 목록처럼 붙여 둔다: 사본 구역 간격(32) 대신 8 + 구분선 */
 .guardian-copy > .guardian-day.is-folded + .guardian-day.is-folded {
