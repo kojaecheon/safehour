@@ -12,7 +12,8 @@
 //   - storage 이벤트를 받지 못한 탭(뒤로·앞으로 캐시, 얼었던 탭)도 다시 보일 때, 세션 응답을 반영하기 전에, 실행기가 일을 시작할 때
 //     다시 대조한다. 다시 묻기가 답을 받지 못하면 한 번만 더 묻는다
 //   - 마지막 계정 키를 바꾼 사건(바뀌기 전과 뒤가 다르다)이면 지금 값이 이 탭이 본 값과 같아도 버린다(A 에서 B, 다시 A 로 바뀐 것을
-//     한꺼번에 받은 탭). 방금 연 탭은 기기에 남은 마지막 계정 키를 본 값으로 시작한다. 다른 탭의 로그아웃 보류 표시는 구독자에게 알린다
+//     한꺼번에 받은 탭). 방금 연 탭은 기기에 남은 마지막 계정 키를 본 값으로 시작한다. 다른 탭의 로그아웃 보류 표시와 저장소 전체
+//     비움은 구독자에게 상태와 데이터를 한 번씩 알린다
 //
 // 탭 둘은 같은 메모리 저장소를 나눠 쓰는 저장소 인스턴스 둘이고, 브라우저 쿠키는 변수 하나가 대신한다(가짜 fetch 와 가짜 요청 함수가
 // 보낸 때의 그 값을 기록한다. 로그아웃 요청은 쿠키를 지운다). storage 이벤트는 바꾼 탭이 아닌 다른 탭에만 오므로 탭 1에만 보낸다.
@@ -809,5 +810,54 @@ describe('다른 탭의 계정 전환: 한꺼번에 받은 바뀜, 시작 값, �
     assert.deepEqual(stays, [null], '읽을 계정이 없어져 데이터 화면도 다시 읽는다');
     assert.equal(h.tab1.writeStay(makeStay({ pace: 'NORMAL' })).code, STORE_ERROR.READ_ONLY);
     assert.deepEqual(h.checkedCookies(), [], '마지막 계정 키는 그대로라 세션을 버리거나 묻지 않는다');
+  });
+});
+
+describe('다른 탭이 저장소를 통째로 비우면 상태와 데이터를 한 번씩 알린다', () => {
+  /** 탭 1의 상태 알림과 체류 알림을 모은다 */
+  function listen(tab) {
+    const notified = [];
+    tab.subscribe('status', () => notified.push(tab.getStatus()));
+    const stays = [];
+    tab.subscribe('stay', ({ accountKey }) => stays.push(accountKey));
+    return { notified, stays };
+  }
+
+  test('로그인한 탭: 세션을 버리고 다시 물으며, 상태와 데이터 주제를 한 번씩만 알린다', () => {
+    const h = twoTabs();
+    h.holdSessions();
+    const seen = listen(h.tab1);
+    h.shared.clear();
+    h.storageEventOnly(null);
+
+    assert.equal(seen.notified.length, 1, '버리기의 알림과 비움의 알림을 한 번으로 모은다');
+    assert.equal(seen.notified[0].readOnly, true);
+    assert.equal(seen.notified[0].accountKey, null);
+    assert.deepEqual(seen.stays, [null], '데이터 화면은 비워진 저장소를 한 번 다시 읽는다');
+    assert.deepEqual(h.checkedCookies(), [A]);
+  });
+
+  test('세션을 버리지 않는 탭(마지막 계정 키가 이미 없다)도 지워진 로그아웃 보류 표시를 상태로 알린다', () => {
+    const h = twoTabs();
+    h.holdSessions();
+    // 다른 탭이 오프라인에서 내 정보 지우기를 했다: 마지막 계정 키를 지우고 로그아웃 보류 표시를 남겼다
+    const lastRaw = h.shared.getItem(DEVICE_KEY.lastAccountKey);
+    h.shared.removeItem(DEVICE_KEY.lastAccountKey);
+    h.storageEventOnly(DEVICE_KEY.lastAccountKey, h.shared, { oldValue: lastRaw, newValue: null });
+    const pending = JSON.stringify({ schemaVersion: 2, data: { since: `${TODAY}T03:00:00.000Z` } });
+    h.shared.setItem(DEVICE_KEY.logoutPending, pending);
+    h.storageEventOnly(DEVICE_KEY.logoutPending, h.shared, { oldValue: null, newValue: pending });
+    assert.equal(h.tab1.getStatus().logoutPending, true);
+    assert.deepEqual(h.checkedCookies(), [A]);
+
+    const seen = listen(h.tab1);
+    h.shared.clear(); // 로그아웃 보류 표시도 지워진다
+    h.storageEventOnly(null);
+
+    assert.equal(seen.notified.length, 1, '알리지 않으면 화면은 지워진 로그아웃 보류 표시를 그대로 그린다');
+    assert.equal(seen.notified[0].logoutPending, false);
+    assert.equal(seen.notified[0].readOnly, true);
+    assert.deepEqual(seen.stays, [null]);
+    assert.deepEqual(h.checkedCookies(), [A], '마지막 계정 키는 이미 없었으므로 다시 버리거나 묻지 않는다');
   });
 });
