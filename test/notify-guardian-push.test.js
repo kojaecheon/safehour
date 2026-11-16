@@ -1144,6 +1144,43 @@ describe('reconcile', () => {
     assert.ok(!lost.events.includes('subscribe'));
   });
 
+  test('다시 켜기가 바로 막혀도(보기 전용, 권한, 지원) 대상 지켜보기마다 결과를 남기고 알린다', async () => {
+    const oldSub = (watchId) => subRecord(watchId, { vapidKey: VAPID_OLD, endpointHash: hashOf(E_OLD) });
+    const blocked = async (options, block, expected) => {
+      const t = setup({ copies: [{ watchId: W1 }, { watchId: W2 }], existing: { endpoint: E_OLD, key: VAPID_OLD }, ...options });
+      // W2 는 moved 라 다시 켜기 대상이 아니다(다시 받기로만 푼다)
+      assert.equal(t.store.writeGuardianPush({ subs: [oldSub(W1), oldSub(W2)], status: [movedStatus(W2)], gone: [] }).ok, true);
+      block?.(t);
+      let seen = null;
+      t.runner.subscribe(() => {
+        seen = t.runner.getState(W1).lastResult;
+      });
+      assert.equal(await t.runner.renew(), expected);
+      assert.equal(t.runner.getState(W1).lastResult, expected);
+      assert.equal(seen, expected, '구독자에게 알린다');
+      assert.equal(t.runner.getState(W1).busy, false);
+      assert.equal(t.runner.getState(W2).lastResult, null, '대상이 아닌 지켜보기에는 남기지 않는다');
+      await t.runner.idle();
+      assert.deepEqual(t.server.routes(), []);
+      assert.deepEqual(pick(t.events, ['requestPermission', 'getSubscription', 'subscribe', 'unsubscribe']), []);
+    };
+    await blocked({}, (t) => t.store.setSession({ authenticated: false }), PUSH_RESULT.READ_ONLY);
+    await blocked({ permission: 'default' }, null, PUSH_RESULT.DENIED);
+    await blocked({ permission: 'denied' }, null, PUSH_RESULT.DENIED);
+    await blocked(
+      {},
+      (t) => {
+        t.browser.win.PushManager = undefined;
+      },
+      PUSH_RESULT.UNSUPPORTED,
+    );
+
+    // 구독이 없으면 대상이 없어 남기지 않는다
+    const empty = setup({ copies: [{ watchId: W1 }], permission: 'default' });
+    assert.equal(await empty.runner.renew(), PUSH_RESULT.DENIED);
+    assert.equal(empty.runner.getState(W1).lastResult, null, '구독이 없으면 대상이 없다');
+  });
+
   test('VAPID 키가 다르면 subscribe 를 부르지 않고 renewNeeded 다', async () => {
     const t = setup({ subs: [subRecord(W1, { vapidKey: VAPID_OLD, endpointHash: hashOf(E_OLD) })], existing: { endpoint: E_OLD, key: VAPID_OLD } });
     t.runner.start();
