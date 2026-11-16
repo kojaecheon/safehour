@@ -1,10 +1,12 @@
 // 받은 일정 화면(/g)의 '앱이 닫혀 있어도 받기' 항목 표시 규칙 (docs/superpowers/plans/2026-11-15-server-push-guardian-ui.md Task 7,
 // 다르게 정한 것 1·2, 정한 값 5·9·10·12·16·25·27·28)
 //
-//   guardianPushViewModel({ state, watchId, mainOn, writable, offline, today, loginElsewhere })
+//   guardianPushViewModel({ state, watchId, mainOn, writable, offline, today, loginElsewhere, lastAction })
 //     → { itemState, showSwitch, switchOn, switchDisabled, switchLocked, lines, result, actions, actionsDisabled,
 //         showMute, muteOn, muteDisabled, muteLocked, consentLines, safetyLines }
-//   resultFitsState(lastResult, { itemState, switchOn, showMute, muteOn })  결과 줄이 지금 상태에 맞는가(검토 I1)
+//   resultFitsState(lastResult, { itemState, switchOn, showMute, muteOn, lastAction })  결과 줄이 지금 상태에 맞는가(검토 I1)
+//   actionForResult(record, lastResult)  지금 결과 줄을 만든 사용자 동작(PUSH_USER_ACTION) 또는 null
+//   PUSH_USER_ACTION         화면이 시작한 사용자 동작: on, off, mute, renew, takeOver
 //   switchControlProps({ disabled, locked })  스위치의 disabled·aria-disabled·누름 막기(포커스를 지키는 잠금)
 //   pushLineSegments(lines)  아이폰 다섯 단계를 목록 하나로 묶은 줄 조각
 //   PUSH_RESULT_LINE         실행기 결과(PUSH_RESULT) → 결과 줄 문구 키
@@ -28,6 +30,10 @@
 //   - 기간 끝(GONE)의 '앱이 열려 있을 때 알림은 그대로 받아요'는 기기 알림 스위치가 꺼져 있으면 말하지 않는다(검토 Minor 1).
 //   - 결과 줄은 실행기 결과마다 하나다. 실패는 alert, 나머지는 status 다. 상태 줄과 같은 문구면 한 번만 보인다. 모르는 결과는 줄이 없다.
 //     실행기의 lastResult 는 다시 맞추기·상태 조회·다른 탭의 변경 뒤에도 남으므로 지금 상태에 맞을 때만 보인다(resultFitsState).
+//   - 실패 문구는 켜기 기준('켜지 못했어요')이다. 그래서 화면이 시작한 동작의 실패면 그 동작의 문구로 바꾼다: 받는 중(ON)에
+//     함께 있음 바꾸기가 실패하면 guardian.muteFailed, 구독이 남은 채 끄기가 실패하면 guardian.pushOffFailed. 어느 동작의
+//     결과인지는 화면(GuardianPushItem)이 기록한 동작이 돌려받은 결과와 지금 lastResult 가 같을 때만 안다(actionForResult).
+//     다시 맞추기·상태 조회가 남긴 결과는 앞의 규칙 그대로다.
 //   - 오늘 함께 있음은 ON 이고 쓰기 가능하고 config.enabled 가 참일 때만 보인다. 켜짐은 오늘(한국 시간) 상태 조회의 muted 만 따른다.
 //
 // React·저장소·네트워크를 쓰지 않는 순수 함수다. node --test 가 읽으므로 상대 경로로만 불러온다.
@@ -186,6 +192,22 @@ function subscribedState(state) {
   return PUSH_ITEM_STATE.ON;
 }
 
+/** 화면이 시작한 사용자 동작(GuardianPushItem 이 기록한다) */
+export const PUSH_USER_ACTION = Object.freeze({ ON: 'on', OFF: 'off', MUTE: 'mute', RENEW: 'renew', TAKE_OVER: 'takeOver' });
+
+/**
+ * 지금 결과 줄을 만든 사용자 동작. 기록한 동작이 끝나 돌려받은 결과가 지금 lastResult 와 같을 때만 그 동작이다.
+ * 끝나기 전이거나 그 뒤 다시 맞추기·상태 조회가 다른 결과를 남겼으면 null 이다.
+ * @param {{ kind: string, done: boolean, result: string | null } | null | undefined} record
+ * @param {string | null | undefined} lastResult
+ * @returns {string | null}
+ */
+export function actionForResult(record, lastResult) {
+  if (!record || record.done !== true) return null;
+  if (typeof lastResult !== 'string' || record.result !== lastResult) return null;
+  return Object.values(PUSH_USER_ACTION).includes(record.kind) ? record.kind : null;
+}
+
 /** 끄기 결과(구독이 없을 때만 맞다) */
 const OFF_RESULTS = new Set([PUSH_RESULT.OFF_DONE, PUSH_RESULT.OFF_PENDING, PUSH_RESULT.OFF_UNSENT, PUSH_RESULT.PERMISSION_LOST]);
 /** 켜기·다시 받기·다시 켜기의 실패와 막힘(받는 중 ON 에서는 맞지 않는다). 문구가 '켜지 못했어요' 쪽이다 */
@@ -204,6 +226,20 @@ const FAILURE_RESULTS = new Set([
 ]);
 
 /**
+ * 화면이 시작한 동작의 실패에 쓸 문구. 받는 중(ON)의 함께 있음 바꾸기 실패, 구독이 남은(스위치 켜짐) 끄기 실패만이다.
+ * 그 밖에는 null(앞의 규칙과 켜기 기준 문구를 쓴다).
+ * @param {string | null | undefined} lastResult
+ * @param {{ itemState: string, switchOn: boolean, lastAction?: string | null }} view
+ * @returns {string | null}
+ */
+function actionFailureKey(lastResult, { itemState, switchOn, lastAction = null }) {
+  if (!FAILURE_RESULTS.has(lastResult)) return null;
+  if (lastAction === PUSH_USER_ACTION.MUTE && itemState === PUSH_ITEM_STATE.ON) return 'guardian.muteFailed';
+  if (lastAction === PUSH_USER_ACTION.OFF && switchOn === true) return 'guardian.pushOffFailed';
+  return null;
+}
+
+/**
  * 결과 줄이 지금 상태에 맞는가(검토 I1). 실행기의 lastResult 는 다시 맞추기, 상태 조회, 자정, 다른 탭의 변경 뒤에도 남는다.
  * 맞지 않는 줄은 상태와 어긋난 말을 읽어 주므로 숨긴다.
  *   - ON: 받는 중(ON)에서만(그 상태 줄과 같아 한 번만 보인다)
@@ -212,10 +248,12 @@ const FAILURE_RESULTS = new Set([
  *   - 실패(DENIED, UNSUPPORTED, SW_NOT_READY, FAILED, LOGIN_REQUIRED, RATE_LIMITED, UNAVAILABLE, NETWORK, READ_ONLY, OFF, GONE):
  *     받는 중(ON)이 아닐 때만
  *   - 모르는 값: 맞지 않는다
+ *   - 화면이 시작한 동작의 실패(lastAction): 받는 중의 함께 있음 바꾸기, 구독이 남은 끄기는 받는 중에도 맞다(그 동작의 문구로 보인다)
  * @param {string | null | undefined} lastResult
- * @param {{ itemState: string, switchOn: boolean, showMute: boolean, muteOn: boolean }} view
+ * @param {{ itemState: string, switchOn: boolean, showMute: boolean, muteOn: boolean, lastAction?: string | null }} view
  */
-export function resultFitsState(lastResult, { itemState, switchOn, showMute, muteOn }) {
+export function resultFitsState(lastResult, { itemState, switchOn, showMute, muteOn, lastAction = null }) {
+  if (actionFailureKey(lastResult, { itemState, switchOn, lastAction }) !== null) return true;
   if (lastResult === PUSH_RESULT.ON) return itemState === PUSH_ITEM_STATE.ON;
   if (lastResult === PUSH_RESULT.MUTE_ON) return muteOn === true;
   if (lastResult === PUSH_RESULT.MUTE_OFF) return showMute === true && muteOn !== true;
@@ -256,6 +294,7 @@ function resultLine(lastResult, offline) {
  * @param {boolean} [args.offline]  보기 전용의 이유가 오프라인이다
  * @param {string | null} [args.today]  오늘(KST, 'YYYY-MM-DD'). 함께 있음 켜짐을 오늘 조회로만 본다
  * @param {boolean} [args.loginElsewhere]  화면의 다른 곳(바로 위 기기 알림 스위치)이 로그인 버튼을 이미 보인다
+ * @param {string | null} [args.lastAction]  지금 결과 줄을 만든 사용자 동작(actionForResult). 다시 맞추기·조회의 결과면 null
  */
 export function guardianPushViewModel({
   state,
@@ -265,6 +304,7 @@ export function guardianPushViewModel({
   offline = false,
   today = null,
   loginElsewhere = false,
+  lastAction = null,
 } = {}) {
   if (!isWatchId(watchId) || !state || typeof state !== 'object') return HIDDEN_MODEL;
   const enabled = state.config?.enabled === true;
@@ -296,8 +336,11 @@ export function guardianPushViewModel({
   const status = state.status ?? null;
   const muteOn = showMute && status?.muted === true && (today === null || status.date === today);
 
-  const fits = resultFitsState(state.lastResult, { itemState, switchOn, showMute, muteOn });
-  let result = fits ? resultLine(state.lastResult, offline) : null;
+  const fits = resultFitsState(state.lastResult, { itemState, switchOn, showMute, muteOn, lastAction });
+  const actionKey = actionFailureKey(state.lastResult, { itemState, switchOn, lastAction });
+  let result = null;
+  if (actionKey !== null) result = { key: actionKey, safety: false, alert: true };
+  else if (fits) result = resultLine(state.lastResult, offline);
   if (result && lines.includes(result.key)) result = null;
   if (result && state.lastResult === PUSH_RESULT.LOGIN_REQUIRED && loginButton && !actions.includes(PUSH_ACTION.LOGIN)) {
     actions.push(PUSH_ACTION.LOGIN);

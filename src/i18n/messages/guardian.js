@@ -825,6 +825,13 @@ export const messages = {
     ja: 'オフにしました。サーバーからこのスマートフォンの通知先を削除しました。',
     zh: '已关闭。已从服务器删除此手机的通知接收地址。',
   },
+  // 끄기를 눌렀는데 이 휴대폰의 기록을 지우지 못해 구독이 남았다(스위치는 켜진 채다)
+  'guardian.pushOffFailed': {
+    ko: '끄지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+    en: "Couldn't turn this off. Please try again in a little while.",
+    ja: 'オフにできませんでした。しばらくしてから、もう一度お試しください。',
+    zh: '未能关闭。请稍后再试。',
+  },
   'guardian.pushPaused': {
     ko: '서버 알림이 지금 쉬고 있어요. 앱이 열려 있을 때 알림은 그대로 받아요.',
     en: 'Server alerts are paused right now. You still get alerts while the app is open.',
@@ -1012,6 +1019,13 @@ export const messages = {
     en: 'Server alerts are back on for today.',
     ja: '今日のサーバー通知をまた受け取ります。',
     zh: '今天将重新接收服务器提醒。',
+  },
+  // 받는 중에 오늘 함께 있음을 눌렀는데 바꾸지 못했다. 스위치가 안 보이는 때(오프라인 등)에도 읽히도록 이름을 넣는다
+  'guardian.muteFailed': {
+    ko: '오늘 함께 있음을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+    en: "Couldn't change “Together today”. Please try again in a little while.",
+    ja: '「今日は同行中」を切り替えられませんでした。しばらくしてから、もう一度お試しください。',
+    zh: '未能更改“今天陪同中”。请稍后再试。',
   },
   // 복귀 확인 꼬리표(정한 값 15). 혼자 쓰지 않고 늘 guardian.confirmedHelp 와 함께 보인다. 돌아왔다는 단정이 아니라
   // '돌아왔어요'를 누른 사실만 말한다(검토 I2: 영어·일본어·중국어는 누름을 그대로 옮긴다. 한국어는 계획 그대로)

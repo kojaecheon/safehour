@@ -19,6 +19,9 @@
 //   - 보기 전용(로그인 문제)이면 바로 위 기기 알림 스위치(AlertsToggle)가 로그인 버튼을 이미 그린다. 같은 화면에 로그인 버튼이
 //     두 번 나오지 않게 이 항목은 안내 줄만 두고 버튼은 뺀다(loginElsewhere, 검토 Minor 2). 두 부품은 같은 기준
 //     (shouldShowReadOnly 이고 오프라인이 아님)으로 판단한다.
+//   - 누름마다 어떤 동작을 시작했는지(on, off, mute, renew, takeOver) 기록하고, 끝나면 돌려받은 결과를 함께 적는다. 그 결과가
+//     지금 lastResult 와 같을 때만 모델에 lastAction 으로 넘긴다(actionForResult). 그래서 함께 있음 바꾸기나 끄기의 실패를
+//     그 동작의 문구로 알리고, 다시 맞추기·상태 조회가 남긴 결과는 앞의 규칙대로 둔다. 계정이나 지켜보기가 바뀌면 기록을 지운다.
 
 import { useEffect, useState } from 'react';
 import { usePrefs } from '@/components/cards/useDeviceData.js';
@@ -28,7 +31,7 @@ import { READ_ONLY_REASON } from '@/lib/store/index.js';
 import { WATCH_ID_RE } from '@/src/guardian/watchRequests.js';
 import { kstDate } from './errorView.js';
 import GuardianPushItemView from './GuardianPushItemView.js';
-import { PUSH_ACTION, guardianPushViewModel } from './guardianPushView.js';
+import { PUSH_ACTION, PUSH_USER_ACTION, actionForResult, guardianPushViewModel } from './guardianPushView.js';
 
 /** 로그인하고 받은 일정 화면으로 돌아온다 */
 const LOGIN_HREF = `/login?returnTo=${encodeURIComponent('/g')}`;
@@ -66,6 +69,21 @@ export default function GuardianPushItem({ watchId }) {
   const status = useStoreStatus();
   const today = useKstToday();
 
+  // 마지막으로 시작한 사용자 동작. 계정이나 지켜보기가 바뀌면 지운다(렌더 중 한 번 바로잡는다)
+  const scope = JSON.stringify([status.accountKey ?? null, watchId ?? null]);
+  const [started, setStarted] = useState({ scope, record: null });
+  if (started.scope !== scope) setStarted({ scope, record: null });
+  const record = started.scope === scope ? started.record : null;
+
+  /** 동작을 누름 안에서 곧바로 부르고, 끝나면 돌려받은 결과를 그 기록에 적는다 */
+  function start(kind, run) {
+    const entry = { kind, done: false, result: null };
+    setStarted({ scope, record: entry });
+    void run().then((result) => {
+      setStarted((current) => (current.record === entry ? { scope: current.scope, record: { ...entry, done: true, result } } : current));
+    });
+  }
+
   // 세션 확인 전에는 그리지 않는다(오프라인은 확인 없이도 확실하다)
   if (status.readOnly && !shouldShowReadOnly(status)) return null;
 
@@ -77,24 +95,25 @@ export default function GuardianPushItem({ watchId }) {
     offline: status.reason === READ_ONLY_REASON.OFFLINE,
     loginElsewhere: shouldShowReadOnly(status) && status.reason !== READ_ONLY_REASON.OFFLINE,
     today,
+    lastAction: actionForResult(record, state.lastResult),
   });
 
   function onToggle(on) {
-    if (on) void turnOn();
-    else void turnOff();
+    if (on) start(PUSH_USER_ACTION.ON, turnOn);
+    else start(PUSH_USER_ACTION.OFF, turnOff);
   }
 
   function onAction(action) {
     if (action === PUSH_ACTION.RELOAD) window.location.reload();
-    else if (action === PUSH_ACTION.RENEW) void renew();
-    else if (action === PUSH_ACTION.TAKE_OVER) void takeOver();
+    else if (action === PUSH_ACTION.RENEW) start(PUSH_USER_ACTION.RENEW, renew);
+    else if (action === PUSH_ACTION.TAKE_OVER) start(PUSH_USER_ACTION.TAKE_OVER, takeOver);
   }
 
   return (
     <GuardianPushItemView
       model={model}
       onToggle={onToggle}
-      onMute={(on) => void mute(on)}
+      onMute={(on) => start(PUSH_USER_ACTION.MUTE, () => mute(on))}
       onAction={onAction}
       loginHref={LOGIN_HREF}
     />

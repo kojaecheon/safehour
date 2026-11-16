@@ -23,6 +23,8 @@ import {
   PUSH_ITEM_STATE,
   PUSH_RESULT_LINE,
   PUSH_SAFETY_KEYS,
+  PUSH_USER_ACTION,
+  actionForResult,
   guardianPushViewModel,
   pushLineSegments,
   resultFitsState,
@@ -511,6 +513,137 @@ describe('결과 줄은 지금 상태에 맞을 때만 (검토 I1)', () => {
   });
 });
 
+describe('화면이 시작한 동작의 실패 (검토 뒤 보강: 함께 있음 바꾸기, 끄기)', () => {
+  const MUTE_FAILURES = [
+    PUSH_RESULT.FAILED,
+    PUSH_RESULT.LOGIN_REQUIRED,
+    PUSH_RESULT.RATE_LIMITED,
+    PUSH_RESULT.UNAVAILABLE,
+    PUSH_RESULT.NETWORK,
+    PUSH_RESULT.READ_ONLY,
+    PUSH_RESULT.OFF,
+  ];
+  const OFF_FAILURES = [PUSH_RESULT.FAILED, PUSH_RESULT.READ_ONLY, PUSH_RESULT.UNAVAILABLE];
+  const ON_TODAY = Object.freeze({ date: TODAY, confirmed: [], muted: false, active: true, atMs: 1 });
+  const MUTE_FAILED = { key: 'guardian.muteFailed', safety: false, alert: true };
+  const OFF_FAILED = { key: 'guardian.pushOffFailed', safety: false, alert: true };
+
+  test('actionForResult: 끝난 동작이 돌려받은 결과가 지금 lastResult 와 같을 때만 그 동작이다', () => {
+    const done = (kind, result) => ({ kind, done: true, result });
+    assert.equal(actionForResult(null, PUSH_RESULT.NETWORK), null);
+    assert.equal(actionForResult(undefined, PUSH_RESULT.NETWORK), null);
+    assert.equal(actionForResult({ kind: 'mute', done: false, result: null }, PUSH_RESULT.NETWORK), null, '끝나기 전');
+    assert.equal(actionForResult({ kind: 'mute', done: false, result: PUSH_RESULT.NETWORK }, PUSH_RESULT.NETWORK), null, '끝나지 않은 기록은 결과가 같아도 아니다');
+    assert.equal(actionForResult(done('mute', PUSH_RESULT.NETWORK), PUSH_RESULT.GONE), null, '그 뒤 조회가 다른 결과를 남김');
+    assert.equal(actionForResult(done('mute', PUSH_RESULT.NETWORK), null), null);
+    assert.equal(actionForResult(done('mute', PUSH_RESULT.NETWORK), undefined), null);
+    assert.equal(actionForResult(done('reload', PUSH_RESULT.NETWORK), PUSH_RESULT.NETWORK), null, '모르는 동작');
+    for (const kind of Object.values(PUSH_USER_ACTION)) {
+      assert.equal(actionForResult(done(kind, PUSH_RESULT.NETWORK), PUSH_RESULT.NETWORK), kind, kind);
+    }
+    assert.deepEqual(Object.values(PUSH_USER_ACTION), ['on', 'off', 'mute', 'renew', 'takeOver']);
+  });
+
+  test('받는 중에 함께 있음 바꾸기가 실패하면 그 동작의 문구(alert)다', () => {
+    for (const lastResult of MUTE_FAILURES) {
+      const model = view({ sub: SUB, status: ON_TODAY, lastResult }, { lastAction: PUSH_USER_ACTION.MUTE });
+      assert.equal(model.itemState, PUSH_ITEM_STATE.ON, lastResult);
+      assert.deepEqual(model.result, MUTE_FAILED, lastResult);
+      assert.equal(resultFitsState(lastResult, { itemState: 'ON', switchOn: true, showMute: true, muteOn: false, lastAction: 'mute' }), true, lastResult);
+    }
+  });
+
+  test('함께 있음 바꾸기 실패가 로그인 필요면 로그인 버튼도 둔다(다른 곳에 없을 때만)', () => {
+    const lastResult = PUSH_RESULT.LOGIN_REQUIRED;
+    assert.deepEqual(view({ sub: SUB, status: ON_TODAY, lastResult }, { lastAction: 'mute' }).actions, [PUSH_ACTION.LOGIN]);
+    assert.deepEqual(view({ sub: SUB, status: ON_TODAY, lastResult }, { lastAction: 'mute', loginElsewhere: true }).actions, []);
+  });
+
+  test('같은 실패라도 동작 기록이 없으면(다시 맞추기·조회의 결과) 받는 중에는 줄이 없다', () => {
+    for (const lastResult of MUTE_FAILURES) {
+      for (const lastAction of [null, undefined, PUSH_USER_ACTION.ON, PUSH_USER_ACTION.RENEW, PUSH_USER_ACTION.TAKE_OVER]) {
+        const model = view({ sub: SUB, status: ON_TODAY, lastResult }, { lastAction });
+        assert.equal(model.result, null, `${lastResult} ${lastAction}`);
+      }
+    }
+  });
+
+  test('함께 있음 바꾸기의 성공 결과는 앞의 규칙 그대로다', () => {
+    const muted = { ...ON_TODAY, muted: true };
+    assert.equal(view({ sub: SUB, status: muted, lastResult: PUSH_RESULT.MUTE_ON }, { lastAction: 'mute' }).result.key, 'guardian.muteOn');
+    assert.equal(view({ sub: SUB, status: ON_TODAY, lastResult: PUSH_RESULT.MUTE_OFF }, { lastAction: 'mute' }).result.key, 'guardian.muteOff');
+  });
+
+  test('함께 있음 바꾸기 뒤 받는 중이 아니게 됐으면 앞의 규칙 그대로다(기간 끝, 다른 기기)', () => {
+    assert.equal(view({ gone: true, lastResult: PUSH_RESULT.GONE }, { lastAction: 'mute' }).result, null);
+    assert.deepEqual(view({ gone: true, lastResult: PUSH_RESULT.GONE }, { lastAction: 'mute' }).lines, ['guardian.pushGone', 'guardian.pushOpenAppAlerts']);
+    assert.equal(view({ sub: SUB, moved: true, lastResult: PUSH_RESULT.NETWORK }, { lastAction: 'mute' }).result.key, 'guardian.pushNetwork');
+  });
+
+  test('구독이 남은 채 끄기가 실패하면 그 동작의 문구(alert)다. 받는 중, 쉼, 다시 켜기, 다른 기기 모두', () => {
+    const states = [
+      [PUSH_ITEM_STATE.ON, {}],
+      [PUSH_ITEM_STATE.PAUSED, { config: CONFIG_OFF }],
+      [PUSH_ITEM_STATE.RENEW_NEEDED, { renewNeeded: true }],
+      [PUSH_ITEM_STATE.MOVED, { moved: true }],
+    ];
+    for (const [itemState, over] of states) {
+      for (const lastResult of OFF_FAILURES) {
+        const model = view({ sub: SUB, ...over, lastResult }, { lastAction: PUSH_USER_ACTION.OFF });
+        assert.equal(model.itemState, itemState, `${itemState} ${lastResult}`);
+        assert.equal(model.switchOn, true);
+        assert.deepEqual(model.result, OFF_FAILED, `${itemState} ${lastResult}`);
+      }
+    }
+  });
+
+  test('보기 전용에서 끄기가 막혔으면 끄기 실패 줄과 보기 전용 줄이 함께 있다', () => {
+    const model = view({ sub: SUB, lastResult: PUSH_RESULT.READ_ONLY }, { lastAction: 'off', writable: false });
+    assert.deepEqual(model.result, OFF_FAILED);
+    assert.ok(model.lines.includes('settings.readOnlyNote'));
+    const offline = view({ sub: SUB, lastResult: PUSH_RESULT.READ_ONLY }, { lastAction: 'off', writable: false, offline: true });
+    assert.deepEqual(offline.result, OFF_FAILED);
+    assert.ok(offline.lines.includes('settings.offlineNote'));
+  });
+
+  test('끄기가 끝나 구독이 없으면 끄기 결과 줄 그대로다. 구독이 없는데 실패면 앞의 규칙(켜기 기준 문구)이다', () => {
+    assert.equal(view({ lastResult: PUSH_RESULT.OFF_DONE }, { lastAction: 'off' }).result.key, 'guardian.pushOffDone');
+    assert.equal(view({ lastResult: PUSH_RESULT.OFF_UNSENT }, { lastAction: 'off' }).result.key, 'guardian.pushOffUnsent');
+    assert.equal(view({ lastResult: PUSH_RESULT.FAILED }, { lastAction: 'off' }).result.key, 'guardian.pushFailed');
+  });
+
+  test('켜기·다시 켜기·다시 받기의 실패는 앞의 규칙 그대로다(받는 중이 아니면 켜기 기준 문구)', () => {
+    for (const lastAction of [PUSH_USER_ACTION.ON, PUSH_USER_ACTION.RENEW, PUSH_USER_ACTION.TAKE_OVER]) {
+      assert.equal(view({ lastResult: PUSH_RESULT.NETWORK }, { lastAction }).result.key, 'guardian.pushNetwork', lastAction);
+      assert.equal(view({ sub: SUB, renewNeeded: true, lastResult: PUSH_RESULT.UNAVAILABLE }, { lastAction }).result.key, 'guardian.pushUnavailable', lastAction);
+      assert.equal(view({ sub: SUB, lastResult: PUSH_RESULT.NETWORK }, { lastAction }).result, null, lastAction);
+    }
+  });
+
+  test('성공이나 끄기 결과에는 동작별 문구를 쓰지 않는다', () => {
+    for (const lastResult of [PUSH_RESULT.ON, PUSH_RESULT.MUTE_ON, PUSH_RESULT.MUTE_OFF, PUSH_RESULT.OFF_DONE, PUSH_RESULT.PERMISSION_LOST]) {
+      for (const lastAction of ['mute', 'off']) {
+        const model = view({ sub: SUB, status: ON_TODAY, lastResult }, { lastAction });
+        assert.ok(!['guardian.muteFailed', 'guardian.pushOffFailed'].includes(model.result?.key), `${lastResult} ${lastAction}`);
+      }
+    }
+  });
+
+  test('화면은 다섯 동작을 기록하고, 계정·지켜보기가 바뀌면 지우고, 끝난 결과와 맞을 때만 넘긴다', () => {
+    const item = readFileSync(join(ROOT, 'components/guardian/GuardianPushItem.js'), 'utf8');
+    assert.match(item, /if \(on\) start\(PUSH_USER_ACTION\.ON, turnOn\);/);
+    assert.match(item, /else start\(PUSH_USER_ACTION\.OFF, turnOff\);/);
+    assert.match(item, /start\(PUSH_USER_ACTION\.RENEW, renew\)/);
+    assert.match(item, /start\(PUSH_USER_ACTION\.TAKE_OVER, takeOver\)/);
+    assert.match(item, /onMute=\{\(on\) => start\(PUSH_USER_ACTION\.MUTE, \(\) => mute\(on\)\)\}/);
+    assert.match(item, /const scope = JSON\.stringify\(\[status\.accountKey \?\? null, watchId \?\? null\]\);/);
+    assert.match(item, /if \(started\.scope !== scope\) setStarted\(\{ scope, record: null \}\);/);
+    assert.match(item, /current\.record === entry \? \{ scope: current\.scope, record: \{ \.\.\.entry, done: true, result \} \} : current/);
+    assert.match(item, /lastAction: actionForResult\(record, state\.lastResult\),/);
+    assert.doesNotMatch(item, /void (turnOn|turnOff|renew|takeOver|mute)\(/);
+  });
+});
+
 describe('스위치 잠금 (검토 M2·M3·M17, 포커스를 지키는 잠금)', () => {
   test('잠금이면 disabled 대신 aria-disabled 이고 누름을 막는다. 막힘이면 disabled 다', () => {
     assert.deepEqual(switchControlProps({ disabled: true, locked: true }), { disabled: false, ariaDisabled: 'true', blockClick: true, ignore: true });
@@ -613,6 +746,8 @@ describe('문구 (Global Constraints, 정한 값 25)', () => {
     'guardian.muteMidnight',
     'guardian.muteOn',
     'guardian.muteOff',
+    'guardian.muteFailed',
+    'guardian.pushOffFailed',
     'guardian.confirmedTag',
     'guardian.statusAsOf',
   ];
@@ -686,6 +821,12 @@ describe('문구 (Global Constraints, 정한 값 25)', () => {
     }
     assert.equal(guardianMessages['guardian.muteTitle'].ja, '今日は同行中');
     assert.equal(guardianMessages['guardian.muteTitle'].zh, '今天陪同中');
+    // 함께 있음 바꾸기 실패는 스위치가 안 보일 때도 읽히도록 스위치 이름을 담는다. 약속 없이 다시 시도만 권한다
+    for (const lang of LANGS) {
+      assert.ok(guardianMessages['guardian.muteFailed'][lang].includes(guardianMessages['guardian.muteTitle'][lang]), `muteFailed.${lang}`);
+    }
+    assert.equal(guardianMessages['guardian.muteFailed'].ko, '오늘 함께 있음을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요.');
+    assert.equal(guardianMessages['guardian.pushOffFailed'].ko, '끄지 못했어요. 잠시 뒤 다시 시도해 주세요.');
     assert.equal(guardianSafety['guardian.pushLocation'].zh, '应用无法获知任何人的位置，只转达患者点按的确认。');
   });
 
