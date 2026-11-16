@@ -13,6 +13,9 @@
 //      사본도 여는 중인 링크도 없으면 펼치고, 그 밖에는 접어 둔다. 여는 중인 링크(로그인·PIN 단계)가 있어도 숨기지 않는다:
 //      PIN 입력·로그인 안내에는 취소가 없어서, 예전 링크를 붙여 넣은 보호자가 1시간 보관이 끝나기 전에 맞는 링크로 바꿀 길이
 //      이 절뿐이다. 새 링크를 받아들이면 임시 보관이 바뀌고 PIN 입력이 새 링크로 다시 시작한다(PIN 잠금은 링크마다 따로다).
+//   7. 서버 알림(계획 2026-11-15 A-3 Task 7, ADR-0012): 기기 알림 스위치 바로 아래에 '앱이 닫혀 있어도 받기' 항목
+//      (GuardianPushItem)을 두고, 보이는 사본의 오늘 상태 조회를 serverStatus 로 넘겨 복귀 확인을 표시한다. 둘 다 보이는 사본의
+//      watchId 만 쓴다. 사본에 watchId 가 없으면 항목이 없고 서버 알림 요청도 없다(실행기가 정한다).
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
@@ -22,6 +25,7 @@ import { GUARDIAN_ERROR, GuardianError, isValidPin, unlockSnapshot } from '@/src
 import { copyIdFor, guardianErrorView } from './errorView.js';
 import { MAX_TIMER_MS, guardianExpiryDelay } from './expiry.js';
 import AlertsToggle from './AlertsToggle.js';
+import GuardianPushItem, { useGuardianServerStatus } from './GuardianPushItem.js';
 import { ErrorText, WarningNote } from './Feedback.js';
 import GuardianCopyView, { kstStamp } from './GuardianCopyView.js';
 import PasteLink from './PasteLink.js';
@@ -289,6 +293,8 @@ export default function GuardianOpen() {
   const pickId = alreadyImported ? knownId : selectedId;
   const current = unsaved ?? copies.find((c) => c.id === pickId) ?? copies[0] ?? null;
   const others = copies.filter((c) => c.id !== current?.id);
+  const watchId = current?.snapshot?.watchId ?? null;
+  const serverStatus = useGuardianServerStatus(watchId);
   const showIncoming = !alreadyImported && (incoming.invalid || Boolean(fragment));
 
   let incomingPart = null;
@@ -329,7 +335,13 @@ export default function GuardianOpen() {
             snapshot={current.snapshot}
             headingRef={copyHeadingRef}
             notice={unsaved ? <WarningNote>{t('guardian.errSaveFailed')}</WarningNote> : null}
-            alerts={<AlertsToggle />}
+            alerts={
+              <>
+                <AlertsToggle />
+                <GuardianPushItem watchId={watchId} />
+              </>
+            }
+            serverStatus={serverStatus}
           />
         )}
         {others.length > 0 && (

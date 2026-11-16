@@ -785,6 +785,240 @@ export const messages = {
     ja: '{asOf}のコピーを見る',
     zh: '查看副本（{asOf}）',
   },
+
+  // ── 받은 일정의 '앱이 닫혀 있어도 받기' 항목 (docs/superpowers/plans/2026-11-15-server-push-guardian-ui.md Task 7, ja·zh 검수 전) ──
+  // 아이폰 4단계의 '받은 일정 보기'는 today.receivedAction, 5단계의 항목 이름은 guardian.pushTitle 과 같은 말이다(테스트가 묶는다)
+  'guardian.pushTitle': {
+    ko: '앱이 닫혀 있어도 받기',
+    en: 'Get alerts even when the app is closed',
+    ja: 'アプリが閉じていても通知を受け取る',
+    zh: '应用关闭时也接收提醒',
+  },
+  'guardian.pushIntro': {
+    ko: '마감이 지나도 복귀 확인이 없으면 SafeHour 서버가 이 휴대폰에 알림을 보내요.',
+    en: "If there's no confirmation that your companion is back after a return time passes, the SafeHour server sends an alert to this phone.",
+    ja: '期限を過ぎても戻りの確認がない場合、SafeHourのサーバーがこのスマートフォンに通知を送ります。',
+    zh: '如果截止时间已过仍没有返回确认，SafeHour服务器会向此手机发送提醒。',
+  },
+  // 설계서 5.5 보호자 동의 문장. 켜기 스위치 바로 아래에 늘 보인다(정한 값 28)
+  'guardian.pushConsentStored': {
+    ko: '이 휴대폰의 알림 주소를 SafeHour 서버에 보관합니다. 환자의 출국 7일 뒤, 또는 스위치를 끄면 지워집니다.',
+    en: 'We keep this phone\'s alert address on the SafeHour server. It is deleted 7 days after your companion leaves Korea, or when you turn this off.',
+    ja: 'このスマートフォンの通知先をSafeHourのサーバーに保管します。患者の出国7日後、またはスイッチをオフにすると削除されます。',
+    zh: '此手机的提醒地址会保存在SafeHour服务器上。患者出境7天后或关闭开关时会被删除。',
+  },
+  'guardian.pushWorking': {
+    ko: '켜는 중이에요',
+    en: 'Turning on',
+    ja: 'オンにしています',
+    zh: '正在开启',
+  },
+  'guardian.pushOn': {
+    ko: '이 휴대폰에서 앱이 닫혀 있어도 알림을 받아요.',
+    en: 'This phone gets alerts even when the app is closed.',
+    ja: 'このスマートフォンでは、アプリが閉じていても通知を受け取ります。',
+    zh: '即使应用已关闭，此手机也会收到提醒。',
+  },
+  'guardian.pushOffDone': {
+    ko: '껐어요. 서버에서 이 휴대폰의 알림 주소를 지웠어요.',
+    en: "Turned off. We deleted this phone's alert address from the server.",
+    ja: 'オフにしました。サーバーからこのスマートフォンの通知先を削除しました。',
+    zh: '已关闭。已从服务器删除此手机的提醒地址。',
+  },
+  'guardian.pushPaused': {
+    ko: '서버 알림이 지금 쉬고 있어요. 앱이 열려 있을 때 알림은 그대로 받아요.',
+    en: 'Server alerts are paused right now. You still get alerts while the app is open.',
+    ja: 'サーバー通知は今は休止中です。アプリが開いているときの通知はこれまでどおり受け取れます。',
+    zh: '服务器提醒目前暂停。应用打开时仍会照常收到提醒。',
+  },
+  'guardian.pushUnsupported': {
+    ko: '이 브라우저에서는 앱이 닫혀 있을 때 알림을 받을 수 없어요. iPhone이라면 Safari에서 열어 홈 화면에 추가해 주세요.',
+    en: "This browser can't get alerts while the app is closed. On iPhone, open this page in Safari and add it to your Home Screen.",
+    ja: 'このブラウザでは、アプリが閉じているときに通知を受け取れません。iPhoneの場合は、Safariで開いてホーム画面に追加してください。',
+    zh: '此浏览器无法在应用关闭时接收提醒。如果是iPhone，请在Safari中打开并添加到主屏幕。',
+  },
+  'guardian.pushIosTitle': {
+    ko: 'iPhone에서 받으려면',
+    en: 'To get alerts on iPhone',
+    ja: 'iPhoneで受け取るには',
+    zh: '在iPhone上接收提醒的方法',
+  },
+  'guardian.pushIosStep1': {
+    ko: 'Safari에서 공유 버튼을 누르세요.',
+    en: 'In Safari, tap the Share button.',
+    ja: 'Safariで共有ボタンをタップします。',
+    zh: '在Safari中点按“分享”按钮。',
+  },
+  'guardian.pushIosStep2': {
+    ko: "'홈 화면에 추가'를 누르세요.",
+    en: 'Tap “Add to Home Screen”.',
+    ja: '「ホーム画面に追加」をタップします。',
+    zh: '点按“添加到主屏幕”。',
+  },
+  'guardian.pushIosStep3': {
+    ko: '홈 화면의 SafeHour를 열고 로그인하세요.',
+    en: 'Open SafeHour from your Home Screen and log in.',
+    ja: 'ホーム画面のSafeHourを開いてログインします。',
+    zh: '从主屏幕打开SafeHour并登录。',
+  },
+  'guardian.pushIosStep4': {
+    ko: "'받은 일정 보기'에서 메신저로 받은 링크를 붙여 넣고 PIN을 넣으세요.",
+    en: 'In “View received schedule”, paste the link from your messenger and enter the PIN.',
+    ja: '「受け取った予定を見る」で、メッセンジャーで受け取ったリンクを貼り付けてPINを入力します。',
+    zh: '在“查看收到的日程”中粘贴从聊天软件收到的链接，并输入PIN。',
+  },
+  'guardian.pushIosStep5': {
+    ko: "'앱이 닫혀 있어도 받기'를 켜세요.",
+    en: 'Turn on “Get alerts even when the app is closed”.',
+    ja: '「アプリが閉じていても通知を受け取る」をオンにします。',
+    zh: '开启“应用关闭时也接收提醒”。',
+  },
+  'guardian.pushIosNote': {
+    ko: '홈 화면 앱은 Safari와 저장 공간이 따로라서 받은 일정을 한 번 더 열어야 해요.',
+    en: 'The Home Screen app keeps its data separately from Safari, so you need to open the received schedule once more.',
+    ja: 'ホーム画面のアプリはSafariと保存領域が別なので、受け取った予定をもう一度開く必要があります。',
+    zh: '主屏幕应用与Safari的存储空间是分开的，因此需要再打开一次收到的日程。',
+  },
+  'guardian.pushIosOld': {
+    ko: 'iOS 16.4 이상에서만 받을 수 있어요. 설정에서 iOS를 업데이트한 뒤 다시 열어 주세요.',
+    en: 'This works on iOS 16.4 or later. Update iOS in Settings, then open the app again.',
+    ja: 'iOS 16.4以降でのみ受け取れます。設定でiOSをアップデートしてから、もう一度開いてください。',
+    zh: '仅支持iOS 16.4及以上版本。请在设置中更新iOS后重新打开。',
+  },
+  'guardian.pushDenied': {
+    ko: '이 브라우저에서 알림이 차단돼 있어요. 브라우저 설정에서 SafeHour 알림을 허용한 뒤 다시 켜 주세요.',
+    en: 'Notifications are blocked in this browser. Allow notifications for SafeHour in your browser settings, then turn this on again.',
+    ja: 'このブラウザでは通知がブロックされています。ブラウザの設定でSafeHourの通知を許可してから、もう一度オンにしてください。',
+    zh: '此浏览器已阻止通知。请在浏览器设置中允许SafeHour的通知后再重新开启。',
+  },
+  'guardian.pushSwNotReady': {
+    ko: '앱을 새로 고친 뒤 다시 켜 주세요.',
+    en: 'Reload the app, then turn this on again.',
+    ja: 'アプリを再読み込みしてから、もう一度オンにしてください。',
+    zh: '请刷新应用后再重新开启。',
+  },
+  'guardian.pushReload': {
+    ko: '새로 고침',
+    en: 'Reload',
+    ja: '再読み込み',
+    zh: '刷新',
+  },
+  'guardian.pushRenew': {
+    ko: '알림 설정이 바뀌어 다시 켜야 해요. 다시 켜기 전까지 앱이 닫혀 있을 때 알림이 오지 않아요.',
+    en: "Alert settings changed, so you need to turn this on again. Until you do, alerts won't arrive while the app is closed.",
+    ja: '通知の設定が変わったため、もう一度オンにする必要があります。オンにし直すまでは、アプリが閉じているときに通知は届きません。',
+    zh: '提醒设置已变更，需要重新开启。重新开启之前，应用关闭时不会收到提醒。',
+  },
+  'guardian.pushRenewButton': {
+    ko: '다시 켜기',
+    en: 'Turn on again',
+    ja: 'もう一度オンにする',
+    zh: '重新开启',
+  },
+  'guardian.pushMoved': {
+    ko: '다른 기기가 알림을 가져갔거나 이 휴대폰의 알림 주소가 만료됐어요.',
+    en: "Another device took over these alerts, or this phone's alert address expired.",
+    ja: '別の端末が通知を引き継いだか、このスマートフォンの通知先の有効期限が切れました。',
+    zh: '其他设备已接管提醒，或此手机的提醒地址已过期。',
+  },
+  'guardian.pushMovedNote': {
+    ko: '다시 받으면 지금 받는 기기에는 알림이 더 가지 않아요.',
+    en: 'If you do, the device that gets them now will stop getting them.',
+    ja: 'もう一度受け取ると、今受け取っている端末には通知が届かなくなります。',
+    zh: '重新接收后，目前接收提醒的设备将不再收到提醒。',
+  },
+  'guardian.pushMovedButton': {
+    ko: '이 휴대폰에서 다시 받기',
+    en: 'Get them on this phone again',
+    ja: 'このスマートフォンでもう一度受け取る',
+    zh: '在此手机上重新接收',
+  },
+  'guardian.pushGone': {
+    ko: '환자가 서버 알림을 껐거나 기간이 끝났어요. 앱이 열려 있을 때 알림은 그대로 받아요.',
+    en: 'Your companion turned off server alerts, or the period ended. You still get alerts while the app is open.',
+    ja: '患者がサーバー通知をオフにしたか、期間が終わりました。アプリが開いているときの通知はこれまでどおり受け取れます。',
+    zh: '患者已关闭服务器提醒，或期限已结束。应用打开时仍会照常收到提醒。',
+  },
+  'guardian.pushLogin': {
+    ko: '로그인해야 켤 수 있어요.',
+    en: 'Log in to turn this on.',
+    ja: 'オンにするにはログインが必要です。',
+    zh: '需要登录才能开启。',
+  },
+  'guardian.pushLimit': {
+    ko: '잠시 뒤 다시 시도해 주세요.',
+    en: 'Please try again in a little while.',
+    ja: 'しばらくしてから、もう一度お試しください。',
+    zh: '请稍后再试。',
+  },
+  'guardian.pushUnavailable': {
+    ko: '지금 켜지 못했어요. 잠시 뒤 다시 시도해 주세요.',
+    en: "Couldn't turn this on right now. Please try again later.",
+    ja: '今はオンにできませんでした。しばらくしてから、もう一度お試しください。',
+    zh: '暂时无法开启。请稍后再试。',
+  },
+  'guardian.pushNetwork': {
+    ko: '연결되지 않아 켜지 못했어요. 연결된 뒤 다시 시도해 주세요.',
+    en: "You're offline, so this didn't turn on. Try again once you're connected.",
+    ja: '接続されていないため、オンにできませんでした。接続してから、もう一度お試しください。',
+    zh: '未连接网络，无法开启。请连接后再试。',
+  },
+  'guardian.pushFailed': {
+    ko: '이 휴대폰에서 알림 주소를 만들지 못했어요. 앱을 새로 고친 뒤 다시 시도해 주세요.',
+    en: "This phone couldn't create an alert address. Reload the app and try again.",
+    ja: 'このスマートフォンで通知先を作成できませんでした。アプリを再読み込みしてから、もう一度お試しください。',
+    zh: '此手机未能创建提醒地址。请刷新应用后再试。',
+  },
+  'guardian.pushPermissionLost': {
+    ko: '알림 권한이 꺼져 서버 알림도 껐어요.',
+    en: 'Notification permission was turned off, so we turned off server alerts too.',
+    ja: '通知の許可がオフになったため、サーバー通知もオフにしました。',
+    zh: '通知权限已关闭，因此服务器提醒也已关闭。',
+  },
+  // 오늘 함께 있음(정한 값 16). 켜짐은 오늘(한국 시간) 상태 조회만 따른다
+  'guardian.muteTitle': {
+    ko: '오늘 함께 있음',
+    en: 'Together today',
+    ja: '今日は一緒にいる',
+    zh: '今天在一起',
+  },
+  'guardian.muteHelp': {
+    ko: '켜면 오늘(한국 시간) 서버 알림을 보내지 않아요. 자정이 지나면 저절로 풀려요. 앱이 열려 있을 때 마감 시각 알림은 그대로 와요.',
+    en: 'When on, the server sends no alerts today (Korea time). It turns off automatically at midnight. Alerts at the return time still come while the app is open.',
+    ja: 'オンにすると、今日（韓国時間）はサーバー通知を送りません。午前0時を過ぎると自動で解除されます。アプリが開いているときの期限の通知はこれまでどおり届きます。',
+    zh: '开启后，今天（韩国时间）服务器不会发送提醒。过了午夜会自动解除。应用打开时，截止时间的提醒仍会照常送达。',
+  },
+  'guardian.muteMidnight': {
+    ko: '자정 직전 마감의 알림은 자정 뒤에 올 수 있어요.',
+    en: 'An alert for a return time just before midnight may still arrive after midnight.',
+    ja: '午前0時直前の期限の通知は、0時を過ぎてから届くことがあります。',
+    zh: '临近午夜的截止时间提醒可能会在午夜之后送达。',
+  },
+  'guardian.muteOn': {
+    ko: '오늘은 서버 알림을 보내지 않아요.',
+    en: 'No server alerts today.',
+    ja: '今日はサーバー通知を送りません。',
+    zh: '今天服务器不会发送提醒。',
+  },
+  'guardian.muteOff': {
+    ko: '오늘 서버 알림을 다시 받아요.',
+    en: 'Server alerts are back on for today.',
+    ja: '今日のサーバー通知をまた受け取ります。',
+    zh: '今天将重新接收服务器提醒。',
+  },
+  // 복귀 확인 꼬리표(정한 값 15). 혼자 쓰지 않고 늘 guardian.confirmedHelp 와 함께 보인다
+  'guardian.confirmedTag': {
+    ko: '복귀 확인',
+    en: 'Back confirmed',
+    ja: '戻り確認',
+    zh: '返回确认',
+  },
+  'guardian.statusAsOf': {
+    ko: '{time}에 서버에서 확인한 내용이에요.',
+    en: 'As checked with the server at {time}.',
+    ja: '{time}にサーバーで確認した内容です。',
+    zh: '这是{time}从服务器确认的内容。',
+  },
 };
 
 /** 안전 문구 — 상태 메시지·사유·고지·복귀 안내 문장 */
@@ -838,5 +1072,38 @@ export const safety = {
     en: 'Server alerts are turned off.',
     ja: 'サーバー通知をオフにしました。',
     zh: '已关闭服务器提醒。',
+  },
+  // 받은 일정의 '앱이 닫혀 있어도 받기' 항목(계획 Task 7). 알림이 늦거나 올 수 있다는 것, 위치를 모른다는 것, 복귀 확인의 뜻을 말하는 문장이다
+  'guardian.pushNoGuarantee': {
+    ko: '알림은 늦거나 오지 않을 수 있습니다. 알림만 믿지 말고 직접 연락해 주세요.',
+    en: 'Alerts may be late or may not arrive. Do not rely on alerts alone; contact your companion directly.',
+    ja: '通知は遅れたり、届かなかったりすることがあります。通知だけに頼らず、直接連絡してください。',
+    zh: '提醒可能会延迟或无法送达。请不要只依赖提醒，请直接联系对方。',
+  },
+  'guardian.pushLocation': {
+    ko: '앱은 위치를 모릅니다. 환자가 누른 확인만 전달합니다.',
+    en: "The app does not know anyone's location. It only passes on the confirmation your companion taps.",
+    ja: 'アプリは位置情報を知りません。患者が押した確認だけを伝えます。',
+    zh: '应用不知道位置，只传达患者点击的确认。',
+  },
+  'guardian.confirmedHelp': {
+    ko: "환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요.",
+    en: 'Your companion tapped “I’m back”. The app does not know their location, so it cannot tell whether they are actually back.',
+    ja: '患者が「戻りました」を押しました。アプリは位置情報を知らないため、実際に戻ったかどうかは分かりません。',
+    zh: '患者点击了“我已返回”。应用不知道其位置，因此无法得知其是否真的已经返回。',
+  },
+  'guardian.pushOffPending': {
+    ko: '이 휴대폰에서는 껐어요. 연결되면 서버에서도 지워요. 그 전까지 알림이 올 수 있어요.',
+    en: "Turned off on this phone. We'll delete it from the server once you're online. Until then, alerts may still arrive.",
+    ja: 'このスマートフォンではオフにしました。接続されたらサーバーからも削除します。それまでは通知が届くことがあります。',
+    zh: '已在此手机上关闭。连接网络后也会从服务器删除。在此之前仍可能收到提醒。',
+  },
+  // 실행기 결과 OFF_UNSENT(Task 5): 이 휴대폰의 구독은 거뒀지만 서버 해지가 닿지 않았다. 보호자가 끄지 않았어도 나온다
+  // (다시 맞추기가 구독을 거둠, 예: 기기 알림 스위치를 끔). 그래서 '껐다'고 말하지 않고 서버가 보낼 수 있다고만 말한다
+  'guardian.pushOffUnsent': {
+    ko: '이 휴대폰의 서버 알림이 꺼졌지만 서버에서 지우지 못했어요. 환자의 일정이 끝날 때까지 서버가 알림을 보낼 수 있어요.',
+    en: "Server alerts are off on this phone, but they could not be deleted from the server. The server may still send alerts until your companion's schedule ends.",
+    ja: 'このスマートフォンのサーバー通知はオフになりましたが、サーバーから削除できませんでした。患者の予定が終わるまで、サーバーから通知が届くことがあります。',
+    zh: '此手机的服务器提醒已关闭，但未能从服务器删除。在患者的日程结束前，服务器仍可能发送提醒。',
   },
 };
