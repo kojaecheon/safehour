@@ -14,8 +14,12 @@
 //     로그아웃은 인터넷에 연결되면 마무리된다(저장소가 온라인이 되면 다시 보낸다). 그동안 로그인으로 보지 않는다.
 //   - stayOnPage(설정 화면)면 로그아웃까지 끝나도 이동하지 않고 결과를 보여준다.
 //   - 버튼 아래 안내는 이 기기에 서버 알림 레코드가 있으면 서버에 저장되는 것(날짜별 복귀 마감 시각, '돌아왔어요' 기록)을 적는다.
+//   - 지우기 전에 보호자 서버 알림의 브라우저 구독을 3초까지 지운다(실패해도 지우기는 계속한다). 서버 쪽 구독 해지는
+//     deleteAllMyData 가 모든 계정의 구독을 해지 대기로 옮겨 보낸다.
 
 import { useState } from 'react';
+import { getGuardianPush } from '@/lib/notify/client.js';
+import { FORGET_TIMEOUT_MS } from '@/lib/notify/guardianPush.js';
 import { deleteAllMyData } from '@/lib/store/index.js';
 import { clearSafeHourSession } from '@/lib/session.js';
 import { useGuardianWatch } from '@/lib/trip/useGuardianWatch.js';
@@ -47,6 +51,11 @@ export default function ClearSessionButton({ stayOnPage = false, quietConfirm = 
 
   async function handleClear() {
     setPhase('working');
+    try {
+      await getGuardianPush()?.forgetBrowser({ timeoutMs: FORGET_TIMEOUT_MS });
+    } catch {
+      // 브라우저 구독을 지우지 못해도 기기 지우기는 계속한다
+    }
     let outcome;
     try {
       outcome = await deleteAllMyData();
