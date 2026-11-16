@@ -171,11 +171,27 @@ describe('서버 상태 조회의 복귀 확인 표시 (계획 2026-11-15 A-3 Ta
     const rows = block('PatientReturns');
     assert.match(rows, /row\.help === RETURN_HELP\.CONFIRMED && <ConfirmedHelp/);
     assert.match(rows, /row\.help === RETURN_HELP\.OVERDUE && \(/);
+    // 안내는 두 언어 병기다(검토 M23)
+    assert.match(block('ConfirmedHelp'), /<SafetyNote messageKey=\{'guardian\.confirmedHelp'\} both /);
     // 긴급 절은 serverStatus 와 무관하다
     const emergency = SOURCE.slice(SOURCE.indexOf('<section className="guardian-emergency"'), SOURCE.indexOf('</section>', SOURCE.indexOf('<section className="guardian-emergency"')));
     assert.ok(emergency.length > 0);
     assert.doesNotMatch(emergency, /serverStatus|confirmed|RETURN_/);
     assert.match(emergency, /EMERGENCY_NUMBERS|numbers\.map/);
+  });
+
+  test('확인된 줄이 있어도 긴급 절은 늘 그린다: 조건 없이 알림 자리 바로 뒤, 날짜들 바로 앞이다(검토 Minor 4)', () => {
+    // 이 저장소의 단위 테스트에는 JSX 렌더러가 없다(새 패키지 금지). 그래서 GuardianCopyView 가 돌려주는 JSX 의 긴급 절 자리를
+    // 원본에서 그대로 묶는다: 앞뒤가 조건식(&&, ?, 삼항)이나 hidden 으로 감싸지면 실패한다. 실제 그림은 화면 테스트(Task 8)가 본다
+    const view = block('GuardianCopyView');
+    const open = '<section className="guardian-emergency" aria-labelledby="guardian-emergency-title">';
+    assert.equal(view.split(open).length, 2, '긴급 절 여는 태그는 하나이고 속성이 그대로다');
+    const before = view.slice(0, view.indexOf(open));
+    assert.match(before, /\{alerts\}\s*$/, '긴급 절 바로 앞은 알림 자리다(사이에 조건식이 없다)');
+    const after = view.slice(view.indexOf(open));
+    const close = after.indexOf('</section>');
+    assert.match(after.slice(close), /^<\/section>\s*\{days\.map\(/, '긴급 절 바로 뒤는 날짜들이다(닫는 괄호가 없다)');
+    assert.doesNotMatch(after.slice(0, close), /hidden|&&|\?\s*\(/);
   });
 
   test('serverStatus 가 없으면 지금과 같은 마크업이다', () => {

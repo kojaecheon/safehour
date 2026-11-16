@@ -578,21 +578,22 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 | `PAUSED` | `pushPaused` | 스위치(켜짐, 끄기만) |
 | `RENEW_NEEDED` | `pushRenew` | 다시 켜기, 스위치(끄기) |
 | `MOVED` | `pushMoved`, `pushMovedNote` | 이 휴대폰에서 다시 받기, 스위치(끄기) |
-| `GONE` | `pushGone` | 없음 |
+| `GONE` | `pushGone`, `pushOpenAppAlerts`(기기 알림 스위치가 꺼져 있으면 뒤 줄은 뺀다) | 없음 |
 
-새 문구. `safety` 블록: `guardian.pushNoGuarantee`, `guardian.pushLocation`, `guardian.confirmedHelp`, `guardian.pushOffPending`. 나머지는 `messages`. 아이폰 4단계의 '받은 일정 보기'는 `today.receivedAction`의 각 언어 문구와 같게 쓴다.
+새 문구. `safety` 블록: `guardian.pushNoGuarantee`, `guardian.pushLocation`, `guardian.confirmedHelp`, `guardian.pushOffPending`, `guardian.pushOffUnsent`. 나머지는 `messages`. 영어 문장은 환자를 "the patient"로, 일본어는 「患者さん」으로 쓴다(검토 반영). 아이폰 4단계의 '받은 일정 보기'는 `today.receivedAction`의 각 언어 문구와 같게 쓴다.
 
 | 키 | ko | en |
 | --- | --- | --- |
 | `guardian.pushTitle` | 앱이 닫혀 있어도 받기 | Get alerts even when the app is closed |
-| `guardian.pushIntro` | 마감이 지나도 복귀 확인이 없으면 SafeHour 서버가 이 휴대폰에 알림을 보내요. | If there's no confirmation that your companion is back after a return time passes, the SafeHour server sends an alert to this phone. |
-| `guardian.pushConsentStored` | 이 휴대폰의 알림 주소를 SafeHour 서버에 보관합니다. 환자의 출국 7일 뒤, 또는 스위치를 끄면 지워집니다. | We keep this phone's alert address on the SafeHour server. It is deleted 7 days after your companion leaves Korea, or when you turn this off. |
-| `guardian.pushNoGuarantee` | 알림은 늦거나 오지 않을 수 있습니다. 알림만 믿지 말고 직접 연락해 주세요. | Alerts may be late or may not arrive. Do not rely on alerts alone; contact your companion directly. |
-| `guardian.pushLocation` | 앱은 위치를 모릅니다. 환자가 누른 확인만 전달합니다. | The app does not know anyone's location. It only passes on the confirmation your companion taps. |
+| `guardian.pushIntro` | 마감이 지나도 복귀 확인이 없으면 SafeHour 서버가 이 휴대폰에 알림을 보내요. | If there's no confirmation that the patient is back after a return time passes, the SafeHour server sends an alert to this phone. |
+| `guardian.pushConsentStored` | 이 휴대폰의 알림 주소를 SafeHour 서버에 보관합니다. 환자의 출국 7일 뒤, 또는 스위치를 끄면 지워집니다. | We keep this phone's alert address on the SafeHour server. It is deleted 7 days after the patient leaves Korea, or when you turn this off. |
+| `guardian.pushNoGuarantee` | 알림은 늦거나 오지 않을 수 있습니다. 알림만 믿지 말고 직접 연락해 주세요. | Alerts may be late or may not arrive. Do not rely on alerts alone; contact the patient directly. |
+| `guardian.pushLocation` | 앱은 위치를 모릅니다. 환자가 누른 확인만 전달합니다. | The app does not know anyone's location. It only passes on the confirmation the patient taps. |
 | `guardian.pushWorking` | 켜는 중이에요 | Turning on |
 | `guardian.pushOn` | 이 휴대폰에서 앱이 닫혀 있어도 알림을 받아요. | This phone gets alerts even when the app is closed. |
 | `guardian.pushOffDone` | 껐어요. 서버에서 이 휴대폰의 알림 주소를 지웠어요. | Turned off. We deleted this phone's alert address from the server. |
 | `guardian.pushOffPending` | 이 휴대폰에서는 껐어요. 연결되면 서버에서도 지워요. 그 전까지 알림이 올 수 있어요. | Turned off on this phone. We'll delete it from the server once you're online. Until then, alerts may still arrive. |
+| `guardian.pushOffUnsent` | 이 휴대폰의 서버 알림이 꺼졌지만 서버에서 지우지 못했어요. 환자의 일정이 끝날 때까지 서버가 알림을 보낼 수 있어요. | Server alerts are off on this phone, but this phone’s alert address could not be deleted from the server. The server may still send alerts until the patient’s schedule ends. |
 | `guardian.pushPaused` | 서버 알림이 지금 쉬고 있어요. 앱이 열려 있을 때 알림은 그대로 받아요. | Server alerts are paused right now. You still get alerts while the app is open. |
 | `guardian.pushUnsupported` | 이 브라우저에서는 앱이 닫혀 있을 때 알림을 받을 수 없어요. iPhone이라면 Safari에서 열어 홈 화면에 추가해 주세요. | This browser can't get alerts while the app is closed. On iPhone, open this page in Safari and add it to your Home Screen. |
 | `guardian.pushIosTitle` | iPhone에서 받으려면 | To get alerts on iPhone |
@@ -611,7 +612,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 | `guardian.pushMoved` | 다른 기기가 알림을 가져갔거나 이 휴대폰의 알림 주소가 만료됐어요. | Another device took over these alerts, or this phone's alert address expired. |
 | `guardian.pushMovedNote` | 다시 받으면 지금 받는 기기에는 알림이 더 가지 않아요. | If you do, the device that gets them now will stop getting them. |
 | `guardian.pushMovedButton` | 이 휴대폰에서 다시 받기 | Get them on this phone again |
-| `guardian.pushGone` | 환자가 서버 알림을 껐거나 기간이 끝났어요. 앱이 열려 있을 때 알림은 그대로 받아요. | Your companion turned off server alerts, or the period ended. You still get alerts while the app is open. |
+| `guardian.pushGone` | 환자가 서버 알림을 껐거나 기간이 끝났어요. | The patient turned off server alerts, or the period ended. |
+| `guardian.pushOpenAppAlerts` | 앱이 열려 있을 때 알림은 그대로 받아요. | You still get alerts while the app is open. |
 | `guardian.pushLogin` | 로그인해야 켤 수 있어요. | Log in to turn this on. |
 | `guardian.pushLimit` | 잠시 뒤 다시 시도해 주세요. | Please try again in a little while. |
 | `guardian.pushUnavailable` | 지금 켜지 못했어요. 잠시 뒤 다시 시도해 주세요. | Couldn't turn this on right now. Please try again later. |
@@ -623,8 +625,8 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 | `guardian.muteMidnight` | 자정 직전 마감의 알림은 자정 뒤에 올 수 있어요. | An alert for a return time just before midnight may still arrive after midnight. |
 | `guardian.muteOn` | 오늘은 서버 알림을 보내지 않아요. | No server alerts today. |
 | `guardian.muteOff` | 오늘 서버 알림을 다시 받아요. | Server alerts are back on for today. |
-| `guardian.confirmedTag` | 복귀 확인 | Back confirmed |
-| `guardian.confirmedHelp` | 환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요. | Your companion tapped “I’m back”. The app does not know their location, so it cannot tell whether they are actually back. |
+| `guardian.confirmedTag` | 복귀 확인 | Tapped “I’m back” |
+| `guardian.confirmedHelp` | 환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요. 걱정되면 환자에게 직접 연락해 주세요. | The patient tapped “I’m back”. The app does not know their location, so it cannot tell whether they are actually back. If you are worried, contact the patient directly. |
 | `guardian.statusAsOf` | {time}에 서버에서 확인한 내용이에요. | As checked with the server at {time}. |
 
 - [ ] **Step 1: 테스트를 쓴다**

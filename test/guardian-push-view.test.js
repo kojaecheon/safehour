@@ -8,6 +8,7 @@
 //   - 기기 알림 스위치가 꺼져 있어도 켤 수 있다(켜면 둘 다 켠다). 꺼진 기기 스위치 아래의 구독은 켜진 것으로 그리지 않는다
 //   - 실행기가 일하는 중(busy)이면 두 스위치를 잠근다. 보기 전용이면 스위치를 잠그고 로그인 길(오프라인이면 연결 안내)을 준다
 //   - 표시 부품은 저장소를 읽지 않는다. 실행기 훅을 부르는 곳은 GuardianPushItem.js 하나다
+//   - 결과 줄은 지금 상태에 맞을 때만 보인다(검토 I1): 실행기의 lastResult 는 다시 맞추기·상태 조회 뒤에도 남는다
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,6 +25,8 @@ import {
   PUSH_SAFETY_KEYS,
   guardianPushViewModel,
   pushLineSegments,
+  resultFitsState,
+  switchControlProps,
 } from '../components/guardian/guardianPushView.js';
 import { confirmedFor } from '../components/guardian/returnStatus.js';
 import { IDLE_STATE, PUSH_RESULT } from '../lib/notify/guardianPush.js';
@@ -146,7 +149,7 @@ describe('상태 표 (계획 Task 7)', () => {
       [{ sub: SUB, config: CONFIG_OFF }, 'PAUSED', ['guardian.pushPaused'], [], true],
       [{ sub: SUB, renewNeeded: true }, 'RENEW_NEEDED', ['guardian.pushRenew'], [PUSH_ACTION.RENEW], true],
       [{ sub: SUB, moved: true }, 'MOVED', ['guardian.pushMoved', 'guardian.pushMovedNote'], [PUSH_ACTION.TAKE_OVER], true],
-      [{ gone: true }, 'GONE', ['guardian.pushGone'], [], false],
+      [{ gone: true }, 'GONE', ['guardian.pushGone', 'guardian.pushOpenAppAlerts'], [], false],
     ];
     for (const [over, itemState, lines, actions, showSwitch] of table) {
       const model = view(over);
@@ -202,6 +205,9 @@ describe('상태 표 (계획 Task 7)', () => {
     assert.equal(model.itemState, PUSH_ITEM_STATE.GONE);
     assert.equal(model.showSwitch, false);
     assert.equal(model.showMute, false);
+    // 기기 알림 스위치가 꺼져 있으면 '앱이 열려 있을 때 알림은 그대로 받아요'를 말하지 않는다(검토 Minor 1)
+    assert.deepEqual(view({ gone: true }, { mainOn: false }).lines, ['guardian.pushGone']);
+    assert.ok(!/앱이 열려 있을 때/.test(guardianMessages['guardian.pushGone'].ko));
     // 서버 스위치가 꺼졌고 구독도 없으면 GONE 이어도 숨는다(정한 값 12)
     assert.equal(view({ gone: true, config: CONFIG_OFF }).itemState, PUSH_ITEM_STATE.HIDDEN);
   });
@@ -274,6 +280,16 @@ describe('잠금과 보기 전용 (정한 값 27, 실행기 검토: 켜기가 �
     }
   });
 
+  test('바로 위 기기 알림 스위치가 로그인 버튼을 이미 보이면 항목은 줄만 두고 버튼을 두지 않는다(검토 Minor 2)', () => {
+    const available = view({}, { writable: false, loginElsewhere: true });
+    assert.deepEqual(available.lines, ['guardian.pushIntro', 'guardian.pushLogin']);
+    assert.deepEqual(available.actions, []);
+    const moved = view({ sub: SUB, moved: true }, { writable: false, loginElsewhere: true });
+    assert.ok(moved.lines.includes('settings.readOnlyNote'));
+    assert.deepEqual(moved.actions, []);
+    assert.deepEqual(view({ lastResult: PUSH_RESULT.LOGIN_REQUIRED }, { loginElsewhere: true }).actions, []);
+  });
+
   test('오프라인 보기 전용이면 로그인을 권하지 않고 연결 안내만 둔다', () => {
     const model = view({ sub: SUB }, { writable: false, offline: true });
     assert.ok(model.lines.includes('settings.offlineNote'));
@@ -283,7 +299,7 @@ describe('잠금과 보기 전용 (정한 값 27, 실행기 검토: 켜기가 �
   });
 
   test('보기 전용이어도 아이폰 안내·기간 끝처럼 켤 수 없는 상태는 줄만 그대로다', () => {
-    assert.deepEqual(view({ gone: true }, { writable: false }).lines, ['guardian.pushGone']);
+    assert.deepEqual(view({ gone: true }, { writable: false }).lines, ['guardian.pushGone', 'guardian.pushOpenAppAlerts']);
     assert.deepEqual(view({ support: PUSH_SUPPORT.IOS_TOO_OLD }, { writable: false }).lines, ['guardian.pushIosOld']);
     assert.deepEqual(view({ support: PUSH_SUPPORT.IOS_TOO_OLD }, { writable: false }).actions, []);
   });
@@ -336,12 +352,16 @@ describe('결과 줄 (정한 값 5, 실행기 결과)', () => {
       'OFF_UNSENT',
       'PERMISSION_LOST',
     ]);
+    // 결과마다 그 결과가 맞는 자리에서 본다. ON 은 ON 상태의 줄과 같아 따로 보이지 않는다
+    const FITS = {
+      MUTE_ON: { sub: SUB, status: { date: TODAY, confirmed: [], muted: true, active: true, atMs: 1 } },
+      MUTE_OFF: { sub: SUB },
+    };
     for (const result of Object.values(PUSH_RESULT)) {
-      // 상태 줄과 겹치지 않게 결과가 상태와 다른 자리(구독 없음, 켤 수 있음)에서 본다
-      const model = view({ lastResult: result, ...(result === 'MUTE_ON' || result === 'MUTE_OFF' ? { sub: SUB } : {}) });
+      const model = view({ lastResult: result, ...(FITS[result] ?? {}) });
       const key = PUSH_RESULT_LINE[result];
-      if (model.lines.includes(key)) {
-        assert.equal(model.result, null, `${result}: 상태 줄과 같은 결과 줄은 한 번만 보인다`);
+      if (result === PUSH_RESULT.ON) {
+        assert.equal(model.result, null);
         continue;
       }
       assert.equal(model.result?.key, key, result);
@@ -361,7 +381,8 @@ describe('결과 줄 (정한 값 5, 실행기 결과)', () => {
     assert.equal(line.ko, '이 휴대폰의 서버 알림이 꺼졌지만 서버에서 지우지 못했어요. 환자의 일정이 끝날 때까지 서버가 알림을 보낼 수 있어요.');
     assert.ok(!/껐어요|껐습니다/.test(line.ko));
     assert.ok(!/\byou turned\b|^Turned off/i.test(line.en));
-    assert.match(line.en, /may still send alerts until your companion's schedule ends/);
+    assert.match(line.en, /this phone’s alert address could not be deleted/);
+    assert.match(line.en, /may still send alerts until the patient’s schedule ends/);
   });
 
   test('OFF_PENDING 은 safety 줄이다(연결되면 서버에서 지운다)', () => {
@@ -373,7 +394,7 @@ describe('결과 줄 (정한 값 5, 실행기 결과)', () => {
     assert.equal(login.result.key, 'guardian.pushLogin');
     assert.deepEqual(login.actions, [PUSH_ACTION.LOGIN]);
     assert.equal(view({ lastResult: PUSH_RESULT.READ_ONLY }).result.key, 'settings.readOnlyNote');
-    const offline = view({ sub: SUB, lastResult: PUSH_RESULT.READ_ONLY }, { offline: true });
+    const offline = view({ lastResult: PUSH_RESULT.READ_ONLY }, { offline: true });
     assert.equal(offline.result.key, 'settings.offlineNote');
     assert.deepEqual(offline.actions, []);
   });
@@ -381,6 +402,159 @@ describe('결과 줄 (정한 값 5, 실행기 결과)', () => {
   test('모르는 결과 값은 줄을 만들지 않는다', () => {
     assert.equal(view({ lastResult: 'SOMETHING_NEW' }).result, null);
     assert.equal(view({ lastResult: null }).result, null);
+  });
+});
+
+describe('결과 줄은 지금 상태에 맞을 때만 (검토 I1)', () => {
+  const YESTERDAY = '2026-11-15';
+  const status = (date, muted) => ({ date, confirmed: [], muted, active: true, atMs: 1 });
+  const FAILURES = [
+    PUSH_RESULT.DENIED,
+    PUSH_RESULT.UNSUPPORTED,
+    PUSH_RESULT.SW_NOT_READY,
+    PUSH_RESULT.FAILED,
+    PUSH_RESULT.LOGIN_REQUIRED,
+    PUSH_RESULT.RATE_LIMITED,
+    PUSH_RESULT.UNAVAILABLE,
+    PUSH_RESULT.NETWORK,
+    PUSH_RESULT.READ_ONLY,
+    PUSH_RESULT.OFF,
+    PUSH_RESULT.GONE,
+  ];
+  const at = (itemState, extra = {}) => ({
+    itemState,
+    switchOn: ['ON', 'PAUSED', 'RENEW_NEEDED', 'MOVED'].includes(itemState),
+    showMute: false,
+    muteOn: false,
+    ...extra,
+  });
+
+  test('규칙 하나(resultFitsState): ON 은 ON 에서만, 함께 있음 결과는 함께 있음 스위치와 맞을 때만', () => {
+    assert.equal(resultFitsState(PUSH_RESULT.ON, at('ON')), true);
+    for (const state of ['AVAILABLE', 'MOVED', 'RENEW_NEEDED', 'PAUSED', 'GONE']) assert.equal(resultFitsState(PUSH_RESULT.ON, at(state)), false, state);
+    assert.equal(resultFitsState(PUSH_RESULT.MUTE_ON, at('ON', { showMute: true, muteOn: true })), true);
+    assert.equal(resultFitsState(PUSH_RESULT.MUTE_ON, at('ON', { showMute: true, muteOn: false })), false);
+    assert.equal(resultFitsState(PUSH_RESULT.MUTE_OFF, at('ON', { showMute: true, muteOn: false })), true);
+    assert.equal(resultFitsState(PUSH_RESULT.MUTE_OFF, at('ON', { showMute: true, muteOn: true })), false);
+    assert.equal(resultFitsState(PUSH_RESULT.MUTE_OFF, at('AVAILABLE')), false);
+  });
+
+  test('규칙 하나: 끄기 결과와 권한 잃음은 구독이 없을 때만, 실패는 ON 이 아닐 때만, 모르는 값은 맞지 않는다', () => {
+    for (const result of [PUSH_RESULT.OFF_DONE, PUSH_RESULT.OFF_PENDING, PUSH_RESULT.OFF_UNSENT, PUSH_RESULT.PERMISSION_LOST]) {
+      assert.equal(resultFitsState(result, at('AVAILABLE')), true, result);
+      assert.equal(resultFitsState(result, at('GONE')), true, result);
+      for (const state of ['ON', 'PAUSED', 'RENEW_NEEDED', 'MOVED']) assert.equal(resultFitsState(result, at(state)), false, `${result} ${state}`);
+    }
+    for (const result of FAILURES) {
+      assert.equal(resultFitsState(result, at('ON')), false, result);
+      for (const state of ['AVAILABLE', 'MOVED', 'RENEW_NEEDED', 'PAUSED', 'SW_NOT_READY']) assert.equal(resultFitsState(result, at(state)), true, `${result} ${state}`);
+    }
+    assert.equal(resultFitsState('SOMETHING_NEW', at('AVAILABLE')), false);
+    assert.equal(resultFitsState(null, at('AVAILABLE')), false);
+  });
+
+  test('검토 경우 A: 켠 뒤 기기 알림 스위치를 끄면 받는 중 줄이 남지 않는다(다시 맞추기 전과 뒤)', () => {
+    const before = view({ sub: SUB, lastResult: PUSH_RESULT.ON }, { mainOn: false });
+    assert.equal(before.itemState, PUSH_ITEM_STATE.AVAILABLE);
+    assert.equal(before.switchOn, false);
+    assert.equal(before.result, null);
+    assert.ok(!before.lines.includes('guardian.pushOn'));
+    const after = view({ lastResult: PUSH_RESULT.ON }, { mainOn: false });
+    assert.equal(after.result, null);
+    assert.equal(view({ lastResult: PUSH_RESULT.ON }).result, null);
+  });
+
+  test('검토 경우 B: 상태 조회가 다른 기기를 알리면(MOVED) 받는 중 줄이 없다. 다시 켜기·쉼도 같다', () => {
+    for (const over of [{ moved: true }, { renewNeeded: true }, { config: CONFIG_OFF }]) {
+      const model = view({ sub: SUB, lastResult: PUSH_RESULT.ON, ...over });
+      assert.notEqual(model.itemState, PUSH_ITEM_STATE.ON);
+      assert.equal(model.result, null, JSON.stringify(over));
+    }
+  });
+
+  test('자정이 지나 함께 있음이 풀리면 어제의 MUTE_ON 줄이 남지 않는다', () => {
+    const next = view({ sub: SUB, lastResult: PUSH_RESULT.MUTE_ON, status: status(YESTERDAY, true) });
+    assert.equal(next.showMute, true);
+    assert.equal(next.muteOn, false);
+    assert.equal(next.result, null);
+    assert.equal(view({ sub: SUB, lastResult: PUSH_RESULT.MUTE_ON, status: status(TODAY, true) }).result.key, 'guardian.muteOn');
+    assert.equal(view({ sub: SUB, lastResult: PUSH_RESULT.MUTE_OFF, status: status(TODAY, false) }).result.key, 'guardian.muteOff');
+    assert.equal(view({ sub: SUB, lastResult: PUSH_RESULT.MUTE_OFF, status: status(TODAY, true) }).result, null);
+    // 함께 있음이 없는 자리(켤 수 있음)에는 함께 있음 결과가 없다
+    assert.equal(view({ lastResult: PUSH_RESULT.MUTE_ON }).result, null);
+  });
+
+  test('끈 뒤에 다른 탭이 다시 켜면 끄기 결과 줄이 받는 중 옆에 남지 않는다', () => {
+    for (const result of [PUSH_RESULT.OFF_DONE, PUSH_RESULT.OFF_PENDING, PUSH_RESULT.OFF_UNSENT, PUSH_RESULT.PERMISSION_LOST]) {
+      assert.equal(view({ sub: SUB, lastResult: result }).result, null, result);
+      assert.equal(view({ lastResult: result }).result?.key, PUSH_RESULT_LINE[result], result);
+    }
+  });
+
+  test('켜기 실패 뒤에 다른 탭이 켜면(ON) 실패 줄이 없고, 다시 받기·다시 켜기의 실패는 보인다', () => {
+    for (const result of FAILURES) {
+      assert.equal(view({ sub: SUB, lastResult: result }).result, null, result);
+      assert.equal(view({ sub: SUB, moved: true, lastResult: result }).result?.key, PUSH_RESULT_LINE[result], result);
+    }
+  });
+
+  test('상태 줄과 같은 결과 줄은 한 번만 보인다(검토 M10)', () => {
+    assert.equal(view({ swReady: false, lastResult: PUSH_RESULT.SW_NOT_READY }).result, null);
+    assert.deepEqual(view({ swReady: false, lastResult: PUSH_RESULT.SW_NOT_READY }).lines, ['guardian.pushSwNotReady']);
+    assert.equal(view({ support: PUSH_SUPPORT.DENIED, lastResult: PUSH_RESULT.DENIED }).result, null);
+    assert.equal(view({ support: PUSH_SUPPORT.UNSUPPORTED, lastResult: PUSH_RESULT.UNSUPPORTED }).result, null);
+    assert.equal(view({ sub: SUB, config: CONFIG_OFF, lastResult: PUSH_RESULT.OFF }).result, null);
+    assert.equal(view({ gone: true, lastResult: PUSH_RESULT.GONE }).result, null);
+    assert.equal(view({ lastResult: PUSH_RESULT.LOGIN_REQUIRED }, { writable: false }).result, null);
+    // 같은 결과라도 상태 줄과 다르면 보인다
+    assert.equal(view({ lastResult: PUSH_RESULT.SW_NOT_READY }).result.key, 'guardian.pushSwNotReady');
+  });
+});
+
+describe('스위치 잠금 (검토 M2·M3·M17, 포커스를 지키는 잠금)', () => {
+  test('잠금이면 disabled 대신 aria-disabled 이고 누름을 막는다. 막힘이면 disabled 다', () => {
+    assert.deepEqual(switchControlProps({ disabled: true, locked: true }), { disabled: false, ariaDisabled: 'true', blockClick: true, ignore: true });
+    assert.deepEqual(switchControlProps({ disabled: false, locked: true }), { disabled: false, ariaDisabled: 'true', blockClick: true, ignore: true });
+    assert.deepEqual(switchControlProps({ disabled: true, locked: false }), { disabled: true, ariaDisabled: undefined, blockClick: false, ignore: true });
+    assert.deepEqual(switchControlProps({ disabled: false, locked: false }), { disabled: false, ariaDisabled: undefined, blockClick: false, ignore: false });
+  });
+
+  test('부품은 두 스위치 모두 모델의 잠금을 넘기고 그 값으로 그린다', () => {
+    const source = readFileSync(join(ROOT, 'components/guardian/GuardianPushItemView.js'), 'utf8');
+    assert.match(source, /locked=\{model\.switchLocked\}/);
+    assert.match(source, /locked=\{model\.muteLocked\}/);
+    const row = source.slice(source.indexOf('function SwitchRow('), source.indexOf('\n}\n', source.indexOf('function SwitchRow(')));
+    assert.match(row, /switchControlProps\(\{ disabled, locked \}\)/);
+    assert.match(row, /disabled=\{control\.disabled\}/);
+    assert.match(row, /aria-disabled=\{control\.ariaDisabled\}/);
+    assert.match(row, /if \(control\.blockClick\) event\.preventDefault\(\);/);
+    assert.match(row, /if \(control\.ignore\) return;/);
+    assert.doesNotMatch(row, /disabled=\{disabled/);
+  });
+
+  test('safety 결과 줄은 두 언어로 그린다(검토 M12)', () => {
+    const source = readFileSync(join(ROOT, 'components/guardian/GuardianPushItemView.js'), 'utf8');
+    const block = (name) => source.slice(source.indexOf(`function ${name}(`), source.indexOf('\n}\n', source.indexOf(`function ${name}(`)));
+    assert.match(block('ResultLine'), /if \(result\.safety\) return <SafetyPair messageKey=\{result\.key\} \/>;/);
+    const pair = block('SafetyPair');
+    assert.match(pair, /text\.primary\.text/);
+    assert.match(pair, /text\.secondary\.text/);
+  });
+
+  test('누른 부품이 사라지면 포커스를 항목 이름으로 옮길 자리가 있다(검토 Minor 3, 동작 확인은 e2e)', () => {
+    const source = readFileSync(join(ROOT, 'components/guardian/GuardianPushItemView.js'), 'utf8');
+    assert.match(source, /<h3 id=\{titleId\} ref=\{headingRef\} tabIndex=\{-1\} className="guardian-push-heading">/);
+    assert.match(source, /inputRef=\{switchRef\}/);
+    assert.match(source, /if \(!focused \|\| focused\.isConnected\) return;/);
+    assert.match(source, /if \(active && active !== document\.body\) return;/);
+    assert.match(source, /\(headingRef\.current \?\? switchRef\.current\)\?\.focus\(\);/);
+  });
+
+  test('보기 전용 로그인 버튼은 기기 알림 스위치와 같은 기준으로 한 번만(검토 Minor 2)', () => {
+    const item = readFileSync(join(ROOT, 'components/guardian/GuardianPushItem.js'), 'utf8');
+    assert.match(item, /loginElsewhere: shouldShowReadOnly\(status\) && status\.reason !== READ_ONLY_REASON\.OFFLINE,/);
+    const toggle = readFileSync(join(ROOT, 'components/guardian/AlertsToggleView.js'), 'utf8');
+    assert.match(toggle, /\{showReadOnly && !offline && \(/);
   });
 });
 
@@ -427,6 +601,7 @@ describe('문구 (Global Constraints, 정한 값 25)', () => {
     'guardian.pushMovedNote',
     'guardian.pushMovedButton',
     'guardian.pushGone',
+    'guardian.pushOpenAppAlerts',
     'guardian.pushLogin',
     'guardian.pushLimit',
     'guardian.pushUnavailable',
@@ -475,7 +650,10 @@ describe('문구 (Global Constraints, 정한 값 25)', () => {
   test('계획의 한국어·영어 문구 그대로다(대표 몇 줄)', () => {
     assert.equal(guardianMessages['guardian.pushTitle'].ko, '앱이 닫혀 있어도 받기');
     assert.equal(guardianMessages['guardian.pushTitle'].en, 'Get alerts even when the app is closed');
-    assert.equal(guardianSafety['guardian.confirmedHelp'].ko, "환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요.");
+    assert.equal(
+      guardianSafety['guardian.confirmedHelp'].ko,
+      "환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요. 걱정되면 환자에게 직접 연락해 주세요.",
+    );
     assert.equal(guardianSafety['guardian.pushLocation'].ko, '앱은 위치를 모릅니다. 환자가 누른 확인만 전달합니다.');
     assert.equal(guardianMessages['guardian.statusAsOf'].ko, '{time}에 서버에서 확인한 내용이에요.');
     assert.equal(guardianMessages['guardian.muteTitle'].en, 'Together today');
@@ -490,10 +668,34 @@ describe('문구 (Global Constraints, 정한 값 25)', () => {
     }
   });
 
+  test('복귀 확인 꼬리표는 누른 사실만 말한다(검토 I2): 영어·일본어·중국어는 돌아왔다고 단정하지 않는다', () => {
+    const tag = guardianMessages['guardian.confirmedTag'];
+    assert.equal(tag.ko, '복귀 확인');
+    assert.equal(tag.en, 'Tapped “I’m back”');
+    assert.equal(tag.ja, '「戻りました」の連絡あり');
+    assert.equal(tag.zh, '已点“我已返回”');
+    assert.doesNotMatch(tag.en, /confirmed/i);
+  });
+
+  test('새 영어 문구는 기존 /g 줄처럼 the patient 라고 쓰고, 새 일본어 문구는 患者さん, 새 중국어 문구는 点按과 通知接收地址를 쓴다', () => {
+    for (const key of [...MESSAGE_KEYS, ...SAFETY_KEYS]) {
+      const entry = guardianMessages[key] ?? guardianSafety[key];
+      assert.doesNotMatch(entry.en, /companion/i, `${key}.en`);
+      assert.doesNotMatch(entry.ja, /患者(?!さん)/, `${key}.ja`);
+      assert.doesNotMatch(entry.zh, /点击|提醒地址/, `${key}.zh`);
+    }
+    assert.equal(guardianMessages['guardian.muteTitle'].ja, '今日は同行中');
+    assert.equal(guardianMessages['guardian.muteTitle'].zh, '今天陪同中');
+    assert.equal(guardianSafety['guardian.pushLocation'].zh, '应用无法获知任何人的位置，只转达患者点按的确认。');
+  });
+
   test('복귀 확인 안내는 환자가 누른 것만 말하고 돌아왔다고 단정하지 않는다', () => {
     const help = guardianSafety['guardian.confirmedHelp'];
     assert.match(help.ko, /알 수 없어요/);
     assert.match(help.en, /cannot tell/);
+    // 줄에서 연락 안내가 빠지므로 안내가 직접 연락을 권한다
+    assert.match(help.ko, /직접 연락해 주세요/);
+    assert.match(help.en, /contact the patient directly/);
     // 꼬리표 혼자 쓰이지 않게 안내 키가 safety 에 있다(두 언어 병기)
     assert.ok(guardianSafety['guardian.confirmedHelp']);
   });

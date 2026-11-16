@@ -796,16 +796,16 @@ export const messages = {
   },
   'guardian.pushIntro': {
     ko: '마감이 지나도 복귀 확인이 없으면 SafeHour 서버가 이 휴대폰에 알림을 보내요.',
-    en: "If there's no confirmation that your companion is back after a return time passes, the SafeHour server sends an alert to this phone.",
+    en: "If there's no confirmation that the patient is back after a return time passes, the SafeHour server sends an alert to this phone.",
     ja: '期限を過ぎても戻りの確認がない場合、SafeHourのサーバーがこのスマートフォンに通知を送ります。',
     zh: '如果截止时间已过仍没有返回确认，SafeHour服务器会向此手机发送提醒。',
   },
   // 설계서 5.5 보호자 동의 문장. 켜기 스위치 바로 아래에 늘 보인다(정한 값 28)
   'guardian.pushConsentStored': {
     ko: '이 휴대폰의 알림 주소를 SafeHour 서버에 보관합니다. 환자의 출국 7일 뒤, 또는 스위치를 끄면 지워집니다.',
-    en: 'We keep this phone\'s alert address on the SafeHour server. It is deleted 7 days after your companion leaves Korea, or when you turn this off.',
-    ja: 'このスマートフォンの通知先をSafeHourのサーバーに保管します。患者の出国7日後、またはスイッチをオフにすると削除されます。',
-    zh: '此手机的提醒地址会保存在SafeHour服务器上。患者出境7天后或关闭开关时会被删除。',
+    en: 'We keep this phone\'s alert address on the SafeHour server. It is deleted 7 days after the patient leaves Korea, or when you turn this off.',
+    ja: 'このスマートフォンの通知先をSafeHourのサーバーに保管します。患者さんの出国7日後、またはスイッチをオフにすると削除されます。',
+    zh: '此手机的通知接收地址会保存在SafeHour服务器上。患者出境7天后或关闭开关时会被删除。',
   },
   'guardian.pushWorking': {
     ko: '켜는 중이에요',
@@ -823,7 +823,7 @@ export const messages = {
     ko: '껐어요. 서버에서 이 휴대폰의 알림 주소를 지웠어요.',
     en: "Turned off. We deleted this phone's alert address from the server.",
     ja: 'オフにしました。サーバーからこのスマートフォンの通知先を削除しました。',
-    zh: '已关闭。已从服务器删除此手机的提醒地址。',
+    zh: '已关闭。已从服务器删除此手机的通知接收地址。',
   },
   'guardian.pushPaused': {
     ko: '서버 알림이 지금 쉬고 있어요. 앱이 열려 있을 때 알림은 그대로 받아요.',
@@ -919,7 +919,7 @@ export const messages = {
     ko: '다른 기기가 알림을 가져갔거나 이 휴대폰의 알림 주소가 만료됐어요.',
     en: "Another device took over these alerts, or this phone's alert address expired.",
     ja: '別の端末が通知を引き継いだか、このスマートフォンの通知先の有効期限が切れました。',
-    zh: '其他设备已接管提醒，或此手机的提醒地址已过期。',
+    zh: '其他设备已接管提醒，或此手机的通知接收地址已过期。',
   },
   'guardian.pushMovedNote': {
     ko: '다시 받으면 지금 받는 기기에는 알림이 더 가지 않아요.',
@@ -934,10 +934,17 @@ export const messages = {
     zh: '在此手机上重新接收',
   },
   'guardian.pushGone': {
-    ko: '환자가 서버 알림을 껐거나 기간이 끝났어요. 앱이 열려 있을 때 알림은 그대로 받아요.',
-    en: 'Your companion turned off server alerts, or the period ended. You still get alerts while the app is open.',
-    ja: '患者がサーバー通知をオフにしたか、期間が終わりました。アプリが開いているときの通知はこれまでどおり受け取れます。',
-    zh: '患者已关闭服务器提醒，或期限已结束。应用打开时仍会照常收到提醒。',
+    ko: '환자가 서버 알림을 껐거나 기간이 끝났어요.',
+    en: 'The patient turned off server alerts, or the period ended.',
+    ja: '患者さんがサーバー通知をオフにしたか、期間が終わりました。',
+    zh: '患者已关闭服务器提醒，或期限已结束。',
+  },
+  // 기간 끝(GONE) 아래 줄. 기기 알림 스위치가 꺼져 있으면 보이지 않는다(검토 Minor 1)
+  'guardian.pushOpenAppAlerts': {
+    ko: '앱이 열려 있을 때 알림은 그대로 받아요.',
+    en: 'You still get alerts while the app is open.',
+    ja: 'アプリが開いているときの通知はこれまでどおり受け取れます。',
+    zh: '应用打开时仍会照常收到提醒。',
   },
   'guardian.pushLogin': {
     ko: '로그인해야 켤 수 있어요.',
@@ -967,7 +974,7 @@ export const messages = {
     ko: '이 휴대폰에서 알림 주소를 만들지 못했어요. 앱을 새로 고친 뒤 다시 시도해 주세요.',
     en: "This phone couldn't create an alert address. Reload the app and try again.",
     ja: 'このスマートフォンで通知先を作成できませんでした。アプリを再読み込みしてから、もう一度お試しください。',
-    zh: '此手机未能创建提醒地址。请刷新应用后再试。',
+    zh: '此手机未能创建通知接收地址。请刷新应用后再试。',
   },
   'guardian.pushPermissionLost': {
     ko: '알림 권한이 꺼져 서버 알림도 껐어요.',
@@ -979,8 +986,8 @@ export const messages = {
   'guardian.muteTitle': {
     ko: '오늘 함께 있음',
     en: 'Together today',
-    ja: '今日は一緒にいる',
-    zh: '今天在一起',
+    ja: '今日は同行中',
+    zh: '今天陪同中',
   },
   'guardian.muteHelp': {
     ko: '켜면 오늘(한국 시간) 서버 알림을 보내지 않아요. 자정이 지나면 저절로 풀려요. 앱이 열려 있을 때 마감 시각 알림은 그대로 와요.',
@@ -1006,12 +1013,13 @@ export const messages = {
     ja: '今日のサーバー通知をまた受け取ります。',
     zh: '今天将重新接收服务器提醒。',
   },
-  // 복귀 확인 꼬리표(정한 값 15). 혼자 쓰지 않고 늘 guardian.confirmedHelp 와 함께 보인다
+  // 복귀 확인 꼬리표(정한 값 15). 혼자 쓰지 않고 늘 guardian.confirmedHelp 와 함께 보인다. 돌아왔다는 단정이 아니라
+  // '돌아왔어요'를 누른 사실만 말한다(검토 I2: 영어·일본어·중국어는 누름을 그대로 옮긴다. 한국어는 계획 그대로)
   'guardian.confirmedTag': {
     ko: '복귀 확인',
-    en: 'Back confirmed',
-    ja: '戻り確認',
-    zh: '返回确认',
+    en: 'Tapped “I’m back”',
+    ja: '「戻りました」の連絡あり',
+    zh: '已点“我已返回”',
   },
   'guardian.statusAsOf': {
     ko: '{time}에 서버에서 확인한 내용이에요.',
@@ -1076,21 +1084,22 @@ export const safety = {
   // 받은 일정의 '앱이 닫혀 있어도 받기' 항목(계획 Task 7). 알림이 늦거나 올 수 있다는 것, 위치를 모른다는 것, 복귀 확인의 뜻을 말하는 문장이다
   'guardian.pushNoGuarantee': {
     ko: '알림은 늦거나 오지 않을 수 있습니다. 알림만 믿지 말고 직접 연락해 주세요.',
-    en: 'Alerts may be late or may not arrive. Do not rely on alerts alone; contact your companion directly.',
+    en: 'Alerts may be late or may not arrive. Do not rely on alerts alone; contact the patient directly.',
     ja: '通知は遅れたり、届かなかったりすることがあります。通知だけに頼らず、直接連絡してください。',
-    zh: '提醒可能会延迟或无法送达。请不要只依赖提醒，请直接联系对方。',
+    zh: '提醒可能会延迟或无法送达。请不要只依赖提醒，请直接联系患者。',
   },
   'guardian.pushLocation': {
     ko: '앱은 위치를 모릅니다. 환자가 누른 확인만 전달합니다.',
-    en: "The app does not know anyone's location. It only passes on the confirmation your companion taps.",
-    ja: 'アプリは位置情報を知りません。患者が押した確認だけを伝えます。',
-    zh: '应用不知道位置，只传达患者点击的确认。',
+    en: "The app does not know anyone's location. It only passes on the confirmation the patient taps.",
+    ja: 'アプリは位置情報を知りません。患者さんが押した確認だけを伝えます。',
+    zh: '应用无法获知任何人的位置，只转达患者点按的确认。',
   },
+  // 줄에서 마감 지남 연락 안내가 빠지므로 직접 연락을 권하는 문장을 함께 둔다(검토)
   'guardian.confirmedHelp': {
-    ko: "환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요.",
-    en: 'Your companion tapped “I’m back”. The app does not know their location, so it cannot tell whether they are actually back.',
-    ja: '患者が「戻りました」を押しました。アプリは位置情報を知らないため、実際に戻ったかどうかは分かりません。',
-    zh: '患者点击了“我已返回”。应用不知道其位置，因此无法得知其是否真的已经返回。',
+    ko: "환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요. 걱정되면 환자에게 직접 연락해 주세요.",
+    en: 'The patient tapped “I’m back”. The app does not know their location, so it cannot tell whether they are actually back. If you are worried, contact the patient directly.',
+    ja: '患者さんが「戻りました」を押しました。アプリは位置情報を知らないため、実際に戻ったかどうかは分かりません。心配な場合は、患者さんに直接連絡してください。',
+    zh: '患者点按了“我已返回”。应用无法获知其位置，因此无法得知其是否真的已经返回。如有担心，请直接联系患者。',
   },
   'guardian.pushOffPending': {
     ko: '이 휴대폰에서는 껐어요. 연결되면 서버에서도 지워요. 그 전까지 알림이 올 수 있어요.',
@@ -1102,8 +1111,8 @@ export const safety = {
   // (다시 맞추기가 구독을 거둠, 예: 기기 알림 스위치를 끔). 그래서 '껐다'고 말하지 않고 서버가 보낼 수 있다고만 말한다
   'guardian.pushOffUnsent': {
     ko: '이 휴대폰의 서버 알림이 꺼졌지만 서버에서 지우지 못했어요. 환자의 일정이 끝날 때까지 서버가 알림을 보낼 수 있어요.',
-    en: "Server alerts are off on this phone, but they could not be deleted from the server. The server may still send alerts until your companion's schedule ends.",
-    ja: 'このスマートフォンのサーバー通知はオフになりましたが、サーバーから削除できませんでした。患者の予定が終わるまで、サーバーから通知が届くことがあります。',
+    en: 'Server alerts are off on this phone, but this phone’s alert address could not be deleted from the server. The server may still send alerts until the patient’s schedule ends.',
+    ja: 'このスマートフォンのサーバー通知はオフになりましたが、サーバーから削除できませんでした。患者さんの予定が終わるまで、サーバーから通知が届くことがあります。',
     zh: '此手机的服务器提醒已关闭，但未能从服务器删除。在患者的日程结束前，服务器仍可能发送提醒。',
   },
 };

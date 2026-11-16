@@ -8,15 +8,19 @@
 // 모양
 //   - 스위치는 기기 알림 스위치와 같은 부품(.toggle-row 라벨 + input.ui-switch, role="switch")이다. 라벨 줄 전체가 누르는 곳(52px)이다.
 //     켤 수 없는 상태(아이폰 안내, 지원 안 됨, 차단, 기간 끝)는 스위치 대신 같은 이름의 제목을 둔다.
-//   - 실행기가 일하는 중(model.switchLocked)이면 disabled 대신 aria-disabled 로 막고 누름을 무시한다. 누른 스위치에 포커스가 남는다.
+//   - 실행기가 일하는 중(model.switchLocked)이면 disabled 대신 aria-disabled 로 막고 누름을 무시한다. 누른 스위치에 포커스가 남는다
+//     (switchControlProps).
+//   - 누른 부품이 결과로 사라지면(켜기가 차단·지원 안 됨·기간 끝으로 끝나 스위치가 없어짐, 다시 켜기·다시 받기가 성공해 버튼이
+//     없어짐) 포커스가 문서 몸통으로 떨어진다. 그때는 항목 이름으로 옮긴다: 제목이 있으면 제목(tabIndex -1), 스위치가 있는 상태면
+//     같은 이름을 가진 켜기 스위치다(검토 Minor 3). 사용자가 포커스를 다른 곳(빈 곳 포함)으로 옮긴 뒤면 건드리지 않는다.
 //   - 상태 줄은 role="status", 결과 줄은 성공·안내는 role="status", 실패는 role="alert" 에 넣는다. 두 칸은 늘 있어 바뀜을 읽어 준다.
 //   - 안전 문구(도착 비보장, 위치, 끄기 대기)는 두 언어 병기다(일본어·중국어 화면은 검수 전까지 영어와 한국어). 줄마다 lang 을 단다.
 //   - 동의 문장과 법률 검토 줄은 늘 보인다(정한 값 28). 켜기 스위치를 누르는 것이 동의다.
 
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
 import { Button, Icon } from '@/components/ui/index.js';
-import { PUSH_ACTION, PUSH_ITEM_STATE, pushLineSegments } from './guardianPushView.js';
+import { PUSH_ACTION, PUSH_ITEM_STATE, pushLineSegments, switchControlProps } from './guardianPushView.js';
 
 const ACTION_LABEL = Object.freeze({
   [PUSH_ACTION.RELOAD]: 'guardian.pushReload',
@@ -47,24 +51,26 @@ function ResultLine({ result }) {
 }
 
 /** 스위치 하나(켜기·함께 있음 공용). locked 면 포커스를 지키며 막는다 */
-function SwitchRow({ label, on, disabled, locked, describedBy, onChange }) {
+function SwitchRow({ label, on, disabled, locked, describedBy, inputRef, onChange }) {
+  const control = switchControlProps({ disabled, locked });
   return (
     <label className="toggle-row guardian-alerts-row">
       <span className="label">{label}</span>
       <input
+        ref={inputRef}
         type="checkbox"
         role="switch"
         className="ui-switch"
         checked={on}
         aria-checked={on}
         aria-describedby={describedBy}
-        disabled={disabled && !locked}
-        aria-disabled={locked ? 'true' : undefined}
+        disabled={control.disabled}
+        aria-disabled={control.ariaDisabled}
         onClick={(event) => {
-          if (locked) event.preventDefault();
+          if (control.blockClick) event.preventDefault();
         }}
         onChange={(event) => {
-          if (disabled || locked) return;
+          if (control.ignore) return;
           onChange?.(event.target.checked);
         }}
       />
@@ -83,6 +89,21 @@ function SwitchRow({ label, on, disabled, locked, describedBy, onChange }) {
 export default function GuardianPushItemView({ model, onToggle, onMute, onAction, loginHref = null }) {
   const { t } = useLang();
   const baseId = useId();
+  const headingRef = useRef(null);
+  const switchRef = useRef(null);
+  /** 항목 안에서 마지막으로 포커스를 받은 부품 */
+  const lastFocused = useRef(null);
+
+  // 누른 부품이 사라져 포커스가 몸통으로 떨어졌으면 항목 이름(제목, 없으면 켜기 스위치)으로 옮긴다
+  useEffect(() => {
+    const focused = lastFocused.current;
+    if (!focused || focused.isConnected) return;
+    lastFocused.current = null;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    (headingRef.current ?? switchRef.current)?.focus();
+  });
+
   if (!model || model.itemState === PUSH_ITEM_STATE.HIDDEN) return null;
   const titleId = `${baseId}-title`;
   const linesId = `${baseId}-lines`;
@@ -94,6 +115,18 @@ export default function GuardianPushItemView({ model, onToggle, onMute, onAction
       className="guardian-push-item"
       aria-labelledby={model.showSwitch ? undefined : titleId}
       aria-label={model.showSwitch ? t('guardian.pushTitle') : undefined}
+      onFocus={(event) => {
+        lastFocused.current = event.target;
+      }}
+      onBlur={(event) => {
+        // 사용자가 다른 곳(빈 곳 포함)으로 옮겼으면 잊는다. 부품이 사라졌거나 창 전체가 포커스를 잃은(권한 묻기 등) 때는 둔다
+        const target = event.target;
+        setTimeout(() => {
+          if (lastFocused.current === target && target.isConnected && document.activeElement !== target) {
+            lastFocused.current = null;
+          }
+        }, 0);
+      }}
     >
       {model.showSwitch ? (
         <SwitchRow
@@ -102,10 +135,11 @@ export default function GuardianPushItemView({ model, onToggle, onMute, onAction
           disabled={model.switchDisabled}
           locked={model.switchLocked}
           describedBy={linesId}
+          inputRef={switchRef}
           onChange={onToggle}
         />
       ) : (
-        <h3 id={titleId} className="guardian-push-heading">
+        <h3 id={titleId} ref={headingRef} tabIndex={-1} className="guardian-push-heading">
           {t('guardian.pushTitle')}
         </h3>
       )}

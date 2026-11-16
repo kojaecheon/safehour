@@ -16,6 +16,9 @@
 //   - 지원 판별의 installed 는 실행기 기본값(navigator.standalone)을 쓴다. 훅이 installed 를 받지 않아 readInstalled 를
 //     넘기지 않는다(계획 Interfaces 와 다른 점, 보고에 적는다).
 //   - 상태 조회의 주기 묻기는 useGuardianServerStatus 한 곳만 건다(항목은 poll 없이 같은 상태를 읽는다).
+//   - 보기 전용(로그인 문제)이면 바로 위 기기 알림 스위치(AlertsToggle)가 로그인 버튼을 이미 그린다. 같은 화면에 로그인 버튼이
+//     두 번 나오지 않게 이 항목은 안내 줄만 두고 버튼은 뺀다(loginElsewhere, 검토 Minor 2). 두 부품은 같은 기준
+//     (shouldShowReadOnly 이고 오프라인이 아님)으로 판단한다.
 
 import { useEffect, useState } from 'react';
 import { usePrefs } from '@/components/cards/useDeviceData.js';
@@ -72,6 +75,7 @@ export default function GuardianPushItem({ watchId }) {
     mainOn: prefs?.notifications === true,
     writable: status.readOnly === false && Boolean(status.accountKey),
     offline: status.reason === READ_ONLY_REASON.OFFLINE,
+    loginElsewhere: shouldShowReadOnly(status) && status.reason !== READ_ONLY_REASON.OFFLINE,
     today,
   });
 
