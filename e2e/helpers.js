@@ -667,22 +667,36 @@ const WATCH_ERRORS = Object.freeze({
   OFF: { status: 503, errorCode: 'SAFEHOUR_SERVER_PUSH_OFF', message: '서버 알림이 꺼져 있습니다.' },
 });
 
-/** 켜진 스위치가 돌려주는 VAPID 공개 키 자리(형식만 맞춘 값. A-2 화면은 쓰지 않는다) */
-const STUB_VAPID_KEY = `B${'A'.repeat(86)}`;
+/** 켜진 스위치가 돌려주는 VAPID 공개 키 자리(형식만 맞춘 값: 65바이트, 첫 바이트 0x04, 채움 없는 base64url) */
+export const STUB_VAPID_KEY = `B${'A'.repeat(86)}`;
+/** 키 교체 시험용 다음 VAPID 공개 키(형식만 맞춘 값, STUB_VAPID_KEY 와 다르다) */
+export const STUB_VAPID_KEY_NEXT = `B${'C'.repeat(85)}A`;
+
+/** 보호자 구독 상태 조회의 기본 대역 응답(docs/contracts.md POST /api/watch/status). date 를 비우면 오늘(KST, 옮긴 시계)이다 */
+const STATUS_DEFAULT = Object.freeze({ status: 200, confirmed: [], muted: false, subscriptionActive: true });
+
+const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const statusOf = (spec) => (isPlainObject(spec) ? spec.status : spec);
 
 function isWatchRoute(url) {
   return url.pathname === '/api/push/config' || url.pathname === '/api/watch' || url.pathname.startsWith('/api/watch/');
 }
 
-function watchReply({ method, path, body }, opts) {
+/** 대역이 내주는 subId: 22자 base64url, 구독할 때마다 새 값(서버처럼 새 구독은 새 subId) */
+function nextSubId(state) {
+  state.subIds.push(`e2eSubId${String(state.subIds.length + 1).padStart(14, '0')}`);
+  return state.subIds[state.subIds.length - 1];
+}
+
+function watchReply({ method, path, body }, opts, state) {
   const reply = (spec, data) => {
-    const status = typeof spec === 'object' && spec !== null ? spec.status : spec;
+    const status = statusOf(spec);
     if (status === 200) return { status: 200, body: { ok: true, ...data } };
     const error = WATCH_ERRORS[status] ?? WATCH_ERRORS[503];
     return { status: error.status, body: { ok: false, errorCode: error.errorCode, message: error.message } };
   };
   if (path === '/api/push/config' && method === 'GET') {
-    return reply(200, { enabled: opts.enabled, vapidPublicKey: opts.enabled ? STUB_VAPID_KEY : null, guardianLoginRequired: true });
+    return reply(200, { enabled: opts.enabled, vapidPublicKey: opts.enabled ? opts.vapidPublicKey : null, guardianLoginRequired: true });
   }
   if (path === '/api/watch' && method === 'POST') return reply(opts.register, { expiresOn: body?.expiresOn });
   if (path === '/api/watch' && method === 'DELETE') return reply(opts.remove, body?.all === true ? { deleted: opts.deleted } : {});
@@ -690,6 +704,30 @@ function watchReply({ method, path, body }, opts) {
     return reply(opts.deadlines, { expiresOn: body?.expiresOn, armFailed: opts.deadlines?.armFailed ?? 0 });
   }
   if (path === '/api/watch/back' && method === 'POST') return reply(opts.back, { recorded: opts.back?.recorded ?? true });
+  // 보호자 경로(A-3). 스위치가 꺼졌으면 구독·상태 조회·함께 있음은 503 꺼짐이고, 해지는 스위치와 무관하다(docs/contracts.md)
+  if (path === '/api/watch/subscribe' && method === 'POST') {
+    if (!opts.enabled) return reply('OFF');
+    return statusOf(opts.subscribe) === 200 ? reply(200, { subId: nextSubId(state) }) : reply(opts.subscribe);
+  }
+  if (path === '/api/watch/subscribe' && method === 'DELETE') return reply(opts.unsubscribe, {});
+  if (path === '/api/watch/status' && method === 'POST') {
+    if (!opts.enabled) return reply('OFF');
+    const spec = opts.status;
+    if (statusOf(spec) !== 200) return reply(spec);
+    return reply(200, {
+      date: spec.date ?? kstDate(0),
+      confirmed: spec.confirmed ?? [],
+      muted: state.muted,
+      // 받은 subId 가 지금 구독의 것일 때만 참이다. subId 없이 물으면 거짓이다
+      subscriptionActive: typeof body?.subId === 'string' ? spec.subscriptionActive !== false : false,
+    });
+  }
+  if (path === '/api/watch/mute' && method === 'POST') {
+    if (!opts.enabled) return reply('OFF');
+    if (statusOf(opts.mute) !== 200) return reply(opts.mute);
+    state.muted = body?.on === true;
+    return reply(200, { muted: state.muted });
+  }
   return null;
 }
 
@@ -700,11 +738,16 @@ function watchReply({ method, path, body }, opts) {
  * - 상태 값: 200(성공), 400·401·404·429·503(실패), 'OFF'(503 꺼짐). deadlines·back 은 { status, armFailed|recorded }
  * - offline: true 면 요청을 끊는다. context.setOffline(true) 여도 route 는 요청을 받아 응답한다(실측). 오프라인 시험은 둘 다 켠다
  * - config: 'fail' 이면 스위치 조회만 끊는다(스위치를 읽지 못한 상태)
- * - calls 에는 응답한 요청, blocked 에는 끊은 요청을 { method, path, body } 로 쌓는다. body 는 JSON 으로 읽은 값이다
+ * - 보호자 경로(A-3): subscribe(구독, 성공이면 새 subId), unsubscribe(해지), status(상태 조회, { status, date, confirmed,
+ *   subscriptionActive } 또는 실패 상태 값), mute(오늘 함께 있음, 성공이면 받은 on 을 기억해 상태 조회의 muted 로 돌려준다),
+ *   vapidPublicKey(설정이 돌려주는 공개 키, 키 교체 시험은 STUB_VAPID_KEY_NEXT 로 바꾼다). 스위치가 꺼졌으면(enabled: false)
+ *   구독·상태 조회·함께 있음은 503 꺼짐이다. set({ status: {...} }) 는 앞의 상태 조회 응답에 덧붙인다
+ * - calls 에는 응답한 요청, blocked 에는 끊은 요청을 { method, path, body } 로 쌓는다. body 는 JSON 으로 읽은 값이다.
+ *   subIds 에는 대역이 내준 subId 를 차례대로 쌓는다
  * @param {import('@playwright/test').Page} page
  * @param {object} [options]
  * @returns {Promise<{ calls: Array<{method: string, path: string, body: any}>, blocked: Array<{method: string, path: string, body: any}>,
- *   set: (partial: object) => void, sent: (method: string, path: string) => Array<{method: string, path: string, body: any}> }>}
+ *   subIds: string[], set: (partial: object) => void, sent: (method: string, path: string) => Array<{method: string, path: string, body: any}> }>}
  */
 export async function stubServerPush(page, options = {}) {
   const opts = {
@@ -716,8 +759,14 @@ export async function stubServerPush(page, options = {}) {
     deleted: 1,
     offline: false,
     config: 'ok',
+    subscribe: 200,
+    unsubscribe: 200,
+    mute: 200,
+    vapidPublicKey: STUB_VAPID_KEY,
     ...options,
+    status: isPlainObject(options.status) ? { ...STATUS_DEFAULT, ...options.status } : (options.status ?? { ...STATUS_DEFAULT }),
   };
+  const state = { subIds: [], muted: isPlainObject(opts.status) && opts.status.muted === true };
   const calls = [];
   const blocked = [];
   await page.context().route(isWatchRoute, (route) => {
@@ -734,7 +783,7 @@ export async function stubServerPush(page, options = {}) {
       blocked.push(entry);
       return route.abort('internetdisconnected');
     }
-    const reply = watchReply(entry, opts);
+    const reply = watchReply(entry, opts, state);
     if (!reply) return route.fallback();
     calls.push(entry);
     return route.fulfill({
@@ -747,8 +796,15 @@ export async function stubServerPush(page, options = {}) {
   return {
     calls,
     blocked,
+    subIds: state.subIds,
     set(partial) {
-      Object.assign(opts, partial);
+      const { status, ...rest } = partial;
+      Object.assign(opts, rest);
+      if (status === undefined) return;
+      if (isPlainObject(status)) {
+        opts.status = { ...(isPlainObject(opts.status) ? opts.status : STATUS_DEFAULT), ...status };
+        if (typeof status.muted === 'boolean') state.muted = status.muted;
+      } else opts.status = status;
     },
     sent(method, path) {
       return calls.filter((c) => c.method === method && c.path === path);
@@ -769,6 +825,220 @@ export async function seedGuardianWatch(page, record, { accountKey } = {}) {
   await page.evaluate(
     ({ key, record }) => {
       const storeKey = `safehour.v2.${key}.guardianWatch`;
+      if (record === null) localStorage.removeItem(storeKey);
+      else localStorage.setItem(storeKey, JSON.stringify({ schemaVersion: 2, data: record }));
+    },
+    { key, record },
+  );
+  return key;
+}
+
+// ── 보호자 쪽 서버 알림 (계획 2026-11-15 server-push-guardian-ui Task 8) ─────────────────
+
+/** 대역 브라우저 구독의 endpoint(문자열일 뿐 브라우저가 이 주소로 요청하지 않는다). 둘째 구독부터는 끝에 '-번호'가 붙는다 */
+export const STUB_PUSH_ENDPOINT = 'https://fcm.googleapis.com/fcm/send/e2e-1';
+/** 대역 구독 키: p256dh 는 P-256 비압축 점 65바이트(첫 바이트 0x04), auth 는 16바이트. 채움 없는 base64url */
+export const STUB_P256DH = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 7)]).toString('base64url');
+export const STUB_AUTH = Buffer.alloc(16, 9).toString('base64url');
+/** 대역 브라우저 푸시 상태를 두는 탭 저장소 키(새로 고침·이동에도 남는다) */
+const FAKE_PUSH_STATE_KEY = 'e2e.fakePush';
+/** 환자 동의 화면의 서버 알림 항목 라벨 */
+export const SERVER_PUSH_OPTION_LABEL = '서버 알림 사용: 앱이 닫혀 있어도 보호자에게 알림을 보내요';
+
+/** 페이지 스크립트보다 먼저 도는 브라우저 푸시 대역(직렬화되어 페이지 안에서 돈다: 바깥 변수를 쓰지 않는다) */
+function fakePushApi({ storageKey, permission, answer, subscribeThrows, endpoint, ios, p256dh, auth }) {
+  let state = null;
+  try {
+    state = JSON.parse(sessionStorage.getItem(storageKey));
+  } catch {
+    state = null;
+  }
+  if (!state || typeof state !== 'object') state = { permission, sub: null, made: 0, calls: [] };
+  const save = () => {
+    try {
+      sessionStorage.setItem(storageKey, JSON.stringify(state));
+    } catch {
+      // 저장소가 없는 문서(about:blank)는 메모리로만 둔다
+    }
+  };
+  save();
+  const log = (entry) => {
+    state.calls.push(entry);
+    save();
+  };
+  Object.defineProperty(window, '__pushCalls', { configurable: true, get: () => JSON.parse(JSON.stringify(state.calls)) });
+
+  const toB64 = (bytes) => {
+    let text = '';
+    for (const byte of bytes) text += String.fromCharCode(byte);
+    return btoa(text).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const fromB64 = (text) => {
+    const padded = text.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (text.length % 4)) % 4);
+    return Uint8Array.from(atob(padded), (ch) => ch.charCodeAt(0));
+  };
+
+  if (typeof window.Notification === 'function') {
+    try {
+      Object.defineProperty(window.Notification, 'permission', { configurable: true, get: () => state.permission });
+      Object.defineProperty(window.Notification, 'requestPermission', {
+        configurable: true,
+        writable: true,
+        value: (callback) => {
+          log({ op: 'requestPermission' });
+          if (state.permission === 'default') {
+            state.permission = answer;
+            save();
+          }
+          const reply = Promise.resolve(state.permission);
+          if (typeof callback === 'function') reply.then(callback);
+          return reply;
+        },
+      });
+    } catch {
+      // 덮어쓸 수 없는 환경
+    }
+  }
+
+  if (ios === 'tab' || ios === 'old') {
+    // 아이폰 Safari: 홈 화면 앱이 아니면(또는 iOS 16.4 미만이면) PushManager 가 없고 navigator.standalone 이 있다
+    try {
+      delete window.PushManager;
+    } catch {
+      // 지울 수 없으면 아래에서 덮는다
+    }
+    if (typeof window.PushManager === 'function') {
+      Object.defineProperty(window, 'PushManager', { configurable: true, writable: true, value: undefined });
+    }
+    Object.defineProperty(Navigator.prototype, 'standalone', { configurable: true, get: () => ios === 'old' });
+    return;
+  }
+
+  const PushManagerImpl = window.PushManager;
+  if (typeof PushManagerImpl !== 'function') return;
+  const makeSubscription = (record) => ({
+    endpoint: record.endpoint,
+    expirationTime: null,
+    options: { userVisibleOnly: true, applicationServerKey: fromB64(record.key).buffer },
+    getKey: (name) => {
+      if (name === 'p256dh') return fromB64(p256dh).buffer;
+      if (name === 'auth') return fromB64(auth).buffer;
+      return null;
+    },
+    toJSON: () => ({ endpoint: record.endpoint, expirationTime: null, keys: { p256dh, auth } }),
+    unsubscribe: async () => {
+      log({ op: 'unsubscribe', endpoint: record.endpoint });
+      if (state.sub && state.sub.endpoint === record.endpoint) {
+        state.sub = null;
+        save();
+        return true;
+      }
+      return false;
+    },
+  });
+  const define = (name, value) =>
+    Object.defineProperty(PushManagerImpl.prototype, name, { configurable: true, writable: true, value });
+  define('subscribe', async function subscribe(options = {}) {
+    const raw = options?.applicationServerKey;
+    let bytes = null;
+    if (raw instanceof ArrayBuffer) bytes = new Uint8Array(raw);
+    else if (ArrayBuffer.isView(raw)) bytes = new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
+    else if (typeof raw === 'string') bytes = fromB64(raw);
+    const key = bytes ? toB64(bytes) : null;
+    log({ op: 'subscribe', userVisibleOnly: options?.userVisibleOnly === true, key });
+    if (subscribeThrows) throw new DOMException('e2e: 구독 실패', 'AbortError');
+    if (state.permission !== 'granted') throw new DOMException('e2e: 권한 없음', 'NotAllowedError');
+    if (state.sub) {
+      // 크롬처럼: 같은 키면 있는 구독, 다른 키면 던진다
+      if (state.sub.key !== key) throw new DOMException('e2e: 다른 키의 구독이 있다', 'InvalidStateError');
+      return makeSubscription(state.sub);
+    }
+    state.made += 1;
+    state.sub = { endpoint: state.made === 1 ? endpoint : `${endpoint}-${state.made}`, key };
+    save();
+    return makeSubscription(state.sub);
+  });
+  define('getSubscription', async function getSubscription() {
+    return state.sub ? makeSubscription(state.sub) : null;
+  });
+  define('permissionState', async function permissionState() {
+    if (state.permission === 'granted') return 'granted';
+    return state.permission === 'denied' ? 'denied' : 'prompt';
+  });
+}
+
+/**
+ * 브라우저 푸시 API 를 대역으로 바꾼다(실행기는 그대로 돈다). page.addInitScript 라 다음 이동부터 걸린다: page.goto 전에 부른다.
+ * - PushManager.prototype 의 subscribe·getSubscription·permissionState 와 구독 객체(endpoint, options.applicationServerKey,
+ *   getKey, toJSON, unsubscribe)를 바꾼다. 서비스 워커 등록은 진짜다(빌드한 public/sw.js).
+ * - Notification.permission 과 Notification.requestPermission 을 바꾼다. 'default' 에서 권한을 물으면 answer(기본 'granted')가 된다.
+ * - 상태(권한, 구독, 만든 수, 호출 기록)는 탭 저장소에 둬 새로 고침과 이동에도 남는다. window.__pushCalls 가 호출 기록이다:
+ *   { op: 'requestPermission' } | { op: 'subscribe', userVisibleOnly, key } | { op: 'unsubscribe', endpoint }
+ * - ios: 'tab' 은 아이폰 Safari 탭(PushManager 없음, standalone 거짓), 'old' 는 iOS 16.4 미만 홈 화면 앱(standalone 참)
+ * @param {import('@playwright/test').Page} page
+ * @param {{ permission?: 'granted'|'default'|'denied', answer?: 'granted'|'denied', subscribeThrows?: boolean, endpoint?: string,
+ *   ios?: 'tab'|'old'|null }} [options]
+ */
+export async function stubPushApi(
+  page,
+  { permission = 'granted', answer = 'granted', subscribeThrows = false, endpoint = STUB_PUSH_ENDPOINT, ios = null } = {},
+) {
+  await page.addInitScript(fakePushApi, {
+    storageKey: FAKE_PUSH_STATE_KEY,
+    permission,
+    answer,
+    subscribeThrows,
+    endpoint,
+    ios,
+    p256dh: STUB_P256DH,
+    auth: STUB_AUTH,
+  });
+}
+
+/** 대역 브라우저 푸시의 호출 기록(stubPushApi) */
+export async function pushCalls(page) {
+  return page.evaluate(() => window.__pushCalls ?? []);
+}
+
+/**
+ * 서버 알림을 켠 보호자 사본을 이 기기에 연다: 동반 보호자 체류로 서버 알림 항목을 켜고 링크를 만든 뒤 같은 기기에서 PIN 으로 연다.
+ * 서비스 워커가 준비될 때까지 기다린 뒤 /g 를 다시 연다(첫 화면의 준비 확인이 등록 전에 돌았을 수 있다).
+ * stubServerPush(켜진 스위치)를 먼저 걸어야 한다. 환자와 보호자는 같은 데모 계정이다.
+ * @param {import('@playwright/test').Page} page
+ * @param {{ pin?: string, stayOptions?: object }} [options]
+ * @returns {Promise<{ watchId: string, link: string, copy: object }>}
+ */
+export async function openCopyWithWatch(page, { pin = '246813', stayOptions = {} } = {}) {
+  await startTrip(page, { hasCompanion: true, ...stayOptions }, { path: '/guardian' });
+  await page.getByLabel(SERVER_PUSH_OPTION_LABEL).check();
+  const link = await createGuardianLink(page, { pin });
+  await page.goto(link);
+  await page.getByLabel('환자에게 받은 PIN (숫자 6자리)').fill(pin);
+  await page.getByRole('button', { name: '열기', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+  await expect.poll(async () => Object.keys((await readRecord(page, 'guardianCopies')) ?? {}).length).toBe(1);
+  const copy = Object.values(await readRecord(page, 'guardianCopies'))[0];
+  expect(copy?.snapshot?.watchId, '사본에 서버 알림 지켜보기 id 가 있어야 한다').toMatch(/^[A-Za-z0-9_-]{22}$/);
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
+  await page.goto('/g');
+  await expect(page.getByRole('heading', { name: '받은 일정' })).toBeVisible();
+  return { watchId: copy.snapshot.watchId, link, copy };
+}
+
+/**
+ * 이 계정의 보호자 구독 기록(guardianPush)을 기기 저장소에 쓴다. null 이면 지운다. 쓴 뒤 이동하거나 새로 고쳐야 반영된다.
+ * @param {import('@playwright/test').Page} page
+ * @param {object|null} record lib/store/guardianPush.js 모양 { subs, status, gone }
+ * @param {{accountKey?: string}} [options]
+ * @returns {Promise<string>} 계정 키
+ */
+export async function seedGuardianPush(page, record, { accountKey } = {}) {
+  const key = accountKey ?? (await accountKeyOf(page));
+  await page.evaluate(
+    ({ key, record }) => {
+      const storeKey = `safehour.v2.${key}.guardianPush`;
       if (record === null) localStorage.removeItem(storeKey);
       else localStorage.setItem(storeKey, JSON.stringify({ schemaVersion: 2, data: record }));
     },
