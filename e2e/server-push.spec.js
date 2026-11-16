@@ -1,7 +1,7 @@
 // 서버 알림 환자 쪽 화면 테스트 (docs/superpowers/plans/2026-11-15-server-push-patient-ui.md Task 11, D16)
 //
 // - 보호자 링크 동의 화면의 서버 알림 항목, 외출 카드와 복귀 시트의 '돌아왔어요'·되돌리기, 설정의 '서버 알림' 절,
-//   내 정보 지우기의 서버 삭제 대기를 본다.
+//   내 정보 지우기의 서버 삭제 대기를 본다. 다른 탭이 마지막 계정 키를 바꾸면 보이던 링크 결과가 사라지는 것도 본다.
 // - e2e 서버는 서버 알림 스위치가 꺼진 채 돈다. 첫 시험만 실제 서버의 꺼진 스위치를 보고, 나머지는 stubServerPush 대역으로
 //   켜진 서버를 흉내 낸다(응답 모양은 docs/contracts.md '서버 알림' 그대로).
 // - 지켜보기 레코드는 seedGuardianWatch 로 기기에 심는다. 같은 탭은 storage 이벤트를 받지 않으므로 심은 뒤 이동한다.
@@ -13,6 +13,7 @@
 import { test, expect } from './fixtures.js';
 import { isClampedOverdueOuting } from '../src/domain/states.js';
 import {
+  GUARDIAN_CONSENT_LABEL,
   HOSPITAL_NAME,
   LODGING_NAME,
   WATCH_FIXTURE,
@@ -45,6 +46,7 @@ const SENT = '보호자에게 전달했어요.';
 const OFFLINE_TITLE = '인터넷 연결 없음, 저장된 일정만 보여 줘요';
 const CLEAR_NOTE_PUSH = "서버 알림을 켜 두면 날짜별 복귀 마감 시각과 '돌아왔어요' 기록이 서버에 저장됩니다.";
 const PENDING_DELETE_KEY = 'safehour.v2.device.pendingServerDelete';
+const LAST_ACCOUNT_KEY = 'safehour.v2.device.lastAccountKey';
 
 const minutesOf = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const byDepart = (a, b) => minutesOf(a.departAt) - minutesOf(b.departAt);
@@ -209,6 +211,37 @@ test.describe('서버 알림 환자 쪽 화면', () => {
     await expect.poll(async () => (await readRecord(page, 'guardianWatch'))?.uploadPending).toBe(false);
     const record = await readRecord(page, 'guardianWatch');
     expect(record).toMatchObject({ watchId: register.watchId, writeToken: register.writeToken, expiresOn: stay.departure.date, state: 'ON' });
+    await expectNoSafeClaim(page);
+  });
+
+  test('다른 탭이 마지막 계정 키를 바꾸면 보이던 링크 결과가 사라지고, 곧바로 세션을 다시 물어 양식부터 새로 시작한다', async ({ page, context }) => {
+    await startTrip(page, { hasCompanion: true }, { path: '/guardian' });
+    await createGuardianLink(page, { pin: PIN, verify: true });
+    const resultHeading = page.getByRole('heading', { name: '보호자에게 보낼 링크' });
+    await expect(resultHeading).toBeVisible();
+    const before = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)).data.accountKey, LAST_ACCOUNT_KEY);
+    let sessionChecks = 0;
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/auth/session') sessionChecks += 1;
+    });
+
+    // 다른 탭이 다른 계정으로 로그인해 마지막 계정 키를 쓴 것처럼 키만 바꾼다(데모 로그인은 계정이 하나라 쿠키는 그대로다)
+    const other = await context.newPage();
+    await other.goto('/privacy');
+    await other.evaluate(
+      ({ key, accountKey }) => localStorage.setItem(key, JSON.stringify({ schemaVersion: 2, data: { accountKey } })),
+      { key: LAST_ACCOUNT_KEY, accountKey: 'acct_other_tab_e2e_B0001' },
+    );
+    await other.close();
+
+    await expect(resultHeading).toHaveCount(0);
+    await expect.poll(() => sessionChecks).toBeGreaterThan(0);
+    // 쿠키는 그대로라 다시 물은 답으로 이 계정에 돌아온다. 앞의 링크 결과는 다시 나타나지 않고 양식이 처음 상태다
+    await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key)).data.accountKey, LAST_ACCOUNT_KEY)).toBe(before);
+    await expect(page.getByLabel(GUARDIAN_CONSENT_LABEL)).toBeVisible();
+    await expect(page.getByLabel(GUARDIAN_CONSENT_LABEL)).not.toBeChecked();
+    await expect(page.getByLabel('PIN (숫자 6자리)')).toHaveValue('');
+    await expect(resultHeading).toHaveCount(0);
     await expectNoSafeClaim(page);
   });
 

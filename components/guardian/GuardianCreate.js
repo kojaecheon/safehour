@@ -22,7 +22,8 @@
 //     submitWithServerPush 하나다. 기다리는 동안 계정이 바뀌면 공유 기록을 쓰지 않고 링크도 보이지 않는다(일반 실패 줄).
 //   - 결과 줄은 링크 결과 제목(포커스를 받는다)의 aria-describedby 로 읽힌다(이미 채워진 채 나타나 상태 알림으로는 읽히지 않는다).
 //     끄기 결과 줄은 안전 문구라 주 언어와 병기 언어 두 줄이다.
-//   - 양식은 계정 키를 key 로 그린다. 계정이 바뀌면 동의 체크·PIN·서버 알림 체크를 비우고 처음 체크 상태를 새 계정의 지켜보기로 다시 정한다.
+//   - 링크 결과와 양식은 함께 계정 키를 key 로 그린다(LinkPanel). 계정이 바뀌면 앞 계정의 링크 결과를 지우고, 동의 체크·PIN·서버
+//     알림 체크를 비우고 처음 체크 상태를 새 계정의 지켜보기로 다시 정한다.
 //
 // 보기 전용(로그인 안 함·만료·오프라인)에서는 만들기를 막는다(docs/platform/IA_AND_FLOWS.md '보기 전용 상태': 공유 차단).
 // PIN 은 화면 상태에만 잠시 있고, 링크를 만든 뒤 바로 지운다. 저장하거나 기록하지 않는다.
@@ -496,19 +497,14 @@ function ShareForm({ stay, tripPlan, canCreate, readOnlyShown, onCreated, consen
   );
 }
 
-export default function GuardianCreate() {
-  const { t, locale } = useLang();
-  const hydrated = useHydrated();
-  const status = useStoreStatus();
-  const stay = useStoreRecord('stay', readStay);
-  const tripPlan = useStoreRecord('tripPlan', readTripPlan);
-  const { needed, windowPassed, share } = useGuardianResendNeeded();
+/**
+ * 다시 보내기 안내와, 링크 결과 또는 양식. 부르는 쪽이 계정 키를 key 로 그린다. 계정이 바뀌면 앞 계정의 링크 결과와 넣던 값이
+ * 함께 사라진다(결과를 위에 두면 다른 탭의 로그인 뒤에도 앞 계정의 링크가 보인다).
+ */
+function LinkPanel({ stay, tripPlan, canCreate, readOnlyShown, share, needed, windowPassed, locale }) {
   const [result, setResult] = useState(null);
   const resultHeadingRef = useRef(null);
   const consentHeadingRef = useRef(null);
-
-  const canCreate = status.authenticated && !status.readOnly;
-  const readOnlyShown = shouldShowReadOnly(status);
 
   function showResult(next) {
     setResult(next);
@@ -523,6 +519,36 @@ export default function GuardianCreate() {
       heading?.focus();
     });
   }
+
+  return (
+    <>
+      <ResendNotice share={share} needed={needed} windowPassed={windowPassed} locale={locale} onNewLink={result ? startNewLink : null} />
+      {result ? (
+        <LinkResult result={result} onNewLink={startNewLink} headingRef={resultHeadingRef} />
+      ) : (
+        <ShareForm
+          stay={stay}
+          tripPlan={tripPlan}
+          canCreate={canCreate}
+          readOnlyShown={readOnlyShown}
+          onCreated={showResult}
+          consentHeadingRef={consentHeadingRef}
+        />
+      )}
+    </>
+  );
+}
+
+export default function GuardianCreate() {
+  const { t, locale } = useLang();
+  const hydrated = useHydrated();
+  const status = useStoreStatus();
+  const stay = useStoreRecord('stay', readStay);
+  const tripPlan = useStoreRecord('tripPlan', readTripPlan);
+  const { needed, windowPassed, share } = useGuardianResendNeeded();
+
+  const canCreate = status.authenticated && !status.readOnly;
+  const readOnlyShown = shouldShowReadOnly(status);
 
   let body;
   if (!hydrated) {
@@ -551,23 +577,18 @@ export default function GuardianCreate() {
     );
   } else {
     body = (
-      <>
-        <ResendNotice share={share} needed={needed} windowPassed={windowPassed} locale={locale} onNewLink={result ? startNewLink : null} />
-        {result ? (
-          <LinkResult result={result} onNewLink={startNewLink} headingRef={resultHeadingRef} />
-        ) : (
-          // 계정이 바뀌면(다른 탭의 로그인 등) 양식을 새로 그린다. 앞 계정에서 넣은 동의 체크·PIN·서버 알림 체크를 넘기지 않는다
-          <ShareForm
-            key={status.accountKey ?? ''}
-            stay={stay}
-            tripPlan={tripPlan}
-            canCreate={canCreate}
-            readOnlyShown={readOnlyShown}
-            onCreated={showResult}
-            consentHeadingRef={consentHeadingRef}
-          />
-        )}
-      </>
+      // 계정이 바뀌면(다른 탭의 로그인 등) 새로 그린다. 앞 계정의 링크 결과, 동의 체크·PIN·서버 알림 체크를 넘기지 않는다
+      <LinkPanel
+        key={status.accountKey ?? ''}
+        stay={stay}
+        tripPlan={tripPlan}
+        canCreate={canCreate}
+        readOnlyShown={readOnlyShown}
+        share={share}
+        needed={needed}
+        windowPassed={windowPassed}
+        locale={locale}
+      />
     );
   }
 
