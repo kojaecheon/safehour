@@ -11,6 +11,8 @@
 //   - 저절로 구독하지 않는다: VAPID 키가 바뀌거나 브라우저 구독이 없으면 renewNeeded, MOVED 도 버튼으로만 다시 받는다.
 //     MOVED 인 구독은 언어·해시가 바뀌어도 다시 POST 하지 않고 다시 켜기도 건너뛴다
 //   - 기록하지 못한 구독의 해지가 대기 상한에 밀리면 한 번 직접 보낸다(끄기, 다시 맞추기, 계정이 바뀜, 기록 쓰기 실패)
+//   - 같은 기기의 두 탭은 Web Locks 로 차례를 지킨다: 함께 다시 맞춰도 POST 는 하나이고 기록은 서버의 지금 구독이다. 잠금은 정해진
+//     시간까지만 붙잡고, 일이 실패해도 풀리고, 잠금이 없거나 요청이 실패하면 탭 안 줄로만 지킨다
 //   - 기다린 뒤에는 계정과 쓰기 가능을 다시 본다. 다른 계정의 기록에 쓰지 않고, 앞 계정 구독은 해지 대기로 넘긴다
 //   - 설정 꺼짐, 사본에 watchId 없음, 보기 전용이면 정해진 요청 말고는 0건이다
 //   - 상태 조회는 2분 간격, 마감 60초 전과 마감 + 11분 타이머, 404 는 gone
@@ -25,6 +27,8 @@ import { createECDH, createHash, webcrypto } from 'node:crypto';
 
 import {
   CONFIG_TTL_MS,
+  DEVICE_LOCK_HOLD_MS,
+  DEVICE_LOCK_NAME,
   FORGET_TIMEOUT_MS,
   IDLE_STATE,
   PUSH_RESULT,
@@ -112,21 +116,29 @@ function routeOf(url, method) {
 
 /**
  * 경로별로 답하는 가짜 서버. reply[경로](body) 는 Response, 상태 숫자, 'network'(연결 실패), 'off'(서버 알림 꺼짐 503),
- * 'hang'(release() 까지 기다렸다가 그때의 reply 로 답한다. reply 도 'hang' 이면 기본 답) 가운데 하나를 돌려준다.
+ * 'hang'(release() 까지 기다렸다가 그때의 reply 로 답한다. reply 도 'hang' 이면 기본 답), 'hold'(도착한 때 기본 답으로 처리하고
+ * 응답만 deliver(i) 까지 붙잡는다: 두 탭의 응답 순서를 고른다) 가운데 하나를 돌려준다. current 는 지켜보기마다 서버의 지금 구독 subId 다.
  * once(경로, 값) 은 다음 한 번만 그 값으로 답한다.
  */
 function fakeServer({ events, config = CONFIG_ON }) {
   const calls = [];
   const waiting = [];
+  const held = [];
+  const current = new Map();
   const onceQueue = new Map(ROUTES.map((route) => [route, []]));
   let subSeq = 100;
   const defaults = {
     config: () => json(200, { ok: true, ...server.config }),
-    subscribe: () => {
+    subscribe: (body) => {
       subSeq += 1;
+      if (body?.watchId) current.set(body.watchId, subIdOf(subSeq));
       return json(200, { ok: true, subId: subIdOf(subSeq) });
     },
-    unsubscribe: () => 200,
+    unsubscribe: (body) => {
+      // 서버는 지금 구독의 subId 일 때만 지운다
+      if (body?.watchId && current.get(body.watchId) === body.subId) current.delete(body.watchId);
+      return 200;
+    },
     status: () => json(200, { ok: true, date: DATE, confirmed: ['14:30'], muted: false, subscriptionActive: true }),
     mute: (body) => json(200, { ok: true, muted: body.on }),
     watchDelete: () => 200,
@@ -149,6 +161,10 @@ function fakeServer({ events, config = CONFIG_ON }) {
     of: (route) => calls.filter((call) => call.route === route),
     routes: () => calls.filter((call) => call.route !== null).map((call) => call.route),
     release: () => waiting.splice(0).forEach((fn) => fn()),
+    current,
+    held,
+    maxHeld: 0,
+    deliver: (index = 0) => held.splice(index, 1)[0].deliver(),
     get hanging() {
       return waiting.length;
     },
@@ -161,6 +177,13 @@ function fakeServer({ events, config = CONFIG_ON }) {
       events.push(`${method} ${route}`);
       const queued = onceQueue.get(route);
       const value = queued.length > 0 ? queued.shift() : server.reply[route](body);
+      if (value === 'hold') {
+        const response = toResponse(defaults[route](body));
+        return new Promise((resolve) => {
+          held.push({ route, body, deliver: () => resolve(response) });
+          server.maxHeld = Math.max(server.maxHeld, held.length);
+        });
+      }
       if (value === 'hang') {
         return new Promise((resolve, reject) =>
           waiting.push(() => {
@@ -416,6 +439,80 @@ function holdPermission(t) {
     });
   };
   return (value) => answer(value);
+}
+
+/**
+ * Web Locks 가짜: 이름마다 한 번에 콜백 하나. 콜백의 약속이 끝나면(성공이든 실패든) 다음 차례다. 탭이 닫히는 것은 흉내 내지 않는다.
+ * request(name, callback) 과 request(name, options, callback) 을 받는다.
+ */
+function fakeLocks() {
+  const tails = new Map();
+  const locks = {
+    held: 0,
+    grants: 0,
+    names: new Set(),
+    request(name, ...rest) {
+      const callback = rest[rest.length - 1];
+      locks.names.add(name);
+      const previous = tails.get(name) ?? Promise.resolve();
+      let next;
+      tails.set(name, new Promise((resolve) => (next = resolve)));
+      return previous.then(async () => {
+        locks.held += 1;
+        locks.grants += 1;
+        try {
+          return await callback({ name, mode: 'exclusive' });
+        } finally {
+          locks.held -= 1;
+          next();
+        }
+      });
+    },
+  };
+  return locks;
+}
+
+/** 실행기 하나를 더 만든다(같은 가짜 브라우저·서버·시계·타이머). store 와 locks 를 고른다 */
+function runnerFor(t, { store = t.store, locks = undefined } = {}) {
+  return createGuardianPush({
+    store,
+    fetchImpl: (...args) => t.server.fetchImpl(...args),
+    now: () => t.clock.ms,
+    timers: t.timers,
+    win: t.browser.win,
+    nav: t.browser.nav,
+    NotificationImpl: t.NotificationImpl,
+    subtle: webcrypto.subtle,
+    locks,
+  });
+}
+
+/** 같은 기기의 두 탭: 저장 영역, 브라우저, 서버, 시계, 타이머, Web Locks 는 함께 쓰고 저장소와 실행기는 탭마다 따로다 */
+function twoTabs(options = {}) {
+  const t = setup(options);
+  const locks = fakeLocks();
+  const store2 = createStore({ storage: t.storage, now: () => t.clock.ms, fetchImpl: (...args) => t.server.fetchImpl(...args) });
+  signIn(store2, t.clock);
+  return {
+    ...t,
+    locks,
+    tab1: { store: t.store, runner: runnerFor(t, { locks }) },
+    tab2: { store: store2, runner: runnerFor(t, { store: store2, locks }) },
+  };
+}
+
+/** 붙잡은 응답을 늦게 온 것부터 하나씩 보낸다(두 탭의 응답이 거꾸로 닿는 경우). done 이 끝날 때까지 */
+async function deliverLatestFirst(server, done) {
+  let finished = false;
+  done.then(() => {
+    finished = true;
+  });
+  await settle(60);
+  for (let i = 0; i < 50 && !finished; i += 1) {
+    if (server.held.length > 0) server.deliver(server.held.length - 1);
+    await settle(30);
+  }
+  assert.ok(finished, '끝나지 않았다');
 }
 
 /** 지켜보기 삭제 10개로 꽉 찬 서버 삭제 대기 */
@@ -1682,5 +1779,131 @@ describe('상태와 지우기', () => {
     }
     assert.ok(t.server.routes().includes('subscribe') && t.server.routes().includes('mute') && t.server.routes().includes('status'));
     for (const event of t.events) if (event.includes(' ')) assert.ok(SERVER_EVENTS.has(event), event);
+  });
+});
+
+// ── 같은 기기의 두 탭 ────────────────────────────────────────────────
+
+describe('같은 기기의 두 탭(Web Locks)', () => {
+  test('두 탭이 같은 언어 바뀜으로 함께 다시 맞춰도 POST 는 하나이고 기록은 서버의 지금 구독이다', async () => {
+    const t = twoTabs({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
+    t.server.reply.subscribe = () => 'hold';
+    assert.equal(t.tab1.store.writeLang('en').ok, true);
+    // 탭 1 은 저장소 알림으로, 탭 2 는 다른 탭의 storage 사건으로 거의 같이 다시 맞춘다
+    const both = Promise.all([t.tab1.runner.reconcile(), t.tab2.runner.reconcile()]);
+    await deliverLatestFirst(t.server, both);
+    assert.equal(t.server.of('subscribe').length, 1, '두 번째 탭은 잠금 안에서 기록을 다시 읽어 이미 맞은 것을 본다');
+    assert.equal(t.server.maxHeld, 1, '두 POST 가 겹치지 않는다');
+    const record = t.tab2.store.readGuardianPush();
+    assert.deepEqual(
+      record.subs.map((sub) => [sub.watchId, sub.subId, sub.lang]),
+      [[W1, t.server.current.get(W1), 'en']],
+      '기록은 하나이고 서버의 지금 구독이다',
+    );
+    await t.tab1.store.retryPendingServerDelete();
+    await t.tab2.store.retryPendingServerDelete();
+    assert.equal(t.server.current.get(W1), record.subs[0].subId, '서버의 지금 구독이 지워지지 않는다');
+    assert.ok(!t.store.readPendingServerDelete().some((item) => item.subId === record.subs[0].subId));
+    assert.ok(!t.timers.has(DEVICE_LOCK_HOLD_MS), '일이 끝나면 붙잡는 시간 타이머도 지운다');
+    assert.deepEqual([...t.locks.names], [DEVICE_LOCK_NAME]);
+    assert.equal(t.locks.held, 0);
+  });
+
+  test('한 탭의 다시 맞추기가 도는 동안 다른 탭의 켜기는 차례를 기다리고, 끝난 기록 위에서 같은 브라우저 구독으로 POST 한다', async () => {
+    const t = twoTabs({ subs: [subRecord(W1, { lang: 'en' })], existing: { endpoint: E_EXISTING, key: VAPID } });
+    t.server.reply.subscribe = () => 'hold';
+    const reconciling = t.tab2.runner.reconcile();
+    await until(() => t.server.held.length === 1);
+    const on = t.tab1.runner.turnOn(W1);
+    assert.equal(t.tab1.runner.getState(W1).busy, true);
+    await settle(60);
+    assert.equal(t.server.held.length, 1, '켜기는 다른 탭의 다시 맞추기가 끝날 때까지 POST 하지 않는다');
+    await deliverLatestFirst(t.server, Promise.all([reconciling, on]));
+    assert.equal(await on, PUSH_RESULT.ON);
+    assert.equal(t.server.of('subscribe').length, 2);
+    assert.equal(t.server.maxHeld, 1);
+    assert.ok(!t.events.includes('unsubscribe'), '다른 탭이 쓴 기록의 해시가 맞아 브라우저 구독을 다시 쓴다');
+    const record = t.tab1.store.readGuardianPush();
+    assert.deepEqual(record.subs.map((sub) => [sub.watchId, sub.subId]), [[W1, t.server.current.get(W1)]]);
+    await t.tab1.store.retryPendingServerDelete();
+    assert.equal(t.server.current.get(W1), record.subs[0].subId, '덮인 subId 의 해지는 서버의 지금 구독을 지우지 않는다');
+  });
+
+  test('잠금은 DEVICE_LOCK_HOLD_MS 까지만 붙잡고, 앞 탭의 일이 실패해도 풀린다', async () => {
+    const t = twoTabs({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
+    // 탭 1 의 끄기가 브라우저 구독 지우기에서 멈춘다(이 기기의 마지막 구독이라 지운다, 브라우저 API 는 한도가 없다)
+    t.browser.unsubscribeBehavior = 'hang';
+    void t.tab1.runner.turnOff(W1);
+    await until(() => t.events.includes('unsubscribe'));
+    let status = 'waiting';
+    t.tab2.runner.refreshStatus(W1, { force: true }).then((kind) => {
+      status = kind;
+    });
+    await settle(60);
+    assert.equal(status, 'waiting', '다른 탭은 차례를 기다린다');
+    assert.deepEqual(t.server.of('status'), []);
+    assert.ok(t.timers.fire(DEVICE_LOCK_HOLD_MS));
+    await until(() => status !== 'waiting', '붙잡는 시간이 지나면 다른 탭이 차례를 받는다');
+    assert.equal(status, 'OK');
+
+    // 앞 탭의 일이 던져도(여기서는 저장소가 던짐) 잠금이 풀려 다음 탭이 돈다
+    const u = twoTabs({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
+    const broken = {
+      ...u.tab1.store,
+      retireGuardianPushSub: () => {
+        throw new Error('storage broke');
+      },
+    };
+    const brokenRunner = runnerFor(u, { store: broken, locks: u.locks });
+    assert.equal(await brokenRunner.turnOff(W1), PUSH_RESULT.FAILED);
+    assert.equal(u.locks.held, 0);
+    assert.equal(await u.tab2.runner.turnOff(W1), PUSH_RESULT.OFF_DONE);
+  });
+
+  test('Web Locks 가 없거나 잠금 요청이 실패하면 탭 안 줄로만 지키고 던지지 않는다', async () => {
+    const variants = [
+      ['없음', null],
+      ['request 없음', {}],
+      [
+        '동기 예외',
+        {
+          request() {
+            throw new Error('SecurityError');
+          },
+        },
+      ],
+      ['거절', { request: () => Promise.reject(new Error('AbortError')) }],
+    ];
+    for (const [name, locks] of variants) {
+      const t = setup();
+      const runner = runnerFor(t, { locks });
+      assert.equal(await runner.turnOn(W1), PUSH_RESULT.ON, name);
+      assert.equal(await runner.refreshStatus(W1, { force: true }), 'OK', name);
+      assert.equal(await runner.turnOff(W1), PUSH_RESULT.OFF_DONE, name);
+    }
+
+    // 넘기지 않으면 navigator.locks 를 쓴다
+    const t = setup();
+    const locks = fakeLocks();
+    t.browser.nav.locks = locks;
+    const runner = runnerFor(t);
+    assert.equal(await runner.turnOn(W1), PUSH_RESULT.ON);
+    assert.ok(locks.grants > 0);
+    assert.deepEqual([...locks.names], [DEVICE_LOCK_NAME]);
+  });
+
+  test('권한 창 기다림은 잠금 밖이다', async () => {
+    const t = twoTabs({ permission: 'default', copies: [{ watchId: W1 }, { watchId: W2 }], subs: [subRecord(W2)], existing: { endpoint: E_EXISTING, key: VAPID } });
+    const answer = holdPermission(t);
+    const on = t.tab1.runner.turnOn(W1);
+    await settle(30);
+    assert.equal(t.locks.held, 0, '권한 답을 기다리는 동안 잠금을 잡지 않는다');
+    let status = 'waiting';
+    t.tab2.runner.refreshStatus(W2, { force: true }).then((kind) => {
+      status = kind;
+    });
+    await until(() => status !== 'waiting', '다른 탭의 상태 조회가 권한 창 뒤에서 기다린다');
+    answer('granted');
+    assert.equal(await on, PUSH_RESULT.ON);
   });
 });

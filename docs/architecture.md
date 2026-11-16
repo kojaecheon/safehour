@@ -124,7 +124,7 @@ Next.js 라우트 핸들러 (무상태)
 알림 배너 마운트 ── start ─────────────────────────────────────────────────┤
 지우기 버튼(ClearSessionButton) ── forgetBrowser ──────────────────────────┤
                                                                            ▼
-                lib/notify/guardianPush.js (실행기 하나, getGuardianPush, 동작은 줄 하나에 한 번에 하나)
+                lib/notify/guardianPush.js (실행기 하나, getGuardianPush, 동작은 줄 하나에 한 번에 하나, 탭 사이는 Web Locks)
                   │  지원 판별: lib/notify/pushSupport.js (순수, 사용자 에이전트를 읽지 않는다)
                   │  다시 맞추기·상태 조회 시각: lib/notify/guardianPushPlan.js (순수)
                   │  요청 모양·응답 읽기: src/guardian/pushRequests.js, 보내기: watchSend.js

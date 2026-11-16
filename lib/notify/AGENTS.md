@@ -55,8 +55,9 @@
   서비스 워커 없이 생성자로 낸 알림은 `onclick` 이 같은 허용 목록(`notificationClickPath`)으로 창을 옮긴다.
 - 보호자 구독 실행기는 하나다(`createGuardianPush`, 브라우저에서는 `client.js`의 `getGuardianPush`, 시작은 알림 배너
   `components/pwa/NotificationBanner.js`). 무엇을 할지는 순수 함수가 정한다: 지원 판별 `pushSupport.js`(사용자 에이전트를 읽지 않는다),
-  다시 맞추기와 상태 조회 시각 `guardianPushPlan.js`(`planReconcile`, `statusTimes`). 동작은 약속 줄 하나에 한 번에 하나씩 돌고, 같은
-  지켜보기의 동작이 도는 중이면 그 약속을 돌려준다(`getState(watchId).busy`). 기다린 뒤의 기록 쓰기는 `store.updateGuardianPush`만 쓴다.
+  다시 맞추기와 상태 조회 시각 `guardianPushPlan.js`(`planReconcile`, `statusTimes`). 동작은 약속 줄 하나에 한 번에 하나씩 돌고
+  (같은 기기의 탭 사이에서도: Web Locks `safehour-guardian-push` 안에서 기록을 다시 읽어 정하고 60초까지만 붙잡는다. 없으면 탭
+  안에서만), 같은 지켜보기의 동작이 도는 중이면 그 약속을 돌려준다(`getState(watchId).busy`). 기다린 뒤의 기록 쓰기는 `store.updateGuardianPush`만 쓴다.
   요청 규칙은 `docs/contracts.md` 'A-3 클라이언트가 지키는 것'. 요청 간격(`CONFIG_TTL_MS`, `STATUS_POLL_MS` 등)은 알림 시점이 아니라
   실행기 상수다. 상태 조회의 마감 뒤 시각은 기본값 파일의 `serverPushGraceMin`을 읽는다(마감 + 11분).
 
