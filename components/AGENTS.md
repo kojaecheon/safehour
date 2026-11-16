@@ -55,6 +55,32 @@
   `disabled`가 아니라 `loading`으로 막아 포커스를 지킨다.
 - 보호자 링크 동의 화면의 서버 알림 항목은 표시·처음 체크·결과 문구를 `guardian/serverPush.js`가 고른다. 배지를 두지 않고 법률 검토 안내
   줄(`conditions.consentLegalReview`)을 쓴다.
+- 받은 일정 화면의 '앱이 닫혀 있어도 받기' 항목(A-3)은 세 겹이다. 실행기 훅(`useGuardianPush`)을 부르고 기기 설정·보기 전용 신호를 읽는
+  곳은 `guardian/GuardianPushItem.js` 하나이고, 무엇을 그릴지는 `guardian/guardianPushView.js`(`guardianPushViewModel`, 순수), 그리기는
+  `guardian/GuardianPushItemView.js`다(둘 다 저장소를 읽지 않는다, 테스트가 묶는다). 상태 조회의 주기 묻기도 `GuardianPushItem.js`가
+  내보내는 `useGuardianServerStatus` 한 곳만 건다.
+  - 상태 13가지(`PUSH_ITEM_STATE`)와 순서: 구독이 없으면 기간 끝(`GONE`), 켜는 중, 지원 판별(차단, 아이폰 둘, 지원 안 됨), 준비 확인 실패,
+    켤 수 있음. 구독이 있으면 서버 쉼(`PAUSED`), 다른 기기가 가져감(`MOVED`), 다시 켜기, 받는 중. 기기 알림 스위치가 꺼졌으면 구독
+    기록이 남아 있어도 켜진 것으로 그리지 않는다. `MOVED`인 지켜보기에는 다시 켜기 대신 '이 휴대폰에서 다시 받기'만 둔다.
+  - 켤 수 없는 상태(아이폰 안내, 지원 안 됨, 차단, 기간 끝)는 스위치 대신 같은 이름의 제목을 둔다. 실행기가 일하는 중이면 두 스위치를
+    `disabled`가 아니라 `aria-disabled`로 막고(포커스가 남는다) 버튼은 `loading`이다.
+  - 상태 줄은 `role="status"`, 결과 줄은 실패면 `role="alert"`, 그 밖은 `role="status"`이고 두 칸은 늘 있다. 모든 실행기 결과
+    (`PUSH_RESULT`)에 결과 줄 문구가 있다(`PUSH_RESULT_LINE`, 빠지면 테스트가 깨진다). 결과 줄은 지금 상태와 맞을 때만 보인다: 지난
+    켜짐, 다른 기기가 가져감, 함께 있음 결과를 그와 어긋나는 상태 옆에 두지 않는다. 상태 줄과 같은 문구면 한 번만 보인다.
+  - 보기 전용이면 스위치를 잠그고 로그인 줄과 로그인 버튼(`/login?returnTo=%2Fg`)을 둔다. 로그인 버튼은 받은 일정 화면에 한 번만 보인다.
+    오프라인이면 로그인을 권하지 않고 연결 안내만 둔다. 세션 확인 전(오프라인 말고)에는 항목을 그리지 않는다(`shouldShowReadOnly`).
+  - 동의 문장과 법률 검토 줄(`consentLines`)은 늘 보이고, 도착 비보장·위치 줄과 끄기 대기 줄은 두 언어 병기다. 아이폰 다섯 단계는 순서
+    목록 하나로 묶는다(`pushLineSegments`).
+- 받은 일정의 줄마다 꼬리표와 줄 안 안내는 `guardian/returnStatus.js`의 `returnRowView` 한 곳이 고른다. '복귀 확인' 꼬리표는 환자가
+  돌아왔어요를 눌렀다는 표시(판정 아님)다. 상태 조회 날짜가 줄 날짜와 같고 확인 목록에 그 마감이 있을 때만 붙고(`confirmedFor`),
+  `state-together` 토큰과 체크 아이콘, 글자로 그린다. 꼬리표는 늘 '앱은 위치를 몰라 실제로 돌아왔는지는 알 수 없다'는 안내
+  (`guardian.confirmedHelp`, 두 언어 병기)와 함께 보인다. 확인된 줄은 '마감 지남' 꼬리표, 연락 안내, 줄 안의 전화 버튼 대신 이 안내를
+  보이고(마감 전 줄과 맨 위 오늘 카드도 같다), 그날 절 아래에 서버 확인 시각 줄(`serverCheckedAt`, `guardian.statusAsOf`)을 둔다. 화면
+  아래 긴급 절(119, 1330)은 이 규칙과 무관하게 늘 그대로다. `serverStatus`가 없으면 예전과 같은 마크업이다(시안 보드).
+- 받은 링크 붙여넣기 절(`guardian/PasteLink.js`)의 펼침과 받아들인 뒤 포커스는 `guardian/pasteView.js`가 정한다: 사본도 여는 중인
+  링크도 없을 때만 펼치고, 여는 중인 링크가 있어도 숨기지 않고 접어 둔다. 받아들이면 입력란을 비우고 접으며, 포커스는 PIN 입력 제목,
+  로그인 안내 제목, 상태 줄, 사본 제목 순으로 처음 있는 곳에 둔다(`PASTE_FOCUS_ORDER`). 입력란은 `form` 안의 `textarea`이고
+  `maxLength`는 `PASTE_MAX_CHARS`, `autoComplete="off"`, `spellCheck={false}`, `name`이 없다. 버튼 이름은 '링크 열기'(`guardian.pasteOpen`)다.
 - 안전 문구는 병기 규칙이 고른 두 언어로 보여준다. 부품 안에서 언어 조건문을 따로 만들지 않는다.
 - 문구는 기능별 이름공간 파일에서 가져온다. 부품 파일에 문자열을 직접 쓰지 않는다.
 - 색·크기·간격·모서리·그림자는 **토큰만** 쓴다. 값을 직접 쓰면 디자인이 화면마다 갈라진다.

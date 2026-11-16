@@ -79,9 +79,11 @@ Next.js 라우트 핸들러 (무상태)
 2. 환자 기기가 날짜별 복귀 마감 `HH:MM` 목록을 올린다(`PUT /api/watch/deadlines`, 늘 최신 전체). 서버는 날짜 기록을 바꾸고
    오늘·내일의 걸리지 않은 마감마다 QStash에 '마감 + 10분에 `/api/watch/due`를 불러 달라'는 예약을 건다. 더 뒤의 날짜는
    하루 1회 예약(Vercel Cron, 00:10 KST)이 어제·오늘·내일 색인을 보고 건다.
-3. 보호자 기기가 푸시 구독을 올린다(`POST /api/watch/subscribe`). 서버는 구독을 봉인해 지켜보기마다 하나만 둔다.
+3. 보호자 기기가 푸시 구독을 올린다(`POST /api/watch/subscribe`). 서버는 구독을 봉인해 지켜보기마다 하나만 둔다. 보호자 기기는
+   상태 조회(`POST /api/watch/status`)로 오늘 확인된 마감과 오늘 함께 있음을 받아 받은 일정 화면에 보인다(아래 '보호자 기기 쪽 부품').
 4. 예약이 오면 `/api/watch/due`가 서명을 확인하고, 그 마감에 확인('돌아왔어요')도 '오늘 함께 있음'도 없으면 `HSETNX`로 보낼
-   권리를 얻어 보호자에게 "확인이 없다" 알림을 한 번 보낸다. 판정표는 `docs/contracts.md`의 `POST /api/watch/due`.
+   권리를 얻어 보호자에게 "확인이 없다" 알림을 한 번 보낸다. 판정표는 `docs/contracts.md`의 `POST /api/watch/due`. 보호자 기기의
+   서비스 워커(`public/sw.js`)가 받아 잠금 화면 알림을 띄운다.
 5. 환자가 '돌아왔어요'를 누르면(`POST /api/watch/back`) 확인을 적는다. 이미 마감 지남 알림이 나갔으면 복귀 확인 알림을 보낸다.
 
 서버가 하는 일은 "이 시각까지 확인이 왔는가"를 보는 것뿐이다. 마감 시각을 계산하거나, 늦었다고 판정하거나, 조건을 해석하지 않는다.
@@ -114,6 +116,37 @@ Next.js 라우트 핸들러 (무상태)
 - 지켜보기를 지우는 다섯 길(끄기, 내 정보 지우기, 자동 삭제, 체류 삭제, 동의 철회)은 기기 저장소 안에서 서버 삭제 대기로
   옮긴다. 실행기가 떠 있지 않아도 빠지지 않는다.
 
+**보호자 기기 쪽 부품** (A-3, 2026-11-17)
+
+```
+받은 일정 화면(/g) ── GuardianPushItem ── useGuardianPush(watchId) ─────────┐
+  상태 조회 주기: useGuardianServerStatus(watchId) ── GuardianCopyView      │
+알림 배너 마운트 ── start ─────────────────────────────────────────────────┤
+지우기 버튼(ClearSessionButton) ── forgetBrowser ──────────────────────────┤
+                                                                           ▼
+                lib/notify/guardianPush.js (실행기 하나, getGuardianPush, 동작은 줄 하나에 한 번에 하나)
+                  │  지원 판별: lib/notify/pushSupport.js (순수, 사용자 에이전트를 읽지 않는다)
+                  │  다시 맞추기·상태 조회 시각: lib/notify/guardianPushPlan.js (순수)
+                  │  요청 모양·응답 읽기: src/guardian/pushRequests.js, 보내기: watchSend.js
+                  │  브라우저: 알림 권한, 서비스 워커 준비 확인, pushManager
+                  ▼
+                /api/push/config, /api/watch/subscribe·status·mute
+기기 저장소(lib/store): guardianPush 레코드(subs·status·gone), 서버 삭제 대기의 구독 해지 항목(저장소가 직접 DELETE)
+서비스 워커(public/sw.js): push 를 받아 알림, 준비 확인(SAFEHOUR_SW_INFO)에 답함
+기기 알림(lib/notify/device.js): 보호자 마감 지남은 서버 푸시와 같은 tag(R4)
+표시 규칙(순수): components/guardian/guardianPushView.js(항목), returnStatus.js(복귀 확인), pasteView.js(붙여넣기)
+```
+
+- 실행기는 하나다. 실행기 훅은 `GuardianPushItem.js` 한 곳에서만 부르고, 받은 일정 화면의 상태 조회 주기는 거기서 내보내는
+  `useGuardianServerStatus`로 건다. 표시 부품과 표시 규칙은 저장소를 읽지 않는다.
+- 실행기는 저장소 주제 `guardianCopies`·`guardianPush`·`prefs`·`status`에 붙는다. 기기 알림 스위치를 끄는 곳이 둘(받은 일정 화면,
+  설정)이라 그 지점이 아니라 `prefs` 변경을 받고, 다른 탭의 변경도 받는다.
+- 구독을 빼는 길(끄기, 다시 맞추기, 내 정보 지우기, 사본 수명 정리, 기록하지 못한 구독)은 모두 기기 저장소의 서버 삭제 대기를 거친다.
+  사본이 만료된 `watchId`의 구독은 앱을 열 때 저장소가 모든 계정에서 로그인 없이 대기로 옮긴다. 실행기가 떠 있지 않아도 빠지지 않는다.
+- 브라우저 구독(`PushSubscription`)은 기기에 하나이고 이 기기의 모든 계정과 지켜보기가 함께 쓴다. 기기 기록에는 주소 해시만 둔다.
+- 서비스 워커는 알림을 예약하지 않고 서버가 보낸 푸시만 보인다. `pushsubscriptionchange` 처리기와 IndexedDB를 두지 않는다.
+- 판정의 두 번째 경로는 없다. '복귀 확인'은 서버가 받은 '돌아왔어요'를 보일 뿐이고, 마감 지남 기기 알림의 예약은 그대로다(결정 15).
+
 ## 부품 지도
 
 | 위치 | 역할 | 의존 방향 |
@@ -130,9 +163,9 @@ Next.js 라우트 핸들러 (무상태)
 | `src/push/` | 웹 푸시 프로토콜: VAPID 서명(RFC 8292), 본문 암호화(RFC 8291 aes128gcm), endpoint 허용 목록, 보내기 | Node 암호 기능 + 외부 HTTP(푸시 서비스) |
 | `lib/server/` | 라우트 핸들러가 쓰는 조립·검증·로그·운영 스위치 | 위 모두 |
 | `lib/server/watch/` | 서버 알림(ADR-0012): 저장소(REST)·키·봉인·횟수 제한·레코드, 예약 어댑터, 예약 걸기·처리, 환자·보호자 동작, 문구, 설정 | `src/push/` + `src/stay/`의 시각 도우미·기본값 + `src/i18n/` 입구(문구 파일만) + 외부 HTTP(Upstash·QStash) |
-| `lib/store/` | 기기 저장소 읽기·쓰기, 계정 이름공간, 보기 전용 신호, 서버 알림 기기 상태와 서버 삭제 대기 | 브라우저 저장소 + 로그아웃·`DELETE /api/watch` 경로(`src/guardian/watchSend.js`) |
+| `lib/store/` | 기기 저장소 읽기·쓰기, 계정 이름공간, 보기 전용 신호, 서버 알림 기기 상태와 서버 삭제 대기 | 브라우저 저장소 + 로그아웃·`DELETE /api/watch`·`DELETE /api/watch/subscribe` 경로(`src/guardian/watchSend.js`, `pushRequests.js`) |
 | `lib/trip/` | 변화 감지와 재계획 조정, 서버 호출, 표시 가공, 서버 알림 동기화 실행기(`watchSync`) | 기기 저장소 + 서버 라우트 |
-| `lib/notify/` | 알림 예약과 기기 알림 | 기기 저장소 |
+| `lib/notify/` | 알림 예약과 기기 알림, 보호자 서버 알림 구독 실행기(`guardianPush`) | 기기 저장소 + `/api/push/config`·`/api/watch/subscribe`·`status`·`mute`(`src/guardian/`의 요청 모양과 보내기) |
 | `app/` | 화면과 라우트 핸들러 | 위 모두 |
 | `components/` | 화면 부품 | 문구·스타일·클라이언트 조정 |
 
@@ -157,7 +190,10 @@ Next.js 라우트 핸들러 (무상태)
 
 - 기기에서 서버로: 환자 기기는 `watchId`, 쓰기 토큰, 출국일(`YYYY-MM-DD`), 날짜별 복귀 마감 `HH:MM` 목록, '돌아왔어요'의 날짜·시각을
   보낸다(id, 토큰, 날짜, 시각뿐이다). 대기열이 들고 있는 누른 시각과 외출 출발 시각은 기기에만 둔다. 보호자 기기는 `watchId`, 푸시
-  구독(endpoint·p256dh·auth), 언어, `subId`를 보낸다. 장소·좌표·조건 값·외출 내용은 가지 않는다.
+  구독(endpoint·p256dh·auth), 언어, `subId`만 보낸다(구독은 `watchId`·구독·언어, 상태 조회는 `watchId`와 있으면 `subId`, 함께 있음은
+  `watchId`·`subId`·`on`, 해지는 `watchId`·`subId`). 계정 키와 사본 내용은 보내지 않는다. 장소·좌표·조건 값·외출 내용은 가지 않는다.
+- 서버에서 보호자 기기로: 구독은 `subId`, 상태 조회는 서버가 본 오늘 날짜, 확인된 마감 시각 목록, 함께 있음 여부,
+  `subscriptionActive`뿐이다. 보호자 기기는 `watchId`·`subId`·구독 주소를 로그와 URL에 싣지 않는다.
 - 서버에서 Upstash Redis로: 네 레코드(지켜보기, 봉인한 구독, 날짜 기록, 횟수 계수기)와 소유 집합·날짜 색인. 키는 모두 HMAC이고
   구독은 AES-256-GCM으로 봉인한다. 토큰은 SHA-256만 둔다. 요청은 REST(`Authorization: Bearer`)로 간다.
 - 서버에서 QStash로: 예약 본문 `{ k: 저장 키, d: 날짜, t: 시각 }`, 보낼 시각, 중복 제거 id, 미리보기 배포 보호 우회 헤더.
