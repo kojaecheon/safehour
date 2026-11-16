@@ -580,7 +580,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 | `MOVED` | `pushMoved`, `pushMovedNote` | 이 휴대폰에서 다시 받기, 스위치(끄기) |
 | `GONE` | `pushGone`, `pushOpenAppAlerts`(기기 알림 스위치가 꺼져 있으면 뒤 줄은 뺀다) | 없음 |
 
-새 문구. `safety` 블록: `guardian.pushNoGuarantee`, `guardian.pushLocation`, `guardian.confirmedHelp`, `guardian.pushOffPending`, `guardian.pushOffUnsent`. 나머지는 `messages`. 영어 문장은 환자를 "the patient"로, 일본어는 「患者さん」으로 쓴다(검토 반영). 아이폰 4단계의 '받은 일정 보기'는 `today.receivedAction`의 각 언어 문구와 같게 쓴다.
+새 문구. `safety` 블록: `guardian.pushNoGuarantee`, `guardian.pushLocation`, `guardian.confirmedHelp`, `guardian.pushOffPending`, `guardian.pushOffUnsent`. 나머지는 `messages`. 영어 문장은 환자를 "the patient"로, 일본어는 「患者さん」으로 쓴다(검토 반영). `guardian.muteFailed`와 `guardian.pushOffFailed`는 화면이 시작한 함께 있음 바꾸기·끄기가 실패했을 때만 쓴다(받는 중의 함께 있음, 구독이 남은 끄기). 나머지 실패는 켜기 기준 문구다. 아이폰 4단계의 '받은 일정 보기'는 `today.receivedAction`의 각 언어 문구와 같게 쓴다.
 
 | 키 | ko | en |
 | --- | --- | --- |
@@ -594,6 +594,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 | `guardian.pushOffDone` | 껐어요. 서버에서 이 휴대폰의 알림 주소를 지웠어요. | Turned off. We deleted this phone's alert address from the server. |
 | `guardian.pushOffPending` | 이 휴대폰에서는 껐어요. 연결되면 서버에서도 지워요. 그 전까지 알림이 올 수 있어요. | Turned off on this phone. We'll delete it from the server once you're online. Until then, alerts may still arrive. |
 | `guardian.pushOffUnsent` | 이 휴대폰의 서버 알림이 꺼졌지만 서버에서 지우지 못했어요. 환자의 일정이 끝날 때까지 서버가 알림을 보낼 수 있어요. | Server alerts are off on this phone, but this phone’s alert address could not be deleted from the server. The server may still send alerts until the patient’s schedule ends. |
+| `guardian.pushOffFailed` | 끄지 못했어요. 잠시 뒤 다시 시도해 주세요. | Couldn't turn this off. Please try again in a little while. |
 | `guardian.pushPaused` | 서버 알림이 지금 쉬고 있어요. 앱이 열려 있을 때 알림은 그대로 받아요. | Server alerts are paused right now. You still get alerts while the app is open. |
 | `guardian.pushUnsupported` | 이 브라우저에서는 앱이 닫혀 있을 때 알림을 받을 수 없어요. iPhone이라면 Safari에서 열어 홈 화면에 추가해 주세요. | This browser can't get alerts while the app is closed. On iPhone, open this page in Safari and add it to your Home Screen. |
 | `guardian.pushIosTitle` | iPhone에서 받으려면 | To get alerts on iPhone |
@@ -625,6 +626,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 | `guardian.muteMidnight` | 자정 직전 마감의 알림은 자정 뒤에 올 수 있어요. | An alert for a return time just before midnight may still arrive after midnight. |
 | `guardian.muteOn` | 오늘은 서버 알림을 보내지 않아요. | No server alerts today. |
 | `guardian.muteOff` | 오늘 서버 알림을 다시 받아요. | Server alerts are back on for today. |
+| `guardian.muteFailed` | 오늘 함께 있음을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요. | Couldn't change “Together today”. Please try again in a little while. |
 | `guardian.confirmedTag` | 복귀 확인 | Tapped “I’m back” |
 | `guardian.confirmedHelp` | 환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요. 걱정되면 환자에게 직접 연락해 주세요. | The patient tapped “I’m back”. The app does not know their location, so it cannot tell whether they are actually back. If you are worried, contact the patient directly. |
 | `guardian.statusAsOf` | {time}에 서버에서 확인한 내용이에요. | As checked with the server at {time}. |

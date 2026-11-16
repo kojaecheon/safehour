@@ -95,6 +95,9 @@ export default function GuardianPushItem({ watchId }) {
     offline: status.reason === READ_ONLY_REASON.OFFLINE,
     loginElsewhere: shouldShowReadOnly(status) && status.reason !== READ_ONLY_REASON.OFFLINE,
     today,
+    // 결과 값이 같으면 그 동작의 결과로 본다. 이 맞추기는 바탕 길(다시 맞추기, 상태 조회와 poll, prepare)이 lastResult 에
+    // OFF_UNSENT, PERMISSION_LOST, GONE 만 남긴다는 데 기댄다(lib/notify/guardianPush.js 의 lastResults 주석). 바탕 길이 NETWORK,
+    // FAILED 같은 값을 남기게 바뀌면 동작이 끝난 뒤 같은 값이 와도 그 동작의 실패 문구로 읽힌다
     lastAction: actionForResult(record, state.lastResult),
   });
 

@@ -683,6 +683,48 @@ describe('스위치 잠금 (검토 M2·M3·M17, 포커스를 지키는 잠금)',
     assert.match(source, /\(headingRef\.current \?\? switchRef\.current\)\?\.focus\(\);/);
   });
 
+  test('동의 줄, 결과 alert 칸, 안전 Callout 은 HIDDEN 이 아니면 늘 그린다(검토 M4·M11·M18, 원문 구조로 고정)', () => {
+    // 단위 테스트에는 JSX 렌더러가 없다(새 패키지 금지). 긴급 절 시험처럼 GuardianPushItemView 의 원문 자리를 묶는다:
+    // HIDDEN 의 return null 뒤 하나뿐인 return ( 안에서, 세 부품의 여는 태그가 식 칸({ }) 밖(조건식 && · ? 안이 아님)에 있다
+    const source = readFileSync(join(ROOT, 'components/guardian/GuardianPushItemView.js'), 'utf8');
+    const start = source.indexOf('export default function GuardianPushItemView(');
+    const fn = source.slice(start);
+    const guard = 'if (!model || model.itemState === PUSH_ITEM_STATE.HIDDEN) return null;';
+    assert.equal(fn.split(guard).length, 2, 'HIDDEN 막기는 하나다');
+    assert.equal(fn.split('return null').length, 2, '그리지 않는 길은 HIDDEN 하나다');
+    const body = fn.slice(fn.indexOf(guard) + guard.length);
+    assert.equal(body.split('\n  return (').length, 2, '그리는 return 은 하나다');
+    const jsx = body.slice(body.indexOf('\n  return ('));
+    const depthAt = (tag) => {
+      const at = jsx.indexOf(tag);
+      assert.ok(at > 0, `${tag} 가 있다`);
+      assert.equal(jsx.split(tag).length, 2, `${tag} 는 하나다`);
+      const before = jsx.slice(0, at);
+      return (before.match(/\{/g) ?? []).length - (before.match(/\}/g) ?? []).length;
+    };
+    const block = (tag) => {
+      const from = jsx.indexOf(tag);
+      return jsx.slice(from, jsx.indexOf('\n      </div>', from));
+    };
+    // M4 동의 줄
+    const consent = '<div className="guardian-push-consent">';
+    assert.equal(depthAt(consent), 0, '동의 줄은 조건식 안에 있지 않다');
+    assert.match(block(consent), /\{model\.consentLines\.map\(\(key\) => \(\s*<p key=\{key\}>\{t\(key\)\}<\/p>/);
+    // M11 실패 결과 칸은 늘 role="alert", 성공·안내 칸은 role="status"
+    const alertBox = '<div className="guardian-push-result is-alert" role="alert">';
+    const statusBox = '<div className="guardian-push-result" role="status">';
+    assert.equal(depthAt(alertBox), 0, 'alert 칸은 늘 있다');
+    assert.equal(depthAt(statusBox), 0, 'status 칸은 늘 있다');
+    assert.match(block(alertBox), /\{result && result\.alert && \(/);
+    assert.match(block(statusBox), /\{result && !result\.alert && <ResultLine result=\{result\} \/>\}/);
+    assert.doesNotMatch(jsx, /is-alert" role="status"/);
+    // M18 안전 Callout(도착 비보장, 위치, 두 언어)
+    const callout = '<div className="ui-callout has-icon guardian-note guardian-push-safety" role="note">';
+    assert.equal(depthAt(callout), 0, '안전 Callout 은 조건식 안에 있지 않다');
+    const safety = jsx.slice(jsx.indexOf(callout), jsx.indexOf('</section>'));
+    assert.match(safety, /\{model\.safetyLines\.map\(\(key\) => \(\s*<SafetyPair key=\{key\} messageKey=\{key\} \/>/);
+  });
+
   test('보기 전용 로그인 버튼은 기기 알림 스위치와 같은 기준으로 한 번만(검토 Minor 2)', () => {
     const item = readFileSync(join(ROOT, 'components/guardian/GuardianPushItem.js'), 'utf8');
     assert.match(item, /loginElsewhere: shouldShowReadOnly\(status\) && status\.reason !== READ_ONLY_REASON\.OFFLINE,/);

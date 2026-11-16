@@ -66,8 +66,16 @@
     `disabled`가 아니라 `aria-disabled`로 막고(포커스가 남는다) 버튼은 `loading`이다.
   - 상태 줄은 `role="status"`, 결과 줄은 실패면 `role="alert"`, 그 밖은 `role="status"`이고 두 칸은 늘 있다. 모든 실행기 결과
     (`PUSH_RESULT`)에 결과 줄 문구가 있다(`PUSH_RESULT_LINE`, 빠지면 테스트가 깨진다). 결과 줄은 지금 상태와 맞을 때만 보인다: 지난
-    켜짐, 다른 기기가 가져감, 함께 있음 결과를 그와 어긋나는 상태 옆에 두지 않는다. 상태 줄과 같은 문구면 한 번만 보인다.
-  - 보기 전용이면 스위치를 잠그고 로그인 줄과 로그인 버튼(`/login?returnTo=%2Fg`)을 둔다. 로그인 버튼은 받은 일정 화면에 한 번만 보인다.
+    켜짐, 다른 기기가 가져감, 함께 있음 결과를 그와 어긋나는 상태 옆에 두지 않는다(`resultFitsState` 한 곳). 상태 줄과 같은 문구면 한
+    번만 보인다. 실패 문구는 켜기 기준이라, `GuardianPushItem.js`가 누름마다 시작한 동작(on, off, mute, renew, takeOver)과 돌려받은 결과를
+    기록하고 그 결과가 지금 `lastResult`와 같을 때만 `lastAction`으로 넘긴다(`actionForResult`, 계정이나 지켜보기가 바뀌면 지운다). 받는
+    중의 함께 있음 실패는 `guardian.muteFailed`, 구독이 남은 끄기 실패는 `guardian.pushOffFailed`다. 이 맞추기는 실행기의 바탕 길이
+    `OFF_UNSENT`, `PERMISSION_LOST`, `GONE`만 남긴다는 데 기댄다(`lib/notify/guardianPush.js`의 `lastResults` 주석).
+  - 누른 부품이 결과로 사라지면(켜기가 차단·지원 안 됨·기간 끝으로 끝남, 다시 켜기·다시 받기 성공) 포커스를 항목 제목(`tabIndex -1`),
+    스위치가 있는 상태면 켜기 스위치로 옮긴다. 사용자가 다른 곳으로 옮긴 뒤면 건드리지 않는다. 동의 줄, 결과의 `alert` 칸, 안전
+    Callout은 `HIDDEN`이 아니면 늘 그리고, 단위 테스트가 원문 구조로 묶는다(JSX 렌더러가 없다).
+  - 보기 전용이면 스위치를 잠그고 로그인 줄과 로그인 버튼(`/login?returnTo=%2Fg`)을 둔다. 로그인 버튼은 받은 일정 화면에 한 번만 보인다:
+    기기 알림 스위치(`AlertsToggle`)가 버튼을 보이는 때(`shouldShowReadOnly`이고 오프라인이 아님)는 항목이 줄만 둔다(`loginElsewhere`).
     오프라인이면 로그인을 권하지 않고 연결 안내만 둔다. 세션 확인 전(오프라인 말고)에는 항목을 그리지 않는다(`shouldShowReadOnly`).
   - 동의 문장과 법률 검토 줄(`consentLines`)은 늘 보이고, 도착 비보장·위치 줄과 끄기 대기 줄은 두 언어 병기다. 아이폰 다섯 단계는 순서
     목록 하나로 묶는다(`pushLineSegments`).

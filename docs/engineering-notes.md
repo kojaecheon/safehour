@@ -824,3 +824,27 @@
   공백·줄바꿈을 건너 이어 붙이지 않는다.
 - **확인**: `test/guardian-paste.test.js` '링크 바로 뒤에 붙은 - 와 _ 는 정규 끝 검사로 대부분 거른다(나머지 3 암호문은 알려진 한계)',
   '- · _ 로 이은 PIN: ...'.
+
+### Playwright 기본 헤드리스 셸은 알림 권한을 줘도 `denied`라 알림이 뜨지 않는다
+
+- **증상**: 화면 테스트에서 `context.grantPermissions(['notifications'])`를 줘도 `Notification.permission`이 `'denied'`이고, 서비스 워커가
+  받은 푸시의 `showNotification`이 실패해 알림이 하나도 뜨지 않는다. 보호자 항목도 늘 '차단' 상태로 그려진다.
+- **원인**: Playwright가 기본으로 띄우는 헤드리스 셸은 알림 권한을 붙이지 않는다(실측). 새 헤드리스 크롬(channel
+  `'chromium'`)은 권한이 붙고, CDP `ServiceWorker.deliverPushMessage`로 보낸 푸시가 알림이 된다. channel은 describe 안에서 바꿀 수 없다
+  (작업자를 새로 띄운다).
+- **대응**: 화면 시험 대부분은 `stubPushApi`(`e2e/helpers.js`)로 `PushManager.prototype`과 `Notification`을 대신해 실행기가 진짜 호출 자리를
+  타게 한다. 실제 푸시 수신을 보는 시험 하나(`e2e/guardian-push.spec.js` 'CDP 로 보낸 푸시가 tag 와 함께 알림 하나로 뜬다')만
+  `playwright` 고정 장치로 새 헤드리스 크롬을 따로 띄우고, 기본 컨텍스트와 같은 감시(`guardContext`, `expectGuardClean`, 외부 요청 0건·위치
+  요청 0건)를 건다.
+- **확인**: `E2E_PORT=<빈 포트> npm run e2e -- e2e/guardian-push.spec.js`(빌드 먼저).
+
+### 실제 오프라인(`context.setOffline`)에서는 끄기를 시험할 수 없다
+
+- **증상**: 화면 테스트에서 `context.setOffline(true)` 뒤 '앱이 닫혀 있어도 받기'를 끄려 하면 스위치가 잠겨 있어 끄기 대기(`OFF_PENDING`)
+  경로에 닿지 않는다.
+- **원인**: 실제 오프라인은 저장소를 보기 전용(이유 오프라인)으로 만들고, 실행기는 쓰기 가능할 때만 끈다(`READ_ONLY`). 화면도 보기 전용이면
+  스위치를 잠근다. 끄기 대기는 쓰기는 되는데 서버에 닿지 않는 경우(요청이 끊김)의 길이다.
+- **대응**: 끄기 대기 시험은 가짜 서버의 `offline` 표시(`stubServerPush`의 `stub.set({ offline: true })`, 요청을 끊는다)로 연결 끊김을
+  흉내 낸다. 다시 연결은 표시를 끈 뒤 `context.setOffline(true)`·`setOffline(false)`로 `online` 사건을 내어 대기의 해지를 보내게 한다.
+  A-2의 'Playwright에서 오프라인으로 연 페이지는 다시 연결해도 online 사건이 오지 않는다'와 같은 가짜 서버 표시다.
+- **확인**: `e2e/guardian-push.spec.js` '끄기는 DELETE { watchId, subId } 이고, 오프라인이면 대기에 남았다가 연결되면 보낸다'.
