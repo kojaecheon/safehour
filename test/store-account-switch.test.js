@@ -1,4 +1,4 @@
-// 다른 탭에서 계정이 바뀔 때 (lib/store/store.js attachWindow·recheckAccount·refreshSession, lib/trip/watchSync.js · A-3 검토 I1, e4617eb 검토)
+// 다른 탭에서 계정이 바뀔 때 (lib/store/store.js attachWindow·recheckAccount·refreshSession, lib/trip/watchSync.js · A-3 검토 I1, e4617eb 검토, eb9aa38 재검토)
 //
 // 이 파일이 고정하는 것
 //   - 세션 쿠키는 브라우저에 하나다. 다른 탭이 다른 계정으로 로그인해 마지막 계정 키(lastAccountKey)가 바뀌면, 이 탭은 메모리의
@@ -11,9 +11,12 @@
 //   - 바뀌기 전에 보낸 세션 확인의 응답(앞 계정)과 늦은 실패는 반영하지 않는다. 같은 계정 키가 다시 쓰인 것은 전환이 아니다
 //   - storage 이벤트를 받지 못한 탭(뒤로·앞으로 캐시, 얼었던 탭)도 다시 보일 때, 세션 응답을 반영하기 전에, 실행기가 일을 시작할 때
 //     다시 대조한다. 다시 묻기가 답을 받지 못하면 한 번만 더 묻는다
+//   - 마지막 계정 키를 바꾼 사건(바뀌기 전과 뒤가 다르다)이면 지금 값이 이 탭이 본 값과 같아도 버린다(A 에서 B, 다시 A 로 바뀐 것을
+//     한꺼번에 받은 탭). 방금 연 탭은 기기에 남은 마지막 계정 키를 본 값으로 시작한다. 다른 탭의 로그아웃 보류 표시는 구독자에게 알린다
 //
 // 탭 둘은 같은 메모리 저장소를 나눠 쓰는 저장소 인스턴스 둘이고, 브라우저 쿠키는 변수 하나가 대신한다(가짜 fetch 와 가짜 요청 함수가
 // 보낸 때의 그 값을 기록한다. 로그아웃 요청은 쿠키를 지운다). storage 이벤트는 바꾼 탭이 아닌 다른 탭에만 오므로 탭 1에만 보낸다.
+// 다른 탭의 로그인 사건에는 브라우저처럼 바뀌기 전과 뒤의 원문(oldValue, newValue)을 싣는다.
 // 외부 호출과 벽시계는 없다. 계정 키와 식별 값은 형식만 맞춘 테스트 값이다.
 
 import { describe, test } from 'node:test';
@@ -191,8 +194,10 @@ function twoTabs({ aWatch = true, fresh = false, timers = null } = {}) {
   const runner = createWatchSync({ store: tab1, api, now, randomBytes: (n) => new Uint8Array(n).fill(7) });
   runner.start();
 
-  /** 탭 1에 storage 사건 하나 */
-  const storageEvent = (key, storageArea = shared) => window1.fire('storage', { key, storageArea });
+  /** 탭 1에 storage 사건 하나. values 는 브라우저가 싣는 바뀌기 전과 뒤의 원문({ oldValue, newValue })이다. 없으면 싣지 않는다 */
+  const storageEvent = (key, storageArea = shared, values = {}) => window1.fire('storage', { key, storageArea, ...values });
+  /** 탭 1이 아직 처리하지 않은 사건(otherTabLogsIn 의 event: 'held') */
+  const heldEvents = [];
 
   return {
     shared,
@@ -222,15 +227,31 @@ function twoTabs({ aWatch = true, fresh = false, timers = null } = {}) {
       upload.open();
     },
     /**
-     * 다른 탭이 그 계정으로 로그인했다: 쿠키가 바뀌고 다른 탭이 마지막 계정 키를 쓰고, 탭 1이 storage 이벤트를 받는다.
-     * event: false 면 탭 1은 사건을 받지 못한다(뒤로·앞으로 캐시에 있었거나 얼어 있었다, 또는 사건이 아직 오지 않았다)
+     * 다른 탭이 그 계정으로 로그인했다: 쿠키가 바뀌고 다른 탭이 마지막 계정 키를 쓰고, 탭 1이 storage 이벤트를 받는다. 사건에는
+     * 브라우저처럼 바뀌기 전과 뒤의 원문(oldValue, newValue)이 실린다.
+     * event: false 면 탭 1은 사건을 받지 못한다(뒤로·앞으로 캐시에 있었거나 얼어 있었다). 'held' 면 사건을 쌓아 두고
+     * deliverHeldEvents() 때 보낸다(사건이 아직 오지 않았다, 또는 탭 1이 처리하기 전에 다른 탭이 더 바꿨다)
      */
     otherTabLogsIn(accountKey, { event = true } = {}) {
+      const oldValue = shared.getItem(DEVICE_KEY.lastAccountKey);
       browser.cookie = accountKey;
       tab2.setSession(sessionBody(accountKey));
-      if (event) storageEvent(DEVICE_KEY.lastAccountKey);
+      const values = { oldValue, newValue: shared.getItem(DEVICE_KEY.lastAccountKey) };
+      if (event === 'held') heldEvents.push(values);
+      else if (event) storageEvent(DEVICE_KEY.lastAccountKey, shared, values);
     },
-    /** 같은 키를 다시 쓴 것처럼, 또는 늦게 온 것처럼 사건만 보낸다. storageArea 를 주면 그 저장 영역의 사건이다 */
+    /** 쌓아 둔 마지막 계정 키 사건을 차례대로 탭 1에 보낸다 */
+    deliverHeldEvents() {
+      for (const values of heldEvents.splice(0)) storageEvent(DEVICE_KEY.lastAccountKey, shared, values);
+    },
+    /** 다른 탭의 로그인 응답이 쿠키만 바꿨다. 그 탭은 아직 마지막 계정 키를 쓰지 않았다(첫 세션 응답 전) */
+    cookieChangesTo(accountKey) {
+      browser.cookie = accountKey;
+    },
+    /**
+     * 같은 키를 다시 쓴 것처럼 사건만 보낸다. storageArea 를 주면 그 저장 영역의 사건이다. values({ oldValue, newValue })를 주지
+     * 않으면 바뀌기 전과 뒤를 싣지 않는다(저장소는 지금 값을 이 탭이 본 값과 대조한다)
+     */
     storageEventOnly: storageEvent,
     /** 뒤로·앞으로 캐시에서 돌아왔다 */
     pageshow() {
@@ -281,7 +302,9 @@ describe('다른 탭의 계정 전환: 이 탭의 세션 (실제 저장소 둘)'
   test('마지막 계정 키가 그대로인 이벤트(같은 키를 다시 씀)와 다른 키의 변경은 전환이 아니다: 세션을 두고 다시 묻지 않는다', () => {
     const h = twoTabs();
     const before = h.tab1.getStatus();
+    const same = h.shared.getItem(DEVICE_KEY.lastAccountKey);
     h.storageEventOnly(DEVICE_KEY.lastAccountKey);
+    h.storageEventOnly(DEVICE_KEY.lastAccountKey, h.shared, { oldValue: same, newValue: same });
     h.storageEventOnly(DEVICE_KEY.lang);
     assert.equal(h.tab1.getStatus(), before, '상태가 그대로다(같은 참조)');
     assert.equal(h.tab1.getStatus().readOnly, false);
@@ -675,11 +698,11 @@ describe('다른 탭의 계정 전환: storage 이벤트를 받지 못한 탭 (e
     assert.equal(checks, 1);
   });
 
-  test('앞 쿠키의 세션 응답이 storage 이벤트보다 먼저 와도 반영하지 않는다(응답을 반영하기 전에 대조한다). 늦게 온 사건으로 또 버리지 않는다', async () => {
+  test('앞 쿠키의 세션 응답이 storage 이벤트보다 먼저 와도 반영하지 않는다(응답을 반영하기 전에 대조한다). 늦게 온 사건은 한 번 더 버리고 묻지만 B 로 끝난다', async () => {
     const h = twoTabs();
     h.holdSessions();
     const stale = h.tab1.refreshSession(); // A 쿠키
-    h.otherTabLogsIn(B, { event: false }); // 사건은 아직 오지 않았다
+    h.otherTabLogsIn(B, { event: 'held' }); // 사건은 아직 오지 않았다
     h.sessionChecks[0].open();
     await stale;
     assert.equal(h.tab1.getStatus().accountKey, B);
@@ -687,11 +710,16 @@ describe('다른 탭의 계정 전환: storage 이벤트를 받지 못한 탭 (e
     assert.equal(h.tab1.readLastAccountKey(), B, 'A 로 되돌려 쓰면 다른 탭이 전환을 본다');
     assert.deepEqual(h.checkedCookies(), [A, B]);
 
-    h.storageEventOnly(DEVICE_KEY.lastAccountKey); // 사건이 늦게 왔다
-    assert.deepEqual(h.checkedCookies(), [A, B]);
-    h.sessionChecks[1].open();
+    // 사건이 늦게 왔다. 바뀜을 알리는 사건은 이미 대조한 바뀜인지 알 수 없어 한 번 더 버리고 묻는다(eb9aa38 재검토 M1). 해가 없다
+    h.deliverHeldEvents();
+    assert.deepEqual(h.checkedCookies(), [A, B, B]);
+    h.sessionChecks[1].open(); // 다시 버리기 전에 보낸 확인이라 반영하지 않는다
+    await settle();
+    assert.equal(h.tab1.getStatus().authenticated, false);
+    h.sessionChecks[2].open();
     await until(() => h.tab1.getStatus().authenticated);
     assert.equal(h.tab1.getStatus().accountKey, B);
+    assert.equal(h.tab1.readLastAccountKey(), B);
   });
 
   test('연결을 끊으면 창과 문서에 건 듣기를 모두 뗀다', () => {
@@ -712,5 +740,74 @@ describe('누른 화면의 계정 키 null 도 대조한다 (e4617eb 검토, 살
     assert.deepEqual(h.sent, []);
     assert.equal(h.rawWatch(A)?.state, 'ON');
     assert.deepEqual(h.tab1.readPendingServerDelete(), []);
+  });
+});
+
+describe('다른 탭의 계정 전환: 한꺼번에 받은 바뀜, 시작 값, 로그아웃 보류 알림 (eb9aa38 재검토)', () => {
+  test('A 에서 B, 다시 A 로 바뀐 것을 한꺼번에 받아도(지금 값은 본 A 그대로) 바뀜을 알리는 사건이면 버린다: B 쿠키로 보낸 확인의 답을 A 쿠키인데 반영하지 않는다', async () => {
+    const h = twoTabs();
+    h.holdSessions();
+    h.cookieChangesTo(B); // 다른 탭의 B 로그인 응답이 쿠키를 바꿨다. 그 탭은 아직 마지막 계정 키를 쓰지 않았다
+    const inFlight = h.tab1.refreshSession(); // 이 탭이 그때 세션을 묻는다(화면 복귀 등, B 쿠키)
+    h.otherTabLogsIn(B, { event: 'held' }); // 다른 탭이 B 를 쓴다
+    h.otherTabLogsIn(A, { event: 'held' }); // 이 탭이 사건을 처리하기 전에 다른 탭이 다시 A 로 로그인해 A 를 쓴다
+    assert.equal(h.tab1.readLastAccountKey(), A, '지금 값은 이 탭이 본 A 그대로라 값만 대조하면 바뀜을 모른다');
+
+    h.deliverHeldEvents();
+    assert.equal(h.tab1.getStatus().readOnly, true, '사건이 바뀜을 알리면 지금 값과 상관없이 세션을 버린다');
+    assert.deepEqual(h.checkedCookies(), [B, A, A], '사건마다 버리고 지금 쿠키(A)로 다시 묻는다');
+
+    h.sessionChecks[0].open(); // B 쿠키로 보낸 확인의 답(B)이 온다
+    await inFlight;
+    const status = h.tab1.getStatus();
+    assert.equal(status.authenticated, false, 'B 답을 반영하면 A 쿠키인데 B 이름공간에 쓰고 B 계정으로 요청을 보낸다');
+    assert.equal(status.accountKey, A);
+    assert.equal(h.tab1.readLastAccountKey(), A, '마지막 계정 키를 B 로 쓰면 다른 탭이 B 로 전환을 본다');
+
+    h.sessionChecks[1].open(); // 두 번째 사건이 다시 버리기 전에 보낸 확인이라 반영하지 않는다
+    await settle();
+    assert.equal(h.tab1.getStatus().authenticated, false);
+    h.sessionChecks[2].open();
+    await until(() => h.tab1.getStatus().authenticated);
+    assert.equal(h.tab1.getStatus().accountKey, A);
+    assert.equal(h.tab1.readLastAccountKey(), A);
+  });
+
+  test('방금 연 탭은 기기에 남은 마지막 계정 키를 본 값으로 시작한다: 첫 세션 확인 중에 온 처음의 pageshow·visibilitychange 로 그 확인을 무르거나 두 번 묻지 않는다', async () => {
+    const h = twoTabs({ fresh: true });
+    h.holdSessions();
+    const first = h.tab1.refreshSession(); // 셸의 첫 확인
+    h.window1.fire('pageshow', { persisted: false }); // 처음 열 때도 pageshow 가 온다
+    h.setVisibility('visible');
+    assert.deepEqual(h.checkedCookies(), [A], '본 값이 비어 있으면 열 때마다 첫 확인을 무르고 한 번 더 묻는다');
+
+    h.sessionChecks[0].open();
+    await first;
+    const status = h.tab1.getStatus();
+    assert.equal(status.authenticated, true, '첫 확인의 답을 반영한다');
+    assert.equal(status.accountKey, A);
+    assert.equal(status.readOnly, false);
+    assert.deepEqual(h.checkedCookies(), [A]);
+  });
+
+  test('다른 탭이 로그아웃 보류 표시를 쓰면(마지막 계정 키 사건과 따로 온다) 이 탭도 곧바로 보기 전용을 알린다: 상태와 데이터 구독자가 다시 그린다', () => {
+    const h = twoTabs();
+    const notified = [];
+    h.tab1.subscribe('status', () => notified.push(h.tab1.getStatus()));
+    const stays = [];
+    h.tab1.subscribe('stay', ({ accountKey }) => stays.push(accountKey));
+    assert.equal(h.tab1.getStatus().readOnly, false);
+
+    const pending = JSON.stringify({ schemaVersion: 2, data: { since: `${TODAY}T03:00:00.000Z` } });
+    h.shared.setItem(DEVICE_KEY.logoutPending, pending);
+    h.storageEventOnly(DEVICE_KEY.logoutPending, h.shared, { oldValue: null, newValue: pending });
+
+    assert.equal(notified.length, 1, '알리지 않으면 화면은 앞 상태(쓰기 가능)를 그대로 그린다');
+    assert.equal(notified[0].readOnly, true);
+    assert.equal(notified[0].logoutPending, true);
+    assert.equal(notified[0].accountKey, null);
+    assert.deepEqual(stays, [null], '읽을 계정이 없어져 데이터 화면도 다시 읽는다');
+    assert.equal(h.tab1.writeStay(makeStay({ pace: 'NORMAL' })).code, STORE_ERROR.READ_ONLY);
+    assert.deepEqual(h.checkedCookies(), [], '마지막 계정 키는 그대로라 세션을 버리거나 묻지 않는다');
   });
 });

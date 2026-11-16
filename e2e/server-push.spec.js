@@ -226,8 +226,12 @@ test.describe('서버 알림 환자 쪽 화면', () => {
     });
 
     // 다른 탭이 다른 계정으로 로그인해 마지막 계정 키를 쓴 것처럼 키만 바꾼다(데모 로그인은 계정이 하나라 쿠키는 그대로다)
+    // 다른 페이지도 앱 셸이 세션을 묻는다. 그 답이 B 를 쓴 뒤에 오면 그 페이지가 데모 계정 키를 다시 써 바뀜이 사라지므로 답을
+    // 받은 뒤에 쓴다(기다림은 이동 전에 건다)
     const other = await context.newPage();
+    const otherSession = other.waitForResponse((response) => new URL(response.url()).pathname === '/api/auth/session');
     await other.goto('/privacy');
+    await (await otherSession).finished();
     await other.evaluate(
       ({ key, accountKey }) => localStorage.setItem(key, JSON.stringify({ schemaVersion: 2, data: { accountKey } })),
       { key: LAST_ACCOUNT_KEY, accountKey: 'acct_other_tab_e2e_B0001' },
