@@ -7,7 +7,8 @@
 //   - '내 정보 지우기' 안내는 지켜보기 레코드(ON·REPLACED)가 있으면 서버 알림 저장을 적은 줄, 없으면 예전 줄이다
 //   - 끄기 확인 시트의 제목은 messages, 본문(보호자에게 알림이 가는지)은 safety 다
 //   - 끄기는 ON·REPLACED 이고 쓰기 가능할 때, 서버 지우기는 쓰기 가능하고 온라인일 때만
-//   - 열린 확인 시트는 절이 숨거나 끌 레코드가 사라지면 닫힌다(남으면 다른 절이 inert 로 막힌 채 남는다)
+//   - 열린 확인 시트는 절이 숨거나 끌 레코드가 사라지면 닫힌다(남으면 다른 절이 inert 로 막힌 채 남는다). 연 때와 계정이 달라져도 닫힌다
+//   - 확인 시트의 버튼은 끄기 retire, 서버 지우기 removeAll 을 부르고 둘 다 절을 그린 계정 키를 넘긴다(A-3 검토)
 //   - 끄기 결과: { ok: true, pending: false } 일 때만 '껐어요', pending 이면 알림이 갈 수 있다는 줄, 실패면 끄지 못했다는 줄
 //     (뒤의 둘은 안전 문구, 작업 7 검토 반영)
 //   - 서버 지우기 결과: 성공(지운 수), 로그인 필요, 그 밖 실패
@@ -18,6 +19,7 @@ import assert from 'node:assert/strict';
 
 import {
   clearNoteKey,
+  runServerPushAction,
   serverPushOpenSheet,
   serverPushRemoveResult,
   serverPushSectionView,
@@ -138,6 +140,72 @@ describe('열린 확인 시트', () => {
     assert.equal(openAfter('removeAll', { enabled: false, state: 'NONE' }), null);
     assert.equal(openAfter('turnOff', { enabled: true, state: 'REPLACED' }), 'turnOff');
     assert.equal(openAfter('turnOff', { enabled: true, state: 'NONE' }), null);
+  });
+
+  test('시트를 연 때와 계정이 다르면(다른 탭의 로그인 등) 닫는다. 같은 계정이면 그대로다', () => {
+    const open = { visible: true, exists: true };
+    for (const sheet of ['turnOff', 'removeAll']) {
+      assert.equal(serverPushOpenSheet({ sheet, ...open, openedFor: 'acct_A', accountKey: 'acct_A' }), sheet);
+      assert.equal(serverPushOpenSheet({ sheet, ...open, openedFor: 'acct_A', accountKey: 'acct_B' }), null, `${sheet}: A 에서 연 확인으로 B 를 끄거나 지우지 않는다`);
+      assert.equal(serverPushOpenSheet({ sheet, ...open, openedFor: 'acct_A', accountKey: null }), null);
+      assert.equal(serverPushOpenSheet({ sheet, ...open, openedFor: null, accountKey: 'acct_B' }), null);
+    }
+  });
+});
+
+describe('확인 시트의 버튼이 부르는 실행기 (runServerPushAction, A-3 검토)', () => {
+  function fakeSync(result = { ok: true, pending: false }) {
+    const calls = [];
+    return {
+      calls,
+      retire: async (args) => {
+        calls.push(['retire', args]);
+        return result;
+      },
+      removeAll: async (args) => {
+        calls.push(['removeAll', args]);
+        return result;
+      },
+    };
+  }
+
+  test('끄기는 retire, 서버 지우기는 removeAll 이고 둘 다 절을 그린 계정 키를 넘긴다(넘기지 않으면 바뀐 계정의 지켜보기를 끄거나 지운다)', async () => {
+    const sync = fakeSync({ ok: true, deleted: 2 });
+    assert.deepEqual(await runServerPushAction('turnOff', { sync, accountKey: 'acct_A' }), { ok: true, deleted: 2 });
+    assert.deepEqual(await runServerPushAction('removeAll', { sync, accountKey: 'acct_A' }), { ok: true, deleted: 2 });
+    assert.deepEqual(sync.calls, [
+      ['retire', { accountKey: 'acct_A' }],
+      ['removeAll', { accountKey: 'acct_A' }],
+    ]);
+  });
+
+  test('계정 키가 없으면 null 을 넘겨 실행기가 그래도 계정을 보게 한다', async () => {
+    const sync = fakeSync();
+    await runServerPushAction('turnOff', { sync, accountKey: null });
+    await runServerPushAction('removeAll', { sync });
+    assert.deepEqual(sync.calls, [
+      ['retire', { accountKey: null }],
+      ['removeAll', { accountKey: null }],
+    ]);
+  });
+
+  test('실행기가 없거나 던지거나 결과가 없으면 null 이고, 모르는 동작은 부르지 않는다', async () => {
+    assert.equal(await runServerPushAction('turnOff', { sync: null, accountKey: 'acct_A' }), null);
+    assert.equal(await runServerPushAction('removeAll', { accountKey: 'acct_A' }), null);
+    const throwing = {
+      retire: async () => {
+        throw new Error('x');
+      },
+      removeAll: () => {
+        throw new Error('x');
+      },
+    };
+    assert.equal(await runServerPushAction('turnOff', { sync: throwing, accountKey: 'acct_A' }), null);
+    assert.equal(await runServerPushAction('removeAll', { sync: throwing, accountKey: 'acct_A' }), null);
+    assert.equal(await runServerPushAction('turnOff', { sync: fakeSync(null), accountKey: 'acct_A' }), null);
+    const sync = fakeSync();
+    assert.equal(await runServerPushAction('other', { sync, accountKey: 'acct_A' }), null);
+    assert.deepEqual(sync.calls, []);
   });
 });
 

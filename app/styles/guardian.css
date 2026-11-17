@@ -366,7 +366,8 @@
   color: var(--ink-soft);
   font-size: var(--text-body);
 }
-.guardian-others h2 {
+.guardian-others h2,
+.guardian-paste-title {
   font-size: var(--text-title-3);
 }
 .guardian-other-list {
@@ -482,8 +483,10 @@
   scroll-margin-top: calc(56px + env(safe-area-inset-top) + var(--space-3));
 }
 
-/* 오늘이 아닌 날짜: <details> 로 접는다. 요약 줄은 날짜 제목 + 펼침 화살표, 44px 이상, 초점 링이 보인다 */
-.guardian-day-summary {
+/* 오늘이 아닌 날짜: <details> 로 접는다. 요약 줄은 날짜 제목 + 펼침 화살표, 44px 이상, 초점 링이 보인다.
+   받은 링크 붙여넣기 절(계획 2026-11-15 A-3 Task 6)도 같은 요약 줄과 화살표를 쓴다 */
+.guardian-day-summary,
+.guardian-paste-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -493,14 +496,17 @@
   list-style: none;
   border-radius: var(--radius-10);
 }
-.guardian-day-summary::-webkit-details-marker {
+.guardian-day-summary::-webkit-details-marker,
+.guardian-paste-summary::-webkit-details-marker {
   display: none;
 }
-.guardian-day-summary:focus-visible {
+.guardian-day-summary:focus-visible,
+.guardian-paste-summary:focus-visible {
   outline: var(--focus-width) solid var(--accent);
   outline-offset: var(--space-0-5);
 }
-.guardian-day-summary .guardian-day-title {
+.guardian-day-summary .guardian-day-title,
+.guardian-paste-summary .guardian-paste-title {
   margin-bottom: 0;
 }
 .guardian-day-chevron {
@@ -510,11 +516,19 @@
   color: var(--ink-subtle);
   transition: transform var(--duration-fast) var(--ease-press);
 }
-.guardian-day-fold[open] .guardian-day-chevron {
+.guardian-day-fold[open] .guardian-day-chevron,
+.guardian-paste-fold[open] .guardian-day-chevron {
   transform: rotate(180deg);
 }
 .guardian-day-body {
   margin-top: var(--space-2);
+}
+/* 붙여넣기 입력: 링크 칸 모양(.guardian-link-field, 고정폭 글자·줄바꿈)을 그대로 쓴다. 열기 버튼은 52px 주 버튼 */
+.guardian-paste-form {
+  margin-top: var(--space-3);
+}
+.guardian-paste-open {
+  margin-top: var(--space-4);
 }
 /* 접힌 날짜끼리는 목록처럼 붙여 둔다: 사본 구역 간격(32) 대신 8 + 구분선 */
 .guardian-copy > .guardian-day.is-folded + .guardian-day.is-folded {
@@ -526,4 +540,115 @@
   .guardian-day-chevron {
     transition: none;
   }
+}
+
+/* ───────────────────────── 앱이 닫혀 있어도 받기 · 복귀 확인 (계획 2026-11-15 A-3 Task 7) ───────────────────────── */
+/* 복귀 확인 꼬리표: 체크 아이콘 + 글자. 마감 지남(대기 노랑 토큰)과 다른 함께 있음 초록 토큰이고 둘 다 AA(globals.css 대비 주석).
+   판정이 아니라 눌림 신호라서 늘 아래 안내(.guardian-confirmed-help)와 함께 그린다 */
+.guardian-tag.is-confirmed {
+  border-color: var(--state-together-line);
+  background: var(--state-together-bg);
+  color: var(--state-together-ink);
+}
+/* 마감 줄(회색 면) 안의 복귀 확인 안내: 흰 면 + 초록 선으로 줄 면과 나눈다. 글자는 먹색 그대로 */
+.guardian-return .guardian-confirmed-help {
+  margin-top: var(--space-1);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--state-together-line);
+}
+/* 오늘 카드 바로 아래 안내: 사본 구역 간격(32) 대신 8 */
+.guardian-copy > .guardian-today + .guardian-confirmed-help {
+  margin-top: calc(var(--space-2) - var(--space-8));
+}
+.guardian-status-asof {
+  margin-top: var(--space-2);
+}
+
+/* 항목은 기기 알림 스위치 바로 아래에 붙인다(정한 값 1): 사본 구역 간격(32) 대신 16 + 반복 항목 구분선 */
+.guardian-copy > .guardian-alerts + .guardian-push-item {
+  margin-top: calc(var(--space-4) - var(--space-8));
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+/* 칸 사이 8. 비어 있는 결과 칸(role=status·alert, 늘 있어야 바뀜을 읽어 준다)은 자리를 차지하지 않는다 */
+.guardian-push-item > * + * {
+  margin-top: var(--space-2);
+}
+.guardian-push-item > .guardian-push-result:empty {
+  margin-top: 0;
+}
+/* 켤 수 없는 상태의 이름: 스위치 줄 라벨과 같은 글자 */
+.guardian-push-heading {
+  padding: var(--space-2) 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+.guardian-push-lines {
+  display: grid;
+  gap: var(--space-2);
+}
+.guardian-push-lines p,
+.guardian-push-steps,
+.guardian-push-result p {
+  color: var(--ink);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
+}
+.guardian-push-steps-title {
+  font-weight: var(--weight-bold);
+}
+/* 아이폰 다섯 단계: 번호 목록(도움말의 설치 단계와 같은 모양) */
+.guardian-push-steps {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-5);
+  list-style: decimal;
+}
+.guardian-push-result {
+  font-weight: var(--weight-medium);
+}
+/* 안전 문구 한 줄의 두 언어 묶음. 묶음끼리는 12 띄워 어느 영어가 어느 한국어의 짝인지 보이게 한다 */
+.guardian-safety-pair + .guardian-safety-pair {
+  margin-top: var(--space-3);
+}
+/* 실패 줄: 경고 아이콘 + 문장(색만으로 뜻을 나누지 않는다) */
+.guardian-push-result.is-alert:not(:empty) {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  align-items: start;
+}
+.guardian-push-result-icon {
+  display: inline-grid;
+  place-items: center;
+  height: var(--lh-body);
+  color: var(--emergency);
+}
+.guardian-push-result-text {
+  min-width: 0;
+}
+.guardian-push-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.guardian-push-actions .btn {
+  min-height: var(--tap-min);
+}
+/* 오늘 함께 있음: 항목 안의 두 번째 스위치 줄. 위에 반복 항목 구분선 */
+.guardian-push-mute {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.guardian-push-mute-help,
+.guardian-push-consent {
+  display: grid;
+  gap: var(--space-1);
+}
+.guardian-push-mute-help p,
+.guardian-push-consent p {
+  color: var(--ink-soft);
+  font-size: var(--text-body);
+  line-height: var(--lh-body);
 }

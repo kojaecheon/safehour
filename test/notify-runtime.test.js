@@ -9,6 +9,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { deliverToDevice } from '../lib/notify/device.js';
 import { createNotifier } from '../lib/notify/runtime.js';
 import { NOTIFY_KIND, planNotifications } from '../lib/notify/schedule.js';
 import { createMemoryStorage, createStore } from '../lib/store/index.js';
@@ -429,6 +430,321 @@ describe('보호자 사본 마감 알림', () => {
     assert.deepEqual(
       companionItems(notifier.getItems()).map((i) => i.at),
       [iso('17:00')],
+    );
+  });
+});
+
+// ── 서버 푸시와 같은 마감 (결정 15 그대로, 계획 A-3 다르게 정한 것 17) ─────────────────────────────
+
+describe('서버 푸시와 겹치는 마감의 기기 알림', () => {
+  const TAG_1800 = `sh-watch-${DATE}-18:00`;
+
+  /**
+   * 실행기에 실제 deliverToDevice 를 물린다. 알림 칸(shade)은 브라우저처럼 tag 하나에 알림 하나다:
+   * 같은 tag 로 내면 갈아 끼운다. displayed 는 처음부터 떠 있는 알림이고, serverPush 는 서버 푸시가 도착한 것을 흉내 낸다
+   */
+  function deviceDeliver(displayed = []) {
+    const shade = new Map(displayed.map((n) => [n.tag, n.from ?? 'server']));
+    const shown = [];
+    const asked = [];
+    const pending = [];
+    const options = [];
+    const registration = {
+      active: { state: 'activated' },
+      getNotifications: async ({ tag } = {}) => {
+        asked.push(tag);
+        return shade.has(tag) ? [{ tag }] : [];
+      },
+      showNotification: async (title, opts) => {
+        shown.push({ title, options: opts });
+        shade.set(opts.tag, 'device');
+      },
+    };
+    function NoConstructor() {
+      throw new Error('서비스 워커 경로에서는 생성자를 부르지 않는다');
+    }
+    NoConstructor.permission = 'granted';
+    const env = {
+      store: { readPrefs: () => ({ notifications: true }), readLang: () => 'ko' },
+      nav: { language: 'ko', serviceWorker: { getRegistration: async () => registration } },
+      NotificationImpl: NoConstructor,
+      win: null,
+    };
+    // 실행기가 넘긴 옵션(sharedWatchTag)을 그대로 deliverToDevice 에 준다(lib/notify/client.js 와 같다)
+    const deliver = (item, opts) => {
+      delivered.push(item);
+      options.push(opts);
+      const result = deliverToDevice(item, { ...env, ...opts });
+      pending.push(result);
+      return result;
+    };
+    return {
+      deliver,
+      shade,
+      shown,
+      asked,
+      options,
+      settle: () => Promise.all(pending),
+      serverPush: (tag, from) => shade.set(tag, from),
+    };
+  }
+
+  /** watchId 를 주면 스냅샷 끝에 붙는다(src/guardian/snapshot.js) */
+  function copyWith(days, importedAt, watchId = null) {
+    const copy = copyOf(days, importedAt);
+    return watchId ? { ...copy, snapshot: { ...copy.snapshot, watchId } } : copy;
+  }
+  const W_A = 'A'.repeat(22);
+  const W_B = 'B'.repeat(22);
+  const label = (a, b) => `A=${a ? 'W_A' : '없음'} B=${b ? 'W_B' : '없음'}`;
+
+  test('서버 푸시를 누른 뒤 18:15에 앱을 열면 늦은 기기 알림을 낸다(결정 15)', async () => {
+    setupGuardian({ latest: copyOf([day(DATE, '18:00')], iso('05:30')) });
+    // 18:10 에 온 서버 푸시를 보호자가 눌러 알림 칸에서 닫혔다
+    const device = deviceDeliver([]);
+    notifier = createNotifier({ store, now: () => clock, timers, deliver: device.deliver });
+    clock = kst('18:15');
+    notifier.start();
+    assert.deepEqual(await device.settle(), [true]);
+    assert.deepEqual(device.options, [{ sharedWatchTag: true }]);
+    assert.equal(delivered.length, 1);
+    assert.equal(delivered[0].kind, COMPANION);
+    assert.equal(device.shown.length, 1);
+    assert.equal(device.shown[0].options.tag, TAG_1800, '서버 푸시와 같은 tag 라 알림 칸에는 한 줄이다');
+    assert.deepEqual(device.shown[0].options.data, { url: '/g' });
+    assert.equal(notifier.getBanner()?.id, delivered[0].id);
+  });
+
+  test('서버 푸시가 알림 칸에 떠 있는 채 18:15에 앱을 열면 다시 울리지 않고, 배너와 기억은 그대로다', async () => {
+    setupGuardian({ latest: copyOf([day(DATE, '18:00')], iso('05:30')) });
+    const device = deviceDeliver([{ tag: TAG_1800 }]);
+    notifier = createNotifier({ store, now: () => clock, timers, deliver: device.deliver });
+    clock = kst('18:15');
+    notifier.start();
+    assert.deepEqual(await device.settle(), [false]);
+    assert.deepEqual(device.options, [{ sharedWatchTag: true }], '사본이 하나면 서버 푸시와 같은 tag 를 쓴다');
+    assert.deepEqual(device.asked, [TAG_1800]);
+    assert.equal(device.shown.length, 0);
+    assert.equal(delivered.length, 1, '실행기는 그대로 내려 했다(예약은 바뀌지 않는다)');
+    assert.equal(notifier.getBanner()?.id, delivered[0].id, '앱 안 배너는 그대로 보인다');
+    assert.deepEqual(store.readOverdueSeen(DATE).notified, [delivered[0].id]);
+  });
+
+  test('앱이 열린 채 18:00에 낸 기기 알림은 다른 환자의 18:10 마감 지남, 18:20 복귀 확인 푸시와 서로 갈아 끼우지 않는다', async () => {
+    for (const [watchA, watchB] of [
+      [W_A, W_B],
+      [null, W_B],
+    ]) {
+      // 가장 최근 사본 A 가 기기 알림을 만든다. 옛 사본 B 의 환자는 서버 푸시를 받는다
+      setupGuardian({
+        a: copyWith([day(DATE, '18:00')], iso('05:30'), watchA),
+        b: copyWith([day(DATE, '18:00')], iso('05:00'), watchB),
+      });
+      const device = deviceDeliver([]);
+      notifier = createNotifier({ store, now: () => clock, timers, deliver: device.deliver });
+      clock = kst('17:59');
+      notifier.start();
+      clock = kst('18:00');
+      notifier.tick();
+      assert.deepEqual(await device.settle(), [true], label(watchA, watchB));
+      assert.deepEqual(device.options, [{ sharedWatchTag: false }], label(watchA, watchB));
+      assert.deepEqual(device.asked, [], `${label(watchA, watchB)}: 예약 id tag 로 내니 떠 있는지 묻지 않는다`);
+      assert.equal(device.shown[0].options.tag, delivered[0].id, label(watchA, watchB));
+      // B 의 서버 푸시가 같은 마감 tag 로 오고, B 가 '돌아왔어요'를 눌러 확인 푸시로 갈아 끼운다
+      device.serverPush(TAG_1800, 'B 마감 지남');
+      device.serverPush(TAG_1800, 'B 복귀 확인');
+      assert.deepEqual(
+        [...device.shade.entries()],
+        [
+          [delivered[0].id, 'device'],
+          [TAG_1800, 'B 복귀 확인'],
+        ],
+        `${label(watchA, watchB)}: A 의 마감 지남이 알림 칸에 남는다. 'B 복귀 확인'이 A 의 알림 자리에 들어가지 않는다`,
+      );
+      notifier.stop();
+    }
+  });
+
+  test('같은 환자의 사본뿐이면 18:00 기기 알림을 그 환자의 18:10 서버 푸시가 갈아 끼워 알림 칸에 한 줄이다', async () => {
+    for (const [watchA, watchB] of [
+      [W_A, null],
+      [W_A, W_A],
+      [null, null],
+    ]) {
+      setupGuardian({
+        a: copyWith([day(DATE, '18:00')], iso('05:30'), watchA),
+        b: copyWith([day(DATE, '18:00')], iso('05:00'), watchB),
+      });
+      const device = deviceDeliver([]);
+      notifier = createNotifier({ store, now: () => clock, timers, deliver: device.deliver });
+      clock = kst('17:59');
+      notifier.start();
+      clock = kst('18:00');
+      notifier.tick();
+      assert.deepEqual(await device.settle(), [true], label(watchA, watchB));
+      assert.deepEqual(device.options, [{ sharedWatchTag: true }], label(watchA, watchB));
+      assert.equal(device.shown[0].options.tag, TAG_1800, label(watchA, watchB));
+      device.serverPush(TAG_1800, 'A 마감 지남');
+      assert.deepEqual([...device.shade.entries()], [[TAG_1800, 'A 마감 지남']], label(watchA, watchB));
+      notifier.stop();
+    }
+  });
+
+  test('다른 환자 사본에 같은 마감이 있으면 그 환자의 푸시가 떠 있어도 18:15 늦은 기기 알림을 예약 id tag 로 낸다', async () => {
+    for (const [watchA, watchB] of [
+      [W_A, W_B],
+      [null, W_B],
+    ]) {
+      setupGuardian({
+        a: copyWith([day(DATE, '18:00')], iso('05:30'), watchA),
+        b: copyWith([day(DATE, '18:00')], iso('05:00'), watchB),
+      });
+      // 18:10 에 온 B 의 마감 지남 푸시를, B 가 '돌아왔어요'를 눌러 온 확인 푸시가 같은 tag 로 갈아 끼웠다
+      const device = deviceDeliver([{ tag: TAG_1800, from: 'B 복귀 확인' }]);
+      notifier = createNotifier({ store, now: () => clock, timers, deliver: device.deliver });
+      clock = kst('18:15');
+      notifier.start();
+      assert.deepEqual(await device.settle(), [true], label(watchA, watchB));
+      assert.deepEqual(device.options, [{ sharedWatchTag: false }], label(watchA, watchB));
+      assert.deepEqual(device.asked, [], label(watchA, watchB));
+      assert.equal(delivered.length, 1, label(watchA, watchB));
+      assert.equal(delivered[0].kind, COMPANION, label(watchA, watchB));
+      assert.equal(device.shown.length, 1, label(watchA, watchB));
+      assert.equal(device.shown[0].options.tag, delivered[0].id, label(watchA, watchB));
+      assert.deepEqual(device.shown[0].options.data, { url: '/g' }, label(watchA, watchB));
+      assert.equal(device.shade.get(TAG_1800), 'B 복귀 확인', `${label(watchA, watchB)}: B 의 '복귀 확인'을 갈아 끼우지 않는다`);
+      notifier.stop();
+    }
+  });
+
+  test('사본이 둘이어도 마감 시각이 다르거나, 같은 환자(같은 watchId)이거나, 다른 사본에 watchId 가 없으면 지금처럼 건너뛴다', async () => {
+    for (const [name, a, b] of [
+      ['다른 시각', copyWith([day(DATE, '18:00')], iso('05:30'), W_A), copyWith([day(DATE, '17:00')], iso('05:00'), W_B)],
+      ['같은 watchId', copyWith([day(DATE, '18:00')], iso('05:30'), W_A), copyWith([day(DATE, '18:00')], iso('05:00'), W_A)],
+      ['옛 사본에 watchId 없음', copyWith([day(DATE, '18:00')], iso('05:30'), W_A), copyWith([day(DATE, '18:00')], iso('05:00'))],
+      ['둘 다 watchId 없음', copyWith([day(DATE, '18:00')], iso('05:30')), copyWith([day(DATE, '18:00')], iso('05:00'))],
+    ]) {
+      setupGuardian({ a, b });
+      const device = deviceDeliver([{ tag: TAG_1800 }]);
+      notifier = createNotifier({ store, now: () => clock, timers, deliver: device.deliver });
+      clock = kst('18:15');
+      notifier.start();
+      assert.deepEqual(await device.settle(), [false], name);
+      assert.deepEqual(device.options, [{ sharedWatchTag: true }], name);
+      assert.deepEqual(device.asked, [TAG_1800], name);
+      assert.equal(device.shown.length, 0, name);
+      assert.equal(notifier.getBanner()?.id, delivered[0].id, `${name}: 앱 안 배너는 그대로 보인다`);
+      notifier.stop();
+    }
+  });
+
+  test('낼 때 가장 최근 사본이 바뀌어도 예약을 만든 사본의 watchId 로 tag 를 고른다', async () => {
+    // 18:00:30 에 새 사본 B 를 가져오면 refresh 가 다시 만들기 전에 A 로 만든 18:00 알림을 먼저 낸다
+    for (const [watchA, watchB, shared] of [
+      [null, W_B, false], // 출처 A 는 watchId 없음, 새 사본 B 는 다른 환자일 수 있다
+      [W_A, null, true], // 출처 A 는 W_A, 새 사본 B 는 푸시를 보낼 수 없다
+    ]) {
+      setupGuardian({ a: copyWith([day(DATE, '18:00')], iso('05:30'), watchA) });
+      const device = deviceDeliver([]);
+      notifier = createNotifier({ store, now: () => clock, timers, deliver: device.deliver });
+      clock = kst('17:59');
+      notifier.start();
+      clock = kst('18:00') + 30_000;
+      assert.equal(store.writeGuardianCopy('b', copyWith([day(DATE, '18:00')], iso('18:00'), watchB)).ok, true);
+      assert.equal(store.readGuardianCopies()[0].id, 'b', '낼 때의 가장 최근 사본은 B 다');
+      assert.deepEqual(await device.settle(), [true], label(watchA, watchB));
+      assert.deepEqual(device.options, [{ sharedWatchTag: shared }], label(watchA, watchB));
+      assert.equal(device.shown[0].options.tag, shared ? TAG_1800 : delivered[0].id, label(watchA, watchB));
+      assert.equal(delivered.length, 1, `${label(watchA, watchB)}: B 로 다시 만든 같은 마감은 다시 내지 않는다`);
+      notifier.stop();
+    }
+  });
+
+  test('낼 때 사본 읽기가 던지면 보호자 마감 지남은 예약 id tag 로 내고, 환자 알림은 사본을 읽지 않는다', async () => {
+    let failing = false;
+    let reads = 0;
+    const flaky = (base) => ({
+      ...base,
+      readGuardianCopies: () => {
+        reads += 1;
+        if (failing) throw new Error('읽기 실패');
+        return base.readGuardianCopies();
+      },
+    });
+
+    setupGuardian({ a: copyWith([day(DATE, '18:00')], iso('05:30'), W_A) });
+    const guardian = deviceDeliver([{ tag: TAG_1800 }]);
+    notifier = createNotifier({ store: flaky(store), now: () => clock, timers, deliver: guardian.deliver });
+    clock = kst('17:59');
+    notifier.start();
+    failing = true;
+    clock = kst('18:00');
+    notifier.tick();
+    assert.deepEqual(await guardian.settle(), [true]);
+    assert.deepEqual(guardian.options, [{ sharedWatchTag: false }]);
+    assert.deepEqual(guardian.asked, []);
+    assert.equal(guardian.shown[0].options.tag, delivered[0].id);
+    assert.equal(notifier.getBanner()?.id, delivered[0].id);
+    notifier.stop();
+
+    // 환자 기기: 복귀 마감 60·30분 전과 마감 지남 모두 사본을 읽지 않고 낸다
+    setup();
+    failing = false;
+    const patient = deviceDeliver([]);
+    notifier = createNotifier({ store: flaky(store), now: () => clock, timers, deliver: patient.deliver });
+    notifier.start();
+    failing = true;
+    reads = 0;
+    for (const time of ['17:00', '17:30', '18:00']) {
+      clock = kst(time);
+      notifier.tick();
+    }
+    assert.deepEqual(await patient.settle(), [true, true, true]);
+    assert.deepEqual(
+      delivered.map((i) => i.kind),
+      [NOTIFY_KIND.RETURN, NOTIFY_KIND.RETURN, NOTIFY_KIND.RETURN_PASSED],
+    );
+    assert.deepEqual(patient.options, [{ sharedWatchTag: false }, { sharedWatchTag: false }, { sharedWatchTag: false }]);
+    assert.equal(reads, 0, '환자 알림을 낼 때는 사본을 읽지 않는다');
+    assert.deepEqual(
+      patient.shown.map((s) => s.options.tag),
+      delivered.map((i) => i.id),
+    );
+  });
+
+  test('예약 결과는 guardianPush 기록과 무관하게 지금과 같다', () => {
+    const WATCH = 'w'.repeat(22);
+    // 활성 구독, 두 마감 모두 '복귀 확인', 오늘 함께 있음까지 켠 기록
+    const record = {
+      subs: [{ watchId: WATCH, subId: 's'.repeat(22), lang: 'ko', endpointHash: 'h'.repeat(43), vapidKey: 'B'.repeat(87) }],
+      status: [{ watchId: WATCH, date: DATE, confirmed: ['17:00', '18:00'], muted: true, active: true, atMs: kst('16:00') }],
+      gone: [],
+    };
+    const run = (withRecord) => {
+      setupGuardian({ latest: copyOf([day(DATE, '17:00', '18:00')], iso('05:30')) });
+      const base = store;
+      const runStore = withRecord ? { ...base, readGuardianPush: () => record } : base;
+      notifier = createNotifier({ store: runStore, now: () => clock, timers, deliver: (item) => delivered.push(item) });
+      const trace = [];
+      for (const time of ['06:00', '17:00', '17:30', '18:15', '19:30']) {
+        clock = kst(time);
+        if (time === '06:00') notifier.start();
+        else notifier.tick();
+        trace.push({ time, items: notifier.getItems(), banner: notifier.getBanner()?.id ?? null });
+      }
+      notifier.stop();
+      return { trace, delivered: [...delivered], seen: base.readOverdueSeen(DATE).notified, saved: base.readNotificationSchedule() };
+    };
+    const plain = run(false);
+    const withPush = run(true);
+    assert.deepEqual(withPush, plain);
+    // 비교가 빈 결과끼리가 아니다: 두 마감 모두 기기 알림이 나갔다
+    assert.deepEqual(
+      plain.delivered.map((i) => [i.kind, i.time]),
+      [
+        [COMPANION, '17:00'],
+        [COMPANION, '18:00'],
+      ],
     );
   });
 });

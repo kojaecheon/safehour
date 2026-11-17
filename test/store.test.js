@@ -385,6 +385,31 @@ describe('보기 전용 모드', () => {
     assert.equal(store.readGuardianCopies().length, 1);
   });
 
+  test('세션 만료 타이머가 돌면 구독자에게 SESSION_EXPIRED 를 한 번 알린다(화면이 보기 전용으로 다시 그린다). 계정은 그대로라 데이터는 알리지 않는다', () => {
+    const pending = [];
+    const timers = {
+      setTimeout: (fn, ms) => pending.push({ fn, ms }),
+      clearTimeout: () => {},
+    };
+    const store = makeStore({ timers });
+    store.setSession(sessionFor(KEY_A, { expiresInMs: HOUR }));
+    assert.equal(store.getStatus().readOnly, false);
+    const notified = [];
+    store.subscribe('status', () => notified.push(store.getStatus()));
+    const stays = [];
+    store.subscribe('stay', ({ accountKey }) => stays.push(accountKey));
+
+    const expiry = pending.filter((t) => t.ms === HOUR);
+    assert.equal(expiry.length, 1, '만료 시각에 타이머 하나를 건다');
+    clock += HOUR;
+    expiry[0].fn();
+    assert.equal(notified.length, 1, '알리지 않으면 화면은 만료된 세션으로 쓰기 가능을 그대로 그린다');
+    assert.equal(notified[0].readOnly, true);
+    assert.equal(notified[0].reason, READ_ONLY_REASON.SESSION_EXPIRED);
+    assert.equal(notified[0].accountKey, KEY_A);
+    assert.deepEqual(stays, []);
+  });
+
   test('세션을 받은 뒤 만료 시각이 지나면 SESSION_EXPIRED 로 바뀌고 쓰기가 막힌다', () => {
     const store = seedAccountA();
     clock += 12 * HOUR;

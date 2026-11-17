@@ -9,6 +9,13 @@
 //   3. PIN 입력 — 기기 단위 잠금(5회 연속 오류 → 1시간). 잠금 기록 키는 safehour.v2. 아래라 '내 정보 지우기'가 함께 지운다.
 //   4. 풀리면 사본을 기기에 저장하고, 임시 보관을 지우고, 주소에서 # 뒤를 지운다.
 //   5. 저장한 사본은 로그인 만료·오프라인에서도 보기 전용으로 보여 준다. 만료된 사본은 저장소가 지우고 보여 주지 않는다.
+//   6. 받은 링크 붙여넣기(PasteLink, 계획 2026-11-15 A-3 Task 6): 붙여 넣은 링크를 1의 임시 보관에 넣고 같은 흐름을 탄다.
+//      사본도 여는 중인 링크도 없으면 펼치고, 그 밖에는 접어 둔다. 여는 중인 링크(로그인·PIN 단계)가 있어도 숨기지 않는다:
+//      PIN 입력·로그인 안내에는 취소가 없어서, 예전 링크를 붙여 넣은 보호자가 1시간 보관이 끝나기 전에 맞는 링크로 바꿀 길이
+//      이 절뿐이다. 새 링크를 받아들이면 임시 보관이 바뀌고 PIN 입력이 새 링크로 다시 시작한다(PIN 잠금은 링크마다 따로다).
+//   7. 서버 알림(계획 2026-11-15 A-3 Task 7, ADR-0012): 기기 알림 스위치 바로 아래에 '앱이 닫혀 있어도 받기' 항목
+//      (GuardianPushItem)을 두고, 보이는 사본의 오늘 상태 조회를 serverStatus 로 넘겨 복귀 확인을 표시한다. 둘 다 보이는 사본의
+//      watchId 만 쓴다. 사본에 watchId 가 없으면 항목이 없고 서버 알림 요청도 없다(실행기가 정한다).
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
@@ -18,8 +25,11 @@ import { GUARDIAN_ERROR, GuardianError, isValidPin, unlockSnapshot } from '@/src
 import { copyIdFor, guardianErrorView } from './errorView.js';
 import { MAX_TIMER_MS, guardianExpiryDelay } from './expiry.js';
 import AlertsToggle from './AlertsToggle.js';
+import GuardianPushItem, { useGuardianServerStatus } from './GuardianPushItem.js';
 import { ErrorText, WarningNote } from './Feedback.js';
 import GuardianCopyView, { kstStamp } from './GuardianCopyView.js';
+import PasteLink from './PasteLink.js';
+import { INCOMING_STATUS_ID, LOGIN_TITLE_ID, PIN_ENTRY_TITLE_ID, pasteDefaultOpen, pasteFocusTarget } from './pasteView.js';
 import {
   guardianLockout,
   notifyIncomingLink,
@@ -34,8 +44,16 @@ const readCopies = (store) => store.readGuardianCopies();
 const NO_COPIES = Object.freeze([]);
 /** 더 이상 쓸 수 없는 링크 — 임시 보관을 지운다 */
 const DEAD_LINK_CODES = new Set([GUARDIAN_ERROR.EXPIRED, GUARDIAN_ERROR.INVALID_LINK, GUARDIAN_ERROR.INVALID_SNAPSHOT]);
-
 const onlyDigits = (value) => value.replace(/[^0-9]/g, '').slice(0, 6);
+
+/**
+ * 임시 보관이 이 암호문일 때만 지운다. 풀리기를 기다리는 사이 붙여 넣어 바뀐 다른 링크는 남긴다(그 링크로 이어서 연다)
+ * @param {string} fragment
+ */
+function clearPendingIfHeld(fragment) {
+  const store = getStore();
+  if (store.takePendingGuardianLink() === fragment) store.clearPendingGuardianLink();
+}
 
 /** 가장 이른 만료 시각에 다시 그려 만료된 사본을 치운다 */
 function useExpiryTick(copies) {
@@ -109,7 +127,7 @@ function PinForm({ fragment, onOpened }) {
       if (view.locked) {
         setLock({ fragment, locked: true, lockedUntil: err?.lockedUntil ?? null });
       }
-      if (DEAD_LINK_CODES.has(err?.code)) getStore().clearPendingGuardianLink();
+      if (DEAD_LINK_CODES.has(err?.code)) clearPendingIfHeld(fragment);
       setBusy(false);
       window.requestAnimationFrame(() => inputRef.current?.focus());
       return;
@@ -120,8 +138,10 @@ function PinForm({ fragment, onOpened }) {
   }
 
   return (
-    <section className="guardian-section guardian-pin-card" aria-labelledby="guardian-pin-entry-title">
-      <h2 id="guardian-pin-entry-title">{t('guardian.pinEntryTitle')}</h2>
+    <section className="guardian-section guardian-pin-card" aria-labelledby={PIN_ENTRY_TITLE_ID}>
+      <h2 id={PIN_ENTRY_TITLE_ID} tabIndex={-1}>
+        {t('guardian.pinEntryTitle')}
+      </h2>
       <form onSubmit={onSubmit} noValidate aria-busy={busy}>
         <div className="field">
           <label htmlFor={inputId}>{t('guardian.pinEntryLabel')}</label>
@@ -167,8 +187,10 @@ function LoginNeeded({ fragment }) {
   }
 
   return (
-    <section className="guardian-section guardian-login" aria-labelledby="guardian-login-title">
-      <h2 id="guardian-login-title">{t('guardian.loginNeededTitle')}</h2>
+    <section className="guardian-section guardian-login" aria-labelledby={LOGIN_TITLE_ID}>
+      <h2 id={LOGIN_TITLE_ID} tabIndex={-1}>
+        {t('guardian.loginNeededTitle')}
+      </h2>
       <p>{t('guardian.loginNeededBody')}</p>
       {holdFailed && <WarningNote role="alert">{t('guardian.holdFailed')}</WarningNote>}
       <Button href={LOGIN_HREF} onClick={onLogin}>
@@ -185,6 +207,8 @@ export default function GuardianOpen() {
   const incoming = useIncomingLink();
   const copies = useStoreRecord('guardianCopies', readCopies) ?? NO_COPIES;
   const copyHeadingRef = useRef(null);
+  /** 방금 붙여 넣어 받아들인 암호문: 이미 가져온 링크로 밝혀지면 사본 제목으로 포커스를 옮기고 비운다 */
+  const pastedRef = useRef(null);
   const [selectedId, setSelectedId] = useState(null);
   /** 풀었지만 저장하지 못한 사본 — 이 화면에서만 보여 준다 */
   const [unsaved, setUnsaved] = useState(null);
@@ -209,10 +233,7 @@ export default function GuardianOpen() {
     let cancelled = false;
     copyIdFor(fragment).then(
       (id) => {
-        if (cancelled) return;
-        setIncomingId({ fragment, id });
-        // 이미 가져온 링크면 그 사본을 고른다 — 주소를 정리한 뒤에도 그 사본이 보이게 한다
-        if (getStore().readGuardianCopies().some((c) => c.id === id)) setSelectedId(id);
+        if (!cancelled) setIncomingId({ fragment, id });
       },
       () => {},
     );
@@ -224,13 +245,23 @@ export default function GuardianOpen() {
   const knownId = fragment && incomingId.fragment === fragment ? incomingId.id : null;
   const alreadyImported = knownId !== null && copies.some((c) => c.id === knownId);
 
+  // 이미 가져온 링크면 그 사본을 고른다: 아래 효과가 주소·임시 보관을 정리한 뒤에도 그 사본이 보이게 한다.
+  // 그리는 중에 맞춘다(효과 안 setState 는 쓰지 않는다). 같은 링크를 다시 열거나 붙여 넣으면 사본 id 를 앞서 구한 값
+  // (incomingId)으로 바로 알아 copyIdFor 효과가 끝나기 전에 정리가 끝난다. 그사이 다른 사본을 골랐어도 이 사본으로 바꾼다
+  if (alreadyImported && selectedId !== knownId) setSelectedId(knownId);
+
   // 이미 가져온 링크면 PIN 없이 그 사본을 보여 주고, 임시 보관과 주소의 암호문을 치운다
   useEffect(() => {
     if (!alreadyImported) return;
     getStore().clearPendingGuardianLink();
     stripLinkFromAddress();
     notifyIncomingLink();
-  }, [alreadyImported]);
+    // 붙여 넣은 링크였으면 잠깐 보였던 단계(PIN 입력 등)가 사라지므로 그 사본 제목으로 포커스를 옮긴다
+    if (pastedRef.current === fragment) {
+      pastedRef.current = null;
+      window.requestAnimationFrame(() => copyHeadingRef.current?.focus());
+    }
+  }, [alreadyImported, fragment]);
 
   async function onOpened(snapshot) {
     const id = await copyIdFor(fragment);
@@ -239,8 +270,9 @@ export default function GuardianOpen() {
       importedAt: new Date().toISOString(),
       expiresAt: snapshot.expiresAt,
     });
-    // 가져오기가 끝났다: 임시 보관과 주소의 암호문을 지운다 (docs/security.md '기기 저장소와 계정 이름공간'·'보호자 링크')
-    getStore().clearPendingGuardianLink();
+    // 가져오기가 끝났다: 임시 보관과 주소의 암호문을 지운다 (docs/security.md '기기 저장소와 계정 이름공간'·'보호자 링크').
+    // 임시 보관은 방금 푼 링크일 때만 지운다
+    clearPendingIfHeld(fragment);
     stripLinkFromAddress();
     setSelectedId(id);
     setUnsaved(saved?.ok ? null : { id, snapshot });
@@ -248,9 +280,21 @@ export default function GuardianOpen() {
     window.requestAnimationFrame(() => copyHeadingRef.current?.focus());
   }
 
+  // 붙여 넣은 링크를 받아들이면 붙여넣기 절이 접혀 누른 '링크 열기'가 가려진다: 이어지는 단계로 포커스를 옮긴다.
+  // 순서(pasteView.js PASTE_FOCUS_ORDER): PIN 입력 제목, 로그인 안내 제목, 상태 줄(오프라인 안내·로그인 확인 중), 사본 제목.
+  // 이미 가져온 링크면 그 사실을 안 뒤(위 alreadyImported 효과) 사본 제목으로 다시 옮긴다
+  function onPasteAccepted(pasted) {
+    pastedRef.current = pasted;
+    window.requestAnimationFrame(() => {
+      pasteFocusTarget((id) => document.getElementById(id), copyHeadingRef.current)?.focus();
+    });
+  }
+
   const pickId = alreadyImported ? knownId : selectedId;
   const current = unsaved ?? copies.find((c) => c.id === pickId) ?? copies[0] ?? null;
   const others = copies.filter((c) => c.id !== current?.id);
+  const watchId = current?.snapshot?.watchId ?? null;
+  const serverStatus = useGuardianServerStatus(watchId);
   const showIncoming = !alreadyImported && (incoming.invalid || Boolean(fragment));
 
   let incomingPart = null;
@@ -260,18 +304,21 @@ export default function GuardianOpen() {
     } else if (loggedIn) {
       incomingPart = <PinForm key={fragment} fragment={fragment} onOpened={onOpened} />;
     } else if (offline) {
-      incomingPart = <WarningNote role="status">{t('guardian.offlineImport')}</WarningNote>;
+      incomingPart = (
+        <WarningNote id={INCOMING_STATUS_ID} tabIndex={-1} role="status">
+          {t('guardian.offlineImport')}
+        </WarningNote>
+      );
     } else if (!status.sessionChecked) {
       incomingPart = (
-        <p className="guardian-meta" role="status">
+        <p id={INCOMING_STATUS_ID} tabIndex={-1} className="guardian-meta" role="status">
           {t('guardian.checking')}
         </p>
       );
     } else {
-      incomingPart = <LoginNeeded fragment={fragment} />;
+      incomingPart = <LoginNeeded key={fragment} fragment={fragment} />;
     }
   }
-
   let body;
   if (!hydrated || !incoming.ready) {
     body = (
@@ -288,7 +335,13 @@ export default function GuardianOpen() {
             snapshot={current.snapshot}
             headingRef={copyHeadingRef}
             notice={unsaved ? <WarningNote>{t('guardian.errSaveFailed')}</WarningNote> : null}
-            alerts={<AlertsToggle />}
+            alerts={
+              <>
+                <AlertsToggle />
+                <GuardianPushItem watchId={watchId} />
+              </>
+            }
+            serverStatus={serverStatus}
           />
         )}
         {others.length > 0 && (
@@ -318,6 +371,10 @@ export default function GuardianOpen() {
         {!current && !showIncoming && (
           <EmptyState icon="navToday" title={t('guardian.noLinkTitle')} body={t('guardian.noLinkBody')} />
         )}
+        <PasteLink
+          defaultOpen={pasteDefaultOpen({ hasCopy: Boolean(current), showIncoming, invalid: incoming.invalid })}
+          onAccepted={onPasteAccepted}
+        />
       </>
     );
   }

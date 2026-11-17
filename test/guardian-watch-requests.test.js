@@ -238,6 +238,7 @@ describe('모듈 경계', () => {
   const ENTRIES = [
     'src/guardian/watchRequests.js',
     'src/guardian/watchSend.js',
+    'src/guardian/pushRequests.js',
     'lib/trip/watchApi.js',
     'src/guardian/deadlines.js',
     ...STORE_ENTRIES,

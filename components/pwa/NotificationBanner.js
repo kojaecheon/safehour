@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { useLang } from '@/components/LanguageProvider.js';
 import Icon from '@/components/ui/Icon.js';
-import { getNotifier } from '@/lib/notify/client.js';
+import { getGuardianPush, getNotifier } from '@/lib/notify/client.js';
 import { notificationOpenUrl } from '@/lib/notify/device.js';
 import { NOTIFY_KIND } from '@/lib/notify/schedule.js';
 import { NOTIFY_TITLE_KEY } from '@/lib/notify/text.js';
@@ -39,9 +39,10 @@ export default function NotificationBanner() {
   const { t, pair } = useLang();
   const item = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
-  // 실행기를 시작한다 — 여러 번 불러도 한 번만 시작한다
+  // 실행기를 시작한다(여러 번 불러도 한 번만 시작한다). 보호자 서버 알림 구독 실행기도 여기서 시작한다(다시 맞추기, 상태 조회)
   useEffect(() => {
     getNotifier()?.start();
+    getGuardianPush()?.start();
   }, []);
 
   const dismiss = useCallback(() => getNotifier()?.dismiss(), []);

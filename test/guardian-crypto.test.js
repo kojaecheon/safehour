@@ -2,6 +2,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { deflateRawSync, inflateRawSync } from 'node:zlib';
 
 import {
@@ -18,9 +19,13 @@ import {
   isGuardianFragment,
   isValidPin,
   measureGuardianLink,
+  PIN_LOCKOUT_KEY_PREFIX,
+  fragmentFromPasted,
   normalizeGuardianSnapshot,
   parseGuardianLink,
+  pinLockoutKey,
 } from '../src/guardian/index.js';
+import { fromBase64Url, toBase64Url } from '../src/guardian/crypto.js';
 import { FORBIDDEN_MARK, makeGuardianStay, makeTripPlan } from './guardian-fixtures.js';
 
 const PIN = '042917';
@@ -308,6 +313,55 @@ describe('링크 형식 (규칙 38: 암호문은 # 뒤에만)', () => {
     ]) {
       assert.equal(parseGuardianLink(bad), null, String(bad).slice(0, 60));
     }
+  });
+
+  test('끝 글자만 달라 같은 바이트로 풀리는 글(나머지 2 는 16가지, 나머지 3 은 4가지) 가운데 정규 끝 하나만 받는다', () => {
+    // atob 는 남는 비트를 버린다. PIN 잠금 키는 암호문 글마다 따로라, 받아들이면 같은 링크의 잠금 횟수가 글자 바꿈마다 새로 시작된다
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    for (const [bytes, rest, count] of [
+      [121, 2, 16],
+      [122, 3, 4],
+    ]) {
+      for (let round = 0; round < 25; round += 1) {
+        const fragment = toBase64Url(crypto.getRandomValues(new Uint8Array(bytes)));
+        assert.equal(fragment.length % 4, rest);
+        const same = [...alphabet]
+          .map((ch) => `${fragment.slice(0, -1)}${ch}`)
+          .filter((variant) => isGuardianFragment(variant) && toBase64Url(fromBase64Url(variant)) === fragment);
+        assert.equal(same.length, count, `나머지 ${rest}`);
+        for (const variant of same) {
+          const expected = variant === fragment ? fragment : null;
+          assert.equal(parseGuardianLink(`#${variant}`), expected, `#암호문 나머지 ${rest}`);
+          assert.equal(parseGuardianLink(`${ORIGIN}/g#${variant}`), expected, `링크 나머지 ${rest}`);
+          assert.equal(parseGuardianLink(`${ORIGIN}/g/?utm_source=chat#${variant}`), expected, `쿼리 붙은 링크 나머지 ${rest}`);
+          // 붙여넣기도 같은 검사다(링크 전체, 문장 속 링크, # 없는 암호문)
+          assert.equal(fragmentFromPasted(`${ORIGIN}/g#${variant}`), expected);
+          assert.equal(fragmentFromPasted(`보호자 링크 ${ORIGIN}/g#${variant} 입니다`), expected);
+          assert.equal(fragmentFromPasted(variant), expected);
+        }
+      }
+    }
+  });
+
+  test('빌더가 만든 링크는 길이 나머지와 상관없이 모두 받고, 잠금 키는 암호문 글 그대로의 SHA-256 이다', async () => {
+    const rests = new Set();
+    for (let i = 0; i < 300; i += 1) {
+      const fragment = toBase64Url(crypto.getRandomValues(new Uint8Array(60 + (i % 97))));
+      rests.add(fragment.length % 4);
+      assert.equal(parseGuardianLink(buildGuardianLink(ORIGIN, fragment)), fragment);
+      assert.equal(parseGuardianLink(`#${fragment}`), fragment);
+      if (i % 30 === 0) {
+        const parsed = parseGuardianLink(buildGuardianLink(ORIGIN, fragment));
+        assert.equal(
+          await pinLockoutKey(parsed),
+          `${PIN_LOCKOUT_KEY_PREFIX}${createHash('sha256').update(fragment).digest('hex')}`,
+        );
+      }
+    }
+    assert.deepEqual([...rests].sort(), [0, 2, 3]);
+    // 실제 암호문도 같다
+    const real = await encryptSnapshot(snapshot(), PIN);
+    assert.equal(parseGuardianLink(buildGuardianLink(ORIGIN, real)), real);
   });
 });
 

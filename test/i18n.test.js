@@ -55,7 +55,9 @@ const DIRECT_CALL = /\b(?:t|translate)\(\s*'([a-zA-Z0-9_.]+)'/g;
 function eachSourceFile(fn) {
   // lib/notify: 기기 알림 문구 키(notifications.*)는 알림 예약·문구 모듈이 쓴다 (AX-319)
   // lib/server/watch: 서버 푸시 문구 키(notifications.server*)는 서버 푸시 문구 모듈이 쓴다 (ADR-0012)
-  const roots = ['app', 'components', 'src/i18n', 'lib/notify', 'lib/server/watch'];
+  // public: 서비스 워커(public/sw.js)는 사전을 읽지 못해 서버 푸시 대체 문구를 글자 그대로 품고,
+  //   주석에 따옴표째 둔 키 'notifications.serverPushFallback' 로 사용 중임을 알린다
+  const roots = ['app', 'components', 'src/i18n', 'lib/notify', 'lib/server/watch', 'public'];
   const visit = (path) => {
     for (const entry of readdirSync(path)) {
       const full = join(path, entry);

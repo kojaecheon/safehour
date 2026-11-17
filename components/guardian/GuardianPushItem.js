@@ -1,0 +1,124 @@
+'use client';
+
+// 받은 일정 화면(/g)의 '앱이 닫혀 있어도 받기' 항목 (docs/superpowers/plans/2026-11-15-server-push-guardian-ui.md Task 7, ADR-0012)
+//
+// 실행기 훅(useGuardianPush)을 부르고 기기 설정(prefs.notifications)과 보기 전용 신호를 읽는 곳은 이 파일 하나다.
+// 표시는 GuardianPushItemView, 무엇을 그릴지는 guardianPushViewModel 이 정한다(둘 다 저장소를 읽지 않는다).
+//
+//   <GuardianPushItem watchId={watchId} />         항목
+//   const serverStatus = useGuardianServerStatus(watchId);   보이는 사본의 오늘 상태 조회(복귀 확인 표시, 5분마다 다시 묻는다)
+//
+// 정한 것
+//   - 켜기·다시 켜기·다시 받기는 누름 안에서 곧바로 부른다(권한 요청과 구독은 사용자 동작 안에서만 된다). 결과 줄은 실행기가
+//     남긴 lastResult 로 그린다(화면이 따로 들고 있지 않는다).
+//   - 세션을 아직 확인하지 않았으면(오프라인 말고) 항목을 그리지 않는다. 로그인 안내가 잠깐 보였다 사라지지 않게 한다
+//     (기기 알림 스위치의 보기 전용 안내와 같은 기준, shouldShowReadOnly).
+//   - 지원 판별의 installed 는 실행기 기본값(navigator.standalone)을 쓴다. 훅이 installed 를 받지 않아 readInstalled 를
+//     넘기지 않는다(계획 Interfaces 와 다른 점, 보고에 적는다).
+//   - 상태 조회의 주기 묻기는 useGuardianServerStatus 한 곳만 건다(항목은 poll 없이 같은 상태를 읽는다).
+//   - 보기 전용(로그인 문제)이면 바로 위 기기 알림 스위치(AlertsToggle)가 로그인 버튼을 이미 그린다. 같은 화면에 로그인 버튼이
+//     두 번 나오지 않게 이 항목은 안내 줄만 두고 버튼은 뺀다(loginElsewhere, 검토 Minor 2). 두 부품은 같은 기준
+//     (shouldShowReadOnly 이고 오프라인이 아님)으로 판단한다.
+//   - 누름마다 어떤 동작을 시작했는지(on, off, mute, renew, takeOver) 기록하고, 끝나면 돌려받은 결과를 함께 적는다. 그 결과가
+//     지금 lastResult 와 같을 때만 모델에 lastAction 으로 넘긴다(actionForResult). 그래서 함께 있음 바꾸기나 끄기의 실패를
+//     그 동작의 문구로 알리고, 다시 맞추기·상태 조회가 남긴 결과는 앞의 규칙대로 둔다. 계정이나 지켜보기가 바뀌면 기록을 지운다.
+
+import { useEffect, useState } from 'react';
+import { usePrefs } from '@/components/cards/useDeviceData.js';
+import useStoreStatus, { shouldShowReadOnly } from '@/components/ui/useStoreStatus.js';
+import { useGuardianPush } from '@/lib/notify/useGuardianPush.js';
+import { READ_ONLY_REASON } from '@/lib/store/index.js';
+import { WATCH_ID_RE } from '@/src/guardian/watchRequests.js';
+import { kstDate } from './errorView.js';
+import GuardianPushItemView from './GuardianPushItemView.js';
+import { PUSH_ACTION, PUSH_USER_ACTION, actionForResult, guardianPushViewModel } from './guardianPushView.js';
+
+/** 로그인하고 받은 일정 화면으로 돌아온다 */
+const LOGIN_HREF = `/login?returnTo=${encodeURIComponent('/g')}`;
+const TICK_MS = 60 * 1000;
+
+const isWatchId = (value) => typeof value === 'string' && WATCH_ID_RE.test(value);
+
+/** 오늘(한국 시간, 'YYYY-MM-DD'). 1분마다 다시 읽어 화면을 연 채 자정을 넘겨도 바뀐다 */
+function useKstToday() {
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowMs(Date.now()), TICK_MS);
+    return () => clearInterval(timer);
+  }, []);
+  return kstDate(nowMs);
+}
+
+/**
+ * 보이는 사본의 오늘 상태 조회({ date, confirmed, muted, active, atMs }). 없으면 null.
+ * 로그인한 보호자만 조회한다(실행기가 정한다). GuardianCopyView 의 serverStatus 로 넘긴다.
+ * @param {string|null|undefined} watchId
+ */
+export function useGuardianServerStatus(watchId) {
+  const { state } = useGuardianPush(watchId, { poll: isWatchId(watchId) });
+  return state.status ?? null;
+}
+
+/**
+ * @param {object} props
+ * @param {string|null|undefined} props.watchId  보이는 사본의 watchId
+ */
+export default function GuardianPushItem({ watchId }) {
+  const { state, turnOn, turnOff, renew, takeOver, mute } = useGuardianPush(watchId);
+  const prefs = usePrefs();
+  const status = useStoreStatus();
+  const today = useKstToday();
+
+  // 마지막으로 시작한 사용자 동작. 계정이나 지켜보기가 바뀌면 지운다(렌더 중 한 번 바로잡는다)
+  const scope = JSON.stringify([status.accountKey ?? null, watchId ?? null]);
+  const [started, setStarted] = useState({ scope, record: null });
+  if (started.scope !== scope) setStarted({ scope, record: null });
+  const record = started.scope === scope ? started.record : null;
+
+  /** 동작을 누름 안에서 곧바로 부르고, 끝나면 돌려받은 결과를 그 기록에 적는다 */
+  function start(kind, run) {
+    const entry = { kind, done: false, result: null };
+    setStarted({ scope, record: entry });
+    void run().then((result) => {
+      setStarted((current) => (current.record === entry ? { scope: current.scope, record: { ...entry, done: true, result } } : current));
+    });
+  }
+
+  // 세션 확인 전에는 그리지 않는다(오프라인은 확인 없이도 확실하다)
+  if (status.readOnly && !shouldShowReadOnly(status)) return null;
+
+  const model = guardianPushViewModel({
+    state,
+    watchId,
+    mainOn: prefs?.notifications === true,
+    writable: status.readOnly === false && Boolean(status.accountKey),
+    offline: status.reason === READ_ONLY_REASON.OFFLINE,
+    loginElsewhere: shouldShowReadOnly(status) && status.reason !== READ_ONLY_REASON.OFFLINE,
+    today,
+    // 결과 값이 같으면 그 동작의 결과로 본다. 이 맞추기는 바탕 길(다시 맞추기, 상태 조회와 poll, prepare)이 lastResult 에
+    // OFF_UNSENT, PERMISSION_LOST, GONE 만 남긴다는 데 기댄다(lib/notify/guardianPush.js 의 lastResults 주석). 바탕 길이 NETWORK,
+    // FAILED 같은 값을 남기게 바뀌면 동작이 끝난 뒤 같은 값이 와도 그 동작의 실패 문구로 읽힌다
+    lastAction: actionForResult(record, state.lastResult),
+  });
+
+  function onToggle(on) {
+    if (on) start(PUSH_USER_ACTION.ON, turnOn);
+    else start(PUSH_USER_ACTION.OFF, turnOff);
+  }
+
+  function onAction(action) {
+    if (action === PUSH_ACTION.RELOAD) window.location.reload();
+    else if (action === PUSH_ACTION.RENEW) start(PUSH_USER_ACTION.RENEW, renew);
+    else if (action === PUSH_ACTION.TAKE_OVER) start(PUSH_USER_ACTION.TAKE_OVER, takeOver);
+  }
+
+  return (
+    <GuardianPushItemView
+      model={model}
+      onToggle={onToggle}
+      onMute={(on) => start(PUSH_USER_ACTION.MUTE, () => mute(on))}
+      onAction={onAction}
+      loginHref={LOGIN_HREF}
+    />
+  );
+}

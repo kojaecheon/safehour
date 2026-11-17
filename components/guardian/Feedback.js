@@ -26,13 +26,15 @@ export function ErrorText({ id, children }) {
 /**
  * 주의 안내 한 덩이(긴 링크, 저장 실패).
  * @param {object} props
+ * @param {string} [props.id]
+ * @param {number} [props.tabIndex]  포커스를 옮길 대상이면 -1
  * @param {string} [props.role]
  * @param {string} [props.className]
  * @param {import('react').ReactNode} props.children
  */
-export function WarningNote({ role = 'note', className = '', children }) {
+export function WarningNote({ id, tabIndex, role = 'note', className = '', children }) {
   return (
-    <div className={`guardian-warning ${className}`.trim()} role={role}>
+    <div id={id} tabIndex={tabIndex} className={`guardian-warning ${className}`.trim()} role={role}>
       <span className="guardian-warning-icon" aria-hidden="true">
         <Icon name="alert" size={20} />
       </span>

@@ -12,6 +12,10 @@
 - 날짜별 환자 복귀 마감 공용 계산(`deadlines.js`): 보호자 스냅샷과 서버 알림 업로드가 같은 함수를 쓴다
 - 서버 알림 요청 모양(`watchRequests.js`: 형식, 한도, 본문 허용 목록, 응답 분류, 새 id)과 보내기·결과 판정(`watchSend.js`).
   기기 저장소의 서버 삭제 대기와 `lib/trip/`의 요청 함수가 함께 쓴다(`lib/store/`는 `lib/trip/`을 불러올 수 없어 이 자리다)
+- 보호자 쪽 서버 알림 요청 모양(`pushRequests.js`: 구독·해지·상태 조회·오늘 함께 있음 본문, `SUB_ID_RE`, 응답 읽기 `read*`).
+  보내기는 같은 `watchSend.js`다. 보호자 구독 실행기(`lib/notify/guardianPush.js`)와 저장소의 구독 해지 대기가 함께 쓴다
+- 받은 링크 붙여넣기 해석(`link.js`의 `fragmentFromPasted`): 링크 전체, 메신저 문장 속의 첫 http(s) 링크, `#암호문`, `#` 없는 암호문에서
+  암호문 하나를 꺼낸다. 받은 일정 화면의 붙여넣기 절(`components/guardian/PasteLink.js`)이 공개 진입점(`index.js`)으로 쓴다
 
 ## 맡지 않는 것
 
@@ -41,7 +45,18 @@
 - 마감 계산(`deadlines.js`)은 환자 외출에서만 읽고, 마감이 당겨진 외출(`isClampedOverdueOuting`)은 표시만 해 둔다. 스냅샷은 지금처럼
   담고 서버 알림 업로드만 뺀다. 판정은 `src/domain/states.js` 하나를 쓴다.
 - 서버 알림 요청 본문은 허용 목록 필드만 새로 만들어 담고, 식별 값은 본문으로만 보낸다. 오류 메시지에 식별 값·날짜·시각을 담지 않는다.
-  형식 정규식과 한도는 서버 값과 같아야 한다(`test/guardian-watch-requests.test.js`가 묶는다).
+  형식 정규식과 한도는 서버 값과 같아야 한다(`test/guardian-watch-requests.test.js`가 묶는다). 보호자 쪽(`pushRequests.js`)도 같다: 구독
+  본문은 `watchId`·`subscription.endpoint`·`keys.p256dh`·`keys.auth`·`lang`만 담고(`expirationTime`과 그 밖의 필드는 싣지 않는다), `p256dh`는
+  65바이트(첫 바이트 `0x04`), `auth`는 16바이트, `endpoint`는 `https:` 2,048자 이하다. 오류 메시지에 `endpoint`와 키를 담지 않는다. 서버
+  허용 목록과 같은지는 `test/guardian-push-requests.test.js`, 진짜 처리기를 통과하는지는 `test/watch-client-seam.test.js`가 본다.
+- **붙여 넣은 글은 서버로 보내지 않고 주소창에도 싣지 않는다.** `fragmentFromPasted`는 순수 함수이고 맞는 암호문 하나 또는 `null`만
+  돌려준다. 공백·줄바꿈을 건너 이어 붙이지 않고, 보이지 않는 글자를 지우며, 글 길이 상한은 `PASTE_MAX_CHARS`(32,768자, 입력란
+  `maxLength`와 같다)다. PIN이 붙은 글은 `null`이다: 꺼낸 암호문의 끝이 정규 base64url 끝이 아니거나, 끝이 PIN 모양(숫자가 아닌 글자 뒤
+  6자리 숫자)이고 그 앞부분에서 끝의 이음 글자(`-`·`_`)를 0개부터 3개(`MAX_PIN_JOINERS`)까지 떼어 본 것 가운데 정규 암호문이 있으면
+  받지 않는다(`hasCanonicalTail`, `endsWithPin`). 주소창의 `#` 뒤와 링크 전체를 읽는 `parseGuardianLink`도 끝이 정규가 아니면 `null`이다
+  (같은 `hasCanonicalTail`): `atob`는 남는 비트를 버려 끝 글자만 다른 글이 같은 바이트로 풀리는데, PIN 잠금 키는 암호문 글마다 따로라
+  그런 글마다 잠금 횟수가 새로 시작된다. 형식만 보는 `isGuardianFragment` 계약은 바꾸지 않는다. 알려진 한계(링크 뒤에 붙은 `-`·`_`가 다른 정규
+  암호문이 되는 경우)는 `docs/engineering-notes.md` '링크 뒤에 붙은 `-`·`_`가 다른 암호문이 될 수 있다'.
 
 ## 구현 방식
 
@@ -58,5 +73,7 @@
 - 5회 연속 실패 후 1시간 잠기는지, 잠금이 링크·기기 단위인지 확인한다.
 - 만료 후에는 표시되지 않는지 확인한다.
 - 7일 범위 밖 날짜가 없는지, 짧은 체류는 출국일에서 멈추는지 확인한다.
+- 붙여넣기 해석: 메신저 모양, PIN이 붙은 글(이음 글자 포함), 끝이 `-`·`_`인 진짜 암호문, 긴 서식 표시 묶음의 실행 시간을
+  `test/guardian-paste.test.js`가 고정한다.
 - 링크 길이를 측정하는 테스트가 있다. 최악 크기 7일 범위(7·14·45박 체류 모두)가 8,000자 미만이어야 한다. `watchId`를 담은 경우도
   잰다(7박 6,490자에서 6,538자). **스냅샷에 필드를 더하기 전에 이 테스트를 돌려** 길이 변화를 확인한다.

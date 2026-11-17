@@ -14,6 +14,11 @@
 //     같은 시각·같은 장소 마감은 한 줄로 합친다. 오늘을 맨 앞에 펼쳐 두고 다른 날짜는 접는다(<details>).
 //     오늘이 사본 날짜 밖이면 모든 날짜를 펼친다(전부 접힌 화면을 두지 않는다)
 // 스냅샷에 없는 것(병원 이름·주소, 조건 세부, 마감 이유)은 그릴 수도 없다.
+//   - 서버 상태 조회(serverStatus, 계획 2026-11-15 A-3 Task 7, 정한 값 15): 조회 날짜와 같은 날의 마감이 confirmed 에 있으면
+//     그 줄과 오늘 카드에 복귀 확인 꼬리표(아이콘+글자, 한국어 "'돌아왔어요' 누름")를 붙이고, '마감 지남' 꼬리표·연락 안내·줄 안의 전화 버튼 대신
+//     복귀 확인 안내(환자가 눌렀다는 것, 앱은 위치를 모른다는 것)를 늘 함께 보인다. 판정이 아니라 눌림 신호다.
+//     그날 절 아래에 서버에서 확인한 시각을 적는다. 긴급 절(119·1330)은 serverStatus 와 무관하게 늘 그대로다.
+//     꼬리표·안내를 고르는 규칙은 returnStatus.js 의 returnRowView 하나다. serverStatus 가 없으면 예전과 같은 마크업이다(시안 보드).
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -22,7 +27,7 @@ import { DayTimeline, Icon } from '@/components/ui/index.js';
 import { EMERGENCY_NUMBERS, HOSPITAL_RETURN_LABEL, guardianCoverage } from '@/src/guardian/index.js';
 import { parseInstantMs } from '@/src/stay/index.js';
 import { dateLabel, kstClock, kstDate } from './errorView.js';
-import { patientReturnStatus } from './returnStatus.js';
+import { RETURN_HELP, RETURN_TAG, returnRowView, serverCheckedAt, todayCardTag } from './returnStatus.js';
 import { dedupePatientReturns, orderDaysForView, todayReturnSummary } from './copyView.js';
 import { WarningNote } from './Feedback.js';
 import SafetyNote from './SafetyNote.js';
@@ -75,6 +80,14 @@ function useNowMs() {
 
 function ReturnTag({ status }) {
   const { t } = useLang();
+  if (status === RETURN_TAG.CONFIRMED) {
+    return (
+      <span className="guardian-tag is-confirmed">
+        <Icon name="check" size={16} strokeWidth={2.4} />
+        {t('guardian.confirmedTag')}
+      </span>
+    );
+  }
   if (status === 'PASSED') {
     return (
       <span className="guardian-tag is-passed">
@@ -85,6 +98,11 @@ function ReturnTag({ status }) {
   }
   if (status === 'UPCOMING') return <span className="guardian-tag is-upcoming">{t('guardian.upcomingTag')}</span>;
   return null;
+}
+
+/** 복귀 확인 안내(두 언어 병기). 복귀 확인 꼬리표와 늘 함께 그린다: 꼬리표만으로 돌아왔다고 읽히지 않게 한다 */
+function ConfirmedHelp() {
+  return <SafetyNote messageKey={'guardian.confirmedHelp'} both role={null} className="guardian-confirmed-help" />;
 }
 
 /** 복귀 장소 표시: 병원이면 '병원' 라벨만, 숙소면 이름(없으면 '숙소')과 주소 */
@@ -110,7 +128,7 @@ function ReturnPlace({ entry }) {
 }
 
 /** 맨 위 '오늘 환자 복귀 마감' 카드. 누르면 오늘 날짜 제목으로 내려간다 */
-function TodayReturnCard({ summary }) {
+function TodayReturnCard({ summary, tag }) {
   const { t } = useLang();
   const targetId = `guardian-day-${summary.date}`;
   // 오늘 일정 제목으로 옮겨 가고 초점을 거기 둔다. 링크가 아니라 버튼이다: /g 는 주소 해시를 보호자 링크 암호문으로
@@ -133,7 +151,7 @@ function TodayReturnCard({ summary }) {
           <span className="guardian-today-time">
             <Icon name="flag" size={20} strokeWidth={2.4} />
             <time>{t('guardian.returnBy', { time: summary.by })}</time>
-            <ReturnTag status={summary.status} />
+            <ReturnTag status={tag} />
           </span>
           <ReturnPlace entry={summary} />
           {summary.total > 1 && <span className="guardian-today-more">{t('guardian.todayReturnMore', { count: summary.total })}</span>}
@@ -143,23 +161,24 @@ function TodayReturnCard({ summary }) {
   );
 }
 
-function PatientReturns({ day, nowMs }) {
+function PatientReturns({ day, nowMs, serverStatus }) {
   const { t } = useLang();
   const entries = dedupePatientReturns(day.patientReturn);
   if (entries.length === 0) return <p className="guardian-meta">{t('guardian.noPatientOutings')}</p>;
-  return (
+  const list = (
     <ul className="guardian-returns">
       {entries.map((entry, index) => {
-        const status = patientReturnStatus({ date: day.date, by: entry.by, nowMs });
+        const row = returnRowView({ date: day.date, by: entry.by, nowMs, serverStatus });
         return (
           <li key={`${entry.by}-${index}`} className="guardian-return">
             <span className="guardian-return-time">
               <Icon name="flag" size={16} strokeWidth={2.4} />
               <time>{t('guardian.returnBy', { time: entry.by })}</time>
-              <ReturnTag status={status} />
+              <ReturnTag status={row.tag} />
             </span>
             <ReturnPlace entry={entry} />
-            {status === 'PASSED' && (
+            {row.help === RETURN_HELP.CONFIRMED && <ConfirmedHelp />}
+            {row.help === RETURN_HELP.OVERDUE && (
               <>
                 <p className="guardian-overdue-help">{t('guardian.overdueHelp')}</p>
                 <span className="guardian-overdue-actions">
@@ -178,10 +197,19 @@ function PatientReturns({ day, nowMs }) {
       })}
     </ul>
   );
+  // 확인 시각 줄은 그날 확인된 마감이 있을 때만 붙인다
+  const checkedAt = serverCheckedAt(day.date, entries, serverStatus);
+  if (checkedAt === null) return list;
+  return (
+    <>
+      {list}
+      <p className="guardian-meta guardian-status-asof">{t('guardian.statusAsOf', { time: kstClock(checkedAt) })}</p>
+    </>
+  );
 }
 
 /** 날짜 하나. folded 면 <details> 안에 넣어 제목(요약)만 보인다. 펼치면 같은 내용이다 */
-function GuardianDay({ day, nowMs, folded = false }) {
+function GuardianDay({ day, nowMs, serverStatus, folded = false }) {
   const { t, locale } = useLang();
   const label = dateLabel(day.date, locale);
   const headingId = `guardian-day-${day.date}`;
@@ -207,7 +235,7 @@ function GuardianDay({ day, nowMs, folded = false }) {
     <>
       {day.escortRequired && <SafetyNote messageKey={'guardian.escortRequired'} both icon="walk" className="guardian-escort" />}
       <h4 className="guardian-subtitle">{t('guardian.patientReturnTitle')}</h4>
-      <PatientReturns day={day} nowMs={nowMs} />
+      <PatientReturns day={day} nowMs={nowMs} serverStatus={serverStatus} />
       <h4 className="guardian-subtitle">{t('guardian.guardianPlanTitle')}</h4>
       {guardianPart}
     </>
@@ -243,8 +271,10 @@ function GuardianDay({ day, nowMs, folded = false }) {
  * @param {React.ReactNode} [props.alerts]  복귀 마감 알림 스위치 자리. 부품은 저장소를 읽지 않으므로
  *   실제 화면은 AlertsToggle, 디자인 보드는 고정 상태의 AlertsToggleView 를 넘긴다
  * @param {number} [props.fixedNowMs]  디자인 보드처럼 '지금'을 고정해 그릴 때만 넘긴다. 없으면 기기 시계(1분마다 갱신)
+ * @param {{ date: string, confirmed: string[], atMs: number } | null} [props.serverStatus]  보이는 사본의 오늘 상태 조회.
+ *   없으면(디자인 보드, 로그인 없음, 서버 알림 꺼짐) 예전과 같다
  */
-export default function GuardianCopyView({ snapshot, headingRef, notice, alerts, fixedNowMs }) {
+export default function GuardianCopyView({ snapshot, headingRef, notice, alerts, fixedNowMs, serverStatus = null }) {
   const { t, locale } = useLang();
   const asOf = kstStamp(snapshot.createdAt, locale);
   const expires = kstStamp(snapshot.expiresAt, locale);
@@ -256,6 +286,7 @@ export default function GuardianCopyView({ snapshot, headingRef, notice, alerts,
   const coverage = range && { from: dateLabel(range.from, locale), to: dateLabel(range.to, locale) };
   const passed = range !== null && kstDate(nowMs) > range.to;
   const summary = todayReturnSummary(snapshot, nowMs);
+  const cardTag = todayCardTag(summary, serverStatus);
   const { todayDay, days } = orderDaysForView(snapshot.days, kstDate(nowMs));
 
   return (
@@ -274,7 +305,8 @@ export default function GuardianCopyView({ snapshot, headingRef, notice, alerts,
         {notice}
       </header>
 
-      {summary && <TodayReturnCard summary={summary} />}
+      {summary && <TodayReturnCard summary={summary} tag={cardTag} />}
+      {summary && cardTag === RETURN_TAG.CONFIRMED && <ConfirmedHelp />}
 
       {alerts}
 
@@ -293,7 +325,13 @@ export default function GuardianCopyView({ snapshot, headingRef, notice, alerts,
       </section>
 
       {days.map((day) => (
-        <GuardianDay key={day.date} day={day} nowMs={nowMs} folded={todayDay !== null && day !== todayDay} />
+        <GuardianDay
+          key={day.date}
+          day={day}
+          nowMs={nowMs}
+          serverStatus={serverStatus}
+          folded={todayDay !== null && day !== todayDay}
+        />
       ))}
     </section>
   );

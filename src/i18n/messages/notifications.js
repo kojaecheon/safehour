@@ -38,6 +38,17 @@ export const messages = {
     ja: '受け取った予定を見る',
     zh: '查看收到的行程',
   },
+  /**
+   * 서버 푸시 대체 문구(보호자 기기): 서비스 워커가 푸시 본문을 읽지 못했을 때 보인다.
+   * 서비스 워커는 사전을 읽지 못해 ko 줄과 en 줄을 글자 그대로 품는다(public/sw.js PUSH_FALLBACK_BODY).
+   * test/pwa-sw.test.js 가 두 줄이 같은지 본다. ja·zh 는 검수 전 번역이고 워커는 쓰지 않는다
+   */
+  'notifications.serverPushFallback': {
+    ko: 'SafeHour 알림이 왔어요. 앱을 열어 확인해 주세요.',
+    en: 'You have a SafeHour alert. Open the app to check.',
+    ja: 'SafeHour のお知らせが届きました。アプリを開いて確認してください。',
+    zh: '你收到一条 SafeHour 提醒。请打开应用查看。',
+  },
 };
 
 /**

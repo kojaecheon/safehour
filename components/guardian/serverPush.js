@@ -5,8 +5,9 @@
 //   serverPushSubmitPlan({ visible, checked, state, watchId }) 링크를 만들 때 지켜보기를 어떻게 할지와 스냅샷에 실을 watchId
 //   serverPushResultKeys(result)                              링크를 만든 뒤 결과 줄 문구 키(등록)
 //   serverPushRetireKeys(result)                              링크를 만든 뒤 결과 줄 안전 문구 키(끄기)
-//   applyServerPush(plan, { stay, sync })                     계획대로 지켜보기를 켜거나 끄고 스냅샷에 실을 watchId 를 준다
-//   submitWithServerPush({ option, stay, sync, makeLink })    링크 만들기 순서(지켜보기 먼저, 그 id 로 링크, 그다음 비우기)
+//   applyServerPush(plan, { stay, sync, accountKey })         계획대로 지켜보기를 켜거나 끄고 스냅샷에 실을 watchId 를 준다
+//   submitWithServerPush({ option, stay, sync, makeLink, saveLink, readAccountKey })
+//                                                             링크 만들기 순서(지켜보기 먼저, 그 id 로 링크, 계정을 다시 보고 기록, 그다음 비우기)
 //   SERVER_PUSH_CONSENT_KEYS                                  동의 목록 문구 키(설계서 5.5)
 //
 // 정한 것
@@ -20,6 +21,10 @@
 //   - 끄기가 실패해도 링크는 만들고(watchId 없음) 끄지 못했다는 줄을 보인다. 서버 삭제가 남았으면 그 전까지 보호자에게
 //     알림이 갈 수 있다는 줄을, 이 기기와 서버 모두에서 껐으면 껐다는 줄을 보인다(작업 7 검토 반영, 화면 검토 M10).
 //   - 순서: 지켜보기를 켜거나 끈 결과의 watchId 로 스냅샷을 만든다(등록이 스냅샷보다 먼저다). 링크를 만든 뒤에 비우기를 건다.
+//   - 기다리는 동안(등록·끄기·암호화) 계정이 바뀌면 공유 기록을 쓰지 않고 링크도 보이지 않는다(일반 실패 줄). 스냅샷은 양식을 그린
+//     계정의 것이라 바뀐 계정의 저장소에 쓰면 안 된다.
+//   - 첫 기다림 전에 읽은 계정 키를 켜기·끄기에 넘긴다. 켜기·끄기는 앞선 올리기 뒤에 줄 서므로, 시작될 때 계정이 바뀌었으면 실행기가
+//     아무것도 하지 않는다(바뀐 계정의 지켜보기를 켜거나 끄지 않는다, A-3 검토).
 //
 // React·저장소·네트워크를 직접 쓰지 않는다. 동기화 실행기(getWatchSync())는 부르는 쪽이 넣는다.
 // node --test 가 읽으므로 상대 경로로만 불러온다.
@@ -123,17 +128,19 @@ export function serverPushRetireKeys(result) {
  *   - REGISTER: ensureRegistered. 성공하면 그 watchId 를 싣는다. 실패하거나 실행기가 없으면 id 없이 이유를 돌려준다(링크는 막지 않는다)
  *   - RETIRE: retire. 결과와 상관없이 id 를 싣지 않는다. 실행기가 없거나 던지면 끄지 못한 것({ ok: false })으로 본다
  *   - KEEP: 요청 없이 계획의 watchId(숨은 항목의 켜진 지켜보기 id, 아니면 null)를 싣는다
+ * accountKey 를 받으면 켜기·끄기에 그대로 넘긴다(받지 않으면 넘기지 않는다).
  * @param {{ action: string, watchId: string|null }} plan  serverPushSubmitPlan 결과
- * @param {{ stay: object|null, sync: { ensureRegistered: Function, retire: Function } | null | undefined }} deps
+ * @param {{ stay: object|null, sync: { ensureRegistered: Function, retire: Function } | null | undefined, accountKey?: string|null }} deps
  * @returns {Promise<{ watchId: string|null, serverPush: null | { ok: true } | { ok: false, reason: string }, serverPushRetire: null | object }>}
  *   serverPush: 등록을 시도했을 때만 그 결과(결과 줄), 아니면 null
  *   serverPushRetire: 끄기를 시도했을 때만 retire 결과(결과 줄), 아니면 null
  */
-export async function applyServerPush(plan, { stay, sync } = {}) {
+export async function applyServerPush(plan, { stay, sync, accountKey } = {}) {
+  const scope = accountKey === undefined ? {} : { accountKey };
   if (plan?.action === SERVER_PUSH_ACTION.REGISTER) {
     let registered;
     try {
-      registered = sync ? await sync.ensureRegistered({ stay }) : null;
+      registered = sync ? await sync.ensureRegistered({ stay, ...scope }) : null;
     } catch {
       registered = null;
     }
@@ -143,7 +150,7 @@ export async function applyServerPush(plan, { stay, sync } = {}) {
   if (plan?.action === SERVER_PUSH_ACTION.RETIRE) {
     let retired;
     try {
-      retired = sync ? await sync.retire() : null;
+      retired = sync ? await sync.retire(scope) : null;
     } catch {
       retired = null;
     }
@@ -153,21 +160,35 @@ export async function applyServerPush(plan, { stay, sync } = {}) {
   return { watchId: plan?.watchId ?? null, serverPush: null, serverPushRetire: null };
 }
 
+/** 링크를 만드는 동안 계정이 바뀌어 기록도 표시도 하지 않았다(submitWithServerPush 가 던지는 오류의 code). 화면은 일반 실패 줄을 보인다 */
+export const SUBMIT_ACCOUNT_CHANGED = 'GUARDIAN_SUBMIT_ACCOUNT_CHANGED';
+
 /**
  * 보호자 링크 만들기 순서. 항목 상태로 계획을 세우고(serverPushSubmitPlan), 지켜보기를 켜거나 끈 뒤(applyServerPush) 그 결과의
- * watchId 로 링크를 만들고(makeLink), 링크를 만든 뒤 비우기를 건다(kick('register')). makeLink 가 던지면 그대로 던진다
- * (지켜보기 결과와 상관없이 링크를 만들지 못한 것이다).
- * @template T
+ * watchId 로 링크를 만들고(makeLink), 공유 기록을 쓰고(saveLink), 비우기를 건다(kick('register')). makeLink·saveLink 가 던지면
+ * 그대로 던진다(지켜보기 결과와 상관없이 링크를 만들지 못한 것이다).
+ * 계정: 스냅샷은 양식을 그린 계정의 체류·일정으로 만든다. 그래서 첫 기다림 전에 계정 키(readAccountKey)를 잡아 두고 기록 직전에
+ * 다시 본다. 바뀌었으면 기록하지 않고 SUBMIT_ACCOUNT_CHANGED 를 던진다(앞 계정의 사본이 바뀐 계정의 저장소에 쓰이거나
+ * 화면에 보이지 않게). 다시 보는 것과 기록 사이에는 기다림이 없다. 잡아 둔 키는 켜기·끄기에도 넘긴다(줄 선 일이 시작될 때
+ * 계정이 바뀌었으면 실행기가 아무것도 하지 않는다). 비우기는 이 확인을 지난 뒤에만 건다.
+ * @template T, S
  * @param {object} args
  * @param {{ visible: boolean, checked: boolean, state: 'ON'|'REPLACED'|'NONE', watchId: string|null }} args.option  항목 상태
  * @param {object|null} args.stay
  * @param {{ ensureRegistered: Function, retire: Function, kick?: Function } | null | undefined} args.sync  getWatchSync()
- * @param {(watchId: string|null) => Promise<T>} args.makeLink  스냅샷·암호화·링크·공유 기록
- * @returns {Promise<{ link: T, serverPush: object|null, serverPushRetire: object|null }>}
+ * @param {(watchId: string|null) => Promise<T>} args.makeLink  스냅샷·크기·암호화·링크(기기에 쓰지 않는다)
+ * @param {((link: T) => S) | null} [args.saveLink]  공유 기록 쓰기(동기). 없으면 saved 는 null
+ * @param {(() => string|null) | null} [args.readAccountKey]  지금 계정 키. 없으면 계정을 보지 않는다
+ * @returns {Promise<{ link: T, saved: S|null, serverPush: object|null, serverPushRetire: object|null }>}
  */
-export async function submitWithServerPush({ option, stay, sync, makeLink }) {
-  const push = await applyServerPush(serverPushSubmitPlan(option), { stay, sync });
+export async function submitWithServerPush({ option, stay, sync, makeLink, saveLink = null, readAccountKey = null }) {
+  const accountKey = readAccountKey ? readAccountKey() : undefined;
+  const push = await applyServerPush(serverPushSubmitPlan(option), { stay, sync, accountKey });
   const link = await makeLink(push.watchId);
+  if (readAccountKey && readAccountKey() !== accountKey) {
+    throw Object.assign(new Error('submitWithServerPush: accountKey'), { code: SUBMIT_ACCOUNT_CHANGED });
+  }
+  const saved = saveLink ? saveLink(link) : null;
   void sync?.kick?.('register');
-  return { link, serverPush: push.serverPush, serverPushRetire: push.serverPushRetire };
+  return { link, saved, serverPush: push.serverPush, serverPushRetire: push.serverPushRetire };
 }
