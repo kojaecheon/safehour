@@ -11,8 +11,11 @@
 //   - 저절로 구독하지 않는다: VAPID 키가 바뀌거나 브라우저 구독이 없으면 renewNeeded, MOVED 도 버튼으로만 다시 받는다.
 //     MOVED 인 구독은 언어·해시가 바뀌어도 다시 POST 하지 않고 다시 켜기도 건너뛴다. 다시 맞추기는 다시 POST 전에 상태를 먼저
 //     묻고(다른 휴대폰이 가져갔으면 보내지 않는다), 조회가 실패하면 그 지켜보기는 이번에 보내지 않는다
-//   - 다시 받기는 있는 브라우저 구독을 지우고 새로 구독해 POST 한다(주소 만료 MOVED). 이 계정의 다른 구독은 다시 맞추기가 새 주소로 보낸다
-//   - 브라우저 푸시 호출(등록, 구독 읽기, 구독, 구독 지우기)은 하나에 BROWSER_PUSH_TIMEOUT_MS 까지이고, 넘기면 그 호출의 실패다
+//   - 다시 받기는 있는 브라우저 구독을 지우고 새로 구독해 POST 한다(주소 만료 MOVED). 이 계정의 다른 구독은 다시 맞추기가 새 주소로 보낸다.
+//     이 기기의 다른 계정이 그 구독을 쓰면 지우지 않고 켜기처럼 고른다(그 계정의 구독을 깨지 않는다)
+//   - 다시 POST 앞의 상태 조회가 2분 안에 실패했으면 그 지켜보기는 묻지도 보내지도 않는다(429 되풀이 없음)
+//   - 브라우저 푸시 호출(등록, 구독 읽기, 구독 지우기)은 하나에 BROWSER_PUSH_TIMEOUT_MS, 구독은 BROWSER_SUBSCRIBE_TIMEOUT_MS 까지이고,
+//     넘기면 그 호출의 실패다
 //   - 줄의 일은 잠금 안에서 시작할 때 store.recheckAccount 를 부른다(다른 탭의 계정 바뀜)
 //   - 기록하지 못한 구독의 해지가 대기 상한에 밀리면 한 번 직접 보낸다(끄기, 다시 맞추기, 계정이 바뀜, 기록 쓰기 실패)
 //   - 같은 기기의 두 탭은 Web Locks 로 차례를 지킨다: 함께 다시 맞춰도 POST 는 하나이고 기록은 서버의 지금 구독이다. 잠금은 정해진
@@ -31,6 +34,7 @@ import { createECDH, createHash, webcrypto } from 'node:crypto';
 
 import {
   BROWSER_PUSH_TIMEOUT_MS,
+  BROWSER_SUBSCRIBE_TIMEOUT_MS,
   CONFIG_TTL_MS,
   DEVICE_LOCK_HOLD_MS,
   DEVICE_LOCK_NAME,
@@ -1293,7 +1297,8 @@ describe('reconcile', () => {
       assert.deepEqual(t.server.of('subscribe'), [], `조회가 실패하면 다시 POST 하지 않는다(${reply})`);
       assert.equal(t.store.readGuardianPush().subs[0].lang, 'ko');
       assert.equal(t.runner.getState(W1).lastResult, null, `바탕 길은 실패 결과를 남기지 않는다(${reply})`);
-      // 시도로 세지 않았다: 다음 다시 맞추기가 다시 묻고, 활성이면 보낸다
+      // 시도로 세지 않았다: 2분(STATUS_MIN_GAP_MS) 뒤의 다시 맞추기가 다시 묻고, 활성이면 보낸다
+      t.clock.ms += STATUS_MIN_GAP_MS;
       await t.runner.reconcile();
       assert.deepEqual(
         t.server.routes().filter((route) => route === 'subscribe' || route === 'status'),
@@ -1313,6 +1318,36 @@ describe('reconcile', () => {
     assert.equal(gone.runner.getState(W1).lastResult, PUSH_RESULT.GONE);
     await gone.store.retryPendingServerDelete();
     assert.deepEqual(gone.server.of('unsubscribe'), []);
+  });
+
+  test('다시 POST 앞의 상태 조회가 실패했으면 2분 안의 다시 맞추기는 묻지도 보내지도 않고, 2분이 지나면 다시 묻는다(429 되풀이 없음)', async () => {
+    const t = setup({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
+    t.server.reply.status = () => 429;
+    assert.equal(t.store.writeLang('en').ok, true);
+    await t.runner.reconcile();
+    assert.equal(t.server.of('status').length, 1, '첫 다시 맞추기는 묻는다');
+    // 화면 복귀, 온라인 복귀, 저장소 알림이 2분 안에 다섯 번 다시 맞춘다
+    for (let i = 0; i < 5; i += 1) {
+      t.clock.ms += 20_000;
+      await t.runner.reconcile();
+    }
+    assert.equal(t.server.of('status').length, 1, '2분 안에는 다시 묻지 않는다');
+    assert.deepEqual(t.server.of('subscribe'), []);
+    assert.equal(t.store.readGuardianPush().subs[0].lang, 'ko');
+    // 2분이 지나면 다시 묻고, 활성이면 보낸다
+    t.clock.ms = T0 + STATUS_MIN_GAP_MS;
+    t.server.reply.status = () => json(200, { ok: true, date: DATE, confirmed: [], muted: false, subscriptionActive: true });
+    await t.runner.reconcile();
+    assert.deepEqual(t.server.routes().filter((route) => route === 'subscribe' || route === 'status'), ['status', 'status', 'subscribe']);
+    assert.equal(t.store.readGuardianPush().subs[0].lang, 'en');
+
+    // 성공한 조회는 막지 않는다: 2분 안이어도 다시 POST 앞에서 다시 묻는다(다른 휴대폰이 그새 가져갔을 수 있다)
+    const ok = setup({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
+    assert.equal(await ok.runner.refreshStatus(W1, { force: true }), 'OK');
+    assert.equal(ok.store.writeLang('en').ok, true);
+    ok.clock.ms += 1_000;
+    await ok.runner.reconcile();
+    assert.deepEqual(ok.server.routes().filter((route) => route === 'subscribe' || route === 'status'), ['status', 'status', 'subscribe']);
   });
 
   test('다시 POST 앞의 상태가 활성이면 다시 POST 한다: 상태, 그다음 구독 순서이고 언어 바뀜이 서버에 닿는다', async () => {
@@ -1616,9 +1651,10 @@ describe('상태 조회', () => {
     assert.equal(after.sub.subId, subIdOf(101));
   });
 
-  test('다시 받기는 있는 브라우저 구독을 지우고 새로 구독해 POST 한다(MOVED 가 주소 만료일 수 있다)', async () => {
+  test('다시 받기는 있는 브라우저 구독을 지우고 새로 구독해 POST 한다(MOVED 가 주소 만료일 수 있다, 이 기기의 계정이 하나일 때)', async () => {
     const t = setup({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
     assert.equal(t.store.writeGuardianPush({ subs: [subRecord(W1)], status: [movedStatus(W1)], gone: [] }).ok, true);
+    assert.equal(t.store.guardianPushElsewhere(), false, '다른 계정이 브라우저 구독을 쓰지 않는다');
     assert.equal(t.runner.getState(W1).moved, true);
     assert.equal(await t.runner.takeOver(W1), PUSH_RESULT.ON);
     assert.deepEqual(
@@ -1662,7 +1698,8 @@ describe('상태 조회', () => {
     ]);
   });
 
-  test('다른 계정이 같은 브라우저 구독을 써도 다시 받기는 새로 구독하고, 그 계정은 다음 다시 맞추기에서 새 주소를 보낸다', async () => {
+  test('다른 계정이 같은 브라우저 구독을 쓰면 다시 받기는 그 구독을 지우지 않고 다시 써 POST 하고, 그 계정의 구독은 그대로 맞다', async () => {
+    // 지우면 B 가 다시 맞추기 전에 온 B 의 푸시를 푸시 서비스가 410 으로 돌려 서버가 B 의 구독을 지운다(B 는 알림을 잃고 MOVED)
     const t = setup({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
     const bRecord = { subs: [subRecord(W2)], status: [], gone: [] };
     putRaw(t.storage, accountRecordKey(ACCOUNT_B, RECORD.guardianPush), bRecord);
@@ -1670,19 +1707,30 @@ describe('상태 조회', () => {
     assert.equal(t.store.writeGuardianPush({ subs: [subRecord(W1)], status: [movedStatus(W1)], gone: [] }).ok, true);
     assert.equal(await t.runner.takeOver(W1), PUSH_RESULT.ON);
     await t.runner.idle();
-    assert.deepEqual(pick(t.events, ['unsubscribe', 'subscribe', 'POST subscribe']), ['unsubscribe', 'subscribe', 'POST subscribe']);
-    assert.equal(t.server.of('subscribe')[0].body.subscription.endpoint, freshEndpoint(1));
+    assert.deepEqual(pick(t.events, ['unsubscribe', 'subscribe', 'POST subscribe']), ['POST subscribe'], '브라우저 구독을 지우지도 새로 만들지도 않는다');
+    assert.equal(t.browser.current.endpoint, E_EXISTING);
+    assert.equal(t.server.of('subscribe')[0].body.subscription.endpoint, E_EXISTING);
+    assert.equal(t.runner.getState(W1).moved, false);
     assert.deepEqual(readRaw(t.storage, accountRecordKey(ACCOUNT_B, RECORD.guardianPush)), bRecord, '다른 계정 기록은 건드리지 않는다');
-    assert.equal(t.server.of('subscribe').length, 1, '다른 계정의 구독은 이 계정이 다시 POST 하지 않는다');
 
-    // B 로 바꿔 다시 맞추면 그때 상태를 묻고 새 주소로 보낸다
+    // B 로 바꿔 다시 맞춰도 주소가 같아 묻지도 보내지도 않는다(B 의 구독은 그대로 맞다)
     signIn(t.store, t.clock, ACCOUNT_B);
     assert.equal(t.store.writeGuardianCopy('copyB', copyOf({ watchId: W2 })).ok, true);
     assert.equal(t.store.writePrefs({ notifications: true }).ok, true);
     await t.runner.reconcile();
-    assert.deepEqual(t.server.routes().filter((route) => route === 'subscribe' || route === 'status'), ['subscribe', 'status', 'subscribe']);
-    assert.deepEqual([t.server.of('subscribe')[1].body.watchId, t.server.of('subscribe')[1].body.subscription.endpoint], [W2, freshEndpoint(1)]);
-    assert.equal(t.store.readGuardianPush().subs[0].endpointHash, hashOf(freshEndpoint(1)));
+    assert.deepEqual(t.server.routes().filter((route) => route === 'subscribe' || route === 'status'), ['subscribe']);
+    assert.deepEqual(t.store.readGuardianPush().subs, bRecord.subs);
+    const b = t.runner.getState(W2);
+    assert.equal(b.renewNeeded, false);
+    assert.equal(b.moved, false);
+
+    // 함께 쓰는 구독의 키가 설정과 다르면 켜기처럼 갈아 끼운다(그 구독은 어느 계정도 쓸 수 없다)
+    const key = setup({ subs: [subRecord(W1, { vapidKey: VAPID_OLD })], existing: { endpoint: E_EXISTING, key: VAPID_OLD } });
+    putRaw(key.storage, accountRecordKey(ACCOUNT_B, RECORD.guardianPush), bRecord);
+    assert.equal(key.store.writeGuardianPush({ subs: [subRecord(W1, { vapidKey: VAPID_OLD })], status: [movedStatus(W1)], gone: [] }).ok, true);
+    assert.equal(await key.runner.takeOver(W1), PUSH_RESULT.ON);
+    assert.deepEqual(pick(key.events, ['unsubscribe', 'subscribe', 'POST subscribe']), ['unsubscribe', 'subscribe', 'POST subscribe']);
+    assert.equal(key.server.of('subscribe')[0].body.subscription.endpoint, freshEndpoint(1));
   });
 
   test('함께 있음 404 가 틀린 subId(다른 기기가 가져감)이면 GONE 이 아니고 moved 다', async () => {
@@ -2119,8 +2167,38 @@ describe('브라우저 푸시 호출 한도', () => {
     }
   }
 
-  test('한도는 10초이고 주입 타이머로만 건다', () => {
+  test('한도는 10초이고 subscribe 만 30초다(첫 구독은 느릴 수 있다)', () => {
     assert.equal(BROWSER_PUSH_TIMEOUT_MS, 10_000);
+    assert.equal(BROWSER_SUBSCRIBE_TIMEOUT_MS, 30_000);
+  });
+
+  test('subscribe 는 BROWSER_SUBSCRIBE_TIMEOUT_MS 까지 기다린다: 10초 타이머가 없고, 그 안에 끝나면 그 구독으로 POST 하고, 넘기면 FAILED', async () => {
+    const t = setup();
+    const original = t.browser.pushManager.subscribe;
+    let finish = null;
+    t.browser.pushManager.subscribe = (options) =>
+      new Promise((resolve) => {
+        finish = () => resolve(original(options));
+      });
+    const on = t.runner.turnOn(W1);
+    await until(() => finish !== null, 'subscribe 를 부르지 않았다');
+    await settle(10);
+    assert.ok(t.timers.has(BROWSER_SUBSCRIBE_TIMEOUT_MS), 'subscribe 에 30초 한도');
+    assert.equal(t.timers.has(BROWSER_PUSH_TIMEOUT_MS), false, 'subscribe 에 10초 한도가 걸리지 않는다');
+    assert.equal(t.runner.getState(W1).busy, true);
+    finish();
+    assert.equal(await on, PUSH_RESULT.ON);
+    assert.equal(t.server.of('subscribe')[0].body.subscription.endpoint, freshEndpoint(1));
+    assert.equal(t.timers.has(BROWSER_SUBSCRIBE_TIMEOUT_MS), false, '끝난 뒤 남은 한도 타이머가 없다');
+
+    const late = setup();
+    hang(late, 'subscribe');
+    const failed = late.runner.turnOn(W1);
+    await until(() => late.timers.has(BROWSER_SUBSCRIBE_TIMEOUT_MS), '30초 한도가 걸리지 않았다');
+    assert.equal(late.timers.fire(BROWSER_PUSH_TIMEOUT_MS), false);
+    assert.ok(late.timers.fire(BROWSER_SUBSCRIBE_TIMEOUT_MS));
+    assert.equal(await failed, PUSH_RESULT.FAILED);
+    assert.deepEqual(late.server.of('subscribe'), []);
   });
 
   test('끄기: 브라우저 호출이 끝나지 않아도 한도 뒤 서버 해지를 보내고 결과는 늘 하던 대로이며 다음 일이 돈다', async () => {
@@ -2161,11 +2239,13 @@ describe('브라우저 푸시 호출 한도', () => {
     ]) {
       const t = setup();
       hang(t, call);
-      assert.equal(await drive(t.runner.turnOn(W1), t.timers, BROWSER_PUSH_TIMEOUT_MS), result, call);
+      const limit = call === 'subscribe' ? BROWSER_SUBSCRIBE_TIMEOUT_MS : BROWSER_PUSH_TIMEOUT_MS;
+      assert.equal(await drive(t.runner.turnOn(W1), t.timers, limit), result, call);
       assert.deepEqual(t.server.of('subscribe'), [], call);
       assert.equal(t.store.readGuardianPush(), null, call);
       assert.equal(t.runner.getState(W1).busy, false, call);
       assert.equal(t.timers.has(BROWSER_PUSH_TIMEOUT_MS), false, `${call} 끝난 뒤 남은 한도 타이머가 없다`);
+      assert.equal(t.timers.has(BROWSER_SUBSCRIBE_TIMEOUT_MS), false, `${call} 끝난 뒤 남은 구독 한도 타이머가 없다`);
     }
 
     // 키가 다른 구독을 지우는 unsubscribe 가 끝나지 않아도 한도 뒤 새로 구독한다
@@ -2201,7 +2281,7 @@ describe('브라우저 푸시 호출 한도', () => {
     await subscribe.runner.reconcile();
     assert.equal(subscribe.runner.getState(W1).renewNeeded, true);
     hang(subscribe, 'subscribe');
-    assert.equal(await drive(subscribe.runner.renew(), subscribe.timers, BROWSER_PUSH_TIMEOUT_MS), PUSH_RESULT.FAILED);
+    assert.equal(await drive(subscribe.runner.renew(), subscribe.timers, BROWSER_SUBSCRIBE_TIMEOUT_MS), PUSH_RESULT.FAILED);
     assert.equal(subscribe.runner.getState(W1).busy, false);
     assert.deepEqual(subscribe.server.of('subscribe'), []);
 
@@ -2221,7 +2301,7 @@ describe('브라우저 푸시 호출 한도', () => {
     const take = setup({ subs: [subRecord(W1)], existing: { endpoint: E_EXISTING, key: VAPID } });
     assert.equal(take.store.writeGuardianPush({ subs: [subRecord(W1)], status: [movedStatus(W1)], gone: [] }).ok, true);
     hang(take, 'subscribe');
-    assert.equal(await drive(take.runner.takeOver(W1), take.timers, BROWSER_PUSH_TIMEOUT_MS), PUSH_RESULT.FAILED);
+    assert.equal(await drive(take.runner.takeOver(W1), take.timers, BROWSER_SUBSCRIBE_TIMEOUT_MS), PUSH_RESULT.FAILED);
     assert.deepEqual(take.server.of('subscribe'), []);
     assert.equal(take.runner.getState(W1).moved, true, '받지 못했으면 moved 그대로');
   });

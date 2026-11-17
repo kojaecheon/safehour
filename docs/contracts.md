@@ -578,9 +578,10 @@ A-3 보호자 화면과 서비스 워커). 환자 화면은 `GET /api/push/confi
   메시지, URL 경로·쿼리, 알림 `data`에 싣지 않는다. 실행기는 던지지 않는다.
 - 구독과 함께 있음의 실패는 화면 결과(`PUSH_RESULT`)로 옮긴다: 404는 `GONE`(함께 있음은 아래 '404'), 401은 `LOGIN_REQUIRED`,
   429는 `RATE_LIMITED`, 503 `SAFEHOUR_SERVER_PUSH_OFF`는 `OFF`(설정 기억을 버린다), 400은 `FAILED`, 연결 실패는 `NETWORK`, 그 밖은
-  `UNAVAILABLE`이다. 브라우저 구독 호출이 던지거나 10초(`BROWSER_PUSH_TIMEOUT_MS`)를 넘겨도 `FAILED`다.
-- 브라우저 푸시 호출(`getRegistration`, `getSubscription`, `subscribe`, `unsubscribe`)은 하나에 10초까지 주입 타이머로 기다리고
-  (`AbortSignal.timeout`을 쓰지 않는다), 넘기면 그 호출이 실패한 것으로 본다. 준비 확인의 등록 읽기가 넘기면 `SW_NOT_READY`, 다시
+  `UNAVAILABLE`이다. 브라우저 구독 호출이 던지거나 한도(구독 읽기 10초 `BROWSER_PUSH_TIMEOUT_MS`, 구독 30초
+  `BROWSER_SUBSCRIBE_TIMEOUT_MS`)를 넘겨도 `FAILED`다.
+- 브라우저 푸시 호출(`getRegistration`, `getSubscription`, `unsubscribe`)은 하나에 10초, `subscribe`는 30초(첫 구독은 푸시 서비스
+  등록을 거쳐 느릴 수 있다)까지 주입 타이머로 기다리고(`AbortSignal.timeout`을 쓰지 않는다), 넘기면 그 호출이 실패한 것으로 본다. 준비 확인의 등록 읽기가 넘기면 `SW_NOT_READY`, 다시
   맞추기가 브라우저 구독을 읽지 못하면 판단하지 않는다. 끄기는 `unsubscribe`가 넘겨도 서버 해지를 그대로 보낸다.
 
 **설정 읽기** (`GET /api/push/config`)
@@ -612,8 +613,11 @@ A-3 보호자 화면과 서비스 워커). 환자 화면은 `GET /api/push/confi
 - 다시 받기는 고르지 않는다: 있는 구독을 지우고 새로 만든 뒤 `POST`한다(다시 켜기와 같다). `MOVED`는 이 휴대폰의 주소 만료(서버가
   410 뒤 구독을 지움)일 수 있어 같은 주소로 다시 보내면 다음 푸시에서 또 `MOVED`다. 있는 구독을 읽지 못하면 없는 것으로 보고 새로
   구독한다. 새 구독이 받아들여지면 이 계정의 다시 `POST` 시도 기록을 비우고, 이 계정에 다른 구독이 있으면 다시 맞추기를 건다(그 구독들은
-  지운 옛 주소를 가리킨다). 같은 브라우저 구독을 쓰던 다른 계정의 구독은 그 계정으로 다시 맞출 때 새 주소로 다시 보낸다(실행기는 다른
-  계정의 기록을 다시 맞추지 않는다).
+  지운 옛 주소를 가리킨다).
+- 단 이 기기의 다른 계정이 브라우저 구독을 쓰면(`store.guardianPushElsewhere()`, 잠금 안에서 본다) 다시 받기는 지우지 않고 켜기처럼
+  고른다(같은 키면 함께 쓰는 구독을 다시 써 `POST`한다). 지우면 그 계정이 다시 맞추기 전에 온 그 계정의 푸시를 푸시 서비스가 410으로
+  돌려 서버가 그 계정의 구독을 지우고, 그 알림은 사라진다. 그래서 함께 쓰는 구독이 만료였다면 다시 받기 뒤에도 다시 `MOVED`가 될 수
+  있고, 그때 보호자는 '다시 켜기'나 끄고 다시 켜기가 필요하다(받아들인 틈).
 - 본문은 `{ watchId, subscription: { endpoint, keys: { p256dh, auth } }, lang }`이고 `lang`은 지금 화면 언어다. 성공하면 기록에
   `{ watchId, subId, lang, endpointHash, vapidKey }`를 넣고(`endpointHash`는 `endpoint`의 SHA-256, 채움 없는 base64url 43자) 그
   지켜보기의 오늘 상태를 활성으로 둔다. `endpoint` 원문과 두 키는 기록에 두지 않는다.
@@ -649,7 +653,8 @@ A-3 보호자 화면과 서비스 워커). 환자 화면은 `GET /api/push/confi
 - 다시 `POST`할 지켜보기마다 같은 일 안에서 먼저 상태를 묻는다(`POST /api/watch/status`, 2분 간격을 보지 않는다). 그다음 기록을 다시
   읽어 계획을 다시 세우고, 아직 다시 보낼 것일 때만 보낸다. `subscriptionActive`가 거짓이면 `MOVED`라 보내지 않고, 404면 `GONE`이다.
   조회가 실패하면(연결 실패, 5xx, 429, 401, 503 꺼짐) 그 지켜보기는 이번에 보내지 않고 시도로 세지도 않는다: 다음 다시 맞추기가 다시
-  묻는다. 다른 휴대폰이 다시 받기로 가져간 것을 모른 채 다시 보내 되찾지 않게 한다.
+  묻는다. 단 그 지켜보기의 마지막 조회가 2분(`STATUS_MIN_GAP_MS`) 안에 실패했으면 다시 맞추기는 묻지도 보내지도 않는다(429에
+  다시 맞추기마다 조회를 되풀이하지 않는다). 다른 휴대폰이 다시 받기로 가져간 것을 모른 채 다시 보내 되찾지 않게 한다.
 
 **404**
 
