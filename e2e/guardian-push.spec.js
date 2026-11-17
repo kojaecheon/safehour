@@ -337,7 +337,7 @@ test.describe('서버 알림 보호자 쪽 (A-3)', () => {
     await expectClean(page, urls, idsOf(stub, [watchId]));
   });
 
-  test('subscriptionActive 거짓이면 다시 받기 버튼이 있고 누르면 구독 요청이 다시 간다', async ({ page }) => {
+  test('subscriptionActive 거짓이면 다시 받기 버튼이 있고 누르면 브라우저 구독을 새로 만들어 구독 요청이 다시 간다', async ({ page }) => {
     const { stub, urls, watchId } = await openWithPush(page);
     await turnOnPush(page, stub);
     const [first] = stub.subIds;
@@ -357,18 +357,32 @@ test.describe('서버 알림 보호자 쪽 (A-3)', () => {
     expect(stub.sent('POST', SUBSCRIBE)).toHaveLength(1);
 
     stub.set({ status: { subscriptionActive: true } });
-    const subscribes = subscribeOps(await pushCalls(page)).length;
+    const before = (await pushCalls(page)).length;
     await takeOver.click();
     await expect(item(page)).toContainText(ko('guardian.pushOn'));
     await expect(item(page)).not.toContainText(ko('guardian.pushMoved'));
     // 누른 버튼이 사라지면 포커스는 항목의 켜기 스위치로 간다
     await expect(pushSwitch(page)).toBeFocused();
+    // MOVED 는 주소 만료일 수 있어 이 브라우저 구독을 다시 쓰지 않는다: 지우고 새로 구독해 POST 한다(다시 켜기와 같다)
+    const ops = (await pushCalls(page)).slice(before);
+    expect(ops).toEqual([
+      { op: 'unsubscribe', endpoint: STUB_PUSH_ENDPOINT },
+      { op: 'subscribe', userVisibleOnly: true, key: STUB_VAPID_KEY },
+    ]);
     const posts = stub.sent('POST', SUBSCRIBE);
     expect(posts).toHaveLength(2);
-    expect(posts[1].body).toEqual(posts[0].body);
-    await expect.poll(async () => (await subsOf(page)).map((sub) => sub.subId)).toEqual([stub.subIds[1]]);
-    // 이 브라우저 구독(같은 주소·같은 키)을 다시 쓴다
-    expect(subscribeOps(await pushCalls(page))).toHaveLength(subscribes);
+    expect(posts[1].body.subscription.endpoint).toBe(`${STUB_PUSH_ENDPOINT}-2`);
+    await expect
+      .poll(() => subsOf(page))
+      .toEqual([
+        {
+          watchId,
+          subId: stub.subIds[1],
+          lang: 'ko',
+          endpointHash: endpointHash(`${STUB_PUSH_ENDPOINT}-2`),
+          vapidKey: STUB_VAPID_KEY,
+        },
+      ]);
     // 옛 subId 는 해지 대기를 거쳐 서버로 간다
     await expect.poll(() => stub.sent('DELETE', SUBSCRIBE).map((c) => c.body)).toContainEqual({ watchId, subId: first });
     await expectClean(page, urls, idsOf(stub, [watchId]));

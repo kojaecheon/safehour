@@ -58,6 +58,11 @@
   다시 맞추기와 상태 조회 시각 `guardianPushPlan.js`(`planReconcile`, `statusTimes`). 동작은 약속 줄 하나에 한 번에 하나씩 돌고
   (같은 기기의 탭 사이에서도: Web Locks `safehour-guardian-push` 안에서 기록을 다시 읽어 정하고 60초까지만 붙잡는다. 없으면 탭
   안에서만), 같은 지켜보기의 동작이 도는 중이면 그 약속을 돌려준다(`getState(watchId).busy`). 기다린 뒤의 기록 쓰기는 `store.updateGuardianPush`만 쓴다.
+  줄의 일은 잠금을 얻은 뒤 시작하기 전에 `store.recheckAccount()`를 부른다(다른 탭의 계정 바뀜, `lib/trip/watchSync.js`와 같다).
+  브라우저 푸시 호출(`getRegistration`, `getSubscription`, `subscribe`, `unsubscribe`)은 하나에 `BROWSER_PUSH_TIMEOUT_MS`(10초)까지
+  주입 타이머로 기다리고 넘기면 그 호출의 실패다(`AbortSignal.timeout`을 쓰지 않는다). 다시 맞추기는 다시 `POST` 전에 그 지켜보기의
+  상태를 먼저 묻고(조회가 실패하면 이번에는 보내지 않는다) 기록을 다시 읽어 정한다. 다시 받기는 있는 브라우저 구독을 지우고 새로
+  구독해 `POST`한다(다시 켜기와 같다).
   요청 규칙은 `docs/contracts.md` 'A-3 클라이언트가 지키는 것'. 요청 간격(`CONFIG_TTL_MS`, `STATUS_POLL_MS` 등)은 알림 시점이 아니라
   실행기 상수다. 상태 조회의 마감 뒤 시각은 기본값 파일의 `serverPushGraceMin`을 읽는다(마감 + 11분).
 
