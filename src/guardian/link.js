@@ -68,11 +68,28 @@ export async function measureGuardianLink(snapshot, { origin } = {}) {
   };
 }
 
+const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+/**
+ * 암호문 끝이 패딩 없는 정규 base64url 인가. 암호문은 crypto.js toBase64Url(btoa)이 만들어 남는 비트가 0 이다:
+ * 길이를 4로 나눈 나머지 2 는 끝 글자 값의 아래 4비트가 0(A·Q·g·w), 나머지 3 은 아래 2비트가 0, 나머지 1 은 길이가 될 수 없다
+ */
+function hasCanonicalTail(fragment) {
+  const rest = fragment.length % 4;
+  if (rest === 0) return true;
+  if (rest === 1) return false;
+  const value = BASE64URL_ALPHABET.indexOf(fragment[fragment.length - 1]);
+  return value >= 0 && (value & (rest === 2 ? 0b1111 : 0b11)) === 0;
+}
+
 /**
  * 보호자 링크 또는 `location.hash` 에서 암호문을 꺼낸다.
  * - 절대 URL: http(s) 이고 경로가 `/g`(또는 `/g/`)일 때 # 뒤만 읽는다. 쿼리(예: 메신저가 붙인 utm)는 무시한다.
  * - `#...` 문자열: # 뒤를 읽는다.
  * - 그 밖(경로·쿼리에 암호문, # 없음, 형식이 틀린 암호문)은 null.
+ * - 끝이 정규 base64url 이 아니면(남는 비트가 0 이 아니면) null. atob 는 남는 비트를 버려 끝 글자만 다른 여러 글이 같은 바이트로
+ *   풀리는데, PIN 잠금 키는 암호문 글(SHA-256)마다 따로라 그런 글마다 잠금 횟수가 새로 시작된다. 링크를 만드는 쪽(toBase64Url)은
+ *   늘 정규 끝이라 진짜 링크는 모두 받는다. 붙여넣기(fragmentFromPasted)도 같은 검사(hasCanonicalTail)를 쓴다.
  * @param {string} input
  * @returns {string|null}
  */
@@ -93,7 +110,7 @@ export function parseGuardianLink(input) {
     if (url.pathname !== GUARDIAN_PATH && url.pathname !== `${GUARDIAN_PATH}/`) return null;
     fragment = url.hash.startsWith('#') ? url.hash.slice(1) : '';
   }
-  return isGuardianFragment(fragment) ? fragment : null;
+  return isGuardianFragment(fragment) && hasCanonicalTail(fragment) ? fragment : null;
 }
 
 /** 붙여넣기 칸이 받는 글 길이 상한(UTF-16 단위, 입력란 maxLength 와 같은 값). 7일 최악 크기 링크(6,538자)가 넉넉히 든다 */
@@ -111,25 +128,12 @@ const TRAILING_MARKS = new Set([...'.,;:!?\'")]}>*~']);
 const LEADING_MARKS = new Set(['*', '_', '~']);
 /** 토큰 뒤가 줄바꿈과 긴 base64url 덩어리로 이어진다: 링크가 줄바꿈에서 끊겼다(앞 조각은 다른 암호문이거나 잘린 암호문이다) */
 const BROKEN_LINK_REST_RE = /^[\r\n]+[A-Za-z0-9_-]{16,}(?:\s|$)/;
-const BASE64URL_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 /** 끝의 PIN 모양: ASCII 숫자가 아닌 글자 뒤에 PIN 자리 수(crypto.js PIN_LENGTH, ASCII 숫자)만큼의 숫자 */
 const PIN_TAIL_RE = new RegExp(`[^0-9][0-9]{${PIN_LENGTH}}$`);
 /** 링크와 PIN 사이에 끼어도 암호문 글자로 읽히는 base64url 글자 */
 const PIN_JOINERS = new Set(['-', '_']);
 /** PIN 앞에서 떼어 보는 이음 글자 수의 상한. 0~3 개를 떼어 보면 앞부분 길이의 나머지 넷을 모두 덮는다 */
 const MAX_PIN_JOINERS = 3;
-
-/**
- * 암호문 끝이 패딩 없는 정규 base64url 인가. 암호문은 crypto.js toBase64Url(btoa)이 만들어 남는 비트가 0 이다:
- * 길이를 4로 나눈 나머지 2 는 끝 글자 값의 아래 4비트가 0(A·Q·g·w), 나머지 3 은 아래 2비트가 0, 나머지 1 은 길이가 될 수 없다
- */
-function hasCanonicalTail(fragment) {
-  const rest = fragment.length % 4;
-  if (rest === 0) return true;
-  if (rest === 1) return false;
-  const value = BASE64URL_ALPHABET.indexOf(fragment[fragment.length - 1]);
-  return value >= 0 && (value & (rest === 2 ? 0b1111 : 0b11)) === 0;
-}
 
 /**
  * 끝에 PIN 이 붙은 암호문으로 보이는가: 끝의 PIN 모양 숫자를 떼어 낸 앞부분, 또는 그 앞부분 끝의 - · _ 를 1~3개 더 떼어 낸 것이
@@ -207,7 +211,8 @@ function trimLinkToken(token, before) {
  * 이음 글자를 뗀 앞부분)에 걸린다.
  * 알려진 한계: PIN 없이 링크 끝에 붙은 - · _ 가 길이를 나머지 0 으로 맞추면(나머지 3 암호문 뒤 하나, 나머지 2 암호문 뒤 둘 등)
  * 다른 정규 암호문이 되어 떼지 못한다. 그 링크는 PIN 이 맞지 않는다고만 나온다(PIN 은 임시 보관에 닿지 않는다).
- * isGuardianFragment 의 계약(형식만 본다)은 그대로 둔다: 주소의 # 뒤·복호화·잠금이 같은 함수를 쓴다.
+ * isGuardianFragment 의 계약(형식만 본다)은 그대로 둔다: 복호화와 잠금이 같은 함수를 쓴다. 정규 끝 검사는 parseGuardianLink(주소의
+ * # 뒤, 링크 전체)와 이 함수(# 없는 암호문)가 같은 hasCanonicalTail 로 한다.
  * 경로·쿼리에 실린 값은 parseGuardianLink 처럼 받아들이지 않는다. 글은 기기 밖으로 보내지 않는다(호출하는 화면의 몫).
  * @param {string} text
  * @returns {string|null}

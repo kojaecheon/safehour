@@ -627,7 +627,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
 | `guardian.muteOn` | 오늘은 서버 알림을 보내지 않아요. | No server alerts today. |
 | `guardian.muteOff` | 오늘 서버 알림을 다시 받아요. | Server alerts are back on for today. |
 | `guardian.muteFailed` | 오늘 함께 있음을 바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요. | Couldn't change “Together today”. Please try again in a little while. |
-| `guardian.confirmedTag` | 복귀 확인 | Tapped “I’m back” |
+| `guardian.confirmedTag` | '돌아왔어요' 누름 | Tapped “I’m back” |
 | `guardian.confirmedHelp` | 환자가 '돌아왔어요'를 눌렀어요. 앱은 위치를 모르기 때문에 실제로 돌아왔는지는 알 수 없어요. 걱정되면 환자에게 직접 연락해 주세요. | The patient tapped “I’m back”. The app does not know their location, so it cannot tell whether they are actually back. If you are worried, contact the patient directly. |
 | `guardian.statusAsOf` | {time}에 서버에서 확인한 내용이에요. | As checked with the server at {time}. |
 

@@ -330,6 +330,32 @@ test.describe('서버 알림 보호자 쪽 (A-3)', () => {
     await expect(article.locator('.guardian-status-asof')).toHaveText(asOf);
     await expect(card).toContainText(ko('guardian.confirmedTag'));
     await expect(card).not.toContainText(ko('guardian.overdueTag'));
+    // 320px 에서도 꼬리표(한국어 "'돌아왔어요' 누름", 검토 L2)가 한 줄로 줄과 카드 안에 들고 가로 스크롤이 없다
+    await page.setViewportSize({ width: 320, height: 780 });
+    await expectNoHorizontalScroll(page, '복귀 확인 꼬리표 320px');
+    for (const [name, scope] of [
+      ['줄', row],
+      ['카드', card],
+    ]) {
+      const tag = scope.locator('.guardian-tag.is-confirmed');
+      await expect(tag, name).toHaveText(ko('guardian.confirmedTag'));
+      const [tagBox, scopeBox] = [await tag.boundingBox(), await scope.boundingBox()];
+      expect(tagBox.x, name).toBeGreaterThanOrEqual(scopeBox.x);
+      expect(tagBox.x + tagBox.width, name).toBeLessThanOrEqual(scopeBox.x + scopeBox.width + 0.5);
+      // 글자 줄 수(아이콘은 빼고 글자 노드만 잰다)
+      const lines = await tag.evaluate((el) => {
+        const tops = new Set();
+        for (const node of el.childNodes) {
+          if (node.nodeType !== Node.TEXT_NODE || !node.textContent.trim()) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) if (rect.width > 0) tops.add(Math.round(rect.top));
+        }
+        return tops.size;
+      });
+      expect(lines, `${name} 한 줄`).toBe(1);
+    }
+    await page.setViewportSize({ width: 360, height: 780 });
     // 긴급 절(119·1330)은 상태 조회와 무관하게 그대로다
     const emergency = page.locator('section.guardian-emergency');
     await expect(emergency.locator('a[href="tel:119"]')).toBeVisible();

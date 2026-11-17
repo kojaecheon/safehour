@@ -37,6 +37,7 @@ import { messages as guardianMessages, safety as guardianSafety } from '../src/i
 import { UI_TEXT } from '../src/i18n/messages/index.js';
 import { LANGS } from '../src/i18n/index.js';
 import { messages as todayMessages } from '../src/i18n/messages/today.js';
+import { messages as tripMessages } from '../src/i18n/messages/trip.js';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const WATCH = 'AAAAAAAAAAAAAAAAAAAAAA';
@@ -845,9 +846,11 @@ describe('문구 (Global Constraints, 정한 값 25)', () => {
     }
   });
 
-  test('복귀 확인 꼬리표는 누른 사실만 말한다(검토 I2): 영어·일본어·중국어는 돌아왔다고 단정하지 않는다', () => {
+  test('복귀 확인 꼬리표는 누른 사실만 말한다(검토 I2, L2): 네 언어 모두 돌아왔다고 단정하지 않는다', () => {
     const tag = guardianMessages['guardian.confirmedTag'];
-    assert.equal(tag.ko, '복귀 확인');
+    assert.equal(tag.ko, "'돌아왔어요' 누름");
+    assert.ok(tag.ko.includes(tripMessages['return.back'].ko), '환자 화면 버튼 이름 그대로다');
+    assert.doesNotMatch(tag.ko, /확인/);
     assert.equal(tag.en, 'Tapped “I’m back”');
     assert.equal(tag.ja, '「戻りました」の連絡あり');
     assert.equal(tag.zh, '已点“我已返回”');

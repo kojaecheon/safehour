@@ -53,7 +53,9 @@
   돌려준다. 공백·줄바꿈을 건너 이어 붙이지 않고, 보이지 않는 글자를 지우며, 글 길이 상한은 `PASTE_MAX_CHARS`(32,768자, 입력란
   `maxLength`와 같다)다. PIN이 붙은 글은 `null`이다: 꺼낸 암호문의 끝이 정규 base64url 끝이 아니거나, 끝이 PIN 모양(숫자가 아닌 글자 뒤
   6자리 숫자)이고 그 앞부분에서 끝의 이음 글자(`-`·`_`)를 0개부터 3개(`MAX_PIN_JOINERS`)까지 떼어 본 것 가운데 정규 암호문이 있으면
-  받지 않는다(`hasCanonicalTail`, `endsWithPin`). 링크 주소의 `#` 뒤를 읽는 `isGuardianFragment` 계약은 바꾸지 않는다. 알려진 한계(링크 뒤에 붙은 `-`·`_`가 다른 정규
+  받지 않는다(`hasCanonicalTail`, `endsWithPin`). 주소창의 `#` 뒤와 링크 전체를 읽는 `parseGuardianLink`도 끝이 정규가 아니면 `null`이다
+  (같은 `hasCanonicalTail`): `atob`는 남는 비트를 버려 끝 글자만 다른 글이 같은 바이트로 풀리는데, PIN 잠금 키는 암호문 글마다 따로라
+  그런 글마다 잠금 횟수가 새로 시작된다. 형식만 보는 `isGuardianFragment` 계약은 바꾸지 않는다. 알려진 한계(링크 뒤에 붙은 `-`·`_`가 다른 정규
   암호문이 되는 경우)는 `docs/engineering-notes.md` '링크 뒤에 붙은 `-`·`_`가 다른 암호문이 될 수 있다'.
 
 ## 구현 방식
